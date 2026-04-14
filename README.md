@@ -17,6 +17,7 @@ my-skills/
 │   ├── baoyu-skills/                          # 宝玉中文技能
 │   ├── claude-plugins-official/               # Anthropic 插件技能
 │   └── axton-obsidian-visual-skills/          # Obsidian 可视化技能
+│   └── kepano-obsidian-skills/                 # Obsidian 官方 CLI/Canvas 技能
 ├── update.sh / update.bat                     # 同步外部技能源
 ├── pull.sh / pull.bat                         # 拉取远端覆盖本地
 └── push.sh / push.bat                         # 提交推送
@@ -40,6 +41,7 @@ my-skills/
 | `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills) | 宝玉的中文技能 |
 | `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) | Anthropic 官方插件技能 |
 | `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills) | Obsidian 可视化技能 |
+| `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 Markdown/Bases/Canvas/CLI 技能 |
 
 ## 一键脚本
 

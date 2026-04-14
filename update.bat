@@ -102,6 +102,18 @@ if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
 )
 echo.
 
+:: --- kepano/obsidian-skills ---
+echo ^>^> [kepano-obsidian-skills] Cloning...
+git clone --depth 1 --branch main https://github.com/kepano/obsidian-skills.git "%TMP_DIR%\kepano-obsidian-skills" 2>nul
+if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
+    echo     Copying skills...
+    xcopy /e /i /y /q "%TMP_DIR%\kepano-obsidian-skills\skills" "%REPO_ROOT%\external\kepano-obsidian-skills\" >nul
+    echo     Done
+) else (
+    echo     ERROR: Failed to clone or skills dir not found
+)
+echo.
+
 :: Cleanup
 rmdir /s /q "%TMP_DIR%" 2>nul
 

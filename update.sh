@@ -14,6 +14,7 @@ SOURCES=(
     "claude-plugins-official|https://github.com/anthropics/claude-plugins-official.git|main|."
     "axton-obsidian-visual-skills|https://github.com/axtonliu/axton-obsidian-visual-skills.git|main|."
     "baoyu-skills|https://github.com/JimLiu/baoyu-skills.git|main|skills"
+    "kepano-obsidian-skills|https://github.com/kepano/obsidian-skills.git|main|skills"
 )
 
 # 不合并的 skill 名称（排除低质量或不需要的）
