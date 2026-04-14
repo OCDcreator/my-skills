@@ -23,7 +23,7 @@ echo ^>^> [anthropics-skills] Cloning...
 git clone --depth 1 --branch main https://github.com/anthropics/skills.git "%TMP_DIR%\anthropics-skills" 2>nul
 if exist "%TMP_DIR%\anthropics-skills\skills" (
     echo     Copying skills...
-    xcopy /e /i /y /q "%TMP_DIR%\anthropics-skills\skills" "%REPO_ROOT%\anthropics-skills\" >nul
+    xcopy /e /i /y /q "%TMP_DIR%\anthropics-skills\skills" "%REPO_ROOT%\external\anthropics-skills\" >nul
     echo     Done
 ) else (
     echo     ERROR: Failed to clone or skills dir not found
@@ -38,7 +38,7 @@ if exist "%TMP_DIR%\awesome-claude-skills" (
     :: Copy root-level skill directories (those with SKILL.md)
     for /d %%d in ("%TMP_DIR%\awesome-claude-skills\*") do (
         if exist "%%d\SKILL.md" (
-            xcopy /e /i /y /q "%%d" "%REPO_ROOT%\awesome-claude-skills\%%~nxd\" >nul 2>nul
+            xcopy /e /i /y /q "%%d" "%REPO_ROOT%\external\awesome-claude-skills\%%~nxd\" >nul 2>nul
         )
     )
     echo     Done
@@ -56,7 +56,7 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
     for /d %%p in ("%TMP_DIR%\claude-plugins-official\plugins\*") do (
         for /d %%s in ("%%p\skills\*") do (
             if exist "%%s\SKILL.md" (
-                xcopy /e /i /y /q "%%s" "%REPO_ROOT%\claude-plugins-official\%%~nxs\" >nul 2>nul
+                xcopy /e /i /y /q "%%s" "%REPO_ROOT%\external\claude-plugins-official\%%~nxs\" >nul 2>nul
             )
         )
     )
@@ -64,7 +64,7 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
     for /d %%p in ("%TMP_DIR%\claude-plugins-official\external_plugins\*") do (
         for /d %%s in ("%%p\skills\*") do (
             if exist "%%s\SKILL.md" (
-                xcopy /e /i /y /q "%%s" "%REPO_ROOT%\claude-plugins-official\%%~nxs\" >nul 2>nul
+                xcopy /e /i /y /q "%%s" "%REPO_ROOT%\external\claude-plugins-official\%%~nxs\" >nul 2>nul
             )
         )
     )
@@ -79,7 +79,7 @@ echo ^>^> [baoyu-skills] Cloning...
 git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills" 2>nul
 if exist "%TMP_DIR%\baoyu-skills\skills" (
     echo     Copying skills...
-    xcopy /e /i /y /q "%TMP_DIR%\baoyu-skills\skills" "%REPO_ROOT%\baoyu-skills\" >nul
+    xcopy /e /i /y /q "%TMP_DIR%\baoyu-skills\skills" "%REPO_ROOT%\external\baoyu-skills\" >nul
     echo     Done
 ) else (
     echo     ERROR: Failed to clone or skills dir not found
@@ -93,7 +93,7 @@ if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
     echo     Copying skills...
     for /d %%d in ("%TMP_DIR%\axton-obsidian-visual-skills\*") do (
         if exist "%%d\SKILL.md" (
-            xcopy /e /i /y /q "%%d" "%REPO_ROOT%\axton-obsidian-visual-skills\%%~nxd\" >nul 2>nul
+            xcopy /e /i /y /q "%%d" "%REPO_ROOT%\external\axton-obsidian-visual-skills\%%~nxd\" >nul 2>nul
         )
     )
     echo     Done

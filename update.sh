@@ -72,7 +72,7 @@ for source in "${SOURCES[@]}"; do
         done
         $skip && continue
 
-        dest="$REPO_ROOT/$prefix/$skill_name"
+        dest="$REPO_ROOT/external/$prefix/$skill_name"
         rm -rf "$dest"
         cp -r "$skill_dir" "$dest"
 
