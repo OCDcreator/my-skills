@@ -1,0 +1,23 @@
+{
+  "skill_name": "opencode-provider-config",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just set up a custom provider in cc-Switch for OpenCode using the OpenAI-compatible endpoint. The provider ID is 'my-custom-llm' and it has two models: 'my-model-8b' and 'my-model-32b'. The API is at https://api.myprovider.com/v1. The problem is OpenCode doesn't know the context window size for these models, so it can't manage context properly. The 8B model has a 32K context window and 4K output. The 32B model has 128K context and 16K output. Both support tool calling and temperature. The 32B model supports reasoning. Can you help me configure the complete parameters?",
+      "expected_output": "The skill should: (1) find the provider in cc-Switch database, (2) query current settings_config, (3) update the config with limit (context/output), reasoning, temperature, toolcall fields for both models, (4) provide the SQL UPDATE statement, (5) explain how to sync to opencode.json",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I want to add DeepSeek as a provider in cc-Switch for OpenCode. I have an API key. The models I want are deepseek-chat (V3.2) and deepseek-reasoner (R1). I want to see the cost information too so I can track spending. Can you set this up with all the correct parameters?",
+      "expected_output": "The skill should: (1) look up DeepSeek model parameters from the reference file (context, output, reasoning, cost in USD), (2) construct the complete settings_config JSON with all fields including cost, (3) provide the SQL to insert/update the provider in cc-Switch database, (4) warn about setCacheKey not being needed for DeepSeek",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我在 cc-switch 里配置了一个智谱 GLM Coding Plan 的 provider，模型只有 name 没有 limit，opencode 读不到上下文窗口大小。provider ID 是 zhipu-coding，API 地址是 https://open.bigmodel.cn/api/coding/paas/v4，有 glm-5.1、glm-5-turbo、glm-4.7、glm-4.6v 这几个模型。帮我补全参数，包括 cost。",
+      "expected_output": "The skill should: (1) find the provider in the database, (2) look up Zhipu GLM parameters from the reference (correct context/output for each model), (3) include reasoning/attachment/interleaved capabilities (glm-4.6v has attachment=true), (4) include cost converted to USD from CNY official pricing, (5) NOT include setCacheKey (Zhipu handles caching automatically), (6) provide the SQL UPDATE statement",
+      "files": []
+    }
+  ]
+}
