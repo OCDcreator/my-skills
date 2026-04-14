@@ -8,7 +8,4 @@ git fetch origin
 echo ">>> 覆盖本地..."
 git reset --hard origin/main
 
-echo ">>> 更新 submodule..."
-git submodule update --init --recursive
-
 echo ">>> 完成"
