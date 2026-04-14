@@ -73,9 +73,8 @@ for source in "${SOURCES[@]}"; do
         $skip && continue
 
         dest="$REPO_ROOT/$prefix/$skill_name"
-        mkdir -p "$dest"
-        cp -r "$skill_dir/"* "$dest/" 2>/dev/null
-        cp "$skill_dir/SKILL.md" "$dest/" 2>/dev/null
+        rm -rf "$dest"
+        cp -r "$skill_dir" "$dest"
 
         copied=$((copied + 1))
     done < <(find "$search_path" -name "SKILL.md" -exec dirname {} \; -print0 | sort -z -u)
