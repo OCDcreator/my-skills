@@ -60,7 +60,7 @@ for source in "${SOURCES[@]}"; do
     fi
 
     copied=0
-    while IFS= read -r -d '' skill_dir; do
+    while IFS= read -r skill_dir; do
         skill_name="$(basename "$skill_dir")"
 
         skip=false
@@ -77,7 +77,7 @@ for source in "${SOURCES[@]}"; do
         cp -r "$skill_dir" "$dest"
 
         copied=$((copied + 1))
-    done < <(find "$search_path" -name "SKILL.md" -exec dirname {} \; -print0 | sort -z -u)
+    done < <(find "$search_path" -name "SKILL.md" -exec dirname {} \; | sort -u)
 
     total_copied=$((total_copied + copied))
     echo "    Copied $copied skills"
