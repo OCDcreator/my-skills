@@ -1,0 +1,185 @@
+{
+  "skill_name": "liquid-glass-compose",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm building an Android app using Kotlin Compose Multiplatform. I want to add a frosted glass / glassmorphism effect to my bottom navigation bar. The nav bar should float at the bottom center as a pill/capsule shape, with blur behind it so content scrolls underneath. I need dark mode and light mode support. Please generate all necessary Kotlin files with complete working code.",
+      "expected_output": "Complete Kotlin implementation with liquid library dependency, LiquidState management, liquefiable/liquid modifiers, dark/light theme parameter tables, glass indicator drawBehind code, and platform compatibility fallback",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output includes liquid library dependency (io.github.fletchmckee.liquid)",
+          "type": "contains",
+          "value": "io.github.fletchmckee.liquid"
+        },
+        {
+          "text": "Output includes rememberLiquidState() or LiquidState creation",
+          "type": "contains",
+          "value": "rememberLiquidState"
+        },
+        {
+          "text": "Output includes liquefiable modifier usage",
+          "type": "contains",
+          "value": "liquefiable"
+        },
+        {
+          "text": "Output includes .liquid() modifier with frost parameter",
+          "type": "contains",
+          "value": "frost"
+        },
+        {
+          "text": "Output includes dark/light theme parameter variation",
+          "type": "contains",
+          "value": "isDarkTheme"
+        },
+        {
+          "text": "Output includes CircleShape for capsule navigation bar",
+          "type": "contains",
+          "value": "CircleShape"
+        },
+        {
+          "text": "Output includes platform compatibility fallback (expect/actual or API level check)",
+          "type": "contains",
+          "value": "isLiquidFrostAvailable"
+        },
+        {
+          "text": "Output includes CompositionLocal for LiquidState distribution",
+          "type": "contains",
+          "value": "compositionLocalOf"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I have a Compose Multiplatform app and I want to create a glass-style tab bar at the top of my screen, similar to Apple's liquid glass effect. It should show categories like 'Trending', 'Popular', 'New' and have a glowing pill indicator that slides between them. The whole bar should be translucent with blur. How do I implement this?",
+      "expected_output": "Complete LiquidGlassCategoryChips composable with liquid modifier, animated pill indicator using drawBehind, glass color definitions, and dark/light theme support",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output includes liquid modifier with glass parameters (frost, refraction, etc.)",
+          "type": "contains",
+          "value": "frost"
+        },
+        {
+          "text": "Output includes drawBehind for glass indicator",
+          "type": "contains",
+          "value": "drawBehind"
+        },
+        {
+          "text": "Output includes specular highlight or gradient glass effect",
+          "type": "contains",
+          "value": "specular"
+        },
+        {
+          "text": "Output includes Animated indicator with spring physics",
+          "type": "contains",
+          "value": "spring"
+        },
+        {
+          "text": "Output includes RoundedCornerShape for filter chips container",
+          "type": "contains",
+          "value": "RoundedCornerShape"
+        },
+        {
+          "text": "Output includes dark/light theme glass color definitions",
+          "type": "contains",
+          "value": "isDarkTheme"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "我在做一个KMP项目，想给整个应用添加毛玻璃效果——底部导航栏和顶部标签栏都需要。我需要知道怎么配置这个 liquid 库、怎么管理状态、以及怎么让内容在玻璃面板后面正确地模糊显示。",
+      "expected_output": "Complete setup guide covering dependency configuration, LiquidState creation and CompositionLocal distribution, liquefiable content registration pattern, and integration of both bottom nav and top filter chips with glass effects",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output includes liquid library dependency in gradle version catalog format",
+          "type": "contains",
+          "value": "io.github.fletchmckee.liquid"
+        },
+        {
+          "text": "Output explains separate LiquidState per glass panel",
+          "type": "contains",
+          "value": "rememberLiquidState"
+        },
+        {
+          "text": "Output includes liquefiable modifier for background content",
+          "type": "contains",
+          "value": "liquefiable"
+        },
+        {
+          "text": "Output includes CompositionLocalProvider pattern",
+          "type": "contains",
+          "value": "CompositionLocalProvider"
+        },
+        {
+          "text": "Output covers both bottom nav and top bar integration",
+          "type": "contains",
+          "value": "bottom"
+        },
+        {
+          "text": "Output includes Android API 33+ compatibility check",
+          "type": "contains",
+          "value": "TIRAMISU"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I'm working on a KMP app and want to add a glassmorphism effect to a BottomSheet and a Dialog component. The sheet/dialog should blur the content behind it with a frosted glass look. Is this possible with the liquid library? How would I set it up?",
+      "expected_output": "Explanation of how to apply liquid glass to BottomSheet/Dialog surfaces, with LiquidState setup for modal surfaces, liquefiable content behind the modal, and fallback behavior",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output mentions applying liquid glass to modal/sheet surfaces",
+          "type": "contains",
+          "value": "liquid"
+        },
+        {
+          "text": "Output includes liquefiable for content behind the modal",
+          "type": "contains",
+          "value": "liquefiable"
+        },
+        {
+          "text": "Output includes frost/blur parameter configuration",
+          "type": "contains",
+          "value": "frost"
+        },
+        {
+          "text": "Output addresses the modal overlay use case specifically",
+          "type": "contains",
+          "value": "BottomSheet"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I want to use the liquid glass effect on my Compose Multiplatform app, but I need to support Android API 26+ devices. How do I handle devices that don't support the RuntimeShader-based blur? Show me a complete fallback strategy.",
+      "expected_output": "Complete expect/actual platform check, graceful degradation to opaque background with border, and conditional modifier chain that toggles between glass and fallback",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output includes expect/actual platform compatibility check",
+          "type": "contains",
+          "value": "expect"
+        },
+        {
+          "text": "Output references Android API level threshold (TIRAMISU / API 33)",
+          "type": "contains",
+          "value": "TIRAMISU"
+        },
+        {
+          "text": "Output includes fallback UI (opaque background or border)",
+          "type": "contains",
+          "value": "fallback"
+        },
+        {
+          "text": "Output shows conditional modifier chain (if glass available use liquid, else fallback)",
+          "type": "contains",
+          "value": "isLiquidFrostAvailable"
+        }
+      ]
+    }
+  ]
+}
