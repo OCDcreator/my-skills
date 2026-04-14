@@ -74,6 +74,18 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
 )
 echo.
 
+:: --- baoyu-skills ---
+echo ^>^> [baoyu-skills] Cloning...
+git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills" 2>nul
+if exist "%TMP_DIR%\baoyu-skills\skills" (
+    echo     Copying skills...
+    xcopy /e /i /y /q "%TMP_DIR%\baoyu-skills\skills" "%REPO_ROOT%\baoyu-skills\" >nul
+    echo     Done
+) else (
+    echo     ERROR: Failed to clone or skills dir not found
+)
+echo.
+
 :: --- axton-obsidian-visual-skills ---
 echo ^>^> [axton-obsidian-visual-skills] Cloning...
 git clone --depth 1 --branch main https://github.com/axtonliu/axton-obsidian-visual-skills.git "%TMP_DIR%\axton-obsidian-visual-skills" 2>nul
