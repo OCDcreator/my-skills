@@ -1,3 +1,15 @@
 [submodule "external/awesome-claude-skills"]
 	path = external/awesome-claude-skills
 	url = https://github.com/ComposioHQ/awesome-claude-skills.git
+[submodule "external/baoyu-skills"]
+	path = external/baoyu-skills
+	url = https://github.com/JimLiu/baoyu-skills.git
+[submodule "external/claude-plugins-official"]
+	path = external/claude-plugins-official
+	url = https://github.com/anthropics/claude-plugins-official.git
+[submodule "external/anthropics-skills"]
+	path = external/anthropics-skills
+	url = https://github.com/anthropics/skills.git
+[submodule "external/axton-obsidian-visual-skills"]
+	path = external/axton-obsidian-visual-skills
+	url = https://github.com/axtonliu/axton-obsidian-visual-skills.git
