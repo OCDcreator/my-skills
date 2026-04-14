@@ -10,7 +10,9 @@ my-skills/
 │   ├── devops/syncthing/                      # Syncthing 同步排障
 │   ├── fnos-fpk-dev/                          # 飞牛 fnOS FPK 开发
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
-│   └── opencode-provider-config/              # OpenCode 模型配置
+│   ├── opencode-provider-config/              # OpenCode 模型配置
+│   ├── searxng/                               # SearXNG 联网搜索
+│   └── x-reader/                              # 视频/播客转录内容分析
 ├── external/                                  # 外部社区技能
 │   ├── anthropics-skills/                     # Anthropic 官方技能
 │   ├── awesome-claude-skills/                 # ComposioHQ 社区技能
@@ -31,6 +33,8 @@ my-skills/
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
+| [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
+| [x-reader](custom/x-reader/) | 视频/播客转录内容多维分析与结构化总结 |
 
 ## 外部技能来源 (external/)
 
