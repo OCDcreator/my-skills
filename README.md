@@ -8,6 +8,9 @@
 my-skills/
 ├── devops/                        # 自有技能
 │   └── syncthing/                 # Syncthing 同步排障
+├── fnos-fpk-dev/                  # 飞牛 fnOS FPK 开发
+├── liquid-glass-compose/          # Apple Liquid Glass UI
+├── opencode-provider-config/      # OpenCode 模型配置
 ├── external/                      # 外部技能（submodule）
 │   ├── awesome-claude-skills/     # ComposioHQ
 │   ├── baoyu-skills/              # JimLiu
@@ -25,6 +28,9 @@ my-skills/
 | 技能 | 说明 |
 |------|------|
 | [syncthing](devops/syncthing/) | Syncthing 同步排障与诊断 |
+| [fnos-fpk-dev](fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
+| [liquid-glass-compose](liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
+| [opencode-provider-config](opencode-provider-config/) | OpenCode 自定义模型参数配置 |
 
 ## 外部技能来源
 
