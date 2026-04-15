@@ -25,6 +25,7 @@ SOURCES=(
   "baoyu-skills|https://github.com/JimLiu/baoyu-skills.git|main|skills"
   "kepano-obsidian-skills|https://github.com/kepano/obsidian-skills.git|main|skills"
   "taste-skill|https://github.com/Leonxlnx/taste-skill.git|master|skills"
+  "html-ppt-skill|https://github.com/lewislulu/html-ppt-skill.git|main|."
 )
 
 EXCLUDE_NAMES=(

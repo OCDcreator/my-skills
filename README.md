@@ -22,7 +22,8 @@ my-skills/
 │   ├── claude-plugins-official/               # Anthropic 插件技能
 │   ├── axton-obsidian-visual-skills/          # Obsidian 可视化技能
 │   ├── kepano-obsidian-skills/                # Obsidian 官方 CLI/Canvas 技能
-│   └── taste-skill/                            # 高级前端设计技能（多风格）
+│   ├── taste-skill/                            # 高级前端设计技能（多风格）
+│   └── html-ppt-skill/                          # HTML PPT 演示文稿生成技能
 ├── update.sh / update.bat                     # 同步外部技能源
 ├── pull.sh / pull.bat                         # 拉取远端覆盖本地
 └── push.sh / push.bat                         # 提交推送
@@ -52,12 +53,13 @@ my-skills/
 | `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills) | Obsidian 可视化技能 |
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 Markdown/Bases/Canvas/CLI 技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 高级前端设计技能（多风格、参数可调） |
+| `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill) | HTML PPT 演示文稿生成技能（多主题/布局/动画） |
 
 ## 一键脚本
 
 | 脚本 | 说明 |
 |------|------|
-| `update.sh` / `update.bat` | 从 7 个外部源拉取最新技能到 `external/` → 自动 commit & push |
+| `update.sh` / `update.bat` | 从 8 个外部源拉取最新技能到 `external/` → 自动 commit & push |
 | `pull.sh` / `pull.bat` | 拉取远端仓库覆盖本地 |
 | `push.sh` / `push.bat` | 提交所有变更并推送到远端 |
 
