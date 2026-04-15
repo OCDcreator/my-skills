@@ -9,9 +9,11 @@ Two top-level directories: `custom/` (self-authored) and `external/` (cloned fro
 
 ### Custom skill (`custom/`)
 
-1. Create directory under `custom/` with a `SKILL.md` inside
-2. Update `README.md`: add entry to directory tree + custom skill table
-3. Commit and push
+1. Create a leaf skill directory anywhere under `custom/` and put `SKILL.md` at that leaf
+2. `custom/` is not flat: grouped paths like `custom/devops/syncthing` and nested families like `custom/x-reader/*` already exist
+3. Update `README.md`: add entry to directory tree + custom skill table
+4. If `SKILLS.md` exists or the user asks for a skill catalog, use `custom/skill-catalog-maintainer` and update the catalog too
+5. Commit and push
 
 ### External skill (`external/`)
 
@@ -32,6 +34,7 @@ When adding a new external source, **all four files** must be updated:
    - Directory tree under `external/`
    - External sources table (columns: local dir, source repo link, description)
    - Source count in the `update.sh` / `update.bat` row of the scripts table
+5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`
 
 ## Gotchas
 
@@ -39,6 +42,7 @@ When adding a new external source, **all four files** must be updated:
 - **`EXCLUDE_NAMES` only in `update.sh`**: the `.sh` script filters out excluded skill names; `.bat` has no exclusion logic and copies everything.
 - **`external/<name>/` structure varies by source**: some sources put skill dirs directly under the cloned root (subdir=`.`), others use a `skills/` subdirectory (subdir=`skills`). The `update.sh` SOURCES `subdir` field controls this.
 - **`.bat` mirrors `.sh` manually**: there is no code generation; any change to `.sh` must be replicated to `.bat` by hand.
+- **Duplicate skill names are normal**: catalog external skills by path and source, not by `name` alone.
 
 ## Script details
 

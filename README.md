@@ -13,14 +13,15 @@ my-skills/
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
 │   ├── opencode-provider-config/              # OpenCode 模型配置
 │   ├── searxng/                               # SearXNG 联网搜索
+│   ├── skill-catalog-maintainer/              # 技能目录维护
 │   └── x-reader/                              # 视频/播客转录内容分析
 ├── external/                                  # 外部社区技能
 │   ├── anthropics-skills/                     # Anthropic 官方技能
 │   ├── awesome-claude-skills/                 # ComposioHQ 社区技能
 │   ├── baoyu-skills/                          # 宝玉中文技能
 │   ├── claude-plugins-official/               # Anthropic 插件技能
-│   └── axton-obsidian-visual-skills/          # Obsidian 可视化技能
-│   └── kepano-obsidian-skills/                 # Obsidian 官方 CLI/Canvas 技能
+│   ├── axton-obsidian-visual-skills/          # Obsidian 可视化技能
+│   ├── kepano-obsidian-skills/                # Obsidian 官方 CLI/Canvas 技能
 │   └── taste-skill/                            # 高级前端设计技能（多风格）
 ├── update.sh / update.bat                     # 同步外部技能源
 ├── pull.sh / pull.bat                         # 拉取远端覆盖本地
@@ -37,6 +38,7 @@ my-skills/
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
+| [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录创建、分类、审计与维护规则同步 |
 | [x-reader](custom/x-reader/) | 视频/播客转录内容多维分析与结构化总结 |
 
 ## 外部技能来源 (external/)
