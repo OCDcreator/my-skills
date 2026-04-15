@@ -172,7 +172,7 @@ if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
 )
 echo.
 
-echo [6/6] kepano-obsidian-skills
+echo [6/7] kepano-obsidian-skills
 git clone --depth 1 --branch main https://github.com/kepano/obsidian-skills.git "%TMP_DIR%\kepano-obsidian-skills"
 if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
     if not exist "%REPO_DIR%\external\kepano-obsidian-skills" mkdir "%REPO_DIR%\external\kepano-obsidian-skills"
@@ -181,6 +181,18 @@ if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
 ) else (
     set /a SOURCE_ERRORS+=1
     echo [WARN] kepano-obsidian-skills 下载失败或没有找到 skills 目录
+)
+echo.
+
+echo [7/7] taste-skill
+git clone --depth 1 --branch master https://github.com/Leonxlnx/taste-skill.git "%TMP_DIR%\taste-skill"
+if exist "%TMP_DIR%\taste-skill\skills" (
+    if not exist "%REPO_DIR%\external\taste-skill" mkdir "%REPO_DIR%\external\taste-skill"
+    xcopy /e /i /y /q "%TMP_DIR%\taste-skill\skills" "%REPO_DIR%\external\taste-skill\" >nul
+    echo [OK] taste-skill 已复制
+) else (
+    set /a SOURCE_ERRORS+=1
+    echo [WARN] taste-skill 下载失败或没有找到 skills 目录
 )
 echo.
 
