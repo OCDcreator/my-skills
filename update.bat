@@ -188,7 +188,11 @@ echo [7/7] taste-skill
 git clone --depth 1 --branch master https://github.com/Leonxlnx/taste-skill.git "%TMP_DIR%\taste-skill"
 if exist "%TMP_DIR%\taste-skill\skills" (
     if not exist "%REPO_DIR%\external\taste-skill" mkdir "%REPO_DIR%\external\taste-skill"
-    xcopy /e /i /y /q "%TMP_DIR%\taste-skill\skills" "%REPO_DIR%\external\taste-skill\" >nul
+    for /d %%d in ("%TMP_DIR%\taste-skill\skills\*") do (
+        if exist "%%d\SKILL.md" (
+            xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\taste-skill\%%~nxd\" >nul 2>nul
+        )
+    )
     echo [OK] taste-skill 已复制
 ) else (
     set /a SOURCE_ERRORS+=1
