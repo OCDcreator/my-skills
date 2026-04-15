@@ -12,7 +12,7 @@ Two top-level directories: `custom/` (self-authored) and `external/` (cloned fro
 1. Create a leaf skill directory anywhere under `custom/` and put `SKILL.md` at that leaf
 2. `custom/` is not flat: grouped paths like `custom/devops/syncthing` and nested families like `custom/x-reader/*` already exist
 3. Update `README.md`: add entry to directory tree + custom skill table
-4. If `SKILLS.md` exists or the user asks for a skill catalog, use `custom/skill-catalog-maintainer` and update the catalog too
+4. If `SKILLS.md` exists or the user asks for a skill catalog, use `custom/skill-catalog-maintainer` and include source repo/subdir/install hints in the catalog
 5. Commit and push
 
 ### External skill (`external/`)
@@ -34,7 +34,7 @@ When adding a new external source, **all four files** must be updated:
    - Directory tree under `external/`
    - External sources table (columns: local dir, source repo link, description)
    - Source count in the `update.sh` / `update.bat` row of the scripts table
-5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`
+5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`; external entries should keep source repo, branch, subdir, and install hints
 
 ## Gotchas
 
