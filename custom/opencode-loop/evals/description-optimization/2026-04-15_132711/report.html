@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>opencode-loop — Skill Description Optimization</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Lora', Georgia, serif;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+            background: #faf9f5;
+            color: #141413;
+        }
+        h1 { font-family: 'Poppins', sans-serif; color: #141413; }
+        .explainer {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #e8e6dc;
+            color: #b0aea5;
+            font-size: 0.875rem;
+            line-height: 1.6;
+        }
+        .summary {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border: 1px solid #e8e6dc;
+        }
+        .summary p { margin: 5px 0; }
+        .best { color: #788c5d; font-weight: bold; }
+        .table-container {
+            overflow-x: auto;
+            width: 100%;
+        }
+        table {
+            border-collapse: collapse;
+            background: white;
+            border: 1px solid #e8e6dc;
+            border-radius: 6px;
+            font-size: 12px;
+            min-width: 100%;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #e8e6dc;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        th {
+            font-family: 'Poppins', sans-serif;
+            background: #141413;
+            color: #faf9f5;
+            font-weight: 500;
+        }
+        th.test-col {
+            background: #6a9bcc;
+        }
+        th.query-col { min-width: 200px; }
+        td.description {
+            font-family: monospace;
+            font-size: 11px;
+            word-wrap: break-word;
+            max-width: 400px;
+        }
+        td.result {
+            text-align: center;
+            font-size: 16px;
+            min-width: 40px;
+        }
+        td.test-result {
+            background: #f0f6fc;
+        }
+        .pass { color: #788c5d; }
+        .fail { color: #c44; }
+        .rate {
+            font-size: 9px;
+            color: #b0aea5;
+            display: block;
+        }
+        tr:hover { background: #faf9f5; }
+        .score {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+        .score-good { background: #eef2e8; color: #788c5d; }
+        .score-ok { background: #fef3c7; color: #d97706; }
+        .score-bad { background: #fceaea; color: #c44; }
+        .train-label { color: #b0aea5; font-size: 10px; }
+        .test-label { color: #6a9bcc; font-size: 10px; font-weight: bold; }
+        .best-row { background: #f5f8f2; }
+        th.positive-col { border-bottom: 3px solid #788c5d; }
+        th.negative-col { border-bottom: 3px solid #c44; }
+        th.test-col.positive-col { border-bottom: 3px solid #788c5d; }
+        th.test-col.negative-col { border-bottom: 3px solid #c44; }
+        .legend { font-family: 'Poppins', sans-serif; display: flex; gap: 20px; margin-bottom: 10px; font-size: 13px; align-items: center; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-swatch { width: 16px; height: 16px; border-radius: 3px; display: inline-block; }
+        .swatch-positive { background: #141413; border-bottom: 3px solid #788c5d; }
+        .swatch-negative { background: #141413; border-bottom: 3px solid #c44; }
+        .swatch-test { background: #6a9bcc; }
+        .swatch-train { background: #141413; }
+    </style>
+</head>
+<body>
+    <h1>opencode-loop — Skill Description Optimization</h1>
+    <div class="explainer">
+        <strong>Optimizing your skill's description.</strong> This page updates automatically as Claude tests different versions of your skill's description. Each row is an iteration — a new description attempt. The columns show test queries: green checkmarks mean the skill triggered correctly (or correctly didn't trigger), red crosses mean it got it wrong. The "Train" score shows performance on queries used to improve the description; the "Test" score shows performance on held-out queries the optimizer hasn't seen. When it's done, Claude will apply the best-performing description to your skill.
+    </div>
+
+    <div class="summary">
+        <p><strong>Original:</strong> Use OpenCode Loop to run an unattended AI coding loop for creating a new project from scratch, optimizing an existing project, fixing bugs, resolving warnings/errors, or letting a model repeatedly build/verify/report against a target repo. Use this skill whenever the user wants autonomous or unattended coding work with OpenCode Loop, mentions open loop/OpenCodeLoop/opencode-loop, asks to have an agent “keep running,” “auto-fix,” “iterate,” “optimize the project,” or needs guidance for either the command-line workflow or the TUI workflow.</p>
+        <p class="best"><strong>Best:</strong> Use OpenCode Loop to run an unattended AI coding loop for creating a new project from scratch, optimizing an existing project, fixing bugs, resolving warnings/errors, or letting a model repeatedly build/verify/report against a target repo. Use this skill whenever the user wants autonomous or unattended coding work with OpenCode Loop, mentions open loop/OpenCodeLoop/opencode-loop, asks to have an agent “keep running,” “auto-fix,” “iterate,” “optimize the project,” or needs guidance for either the command-line workflow or the TUI workflow.</p>
+        <p><strong>Best Score:</strong> 4/8 (test)</p>
+        <p><strong>Iterations:</strong> 2 | <strong>Train:</strong> 12 | <strong>Test:</strong> 8</p>
+    </div>
+
+    <div class="legend">
+        <span style="font-weight:600">Query columns:</span>
+        <span class="legend-item"><span class="legend-swatch swatch-positive"></span> Should trigger</span>
+        <span class="legend-item"><span class="legend-swatch swatch-negative"></span> Should NOT trigger</span>
+        <span class="legend-item"><span class="legend-swatch swatch-train"></span> Train</span>
+        <span class="legend-item"><span class="legend-swatch swatch-test"></span> Test</span>
+    </div>
+
+    <div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Iter</th>
+                <th>Train</th>
+                <th>Test</th>
+                <th class="query-col">Description</th>
+                <th class="positive-col">用 TUI 管多个项目时，我应该怎么给这个项目填 recent target、iterations、timeout 和 program？目标是自动解决 warnings，不是手动 debug。</th>
+                <th class="positive-col">我有个旧 Node 项目，npm test 会失败。我不想手动来回改，让大模型自己 build/verify/report 多跑几轮，但是要有 circuit breaker 和 timeout。怎么用这个 open loop 跑？</th>
+                <th class="positive-col">请在当前 repo 上用命令行启动 OpenCode Loop：先 setup，目标是修掉 mypy 报错和单元测试失败，最多 5 次迭代，每次 20 分钟。</th>
+                <th class="positive-col">我想拖一个 Windows 文件夹到 .cmd 启动器里，让 Windows 原生 TUI + WSL 后端跑自动修 bug。你帮我准备要填的任务描述和注意事项。</th>
+                <th class="positive-col">这个 React 仓库 lint warning 很多，还有几个测试红了。我想让一个 agent 一轮轮自动修，修完自己跑验证。请用 opencode-loop 命令行方式准备并启动，iterations 先设小一点。</th>
+                <th class="positive-col">我在 C:\Users\lt\Desktop\demo-api 下面想从零做一个 FastAPI 小项目，不想每一步都盯着。帮我用 OpenCode Loop 先无人值守跑 3 轮，目标是生成骨架、README、基础 pytest，并且不要无限跑。</th>
+                <th class="negative-col">帮我创建一个 Codex skill，用来指导用户写测试计划。这个 skill 跟 unattended coding loop 无关。</th>
+                <th class="negative-col">解释一下 while loop 和 for loop 的区别，最好用 Python 举例。</th>
+                <th class="negative-col">请你现在手动看一下 tests/test_api.py 的断言失败，别启动无人值守 agent，也不要用 OpenCode Loop。</th>
+                <th class="negative-col">修复当前 Python traceback：KeyError: &#x27;status&#x27;。先定位根因并给最小 patch，别让模型自动反复跑。</th>
+                <th class="negative-col">请运行项目的现有 test.sh 看看失败原因，然后把日志摘要给我。不要启动 OpenCode Loop，也不要长期运行。</th>
+                <th class="negative-col">我想了解 OpenCode 这个 CLI 和 Claude Code 的区别，给我概念解释即可。</th>
+                <th class="test-col positive-col">项目还没建，只有一个想法：做一个 CLI 工具整理 markdown。你能先建项目 brief，然后让 OpenCode Loop unattended 地按 dev 模式跑起来吗？</th>
+                <th class="test-col positive-col">把 D:\work\ml-exp 这个目录交给无人值守循环，做几轮小实验，评估指标是 validation loss。应该用 dev 还是 ml mode？帮我准备 OpenCodeLoop 的启动方案。</th>
+                <th class="test-col negative-col">请审查 opencode-loop.sh 里 source lib 的顺序有没有问题，只做代码审查，不运行 loop。</th>
+                <th class="test-col negative-col">我想优化这个 README 的表达，直接帮我改文案就好，不要创建 .opencode-loop 或启动外部工具。</th>
+                <th class="test-col positive-col">open loop 跑完上一轮后还有 stderr log，我想继续让它 auto-reset circuit breaker 后再跑 2 轮，但先帮我确认状态文件和启动命令。</th>
+                <th class="test-col positive-col">我想通过 TUI 看着 open loop 跑当前项目优化：目标是减少 obvious bugs、补文档、跑测试。你先告诉我 OpenCode Loop TUI 里 target、mode、timeout、iterations 应该怎么填。</th>
+                <th class="test-col negative-col">帮我写一个 GitHub Actions workflow 跑 pytest 和 ruff，不需要任何自动 agent 循环。</th>
+                <th class="test-col negative-col">这个 TUI 组件布局有点丑，帮我改 Textual CSS。注意这里说的是应用界面本身，不是要用 OpenCode Loop 去跑项目。</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr class="best-row">
+                <td>1</td>
+                <td><span class="score score-ok">6/12</span></td>
+                <td><span class="score score-ok">4/8</span></td>
+                <td class="description">Use OpenCode Loop to run an unattended AI coding loop for creating a new project from scratch, optimizing an existing project, fixing bugs, resolving warnings/errors, or letting a model repeatedly build/verify/report against a target repo. Use this skill whenever the user wants autonomous or unattended coding work with OpenCode Loop, mentions open loop/OpenCodeLoop/opencode-loop, asks to have an agent “keep running,” “auto-fix,” “iterate,” “optimize the project,” or needs guidance for either the command-line workflow or the TUI workflow.</td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+            </tr>
+            <tr class="">
+                <td>2</td>
+                <td><span class="score score-ok">6/12</span></td>
+                <td><span class="score score-ok">4/8</span></td>
+                <td class="description">Use this skill for OpenCode Loop — an autonomous coding agent that loops through write → verify → fix cycles without human supervision. Trigger when the user wants hands-off, multi-round automated coding: creating projects from scratch without step-by-step oversight, iteratively auto-fixing bugs/test failures/type errors/lint warnings, running repeated build-verify-report cycles, or configuring iteration caps, timeouts, and circuit breakers for a self-running agent. Covers CLI and TUI workflows including setup, monitoring, and program customization. Triggers on mentions of opencode-loop, OpenCodeLoop, open loop, or any request to run an autonomous coding loop. Not for one-shot fixes, manual debugging, or general questions about loops or iteration in programming.</td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result fail">✗<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result fail">✗<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+                <td class="result test-result pass">✓<span class="rate">0/1</span></td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+
+</body>
+</html>

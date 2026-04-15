@@ -1,0 +1,30 @@
+{
+  "skill_name": "opencode-loop",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我想从零开始做一个小型 FastAPI 项目，让 OpenCode Loop 无人值守地先跑 3 轮，把项目骨架、README、基础测试都建起来。你帮我准备并直接用命令行跑。",
+      "expected_output": "Assistant should trigger the skill, confirm/prepare target project details, choose command-line mode, initialize with bin/setup.sh, run opencode-loop.sh with conservative iterations/timeout, and report monitoring paths.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "这个仓库现在测试有一堆失败和 warning，我想用 TUI 看着它自动修。请先帮我整理要填到 OpenCode Loop TUI 里的路径、mode、iterations、timeout 和任务说明。",
+      "expected_output": "Assistant should trigger the skill, choose TUI mode, prepare a target-specific task brief and TUI field checklist, and include the Windows/WSL launcher guidance when relevant.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "帮我用 open loop 跑一下当前项目的优化，不要无限跑，先限制几轮，目标是减少 lint 报错并修掉 obvious bugs。",
+      "expected_output": "Assistant should recognize open loop/OpenCode Loop intent, set a bounded CLI plan with small iteration cap, prepare acceptance criteria, run setup if needed, and start/monitor the loop safely.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "我只是想让你手动看一下 Python 报错，别启动任何无人值守 agent。",
+      "expected_output": "Assistant should not use OpenCode Loop despite related debugging language because the user explicitly asks for manual debugging and no unattended agent.",
+      "files": []
+    }
+  ]
+}
+

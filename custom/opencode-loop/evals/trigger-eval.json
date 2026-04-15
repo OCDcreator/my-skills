@@ -1,0 +1,83 @@
+[
+  {
+    "query": "我在 C:\\Users\\lt\\Desktop\\demo-api 下面想从零做一个 FastAPI 小项目，不想每一步都盯着。帮我用 OpenCode Loop 先无人值守跑 3 轮，目标是生成骨架、README、基础 pytest，并且不要无限跑。",
+    "should_trigger": true
+  },
+  {
+    "query": "这个 React 仓库 lint warning 很多，还有几个测试红了。我想让一个 agent 一轮轮自动修，修完自己跑验证。请用 opencode-loop 命令行方式准备并启动，iterations 先设小一点。",
+    "should_trigger": true
+  },
+  {
+    "query": "我想通过 TUI 看着 open loop 跑当前项目优化：目标是减少 obvious bugs、补文档、跑测试。你先告诉我 OpenCode Loop TUI 里 target、mode、timeout、iterations 应该怎么填。",
+    "should_trigger": true
+  },
+  {
+    "query": "把 D:\\work\\ml-exp 这个目录交给无人值守循环，做几轮小实验，评估指标是 validation loss。应该用 dev 还是 ml mode？帮我准备 OpenCodeLoop 的启动方案。",
+    "should_trigger": true
+  },
+  {
+    "query": "我有个旧 Node 项目，npm test 会失败。我不想手动来回改，让大模型自己 build/verify/report 多跑几轮，但是要有 circuit breaker 和 timeout。怎么用这个 open loop 跑？",
+    "should_trigger": true
+  },
+  {
+    "query": "请在当前 repo 上用命令行启动 OpenCode Loop：先 setup，目标是修掉 mypy 报错和单元测试失败，最多 5 次迭代，每次 20 分钟。",
+    "should_trigger": true
+  },
+  {
+    "query": "我想拖一个 Windows 文件夹到 .cmd 启动器里，让 Windows 原生 TUI + WSL 后端跑自动修 bug。你帮我准备要填的任务描述和注意事项。",
+    "should_trigger": true
+  },
+  {
+    "query": "项目还没建，只有一个想法：做一个 CLI 工具整理 markdown。你能先建项目 brief，然后让 OpenCode Loop unattended 地按 dev 模式跑起来吗？",
+    "should_trigger": true
+  },
+  {
+    "query": "open loop 跑完上一轮后还有 stderr log，我想继续让它 auto-reset circuit breaker 后再跑 2 轮，但先帮我确认状态文件和启动命令。",
+    "should_trigger": true
+  },
+  {
+    "query": "用 TUI 管多个项目时，我应该怎么给这个项目填 recent target、iterations、timeout 和 program？目标是自动解决 warnings，不是手动 debug。",
+    "should_trigger": true
+  },
+  {
+    "query": "请你现在手动看一下 tests/test_api.py 的断言失败，别启动无人值守 agent，也不要用 OpenCode Loop。",
+    "should_trigger": false
+  },
+  {
+    "query": "解释一下 while loop 和 for loop 的区别，最好用 Python 举例。",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我写一个 GitHub Actions workflow 跑 pytest 和 ruff，不需要任何自动 agent 循环。",
+    "should_trigger": false
+  },
+  {
+    "query": "我想优化这个 README 的表达，直接帮我改文案就好，不要创建 .opencode-loop 或启动外部工具。",
+    "should_trigger": false
+  },
+  {
+    "query": "这个 TUI 组件布局有点丑，帮我改 Textual CSS。注意这里说的是应用界面本身，不是要用 OpenCode Loop 去跑项目。",
+    "should_trigger": false
+  },
+  {
+    "query": "请审查 opencode-loop.sh 里 source lib 的顺序有没有问题，只做代码审查，不运行 loop。",
+    "should_trigger": false
+  },
+  {
+    "query": "我想了解 OpenCode 这个 CLI 和 Claude Code 的区别，给我概念解释即可。",
+    "should_trigger": false
+  },
+  {
+    "query": "修复当前 Python traceback：KeyError: 'status'。先定位根因并给最小 patch，别让模型自动反复跑。",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我创建一个 Codex skill，用来指导用户写测试计划。这个 skill 跟 unattended coding loop 无关。",
+    "should_trigger": false
+  },
+  {
+    "query": "请运行项目的现有 test.sh 看看失败原因，然后把日志摘要给我。不要启动 OpenCode Loop，也不要长期运行。",
+    "should_trigger": false
+  }
+]
+

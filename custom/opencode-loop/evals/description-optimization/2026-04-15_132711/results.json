@@ -1,0 +1,565 @@
+{
+  "exit_reason": "max_iterations (2)",
+  "original_description": "Use OpenCode Loop to run an unattended AI coding loop for creating a new project from scratch, optimizing an existing project, fixing bugs, resolving warnings/errors, or letting a model repeatedly build/verify/report against a target repo. Use this skill whenever the user wants autonomous or unattended coding work with OpenCode Loop, mentions open loop/OpenCodeLoop/opencode-loop, asks to have an agent \u201ckeep running,\u201d \u201cauto-fix,\u201d \u201citerate,\u201d \u201coptimize the project,\u201d or needs guidance for either the command-line workflow or the TUI workflow.",
+  "best_description": "Use OpenCode Loop to run an unattended AI coding loop for creating a new project from scratch, optimizing an existing project, fixing bugs, resolving warnings/errors, or letting a model repeatedly build/verify/report against a target repo. Use this skill whenever the user wants autonomous or unattended coding work with OpenCode Loop, mentions open loop/OpenCodeLoop/opencode-loop, asks to have an agent \u201ckeep running,\u201d \u201cauto-fix,\u201d \u201citerate,\u201d \u201coptimize the project,\u201d or needs guidance for either the command-line workflow or the TUI workflow.",
+  "best_score": "4/8",
+  "best_train_score": "6/12",
+  "best_test_score": "4/8",
+  "final_description": "Use this skill for OpenCode Loop \u2014 an autonomous coding agent that loops through write \u2192 verify \u2192 fix cycles without human supervision. Trigger when the user wants hands-off, multi-round automated coding: creating projects from scratch without step-by-step oversight, iteratively auto-fixing bugs/test failures/type errors/lint warnings, running repeated build-verify-report cycles, or configuring iteration caps, timeouts, and circuit breakers for a self-running agent. Covers CLI and TUI workflows including setup, monitoring, and program customization. Triggers on mentions of opencode-loop, OpenCodeLoop, open loop, or any request to run an autonomous coding loop. Not for one-shot fixes, manual debugging, or general questions about loops or iteration in programming.",
+  "iterations_run": 2,
+  "holdout": 0.4,
+  "train_size": 12,
+  "test_size": 8,
+  "history": [
+    {
+      "iteration": 1,
+      "description": "Use OpenCode Loop to run an unattended AI coding loop for creating a new project from scratch, optimizing an existing project, fixing bugs, resolving warnings/errors, or letting a model repeatedly build/verify/report against a target repo. Use this skill whenever the user wants autonomous or unattended coding work with OpenCode Loop, mentions open loop/OpenCodeLoop/opencode-loop, asks to have an agent \u201ckeep running,\u201d \u201cauto-fix,\u201d \u201citerate,\u201d \u201coptimize the project,\u201d or needs guidance for either the command-line workflow or the TUI workflow.",
+      "train_passed": 6,
+      "train_failed": 6,
+      "train_total": 12,
+      "train_results": [
+        {
+          "query": "\u7528 TUI \u7ba1\u591a\u4e2a\u9879\u76ee\u65f6\uff0c\u6211\u5e94\u8be5\u600e\u4e48\u7ed9\u8fd9\u4e2a\u9879\u76ee\u586b recent target\u3001iterations\u3001timeout \u548c program\uff1f\u76ee\u6807\u662f\u81ea\u52a8\u89e3\u51b3 warnings\uff0c\u4e0d\u662f\u624b\u52a8 debug\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u6709\u4e2a\u65e7 Node \u9879\u76ee\uff0cnpm test \u4f1a\u5931\u8d25\u3002\u6211\u4e0d\u60f3\u624b\u52a8\u6765\u56de\u6539\uff0c\u8ba9\u5927\u6a21\u578b\u81ea\u5df1 build/verify/report \u591a\u8dd1\u51e0\u8f6e\uff0c\u4f46\u662f\u8981\u6709 circuit breaker \u548c timeout\u3002\u600e\u4e48\u7528\u8fd9\u4e2a open loop \u8dd1\uff1f",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8bf7\u5728\u5f53\u524d repo \u4e0a\u7528\u547d\u4ee4\u884c\u542f\u52a8 OpenCode Loop\uff1a\u5148 setup\uff0c\u76ee\u6807\u662f\u4fee\u6389 mypy \u62a5\u9519\u548c\u5355\u5143\u6d4b\u8bd5\u5931\u8d25\uff0c\u6700\u591a 5 \u6b21\u8fed\u4ee3\uff0c\u6bcf\u6b21 20 \u5206\u949f\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u62d6\u4e00\u4e2a Windows \u6587\u4ef6\u5939\u5230 .cmd \u542f\u52a8\u5668\u91cc\uff0c\u8ba9 Windows \u539f\u751f TUI + WSL \u540e\u7aef\u8dd1\u81ea\u52a8\u4fee bug\u3002\u4f60\u5e2e\u6211\u51c6\u5907\u8981\u586b\u7684\u4efb\u52a1\u63cf\u8ff0\u548c\u6ce8\u610f\u4e8b\u9879\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a React \u4ed3\u5e93 lint warning \u5f88\u591a\uff0c\u8fd8\u6709\u51e0\u4e2a\u6d4b\u8bd5\u7ea2\u4e86\u3002\u6211\u60f3\u8ba9\u4e00\u4e2a agent \u4e00\u8f6e\u8f6e\u81ea\u52a8\u4fee\uff0c\u4fee\u5b8c\u81ea\u5df1\u8dd1\u9a8c\u8bc1\u3002\u8bf7\u7528 opencode-loop \u547d\u4ee4\u884c\u65b9\u5f0f\u51c6\u5907\u5e76\u542f\u52a8\uff0citerations \u5148\u8bbe\u5c0f\u4e00\u70b9\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u5728 C:\\Users\\lt\\Desktop\\demo-api \u4e0b\u9762\u60f3\u4ece\u96f6\u505a\u4e00\u4e2a FastAPI \u5c0f\u9879\u76ee\uff0c\u4e0d\u60f3\u6bcf\u4e00\u6b65\u90fd\u76ef\u7740\u3002\u5e2e\u6211\u7528 OpenCode Loop \u5148\u65e0\u4eba\u503c\u5b88\u8dd1 3 \u8f6e\uff0c\u76ee\u6807\u662f\u751f\u6210\u9aa8\u67b6\u3001README\u3001\u57fa\u7840 pytest\uff0c\u5e76\u4e14\u4e0d\u8981\u65e0\u9650\u8dd1\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u521b\u5efa\u4e00\u4e2a Codex skill\uff0c\u7528\u6765\u6307\u5bfc\u7528\u6237\u5199\u6d4b\u8bd5\u8ba1\u5212\u3002\u8fd9\u4e2a skill \u8ddf unattended coding loop \u65e0\u5173\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u89e3\u91ca\u4e00\u4e0b while loop \u548c for loop \u7684\u533a\u522b\uff0c\u6700\u597d\u7528 Python \u4e3e\u4f8b\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u4f60\u73b0\u5728\u624b\u52a8\u770b\u4e00\u4e0b tests/test_api.py \u7684\u65ad\u8a00\u5931\u8d25\uff0c\u522b\u542f\u52a8\u65e0\u4eba\u503c\u5b88 agent\uff0c\u4e5f\u4e0d\u8981\u7528 OpenCode Loop\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u4fee\u590d\u5f53\u524d Python traceback\uff1aKeyError: 'status'\u3002\u5148\u5b9a\u4f4d\u6839\u56e0\u5e76\u7ed9\u6700\u5c0f patch\uff0c\u522b\u8ba9\u6a21\u578b\u81ea\u52a8\u53cd\u590d\u8dd1\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u8fd0\u884c\u9879\u76ee\u7684\u73b0\u6709 test.sh \u770b\u770b\u5931\u8d25\u539f\u56e0\uff0c\u7136\u540e\u628a\u65e5\u5fd7\u6458\u8981\u7ed9\u6211\u3002\u4e0d\u8981\u542f\u52a8 OpenCode Loop\uff0c\u4e5f\u4e0d\u8981\u957f\u671f\u8fd0\u884c\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u6211\u60f3\u4e86\u89e3 OpenCode \u8fd9\u4e2a CLI \u548c Claude Code \u7684\u533a\u522b\uff0c\u7ed9\u6211\u6982\u5ff5\u89e3\u91ca\u5373\u53ef\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 4,
+      "test_total": 8,
+      "test_results": [
+        {
+          "query": "\u9879\u76ee\u8fd8\u6ca1\u5efa\uff0c\u53ea\u6709\u4e00\u4e2a\u60f3\u6cd5\uff1a\u505a\u4e00\u4e2a CLI \u5de5\u5177\u6574\u7406 markdown\u3002\u4f60\u80fd\u5148\u5efa\u9879\u76ee brief\uff0c\u7136\u540e\u8ba9 OpenCode Loop unattended \u5730\u6309 dev \u6a21\u5f0f\u8dd1\u8d77\u6765\u5417\uff1f",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u628a D:\\work\\ml-exp \u8fd9\u4e2a\u76ee\u5f55\u4ea4\u7ed9\u65e0\u4eba\u503c\u5b88\u5faa\u73af\uff0c\u505a\u51e0\u8f6e\u5c0f\u5b9e\u9a8c\uff0c\u8bc4\u4f30\u6307\u6807\u662f validation loss\u3002\u5e94\u8be5\u7528 dev \u8fd8\u662f ml mode\uff1f\u5e2e\u6211\u51c6\u5907 OpenCodeLoop \u7684\u542f\u52a8\u65b9\u6848\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8bf7\u5ba1\u67e5 opencode-loop.sh \u91cc source lib \u7684\u987a\u5e8f\u6709\u6ca1\u6709\u95ee\u9898\uff0c\u53ea\u505a\u4ee3\u7801\u5ba1\u67e5\uff0c\u4e0d\u8fd0\u884c loop\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u6211\u60f3\u4f18\u5316\u8fd9\u4e2a README \u7684\u8868\u8fbe\uff0c\u76f4\u63a5\u5e2e\u6211\u6539\u6587\u6848\u5c31\u597d\uff0c\u4e0d\u8981\u521b\u5efa .opencode-loop \u6216\u542f\u52a8\u5916\u90e8\u5de5\u5177\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "open loop \u8dd1\u5b8c\u4e0a\u4e00\u8f6e\u540e\u8fd8\u6709 stderr log\uff0c\u6211\u60f3\u7ee7\u7eed\u8ba9\u5b83 auto-reset circuit breaker \u540e\u518d\u8dd1 2 \u8f6e\uff0c\u4f46\u5148\u5e2e\u6211\u786e\u8ba4\u72b6\u6001\u6587\u4ef6\u548c\u542f\u52a8\u547d\u4ee4\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u901a\u8fc7 TUI \u770b\u7740 open loop \u8dd1\u5f53\u524d\u9879\u76ee\u4f18\u5316\uff1a\u76ee\u6807\u662f\u51cf\u5c11 obvious bugs\u3001\u8865\u6587\u6863\u3001\u8dd1\u6d4b\u8bd5\u3002\u4f60\u5148\u544a\u8bc9\u6211 OpenCode Loop TUI \u91cc target\u3001mode\u3001timeout\u3001iterations \u5e94\u8be5\u600e\u4e48\u586b\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u5199\u4e00\u4e2a GitHub Actions workflow \u8dd1 pytest \u548c ruff\uff0c\u4e0d\u9700\u8981\u4efb\u4f55\u81ea\u52a8 agent \u5faa\u73af\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8fd9\u4e2a TUI \u7ec4\u4ef6\u5e03\u5c40\u6709\u70b9\u4e11\uff0c\u5e2e\u6211\u6539 Textual CSS\u3002\u6ce8\u610f\u8fd9\u91cc\u8bf4\u7684\u662f\u5e94\u7528\u754c\u9762\u672c\u8eab\uff0c\u4e0d\u662f\u8981\u7528 OpenCode Loop \u53bb\u8dd1\u9879\u76ee\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ],
+      "passed": 6,
+      "failed": 6,
+      "total": 12,
+      "results": [
+        {
+          "query": "\u7528 TUI \u7ba1\u591a\u4e2a\u9879\u76ee\u65f6\uff0c\u6211\u5e94\u8be5\u600e\u4e48\u7ed9\u8fd9\u4e2a\u9879\u76ee\u586b recent target\u3001iterations\u3001timeout \u548c program\uff1f\u76ee\u6807\u662f\u81ea\u52a8\u89e3\u51b3 warnings\uff0c\u4e0d\u662f\u624b\u52a8 debug\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u6709\u4e2a\u65e7 Node \u9879\u76ee\uff0cnpm test \u4f1a\u5931\u8d25\u3002\u6211\u4e0d\u60f3\u624b\u52a8\u6765\u56de\u6539\uff0c\u8ba9\u5927\u6a21\u578b\u81ea\u5df1 build/verify/report \u591a\u8dd1\u51e0\u8f6e\uff0c\u4f46\u662f\u8981\u6709 circuit breaker \u548c timeout\u3002\u600e\u4e48\u7528\u8fd9\u4e2a open loop \u8dd1\uff1f",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8bf7\u5728\u5f53\u524d repo \u4e0a\u7528\u547d\u4ee4\u884c\u542f\u52a8 OpenCode Loop\uff1a\u5148 setup\uff0c\u76ee\u6807\u662f\u4fee\u6389 mypy \u62a5\u9519\u548c\u5355\u5143\u6d4b\u8bd5\u5931\u8d25\uff0c\u6700\u591a 5 \u6b21\u8fed\u4ee3\uff0c\u6bcf\u6b21 20 \u5206\u949f\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u62d6\u4e00\u4e2a Windows \u6587\u4ef6\u5939\u5230 .cmd \u542f\u52a8\u5668\u91cc\uff0c\u8ba9 Windows \u539f\u751f TUI + WSL \u540e\u7aef\u8dd1\u81ea\u52a8\u4fee bug\u3002\u4f60\u5e2e\u6211\u51c6\u5907\u8981\u586b\u7684\u4efb\u52a1\u63cf\u8ff0\u548c\u6ce8\u610f\u4e8b\u9879\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a React \u4ed3\u5e93 lint warning \u5f88\u591a\uff0c\u8fd8\u6709\u51e0\u4e2a\u6d4b\u8bd5\u7ea2\u4e86\u3002\u6211\u60f3\u8ba9\u4e00\u4e2a agent \u4e00\u8f6e\u8f6e\u81ea\u52a8\u4fee\uff0c\u4fee\u5b8c\u81ea\u5df1\u8dd1\u9a8c\u8bc1\u3002\u8bf7\u7528 opencode-loop \u547d\u4ee4\u884c\u65b9\u5f0f\u51c6\u5907\u5e76\u542f\u52a8\uff0citerations \u5148\u8bbe\u5c0f\u4e00\u70b9\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u5728 C:\\Users\\lt\\Desktop\\demo-api \u4e0b\u9762\u60f3\u4ece\u96f6\u505a\u4e00\u4e2a FastAPI \u5c0f\u9879\u76ee\uff0c\u4e0d\u60f3\u6bcf\u4e00\u6b65\u90fd\u76ef\u7740\u3002\u5e2e\u6211\u7528 OpenCode Loop \u5148\u65e0\u4eba\u503c\u5b88\u8dd1 3 \u8f6e\uff0c\u76ee\u6807\u662f\u751f\u6210\u9aa8\u67b6\u3001README\u3001\u57fa\u7840 pytest\uff0c\u5e76\u4e14\u4e0d\u8981\u65e0\u9650\u8dd1\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u521b\u5efa\u4e00\u4e2a Codex skill\uff0c\u7528\u6765\u6307\u5bfc\u7528\u6237\u5199\u6d4b\u8bd5\u8ba1\u5212\u3002\u8fd9\u4e2a skill \u8ddf unattended coding loop \u65e0\u5173\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u89e3\u91ca\u4e00\u4e0b while loop \u548c for loop \u7684\u533a\u522b\uff0c\u6700\u597d\u7528 Python \u4e3e\u4f8b\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u4f60\u73b0\u5728\u624b\u52a8\u770b\u4e00\u4e0b tests/test_api.py \u7684\u65ad\u8a00\u5931\u8d25\uff0c\u522b\u542f\u52a8\u65e0\u4eba\u503c\u5b88 agent\uff0c\u4e5f\u4e0d\u8981\u7528 OpenCode Loop\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u4fee\u590d\u5f53\u524d Python traceback\uff1aKeyError: 'status'\u3002\u5148\u5b9a\u4f4d\u6839\u56e0\u5e76\u7ed9\u6700\u5c0f patch\uff0c\u522b\u8ba9\u6a21\u578b\u81ea\u52a8\u53cd\u590d\u8dd1\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u8fd0\u884c\u9879\u76ee\u7684\u73b0\u6709 test.sh \u770b\u770b\u5931\u8d25\u539f\u56e0\uff0c\u7136\u540e\u628a\u65e5\u5fd7\u6458\u8981\u7ed9\u6211\u3002\u4e0d\u8981\u542f\u52a8 OpenCode Loop\uff0c\u4e5f\u4e0d\u8981\u957f\u671f\u8fd0\u884c\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u6211\u60f3\u4e86\u89e3 OpenCode \u8fd9\u4e2a CLI \u548c Claude Code \u7684\u533a\u522b\uff0c\u7ed9\u6211\u6982\u5ff5\u89e3\u91ca\u5373\u53ef\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ]
+    },
+    {
+      "iteration": 2,
+      "description": "Use this skill for OpenCode Loop \u2014 an autonomous coding agent that loops through write \u2192 verify \u2192 fix cycles without human supervision. Trigger when the user wants hands-off, multi-round automated coding: creating projects from scratch without step-by-step oversight, iteratively auto-fixing bugs/test failures/type errors/lint warnings, running repeated build-verify-report cycles, or configuring iteration caps, timeouts, and circuit breakers for a self-running agent. Covers CLI and TUI workflows including setup, monitoring, and program customization. Triggers on mentions of opencode-loop, OpenCodeLoop, open loop, or any request to run an autonomous coding loop. Not for one-shot fixes, manual debugging, or general questions about loops or iteration in programming.",
+      "train_passed": 6,
+      "train_failed": 6,
+      "train_total": 12,
+      "train_results": [
+        {
+          "query": "\u8bf7\u5728\u5f53\u524d repo \u4e0a\u7528\u547d\u4ee4\u884c\u542f\u52a8 OpenCode Loop\uff1a\u5148 setup\uff0c\u76ee\u6807\u662f\u4fee\u6389 mypy \u62a5\u9519\u548c\u5355\u5143\u6d4b\u8bd5\u5931\u8d25\uff0c\u6700\u591a 5 \u6b21\u8fed\u4ee3\uff0c\u6bcf\u6b21 20 \u5206\u949f\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u62d6\u4e00\u4e2a Windows \u6587\u4ef6\u5939\u5230 .cmd \u542f\u52a8\u5668\u91cc\uff0c\u8ba9 Windows \u539f\u751f TUI + WSL \u540e\u7aef\u8dd1\u81ea\u52a8\u4fee bug\u3002\u4f60\u5e2e\u6211\u51c6\u5907\u8981\u586b\u7684\u4efb\u52a1\u63cf\u8ff0\u548c\u6ce8\u610f\u4e8b\u9879\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u7528 TUI \u7ba1\u591a\u4e2a\u9879\u76ee\u65f6\uff0c\u6211\u5e94\u8be5\u600e\u4e48\u7ed9\u8fd9\u4e2a\u9879\u76ee\u586b recent target\u3001iterations\u3001timeout \u548c program\uff1f\u76ee\u6807\u662f\u81ea\u52a8\u89e3\u51b3 warnings\uff0c\u4e0d\u662f\u624b\u52a8 debug\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u6709\u4e2a\u65e7 Node \u9879\u76ee\uff0cnpm test \u4f1a\u5931\u8d25\u3002\u6211\u4e0d\u60f3\u624b\u52a8\u6765\u56de\u6539\uff0c\u8ba9\u5927\u6a21\u578b\u81ea\u5df1 build/verify/report \u591a\u8dd1\u51e0\u8f6e\uff0c\u4f46\u662f\u8981\u6709 circuit breaker \u548c timeout\u3002\u600e\u4e48\u7528\u8fd9\u4e2a open loop \u8dd1\uff1f",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a React \u4ed3\u5e93 lint warning \u5f88\u591a\uff0c\u8fd8\u6709\u51e0\u4e2a\u6d4b\u8bd5\u7ea2\u4e86\u3002\u6211\u60f3\u8ba9\u4e00\u4e2a agent \u4e00\u8f6e\u8f6e\u81ea\u52a8\u4fee\uff0c\u4fee\u5b8c\u81ea\u5df1\u8dd1\u9a8c\u8bc1\u3002\u8bf7\u7528 opencode-loop \u547d\u4ee4\u884c\u65b9\u5f0f\u51c6\u5907\u5e76\u542f\u52a8\uff0citerations \u5148\u8bbe\u5c0f\u4e00\u70b9\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u5728 C:\\Users\\lt\\Desktop\\demo-api \u4e0b\u9762\u60f3\u4ece\u96f6\u505a\u4e00\u4e2a FastAPI \u5c0f\u9879\u76ee\uff0c\u4e0d\u60f3\u6bcf\u4e00\u6b65\u90fd\u76ef\u7740\u3002\u5e2e\u6211\u7528 OpenCode Loop \u5148\u65e0\u4eba\u503c\u5b88\u8dd1 3 \u8f6e\uff0c\u76ee\u6807\u662f\u751f\u6210\u9aa8\u67b6\u3001README\u3001\u57fa\u7840 pytest\uff0c\u5e76\u4e14\u4e0d\u8981\u65e0\u9650\u8dd1\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u521b\u5efa\u4e00\u4e2a Codex skill\uff0c\u7528\u6765\u6307\u5bfc\u7528\u6237\u5199\u6d4b\u8bd5\u8ba1\u5212\u3002\u8fd9\u4e2a skill \u8ddf unattended coding loop \u65e0\u5173\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u89e3\u91ca\u4e00\u4e0b while loop \u548c for loop \u7684\u533a\u522b\uff0c\u6700\u597d\u7528 Python \u4e3e\u4f8b\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u4fee\u590d\u5f53\u524d Python traceback\uff1aKeyError: 'status'\u3002\u5148\u5b9a\u4f4d\u6839\u56e0\u5e76\u7ed9\u6700\u5c0f patch\uff0c\u522b\u8ba9\u6a21\u578b\u81ea\u52a8\u53cd\u590d\u8dd1\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u4f60\u73b0\u5728\u624b\u52a8\u770b\u4e00\u4e0b tests/test_api.py \u7684\u65ad\u8a00\u5931\u8d25\uff0c\u522b\u542f\u52a8\u65e0\u4eba\u503c\u5b88 agent\uff0c\u4e5f\u4e0d\u8981\u7528 OpenCode Loop\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u8fd0\u884c\u9879\u76ee\u7684\u73b0\u6709 test.sh \u770b\u770b\u5931\u8d25\u539f\u56e0\uff0c\u7136\u540e\u628a\u65e5\u5fd7\u6458\u8981\u7ed9\u6211\u3002\u4e0d\u8981\u542f\u52a8 OpenCode Loop\uff0c\u4e5f\u4e0d\u8981\u957f\u671f\u8fd0\u884c\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u6211\u60f3\u4e86\u89e3 OpenCode \u8fd9\u4e2a CLI \u548c Claude Code \u7684\u533a\u522b\uff0c\u7ed9\u6211\u6982\u5ff5\u89e3\u91ca\u5373\u53ef\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ],
+      "test_passed": 4,
+      "test_failed": 4,
+      "test_total": 8,
+      "test_results": [
+        {
+          "query": "\u628a D:\\work\\ml-exp \u8fd9\u4e2a\u76ee\u5f55\u4ea4\u7ed9\u65e0\u4eba\u503c\u5b88\u5faa\u73af\uff0c\u505a\u51e0\u8f6e\u5c0f\u5b9e\u9a8c\uff0c\u8bc4\u4f30\u6307\u6807\u662f validation loss\u3002\u5e94\u8be5\u7528 dev \u8fd8\u662f ml mode\uff1f\u5e2e\u6211\u51c6\u5907 OpenCodeLoop \u7684\u542f\u52a8\u65b9\u6848\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u9879\u76ee\u8fd8\u6ca1\u5efa\uff0c\u53ea\u6709\u4e00\u4e2a\u60f3\u6cd5\uff1a\u505a\u4e00\u4e2a CLI \u5de5\u5177\u6574\u7406 markdown\u3002\u4f60\u80fd\u5148\u5efa\u9879\u76ee brief\uff0c\u7136\u540e\u8ba9 OpenCode Loop unattended \u5730\u6309 dev \u6a21\u5f0f\u8dd1\u8d77\u6765\u5417\uff1f",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u901a\u8fc7 TUI \u770b\u7740 open loop \u8dd1\u5f53\u524d\u9879\u76ee\u4f18\u5316\uff1a\u76ee\u6807\u662f\u51cf\u5c11 obvious bugs\u3001\u8865\u6587\u6863\u3001\u8dd1\u6d4b\u8bd5\u3002\u4f60\u5148\u544a\u8bc9\u6211 OpenCode Loop TUI \u91cc target\u3001mode\u3001timeout\u3001iterations \u5e94\u8be5\u600e\u4e48\u586b\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "open loop \u8dd1\u5b8c\u4e0a\u4e00\u8f6e\u540e\u8fd8\u6709 stderr log\uff0c\u6211\u60f3\u7ee7\u7eed\u8ba9\u5b83 auto-reset circuit breaker \u540e\u518d\u8dd1 2 \u8f6e\uff0c\u4f46\u5148\u5e2e\u6211\u786e\u8ba4\u72b6\u6001\u6587\u4ef6\u548c\u542f\u52a8\u547d\u4ee4\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u4f18\u5316\u8fd9\u4e2a README \u7684\u8868\u8fbe\uff0c\u76f4\u63a5\u5e2e\u6211\u6539\u6587\u6848\u5c31\u597d\uff0c\u4e0d\u8981\u521b\u5efa .opencode-loop \u6216\u542f\u52a8\u5916\u90e8\u5de5\u5177\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u5ba1\u67e5 opencode-loop.sh \u91cc source lib \u7684\u987a\u5e8f\u6709\u6ca1\u6709\u95ee\u9898\uff0c\u53ea\u505a\u4ee3\u7801\u5ba1\u67e5\uff0c\u4e0d\u8fd0\u884c loop\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u5e2e\u6211\u5199\u4e00\u4e2a GitHub Actions workflow \u8dd1 pytest \u548c ruff\uff0c\u4e0d\u9700\u8981\u4efb\u4f55\u81ea\u52a8 agent \u5faa\u73af\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8fd9\u4e2a TUI \u7ec4\u4ef6\u5e03\u5c40\u6709\u70b9\u4e11\uff0c\u5e2e\u6211\u6539 Textual CSS\u3002\u6ce8\u610f\u8fd9\u91cc\u8bf4\u7684\u662f\u5e94\u7528\u754c\u9762\u672c\u8eab\uff0c\u4e0d\u662f\u8981\u7528 OpenCode Loop \u53bb\u8dd1\u9879\u76ee\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ],
+      "passed": 6,
+      "failed": 6,
+      "total": 12,
+      "results": [
+        {
+          "query": "\u8bf7\u5728\u5f53\u524d repo \u4e0a\u7528\u547d\u4ee4\u884c\u542f\u52a8 OpenCode Loop\uff1a\u5148 setup\uff0c\u76ee\u6807\u662f\u4fee\u6389 mypy \u62a5\u9519\u548c\u5355\u5143\u6d4b\u8bd5\u5931\u8d25\uff0c\u6700\u591a 5 \u6b21\u8fed\u4ee3\uff0c\u6bcf\u6b21 20 \u5206\u949f\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u60f3\u62d6\u4e00\u4e2a Windows \u6587\u4ef6\u5939\u5230 .cmd \u542f\u52a8\u5668\u91cc\uff0c\u8ba9 Windows \u539f\u751f TUI + WSL \u540e\u7aef\u8dd1\u81ea\u52a8\u4fee bug\u3002\u4f60\u5e2e\u6211\u51c6\u5907\u8981\u586b\u7684\u4efb\u52a1\u63cf\u8ff0\u548c\u6ce8\u610f\u4e8b\u9879\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u7528 TUI \u7ba1\u591a\u4e2a\u9879\u76ee\u65f6\uff0c\u6211\u5e94\u8be5\u600e\u4e48\u7ed9\u8fd9\u4e2a\u9879\u76ee\u586b recent target\u3001iterations\u3001timeout \u548c program\uff1f\u76ee\u6807\u662f\u81ea\u52a8\u89e3\u51b3 warnings\uff0c\u4e0d\u662f\u624b\u52a8 debug\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u6709\u4e2a\u65e7 Node \u9879\u76ee\uff0cnpm test \u4f1a\u5931\u8d25\u3002\u6211\u4e0d\u60f3\u624b\u52a8\u6765\u56de\u6539\uff0c\u8ba9\u5927\u6a21\u578b\u81ea\u5df1 build/verify/report \u591a\u8dd1\u51e0\u8f6e\uff0c\u4f46\u662f\u8981\u6709 circuit breaker \u548c timeout\u3002\u600e\u4e48\u7528\u8fd9\u4e2a open loop \u8dd1\uff1f",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u8fd9\u4e2a React \u4ed3\u5e93 lint warning \u5f88\u591a\uff0c\u8fd8\u6709\u51e0\u4e2a\u6d4b\u8bd5\u7ea2\u4e86\u3002\u6211\u60f3\u8ba9\u4e00\u4e2a agent \u4e00\u8f6e\u8f6e\u81ea\u52a8\u4fee\uff0c\u4fee\u5b8c\u81ea\u5df1\u8dd1\u9a8c\u8bc1\u3002\u8bf7\u7528 opencode-loop \u547d\u4ee4\u884c\u65b9\u5f0f\u51c6\u5907\u5e76\u542f\u52a8\uff0citerations \u5148\u8bbe\u5c0f\u4e00\u70b9\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u6211\u5728 C:\\Users\\lt\\Desktop\\demo-api \u4e0b\u9762\u60f3\u4ece\u96f6\u505a\u4e00\u4e2a FastAPI \u5c0f\u9879\u76ee\uff0c\u4e0d\u60f3\u6bcf\u4e00\u6b65\u90fd\u76ef\u7740\u3002\u5e2e\u6211\u7528 OpenCode Loop \u5148\u65e0\u4eba\u503c\u5b88\u8dd1 3 \u8f6e\uff0c\u76ee\u6807\u662f\u751f\u6210\u9aa8\u67b6\u3001README\u3001\u57fa\u7840 pytest\uff0c\u5e76\u4e14\u4e0d\u8981\u65e0\u9650\u8dd1\u3002",
+          "should_trigger": true,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": false
+        },
+        {
+          "query": "\u5e2e\u6211\u521b\u5efa\u4e00\u4e2a Codex skill\uff0c\u7528\u6765\u6307\u5bfc\u7528\u6237\u5199\u6d4b\u8bd5\u8ba1\u5212\u3002\u8fd9\u4e2a skill \u8ddf unattended coding loop \u65e0\u5173\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u89e3\u91ca\u4e00\u4e0b while loop \u548c for loop \u7684\u533a\u522b\uff0c\u6700\u597d\u7528 Python \u4e3e\u4f8b\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u4fee\u590d\u5f53\u524d Python traceback\uff1aKeyError: 'status'\u3002\u5148\u5b9a\u4f4d\u6839\u56e0\u5e76\u7ed9\u6700\u5c0f patch\uff0c\u522b\u8ba9\u6a21\u578b\u81ea\u52a8\u53cd\u590d\u8dd1\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u4f60\u73b0\u5728\u624b\u52a8\u770b\u4e00\u4e0b tests/test_api.py \u7684\u65ad\u8a00\u5931\u8d25\uff0c\u522b\u542f\u52a8\u65e0\u4eba\u503c\u5b88 agent\uff0c\u4e5f\u4e0d\u8981\u7528 OpenCode Loop\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u8bf7\u8fd0\u884c\u9879\u76ee\u7684\u73b0\u6709 test.sh \u770b\u770b\u5931\u8d25\u539f\u56e0\uff0c\u7136\u540e\u628a\u65e5\u5fd7\u6458\u8981\u7ed9\u6211\u3002\u4e0d\u8981\u542f\u52a8 OpenCode Loop\uff0c\u4e5f\u4e0d\u8981\u957f\u671f\u8fd0\u884c\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        },
+        {
+          "query": "\u6211\u60f3\u4e86\u89e3 OpenCode \u8fd9\u4e2a CLI \u548c Claude Code \u7684\u533a\u522b\uff0c\u7ed9\u6211\u6982\u5ff5\u89e3\u91ca\u5373\u53ef\u3002",
+          "should_trigger": false,
+          "trigger_rate": 0.0,
+          "triggers": 0,
+          "runs": 1,
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

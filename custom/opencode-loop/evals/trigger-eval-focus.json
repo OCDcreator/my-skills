@@ -1,0 +1,42 @@
+[
+  {
+    "query": "这个 React 仓库 lint warning 很多，还有几个测试红了。我想让一个 agent 一轮轮自动修，修完自己跑验证。请用 opencode-loop 命令行方式准备并启动，iterations 先设小一点。",
+    "should_trigger": true
+  },
+  {
+    "query": "把 D:\\work\\ml-exp 这个目录交给无人值守循环，做几轮小实验，评估指标是 validation loss。应该用 dev 还是 ml mode？帮我准备 OpenCodeLoop 的启动方案。",
+    "should_trigger": true
+  },
+  {
+    "query": "我想拖一个 Windows 文件夹到 .cmd 启动器里，让 Windows 原生 TUI + WSL 后端跑自动修 bug。你帮我准备要填的任务描述和注意事项。",
+    "should_trigger": true
+  },
+  {
+    "query": "我有个旧 Node 项目，npm test 会失败。我不想手动来回改，让大模型自己 build/verify/report 多跑几轮，但是要有 circuit breaker 和 timeout。怎么用这个 open loop 跑？",
+    "should_trigger": true
+  },
+  {
+    "query": "项目还没建，只有一个想法：做一个 CLI 工具整理 markdown。你能先建项目 brief，然后让 OpenCode Loop unattended 地按 dev 模式跑起来吗？",
+    "should_trigger": true
+  },
+  {
+    "query": "用 TUI 管多个项目时，我应该怎么给这个项目填 recent target、iterations、timeout 和 program？目标是自动解决 warnings，不是手动 debug。",
+    "should_trigger": true
+  },
+  {
+    "query": "请你现在手动看一下 tests/test_api.py 的断言失败，别启动无人值守 agent，也不要用 OpenCode Loop。",
+    "should_trigger": false
+  },
+  {
+    "query": "解释一下 while loop 和 for loop 的区别，最好用 Python 举例。",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我写一个 GitHub Actions workflow 跑 pytest 和 ruff，不需要任何自动 agent 循环。",
+    "should_trigger": false
+  },
+  {
+    "query": "我想优化这个 README 的表达，直接帮我改文案就好，不要创建 .opencode-loop 或启动外部工具。",
+    "should_trigger": false
+  }
+]
