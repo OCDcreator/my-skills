@@ -7,13 +7,13 @@
 ```
 my-skills/
 ├── custom/                                    # 自有技能
-│   ├── devops/syncthing/                      # Syncthing 同步排障、保留名与 .stignore 规则
 │   ├── fnos-fpk-dev/                          # 飞牛 fnOS FPK 开发
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
 │   ├── opencode-provider-config/              # OpenCode 模型配置
 │   ├── searxng/                               # SearXNG 联网搜索
 │   ├── skill-catalog-maintainer/              # 技能目录维护
+│   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
 │   └── x-reader/                              # 视频/播客转录内容分析
 ├── external/                                  # 外部社区技能
 │   ├── anthropics-skills/                     # Anthropic 官方技能
@@ -33,13 +33,13 @@ my-skills/
 
 | 技能 | 说明 |
 |------|------|
-| [devops/syncthing](custom/devops/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录创建、分类、审计与维护规则同步 |
+| [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
 | [x-reader](custom/x-reader/) | 视频/播客转录内容多维分析与结构化总结 |
 
 ## 外部技能来源 (external/)

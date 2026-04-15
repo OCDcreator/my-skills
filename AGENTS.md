@@ -10,7 +10,7 @@ Two top-level directories: `custom/` (self-authored) and `external/` (cloned fro
 ### Custom skill (`custom/`)
 
 1. Create a leaf skill directory anywhere under `custom/` and put `SKILL.md` at that leaf
-2. `custom/` is not flat: grouped paths like `custom/devops/syncthing` and nested families like `custom/x-reader/*` already exist
+2. `custom/` can contain grouped paths, but keep single-purpose skills at the leaf path the user expects; nested families like `custom/x-reader/*` already exist
 3. Update `README.md`: add entry to directory tree + custom skill table
 4. If `SKILLS.md` exists or the user asks for a skill catalog, use `custom/skill-catalog-maintainer` and include source repo/subdir/install hints in the catalog
    - For project-specific recommendations, install hints should name target paths for Claude Code (`.claude/skills`), OpenCode (`.opencode/skills`), and/or Codex (`.agents/skills`)
