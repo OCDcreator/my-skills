@@ -1,0 +1,42 @@
+{
+  "skill_name": "syncthing",
+  "evals": [
+    {
+      "id": 0,
+      "name": "windows-mac-reserved-name-stignore-order",
+      "prompt": "Windows 和 Mac 之间 Syncthing 同步显示 0%，Windows 端 folder/errors 里有 `syncing: name is invalid, contains Windows reserved name: \"aux\"`。共享目录根下 `.stignore` 前几行是 `!custom-project/opencodian/reference-projects/`、`!custom-project/opencodian/reference-projects/**`，后面才有 `custom-project/opencodian/reference-projects/claudian/src/providers/claude/aux`。请诊断根因并给出修复和验证步骤。",
+      "expected_output": "指出 Syncthing 忽略规则首个匹配生效，`!` 例外先命中导致 aux 排除失效；要求把 aux 排除放在例外前，补 `aux/**`，必要时同步到 Mac 侧 `.stignore`，并用 db/ignores、db/status、folder/errors、db/completion 验证。",
+      "files": [],
+      "expectations": [
+        "指出 `.stignore` 是首个匹配生效，前置 `!` 例外会让后续 aux 排除失效。",
+        "给出 `aux` 与 `aux/**` 两条规则，并明确需要放在相关 `!` 例外之前。",
+        "提到用 `GET /rest/db/ignores` 验证当前加载规则顺序。",
+        "提到 `.stignore` 不会通过 Syncthing 自动同步到其他设备。"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "scan-macos-vault-for-windows-reserved-names",
+      "prompt": "请通过 SSH 检查 Mac 上 `/Volumes/SDD2T/obsidian-vault-write` 里还有没有会影响 Windows 同步的保留名目录。需要区分活跃同步树和 `.stversions` 历史版本目录，最后说明哪些需要加入忽略规则。",
+      "expected_output": "给出保留名列表 CON/PRN/AUX/NUL/COM1-9/LPT1-9，建议在 Mac 端递归扫描目录并排除 .stversions 作为活跃风险判断；说明 .stversions 是历史版本残留通常不影响当前同步。",
+      "files": [],
+      "expectations": [
+        "列出 Windows 保留名集合，至少覆盖 CON、PRN、AUX、NUL、COM1-9、LPT1-9。",
+        "明确区分活跃同步树和 `.stversions` 历史版本目录。",
+        "说明 `.stversions` 中的历史残留通常不是当前活跃同步失败根因。"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "macos-delete-loop-not-empty",
+      "prompt": "Syncthing 一直显示同步中，日志里反复出现 `Failed to sync: delete dir: directory has been deleted on a remote device but is not empty`。目标设备在线。请给出排障顺序、根因判断和修复命令。",
+      "expected_output": "先查连接、db/status、system/log 或 folder/errors；识别 macOS 扩展属性/残留目录导致删除死循环；用 xattr -cr 和 rm -rf 清理，再 POST /rest/db/scan 并复查 needFiles/needDeletes/errors/completion。",
+      "files": [],
+      "expectations": [
+        "排障顺序中包含 `folder/errors` 或 `db/need`，而不是只看连接和日志。",
+        "修复命令中包含 `xattr -cr` 与 `rm -rf`。",
+        "修复后包含 `POST /rest/db/scan` 与 `db/status`/`db/completion` 验证。"
+      ]
+    }
+  ]
+}
