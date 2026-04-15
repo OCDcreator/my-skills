@@ -14,7 +14,7 @@ if errorlevel 1 (
 set "REPO_DIR=%CD%"
 set "STATUS=SUCCESS"
 set "DETAIL=已成功提交并推送到远端。"
-set "BRANCH="
+set "BRANCH=main"
 set "REMOTE_URL="
 set "COMMIT_TS="
 set "COMMIT_MSG="
