@@ -91,7 +91,7 @@ echo.
 echo [步骤 4/7] 下载并复制外部技能...
 echo.
 
-echo [1/6] anthropics-skills
+echo [1/7] anthropics-skills
 git clone --depth 1 --branch main https://github.com/anthropics/skills.git "%TMP_DIR%\anthropics-skills"
 if exist "%TMP_DIR%\anthropics-skills\skills" (
     if not exist "%REPO_DIR%\external\anthropics-skills" mkdir "%REPO_DIR%\external\anthropics-skills"
@@ -103,7 +103,7 @@ if exist "%TMP_DIR%\anthropics-skills\skills" (
 )
 echo.
 
-echo [2/6] awesome-claude-skills
+echo [2/7] awesome-claude-skills
 git clone --depth 1 --branch master https://github.com/ComposioHQ/awesome-claude-skills.git "%TMP_DIR%\awesome-claude-skills"
 if exist "%TMP_DIR%\awesome-claude-skills" (
     if not exist "%REPO_DIR%\external\awesome-claude-skills" mkdir "%REPO_DIR%\external\awesome-claude-skills"
@@ -119,7 +119,7 @@ if exist "%TMP_DIR%\awesome-claude-skills" (
 )
 echo.
 
-echo [3/6] claude-plugins-official
+echo [3/7] claude-plugins-official
 git clone --depth 1 --branch main https://github.com/anthropics/claude-plugins-official.git "%TMP_DIR%\claude-plugins-official"
 if exist "%TMP_DIR%\claude-plugins-official\plugins" (
     if not exist "%REPO_DIR%\external\claude-plugins-official" mkdir "%REPO_DIR%\external\claude-plugins-official"
@@ -144,7 +144,7 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
 )
 echo.
 
-echo [4/6] baoyu-skills
+echo [4/7] baoyu-skills
 git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills"
 if exist "%TMP_DIR%\baoyu-skills\skills" (
     if not exist "%REPO_DIR%\external\baoyu-skills" mkdir "%REPO_DIR%\external\baoyu-skills"
@@ -156,7 +156,7 @@ if exist "%TMP_DIR%\baoyu-skills\skills" (
 )
 echo.
 
-echo [5/6] axton-obsidian-visual-skills
+echo [5/7] axton-obsidian-visual-skills
 git clone --depth 1 --branch main https://github.com/axtonliu/axton-obsidian-visual-skills.git "%TMP_DIR%\axton-obsidian-visual-skills"
 if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
     if not exist "%REPO_DIR%\external\axton-obsidian-visual-skills" mkdir "%REPO_DIR%\external\axton-obsidian-visual-skills"
