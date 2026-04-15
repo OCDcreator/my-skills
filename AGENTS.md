@@ -13,6 +13,7 @@ Two top-level directories: `custom/` (self-authored) and `external/` (cloned fro
 2. `custom/` is not flat: grouped paths like `custom/devops/syncthing` and nested families like `custom/x-reader/*` already exist
 3. Update `README.md`: add entry to directory tree + custom skill table
 4. If `SKILLS.md` exists or the user asks for a skill catalog, use `custom/skill-catalog-maintainer` and include source repo/subdir/install hints in the catalog
+   - For project-specific recommendations, install hints should name target paths for Claude Code (`.claude/skills`), OpenCode (`.opencode/skills`), and/or Codex (`.agents/skills`)
 5. Commit and push
 
 ### External skill (`external/`)
@@ -34,7 +35,7 @@ When adding a new external source, **all four files** must be updated:
    - Directory tree under `external/`
    - External sources table (columns: local dir, source repo link, description)
    - Source count in the `update.sh` / `update.bat` row of the scripts table
-5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`; external entries should keep source repo, branch, subdir, and install hints
+5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`; external entries should keep source repo, branch, subdir, and install hints. Project install hints should mention `.claude/skills`, `.agents/skills`, and `.opencode/skills` where relevant.
 
 ## Gotchas
 

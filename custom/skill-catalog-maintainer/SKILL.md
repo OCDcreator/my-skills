@@ -63,7 +63,7 @@ When recommending skills for another project, include enough source data for ano
 | Source repo | Git repository to clone or fetch from |
 | Source branch | Branch from `update.sh` for external sources; `main` for this repo unless verified otherwise |
 | Source subdir | Exact upstream path to copy, usually `<source-subdir>/<skill-dir>` |
-| Install hint | One-line copy instruction for the target project's skills directory |
+| Install hint | One-line clone/copy instruction that names the target agent directories |
 
 Prefer this compact recommendation table:
 
@@ -72,6 +72,30 @@ Prefer this compact recommendation table:
 ```
 
 For `custom/*` skills, use this repo as the source repo and the custom path as the source subdir. For `external/*` skills, derive the repo, branch, and base subdir from `update.sh` `SOURCES`; append the local skill directory name to that base subdir. If the source cannot be verified, write `Needs source review` rather than inventing a URL.
+
+## Target Project Installation
+
+When the user wants another agent or another machine to install recommended skills into a project, give tool-specific target paths. Prefer copying the same selected skill directories into both `.claude/skills/` and `.agents/skills/` for broad compatibility.
+
+| Target agent | Project-level skill path | Notes |
+|--------------|--------------------------|-------|
+| Claude Code | `.claude/skills/<skill-name>/SKILL.md` | Project-only skills. If the project uses `AGENTS.md`, create `CLAUDE.md` containing `@AGENTS.md` so Claude Code reads the same project guidance. |
+| OpenCode | `.opencode/skills/<skill-name>/SKILL.md` | Native OpenCode path. OpenCode also discovers `.claude/skills/` and `.agents/skills/`, so those are usually enough for shared setups. |
+| Codex CLI | `.agents/skills/<skill-name>/SKILL.md` | Cross-agent repo skills path; also useful when the project should work across Codex and OpenCode. |
+
+Use this installation plan unless the user specifies one tool only:
+
+1. Clone the source repo to a temp directory.
+2. Copy each selected `Source subdir` to `<project>/.claude/skills/<skill-dir>/` and `<project>/.agents/skills/<skill-dir>/`.
+3. If the user specifically targets OpenCode, also copy to `<project>/.opencode/skills/<skill-dir>/` or note that OpenCode can read the shared `.claude`/`.agents` paths.
+4. Update target `AGENTS.md` with the selected skills, trigger scenarios, and the chosen project skill directories.
+5. For Claude Code projects, create or update `CLAUDE.md` with `@AGENTS.md` unless the project already has equivalent Claude instructions.
+
+Example install hint:
+
+```text
+git clone --depth 1 -b <branch> <source-repo> <tmp>; copy <tmp>/<source-subdir> to <project>/.claude/skills/<skill-dir>/ and <project>/.agents/skills/<skill-dir>/
+```
 
 ## Categories
 
@@ -104,6 +128,7 @@ When adding or removing a skill, update all relevant files in the same change:
 - `custom/` can contain nested skill families such as `custom/x-reader/video`; treat leaf directories containing `SKILL.md` as skills.
 - External sources can duplicate skill names; catalog by `path + name`, not name alone.
 - Recommendation output must include a clone/copy source. A local path alone is not enough for project-specific installation.
+- Project install guidance should name agent-specific directories. Do not say only "copy to the project" without specifying `.claude/skills`, `.agents/skills`, or `.opencode/skills`.
 - `update.sh` auto-discovers skill dirs under each source's configured subdir; `update.bat` mirrors this manually.
 - `update.sh` has `EXCLUDE_NAMES`; `update.bat` may not have equivalent filtering. Document this asymmetry when it affects catalog completeness.
 - Do not list every upstream README or asset as a skill. A skill is a directory containing `SKILL.md`.
