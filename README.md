@@ -7,7 +7,7 @@
 ```
 my-skills/
 ├── custom/                                    # 自有技能
-│   ├── devops/syncthing/                      # Syncthing 同步排障
+│   ├── devops/syncthing/                      # Syncthing 同步排障、保留名与 .stignore 规则
 │   ├── fnos-fpk-dev/                          # 飞牛 fnOS FPK 开发
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
@@ -33,7 +33,7 @@ my-skills/
 
 | 技能 | 说明 |
 |------|------|
-| [syncthing](custom/devops/syncthing/) | Syncthing 同步排障与诊断 |
+| [syncthing](custom/devops/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
