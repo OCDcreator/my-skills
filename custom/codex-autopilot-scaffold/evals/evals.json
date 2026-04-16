@@ -1,0 +1,41 @@
+{
+  "skill_name": "codex-autopilot-scaffold",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "把我们在另一个仓库里跑通的 Codex 无人值守 maintainability autopilot，迁到这个 Node/TypeScript 项目里。我要 repo-local 的 automation/autopilot.py、queue 文档、runtime state、Windows/macOS profile，都直接脚手架出来。",
+      "expected_output": "Assistant should trigger the skill, choose the maintainability preset, inspect the repo for commands and entrypoints, run the bundled scaffold script, and then run doctor plus a dry-run round.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "这个 Python 仓库现在主要问题是 lint/typecheck/test 质量门槛不稳。我不要 OpenCode Loop，我要把一套 Codex 风格的 repo 内 autopilot 注入进来，后面让别的模型按 queue 跑 quality-gate recovery。",
+      "expected_output": "Assistant should trigger the skill, choose the quality-gate preset, keep the boundary on scaffold/config/docs work only, and produce repo-local autopilot assets with queue docs.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "给这个项目装一个 bugfix/backlog 型的 Codex autopilot scaffold。要求以后可以直接 `python automation/autopilot.py start` 跑一轮一轮的修复，不是外部服务。",
+      "expected_output": "Assistant should trigger the skill, choose the bugfix-backlog preset, scaffold the repo-local controller and docs, and verify the generated commands with doctor and dry-run.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "请直接手动调试这个 pytest 失败，不要上任何无人值守 autopilot。",
+      "expected_output": "Assistant should not use this skill because the user wants one-shot manual debugging and explicitly rejects unattended autopilot.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "帮我启动已经装好的 opencode-loop TUI，我只是想看着它多轮自动修 bug。",
+      "expected_output": "Assistant should not use this skill because the request is about operating an existing OpenCode Loop setup rather than scaffolding a repo-local Codex autopilot.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "解释一下编程里的 event loop 和 game loop 的区别，顺便举几个例子。",
+      "expected_output": "Assistant should not use this skill because the request is conceptual and unrelated to autopilot scaffolding.",
+      "files": []
+    }
+  ]
+}
