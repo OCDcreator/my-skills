@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import shutil
 import socket
@@ -24,6 +25,7 @@ DEFAULT_STATE_PATH = "automation/runtime/autopilot-state.json"
 DEFAULT_RUNTIME_PATH = "automation/runtime"
 DEFAULT_PROFILE_NAME = "windows"
 LOCK_FILENAME = "autopilot.lock.json"
+ROUND_DIRECTORY_RE = re.compile(r"^round-(\d+)$")
 SCHEMA_REQUIRED_TYPES: dict[str, tuple[type, ...]] = {
     "string": (str,),
     "boolean": (bool,),
@@ -1169,9 +1171,120 @@ def run_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def parse_round_directory_number(path: Path | None) -> int | None:
+    if path is None:
+        return None
+    match = ROUND_DIRECTORY_RE.fullmatch(path.name)
+    if not match:
+        return None
+    return int(match.group(1))
+
+
+def resolve_watch_state_path(runtime_directory: Path, explicit_state_path: str | None) -> Path:
+    explicit_path = clean_string(explicit_state_path)
+    if explicit_path:
+        return resolve_repo_path(explicit_path)
+
+    default_state_path = runtime_directory / Path(DEFAULT_STATE_PATH).name
+    if default_state_path.exists():
+        return default_state_path
+
+    candidate_paths = sorted(
+        (
+            path
+            for path in runtime_directory.glob("*state*.json")
+            if path.is_file() and path.name != LOCK_FILENAME
+        ),
+        key=lambda path: (path.stat().st_mtime, path.name),
+    )
+    if candidate_paths:
+        return candidate_paths[-1]
+
+    return default_state_path
+
+
+def build_watch_state_signature(state: dict[str, Any] | None, *, state_path_exists: bool) -> tuple[str, ...]:
+    if not state_path_exists or state is None:
+        return ("missing",)
+    return (
+        clean_string(state.get("status")),
+        clean_string(state.get("current_round")),
+        clean_string(state.get("consecutive_failures")),
+        clean_string(state.get("next_phase_number")),
+        clean_string(state.get("last_phase_doc")),
+        clean_string(state.get("last_next_focus")),
+        clean_string(state.get("last_commit_sha")),
+    )
+
+
+def print_watch_snapshot(
+    *,
+    state: dict[str, Any] | None,
+    state_path: Path,
+    progress_path: Path | None,
+) -> None:
+    state_round = clean_string(state.get("current_round")) if state else ""
+    watched_round_number = parse_round_directory_number(progress_path.parent) if progress_path else None
+    phase_number = clean_string(state.get("next_phase_number")) if state else ""
+    status_value = clean_string(state.get("status")) if state else ""
+    failures_value = clean_string(state.get("consecutive_failures")) if state else ""
+    heading_parts: list[str] = []
+
+    if watched_round_number is not None and state_round and state_round == str(watched_round_number):
+        heading_parts.append(f"round={watched_round_number}")
+    else:
+        if watched_round_number is not None:
+            heading_parts.append(f"watch_round={watched_round_number}")
+        if state_round:
+            heading_parts.append(f"state_round={state_round}")
+    if phase_number:
+        heading_parts.append(f"phase={phase_number}")
+    heading_parts.append(f"status={status_value or 'unknown'}")
+    heading_parts.append(f"failures={failures_value or '0'}")
+
+    print()
+    print("[watch] " + "=" * 72)
+    print(f"[watch] {' '.join(heading_parts)}")
+    if state is None:
+        print(f"[watch] state file: {state_path} (not created yet)")
+    else:
+        print(f"[watch] state file: {state_path}")
+        if state.get("last_phase_doc"):
+            print(f"[watch] phase doc: {state.get('last_phase_doc')}")
+        if state.get("last_next_focus"):
+            print(f"[watch] focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=220)}")
+        if state.get("last_commit_sha"):
+            print(f"[watch] last commit: {state.get('last_commit_sha')}")
+    if progress_path is not None:
+        print(f"[watch] progress log: {progress_path}")
+    print("[watch] " + "=" * 72)
+
+
 def latest_round_directory(runtime_directory: Path) -> Path | None:
-    round_directories = sorted(path for path in runtime_directory.glob("round-*") if path.is_dir())
+    round_directories = sorted(
+        (path for path in runtime_directory.iterdir() if path.is_dir() and ROUND_DIRECTORY_RE.fullmatch(path.name)),
+        key=lambda path: parse_round_directory_number(path) or -1,
+    )
     return round_directories[-1] if round_directories else None
+
+
+def expected_round_number_for_state(state: dict[str, Any] | None) -> int | None:
+    if state is None:
+        return None
+    try:
+        completed_round = int(state.get("current_round", 0))
+    except (TypeError, ValueError):
+        return None
+    if clean_string(state.get("status")) == "active":
+        return completed_round + 1
+    return completed_round if completed_round > 0 else None
+
+
+def watched_round_directory(runtime_directory: Path, state: dict[str, Any] | None) -> Path | None:
+    expected_round_number = expected_round_number_for_state(state)
+    if expected_round_number is not None:
+        return runtime_directory / f"round-{expected_round_number:03d}"
+    return latest_round_directory(runtime_directory)
 
 
 def stop_process(pid: int, *, graceful_timeout_seconds: int = 30) -> None:
@@ -1341,28 +1454,32 @@ def spawn_background_autopilot(command_args: list[str], *, output_path: Path, pi
 
 def run_watch(args: argparse.Namespace) -> int:
     runtime_directory = resolve_repo_path(args.runtime_path)
-    state_path = runtime_directory / Path(DEFAULT_STATE_PATH).name
+    state_path = resolve_watch_state_path(runtime_directory, getattr(args, "state_path", ""))
     last_progress_path: Path | None = None
     last_line_count = 0
-    shown_initial_state = False
+    last_state_signature: tuple[str, ...] | None = None
 
     print(f"[watch] runtime: {runtime_directory}")
     while True:
-        if not shown_initial_state:
-            if state_path.exists():
-                print_state_summary(read_json(state_path))
-            else:
-                print(f"[watch] state file not created yet: {state_path}")
-            shown_initial_state = True
+        state_exists = state_path.exists()
+        state = read_json(state_path) if state_exists else None
+        state_signature = build_watch_state_signature(state, state_path_exists=state_exists)
 
-        newest_round_directory = latest_round_directory(runtime_directory)
-        if newest_round_directory is not None:
-            progress_path = newest_round_directory / "progress.log"
+        round_directory = watched_round_directory(runtime_directory, state)
+        progress_path = round_directory / "progress.log" if round_directory is not None else None
+
+        if state_signature != last_state_signature or progress_path != last_progress_path:
+            print_watch_snapshot(
+                state=state,
+                state_path=state_path,
+                progress_path=progress_path,
+            )
+            last_state_signature = state_signature
+
+        if progress_path is not None:
             if progress_path != last_progress_path:
                 last_progress_path = progress_path
                 last_line_count = 0
-                print()
-                print(f"[watch] now watching {progress_path}")
                 if progress_path.exists():
                     existing_lines = progress_path.read_text(encoding="utf-8", errors="replace").splitlines()
                     if existing_lines:
@@ -1546,6 +1663,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     watch_parser = subparsers.add_parser("watch", help="Watch the latest round progress log.")
     watch_parser.add_argument("--runtime-path", default=DEFAULT_RUNTIME_PATH, help="Runtime directory path.")
+    watch_parser.add_argument("--state-path", default="", help="Optional explicit state JSON path.")
     watch_parser.add_argument("--tail", type=int, default=20, help="How many lines to show when switching logs.")
     watch_parser.add_argument("--refresh-seconds", type=int, default=2, help="Polling interval.")
     watch_parser.add_argument("--once", action="store_true", help="Print current status once and exit.")
