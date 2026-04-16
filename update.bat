@@ -91,7 +91,7 @@ echo.
 echo [步骤 4/7] 下载并复制外部技能...
 echo.
 
-echo [1/8] anthropics-skills
+echo [1/9] anthropics-skills
 git clone --depth 1 --branch main https://github.com/anthropics/skills.git "%TMP_DIR%\anthropics-skills"
 if exist "%TMP_DIR%\anthropics-skills\skills" (
     if not exist "%REPO_DIR%\external\anthropics-skills" mkdir "%REPO_DIR%\external\anthropics-skills"
@@ -103,7 +103,7 @@ if exist "%TMP_DIR%\anthropics-skills\skills" (
 )
 echo.
 
-echo [2/8] awesome-claude-skills
+echo [2/9] awesome-claude-skills
 git clone --depth 1 --branch master https://github.com/ComposioHQ/awesome-claude-skills.git "%TMP_DIR%\awesome-claude-skills"
 if exist "%TMP_DIR%\awesome-claude-skills" (
     if not exist "%REPO_DIR%\external\awesome-claude-skills" mkdir "%REPO_DIR%\external\awesome-claude-skills"
@@ -119,7 +119,7 @@ if exist "%TMP_DIR%\awesome-claude-skills" (
 )
 echo.
 
-echo [3/8] claude-plugins-official
+echo [3/9] claude-plugins-official
 git clone --depth 1 --branch main https://github.com/anthropics/claude-plugins-official.git "%TMP_DIR%\claude-plugins-official"
 if exist "%TMP_DIR%\claude-plugins-official\plugins" (
     if not exist "%REPO_DIR%\external\claude-plugins-official" mkdir "%REPO_DIR%\external\claude-plugins-official"
@@ -144,7 +144,7 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
 )
 echo.
 
-echo [4/8] baoyu-skills
+echo [4/9] baoyu-skills
 git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills"
 if exist "%TMP_DIR%\baoyu-skills\skills" (
     if not exist "%REPO_DIR%\external\baoyu-skills" mkdir "%REPO_DIR%\external\baoyu-skills"
@@ -156,7 +156,7 @@ if exist "%TMP_DIR%\baoyu-skills\skills" (
 )
 echo.
 
-echo [5/8] axton-obsidian-visual-skills
+echo [5/9] axton-obsidian-visual-skills
 git clone --depth 1 --branch main https://github.com/axtonliu/axton-obsidian-visual-skills.git "%TMP_DIR%\axton-obsidian-visual-skills"
 if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
     if not exist "%REPO_DIR%\external\axton-obsidian-visual-skills" mkdir "%REPO_DIR%\external\axton-obsidian-visual-skills"
@@ -172,7 +172,7 @@ if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
 )
 echo.
 
-echo [6/8] kepano-obsidian-skills
+echo [6/9] kepano-obsidian-skills
 git clone --depth 1 --branch main https://github.com/kepano/obsidian-skills.git "%TMP_DIR%\kepano-obsidian-skills"
 if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
     if not exist "%REPO_DIR%\external\kepano-obsidian-skills" mkdir "%REPO_DIR%\external\kepano-obsidian-skills"
@@ -184,7 +184,7 @@ if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
 )
 echo.
 
-echo [7/8] taste-skill
+echo [7/9] taste-skill
 git clone --depth 1 --branch master https://github.com/Leonxlnx/taste-skill.git "%TMP_DIR%\taste-skill"
 if exist "%TMP_DIR%\taste-skill\skills" (
     if not exist "%REPO_DIR%\external\taste-skill" mkdir "%REPO_DIR%\external\taste-skill"
@@ -200,7 +200,7 @@ if exist "%TMP_DIR%\taste-skill\skills" (
 )
 echo.
 
-echo [8/8] html-ppt-skill
+echo [8/9] html-ppt-skill
 git clone --depth 1 --branch main https://github.com/lewislulu/html-ppt-skill.git "%TMP_DIR%\html-ppt-skill"
 if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
     if not exist "%REPO_DIR%\external\html-ppt-skill" mkdir "%REPO_DIR%\external\html-ppt-skill"
@@ -209,6 +209,20 @@ if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
 ) else (
     set /a SOURCE_ERRORS+=1
     echo [WARN] html-ppt-skill 下载失败或没有找到 SKILL.md
+)
+echo.
+
+echo [9/9] awesome-design-md
+git clone --depth 1 --branch main https://github.com/VoltAgent/awesome-design-md.git "%TMP_DIR%\awesome-design-md"
+if exist "%TMP_DIR%\awesome-design-md\design-md" (
+    if not exist "%REPO_DIR%\external\awesome-design-md" mkdir "%REPO_DIR%\external\awesome-design-md"
+    for /d %%d in ("%TMP_DIR%\awesome-design-md\design-md\*") do (
+        xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\awesome-design-md\%%~nxd\" >nul 2>nul
+    )
+    echo [OK] awesome-design-md 已复制
+) else (
+    set /a SOURCE_ERRORS+=1
+    echo [WARN] awesome-design-md 下载失败或没有找到 design-md 目录
 )
 echo.
 

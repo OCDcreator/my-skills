@@ -247,6 +247,36 @@ for source in "${SOURCES[@]}"; do
   echo
 done
 
+source_index=$((source_index + 1))
+echo "[$source_index/$(( ${#SOURCES[@]} + 1 ))] awesome-design-md (DESIGN.md refs, no SKILL.md)"
+clone_dir="$TMP_DIR/awesome-design-md-manual"
+rm -rf "$clone_dir"
+if git clone --depth 1 --branch main https://github.com/VoltAgent/awesome-design-md.git "$clone_dir"; then
+  search_path="$clone_dir/design-md"
+  if [ -d "$search_path" ]; then
+    mkdir -p "$REPO_DIR/external/awesome-design-md"
+    copied=0
+    for d in "$search_path"/*/; do
+      if [ -d "$d" ]; then
+        name="$(basename "$d")"
+        dest="$REPO_DIR/external/awesome-design-md/$name"
+        rm -rf "$dest"
+        if cp -R "$d" "$dest"; then
+          copied=$((copied + 1))
+        fi
+      fi
+    done
+    echo "[OK] awesome-design-md 已复制 $copied 个设计参考"
+  else
+    SOURCE_ERRORS=$((SOURCE_ERRORS + 1))
+    echo "[WARN] awesome-design-md 没有找到 design-md 目录"
+  fi
+else
+  SOURCE_ERRORS=$((SOURCE_ERRORS + 1))
+  echo "[WARN] awesome-design-md 下载失败"
+fi
+echo
+
 echo "[步骤 5/7] 清理临时目录..."
 cleanup
 echo "[OK] 临时目录已清理"
