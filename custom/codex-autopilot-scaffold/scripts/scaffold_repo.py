@@ -6,7 +6,7 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -426,6 +426,37 @@ def build_validation_bullets(detection: DetectionResult) -> str:
     return "\n".join(lines)
 
 
+def apply_cli_overrides(detection: DetectionResult, args: argparse.Namespace) -> DetectionResult:
+    updated = replace(
+        detection,
+        command_sources=dict(detection.command_sources),
+        warnings=list(detection.warnings),
+        targeted_test_prefixes=list(detection.targeted_test_prefixes),
+    )
+
+    command_flags = {
+        "lint_command": "lint_command",
+        "typecheck_command": "typecheck_command",
+        "full_test_command": "full_test_command",
+        "build_command": "build_command",
+    }
+    for arg_name, field_name in command_flags.items():
+        value = clean_string(getattr(args, arg_name))
+        if not value:
+            continue
+        setattr(updated, field_name, value)
+        updated.command_sources[field_name] = "CLI override"
+
+    if any([updated.lint_command, updated.typecheck_command, updated.full_test_command, updated.build_command]):
+        updated.warnings = [
+            warning
+            for warning in updated.warnings
+            if "No standard lint/typecheck/test/build commands were inferred" not in warning
+        ]
+
+    return updated
+
+
 def write_if_changed(path: Path, content: str, *, force: bool) -> str:
     if path.exists():
         existing = read_text(path)
@@ -562,7 +593,7 @@ def override_tokens(tokens: dict[str, str], args: argparse.Namespace) -> dict[st
 def scaffold_repo(args: argparse.Namespace) -> int:
     target_repo = Path(args.target_repo).expanduser().resolve()
     repo_root = resolve_git_root(target_repo)
-    detection = detect_commands(repo_root)
+    detection = apply_cli_overrides(detect_commands(repo_root), args)
     tokens = override_tokens(default_tokens(detection, args.preset), args)
 
     common_root = COMMON_TEMPLATES_ROOT
