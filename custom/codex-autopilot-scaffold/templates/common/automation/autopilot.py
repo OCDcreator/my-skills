@@ -108,6 +108,36 @@ def render_template(template_text: str, tokens: dict[str, Any]) -> str:
     return rendered
 
 
+def windows_hidden_process_kwargs(
+    *,
+    detached: bool = False,
+    new_process_group: bool = False,
+) -> dict[str, Any]:
+    if os.name != "nt":
+        return {}
+
+    creationflags = int(getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    if detached:
+        creationflags |= int(getattr(subprocess, "DETACHED_PROCESS", 0))
+    if new_process_group:
+        creationflags |= int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+
+    popen_kwargs: dict[str, Any] = {}
+    if creationflags:
+        popen_kwargs["creationflags"] = creationflags
+
+    startupinfo_factory = getattr(subprocess, "STARTUPINFO", None)
+    startf_use_show_window = int(getattr(subprocess, "STARTF_USESHOWWINDOW", 0))
+    sw_hide = int(getattr(subprocess, "SW_HIDE", 0))
+    if startupinfo_factory and startf_use_show_window:
+        startupinfo = startupinfo_factory()
+        startupinfo.dwFlags |= startf_use_show_window
+        startupinfo.wShowWindow = sw_hide
+        popen_kwargs["startupinfo"] = startupinfo
+
+    return popen_kwargs
+
+
 def run_command(
     args: list[str],
     *,
@@ -121,6 +151,7 @@ def run_command(
         text=True,
         encoding="utf-8",
         errors="replace",
+        **windows_hidden_process_kwargs(),
     )
     result = CommandResult(
         stdout=process.stdout.strip(),
@@ -138,7 +169,11 @@ def run_git(args: list[str], *, check: bool = True) -> CommandResult:
 
 
 def run_git_no_capture(args: list[str], *, check: bool = True) -> int:
-    process = subprocess.run(["git", "-C", str(REPO_ROOT), *args], check=False)
+    process = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), *args],
+        check=False,
+        **windows_hidden_process_kwargs(),
+    )
     if check and process.returncode != 0:
         raise AutopilotError(f"git {' '.join(args)} failed with exit code {process.returncode}")
     return int(process.returncode)
@@ -673,6 +708,7 @@ def invoke_runner_round(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=False,
+        **windows_hidden_process_kwargs(),
     )
 
     if not process.stdin or not process.stdout or not process.stderr:
@@ -1165,6 +1201,7 @@ def stop_process(pid: int, *, graceful_timeout_seconds: int = 30) -> None:
             encoding="utf-8",
             errors="replace",
             check=False,
+            **windows_hidden_process_kwargs(),
         )
         if taskkill_result.returncode != 0 and pid_exists(pid):
             combined = "\n".join(part for part in (taskkill_result.stdout, taskkill_result.stderr) if part.strip())
@@ -1282,9 +1319,12 @@ def spawn_background_autopilot(command_args: list[str], *, output_path: Path, pi
     }
 
     if os.name == "nt":
-        detached_process = getattr(subprocess, "DETACHED_PROCESS", 0)
-        new_process_group = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        popen_kwargs["creationflags"] = detached_process | new_process_group
+        popen_kwargs.update(
+            windows_hidden_process_kwargs(
+                detached=True,
+                new_process_group=True,
+            )
+        )
     else:
         popen_kwargs["start_new_session"] = True
 

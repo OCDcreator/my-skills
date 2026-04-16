@@ -139,6 +139,7 @@ If the repo has no allowed autopilot branch yet, create one first. Prefer names 
   - `automation/New-AutopilotWorktree.ps1`
   - `automation/Start-Autopilot.ps1`
   - `automation/Watch-Autopilot.ps1`
+- Windows runner subprocesses should hide console windows by default so unattended rounds do not spawn blank `cmd.exe` popups.
 - Committed profiles must stay machine-neutral
 - Local absolute paths belong in external profile JSON passed through `--profile-path`
 
