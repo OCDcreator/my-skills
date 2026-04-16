@@ -5,6 +5,8 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 ## Files
 
 - `automation/autopilot.py`: cross-platform outer controller
+- `automation/Arm-AutopilotCutover.ps1`: Windows post-commit cutover wrapper
+- `automation/arm-autopilot-cutover.sh`: macOS post-commit cutover wrapper
 - `automation/autopilot-config.json`: repo-specific objective, queue, validation, and runner settings
 - `automation/profiles/windows.json`: machine-neutral Windows defaults
 - `automation/profiles/mac.json`: machine-neutral macOS defaults
@@ -87,6 +89,28 @@ When the watched state is `active`, the live progress log is usually `current_ro
 ## Sentinel cutovers
 
 Use `restart-after-next-commit` when you want the current unattended run to finish its next successful round, stop cleanly, and relaunch with replacement settings.
+
+For routine operator handoffs, prefer the scaffolded wrappers:
+
+### Windows
+
+```powershell
+.\automation\Arm-AutopilotCutover.ps1 `
+  -StatePath automation\runtime\<state-file>.json `
+  -Profile windows `
+  -ConfigPath automation\<config>.json `
+  -RestartSyncRef <cutover-ref>
+```
+
+### macOS
+
+```bash
+./automation/arm-autopilot-cutover.sh \
+  --state-path automation/runtime/<state-file>.json \
+  --profile mac \
+  --config-path automation/<config>.json \
+  --restart-sync-ref <cutover-ref>
+```
 
 ### Config/profile/state cutover
 

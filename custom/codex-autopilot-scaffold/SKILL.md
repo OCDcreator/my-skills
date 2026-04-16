@@ -8,6 +8,7 @@ description: Use this skill when the user wants to inject a Codex-style repo-loc
 Use this skill to install a **repo-local Codex autopilot scaffold** into a target repository. The output is not an external loop service. It is a set of files committed into the target repo so future agents can run:
 
 - `python automation/autopilot.py doctor|start|watch|status|restart-after-next-commit`
+- `automation/Arm-AutopilotCutover.ps1` and `automation/arm-autopilot-cutover.sh` for reusable post-commit cutovers
 - queue-driven `docs/status/autopilot-*.md`
 - machine-readable runtime state in `automation/runtime/`
 
@@ -249,6 +250,30 @@ Sentinel guidance:
 - Keep custom sentinels local and uncommitted under a user config path such as `~/.config/<project>/`.
 - When a repo has multiple concurrent state lines, always pass the exact `--state-path` for the run you are handing off.
 - If the user asks for a future unattended cutover, explicitly report the sentinel command, output log path, pid path, and watched state path.
+
+Reusable scaffolded wrappers:
+
+### Windows
+
+```powershell
+.\automation\Arm-AutopilotCutover.ps1 `
+  -StatePath automation\runtime\<state-file>.json `
+  -Profile windows `
+  -ConfigPath automation\<config>.json `
+  -RestartSyncRef <cutover-ref>
+```
+
+### macOS
+
+```bash
+./automation/arm-autopilot-cutover.sh \
+  --state-path automation/runtime/<state-file>.json \
+  --profile mac \
+  --config-path automation/<config>.json \
+  --restart-sync-ref <cutover-ref>
+```
+
+Both wrappers also support config/profile/state-only cutovers by omitting `restart-sync-ref` and passing replacement paths directly.
 
 ## Final response pattern
 
