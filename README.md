@@ -18,8 +18,9 @@ my-skills/
 │   ├── searxng/                               # SearXNG 联网搜索
 │   ├── skill-catalog-maintainer/              # 技能目录维护
 │   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
+│   ├── design-reference-router/                # 品牌/产品风格参考路由技能
 │   └── x-reader/                              # 视频/播客转录内容分析
-├── external/                                  # 外部社区技能
+├── external/                                  # 外部来源（技能 + 设计参考）
 │   ├── anthropics-skills/                     # Anthropic 官方技能
 │   ├── awesome-claude-skills/                 # ComposioHQ 社区技能
 │   ├── baoyu-skills/                          # 宝玉中文技能
@@ -28,7 +29,7 @@ my-skills/
 │   ├── kepano-obsidian-skills/                # Obsidian 官方 CLI/Canvas 技能
 │   ├── taste-skill/                            # 高级前端设计技能（多风格）
 │   ├── html-ppt-skill/                          # HTML PPT 演示文稿生成技能
-│   └── awesome-design-md/                       # 66 个网站 DESIGN.md 设计参考
+│   └── awesome-design-md/                       # 品牌/产品风格参考索引（getdesign.md 按需读取）
 ├── update.sh / update.bat                     # 同步外部技能源
 ├── pull.sh / pull.bat                         # 拉取远端覆盖本地
 └── push.sh / push.bat                         # 提交推送
@@ -50,6 +51,7 @@ my-skills/
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录创建、分类、审计与维护规则同步 |
 | [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
 | [x-reader](custom/x-reader/) | 视频/播客转录内容多维分析与结构化总结 |
+| [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |
 
 ## 外部技能来源 (external/)
 
@@ -63,13 +65,18 @@ my-skills/
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 Markdown/Bases/Canvas/CLI 技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 高级前端设计技能（多风格、参数可调） |
 | `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill) | HTML PPT 演示文稿生成技能（多主题/布局/动画） |
-| `external/awesome-design-md/` | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) | 66 个知名网站的 DESIGN.md 设计参考（Google Stitch 格式） |
+
+## 外部设计参考来源 (external/)
+
+| 本地目录 | 源仓库 | 说明 |
+|----------|--------|------|
+| `external/awesome-design-md/` | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) | 品牌/产品风格参考索引；本地保留品牌 slug 与跳转链接，详细 DESIGN.md 通过 `getdesign.md` 按需读取 |
 
 ## 一键脚本
 
 | 脚本 | 说明 |
 |------|------|
-| `update.sh` / `update.bat` | 从 9 个外部源拉取最新技能到 `external/` → 自动 commit & push |
+| `update.sh` / `update.bat` | 同步 `external/` 下的外部技能与设计参考源 → 自动 commit & push |
 | `pull.sh` / `pull.bat` | 拉取远端仓库覆盖本地 |
 | `push.sh` / `push.bat` | 提交所有变更并推送到远端 |
 
