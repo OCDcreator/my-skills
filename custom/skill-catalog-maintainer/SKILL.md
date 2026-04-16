@@ -1,6 +1,6 @@
 ---
 name: skill-catalog-maintainer
-description: Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, or maintain AI agent skills. Also use when creating or updating SKILLS.md, README skill tables, AGENTS.md maintenance rules, or when a new custom/external skill is added and the documentation must stay synchronized.
+description: Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, maintain, discover, or recommend AI agent skills for a project or task. Also use when creating or updating SKILLS.md, README skill tables, AGENTS.md maintenance rules, or when another project needs matching skill recommendations with source and install hints.
 ---
 
 # Skill Catalog Maintainer
@@ -12,6 +12,7 @@ Keep a skills repository understandable. Build and maintain a concise catalog th
 ## Use This For
 
 - Explaining what skills in this repo are for
+- Finding which skills fit a specific development request or project need
 - Creating or updating `SKILLS.md`
 - Adding, removing, renaming, or reorganizing skills
 - Auditing duplicate or overlapping skill names across sources
@@ -25,6 +26,31 @@ Keep a skills repository understandable. Build and maintain a concise catalog th
 4. Preserve both path and source because different external sources may contain skills with the same `name`.
 5. Classify by practical use case, not by repository source alone.
 6. Resolve install source information: for `custom/`, use this repository as the source; for `external/`, map the source prefix through `update.sh` `SOURCES` and `README.md`.
+
+## Discovery Workflow
+
+Use this when the user is not asking to maintain the catalog itself, but is using this skill to discover which other skills should be loaded for real work.
+
+1. Translate the user's request into a concrete job to be done, such as `frontend polish`, `bug diagnosis`, `provider config`, or `Obsidian automation`.
+2. Match that job against skill frontmatter `name`, `description`, and category; prefer skills whose trigger conditions directly match the task.
+3. Recommend both the primary implementation skill and any required process skill that should be loaded first.
+4. When multiple skills fit, give a short ordered recommendation with why each one applies and how they combine.
+5. If the user referenced this skill by path while asking for development help, treat that as a discovery request unless they explicitly ask for catalog maintenance only.
+6. If no direct match exists, return the closest skills and clearly say what gap remains.
+
+Prefer recommendations in this order:
+
+- Required process skills first, such as `brainstorming`, `systematic-debugging`, or `test-driven-development`
+- Primary domain skill second, such as `frontend-design`, `pdf`, or `obsidian-cli`
+- Supporting follow-up skills last, only when they add clear value
+
+For a discovery request, the answer should usually be a compact table like this:
+
+```markdown
+| Priority | Skill | Why it matches | Local path | Next action |
+```
+
+After recommending skills, explicitly tell the agent which skill to load next instead of stopping at catalog analysis.
 
 ## Catalog Shape
 
