@@ -1,0 +1,33 @@
+{
+  "skill_name": "obsidian-plugin-debug-logging",
+  "evals": [
+    {
+      "id": 1,
+      "name": "retrofit-quiet-by-default-logger",
+      "prompt": "这个现有 Obsidian 插件现在到处都是 console.log，普通用户打开控制台很吵。请帮我改成默认静默的 debug logging 体系：启动时仍要看到版本和 BUILD_ID，warn/error 始终输出，info/debug 只有打开调试日志后输出。",
+      "expected_output": "Assistant should trigger the skill, audit the existing plugin logging first, then propose or implement an always/error/warn/info/debug contract where always is only for startup identity, warn/error remain visible, info/debug are gated by the debug toggle, and BUILD_ID appears in startup logging and diagnostics.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "diagnostic-report-buffer-export",
+      "prompt": "给我的 Obsidian 插件补一个诊断报告功能。用户要能在设置页复制最近诊断，也能导出日志文件。报告里需要最近日志缓存、vault 信息、manifest 版本、BUILD_ID、当前设置摘要和运行时状态。",
+      "expected_output": "Assistant should trigger the skill and design a diagnostic report architecture with a bounded recent log buffer, copy-to-clipboard and file export actions, build/environment/settings/runtime/recent logs sections, no secrets, clear buffer support, and a shared source between console logging and diagnostics.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "windows-macos-debug-support",
+      "prompt": "这个 Obsidian 插件要给 Windows 和 macOS 用户都提供调试日志入口：设置页里有控制台打开说明、日志导出路径、目录选择器和默认导出目录。不要只按 Windows 写。",
+      "expected_output": "Assistant should trigger the skill and produce a Windows/macOS-aware plan or implementation: shared logger core, platform-specific debugLogPaths with windows and macos keys, Windows Ctrl+Shift+I and macOS Cmd+Option+I instructions, separate path placeholders/defaults, directory picker fallback, and platform-specific export behavior.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "fix-noisy-info-and-missing-build-id",
+      "prompt": "现有插件 logger 的 info 默认一直 console.log，导致用户反馈控制台刷屏；诊断报告里也没有 BUILD_ID，只有普通版本号。请按更现代的 Obsidian 插件调试日志治理方式改进。",
+      "expected_output": "Assistant should trigger the skill, identify always-visible info as a design problem, introduce a distinct always level for startup/build identity, gate info/debug behind debug logging, add BUILD_ID and display version to the diagnostic header, add overload controls such as dedupe/throttle/truncation, and explain what existing behavior to keep versus deprecate.",
+      "files": []
+    }
+  ]
+}
