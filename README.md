@@ -1,6 +1,6 @@
 # my-skills
 
-个人 AI 技能集合，统一管理自有技能和外部社区技能。
+个人 AI 技能集合，统一管理自有技能、外部社区技能和设计参考源。
 
 ## 目录结构
 
@@ -30,7 +30,7 @@ my-skills/
 │   ├── taste-skill/                            # 高级前端设计技能（多风格）
 │   ├── html-ppt-skill/                          # HTML PPT 演示文稿生成技能
 │   └── awesome-design-md/                       # 品牌/产品风格参考索引（getdesign.md 按需读取）
-├── update.sh / update.bat                     # 同步外部技能源
+├── update.sh / update.bat                     # 同步外部技能与设计参考源
 ├── pull.sh / pull.bat                         # 拉取远端覆盖本地
 └── push.sh / push.bat                         # 提交推送
 ```

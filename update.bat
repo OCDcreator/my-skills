@@ -14,7 +14,7 @@ if errorlevel 1 (
 set "REPO_DIR=%CD%"
 set "TMP_DIR=%REPO_DIR%\.tmp-skills"
 set "STATUS=SUCCESS"
-set "DETAIL=外部技能已同步，变更已提交并推送。"
+set "DETAIL=外部资源已同步，变更已提交并推送。"
 set "BRANCH=main"
 set "REMOTE_URL="
 set "COMMIT_TS="
@@ -40,7 +40,7 @@ echo [重要提醒]
 echo 这个脚本会访问 GitHub，并可能修改 external 目录。
 echo 如果你只是想上传自己改的 custom 技能，请关闭窗口，改用 push.bat。
 echo.
-set /p "CONFIRM=确认要更新外部技能并推送吗？请输入 Y 后回车继续："
+set /p "CONFIRM=确认要更新外部资源并推送吗？请输入 Y 后回车继续："
 if /i not "%CONFIRM%"=="Y" (
     set "STATUS=CANCELLED"
     set "DETAIL=你没有输入 Y，脚本已取消，没有改动任何文件。"
@@ -96,8 +96,13 @@ echo [技能来源]
 echo [技能 1/8] anthropics-skills
 git clone --depth 1 --branch main https://github.com/anthropics/skills.git "%TMP_DIR%\anthropics-skills"
 if exist "%TMP_DIR%\anthropics-skills\skills" (
-    if not exist "%REPO_DIR%\external\anthropics-skills" mkdir "%REPO_DIR%\external\anthropics-skills"
-    xcopy /e /i /y /q "%TMP_DIR%\anthropics-skills\skills" "%REPO_DIR%\external\anthropics-skills\" >nul
+    if exist "%REPO_DIR%\external\anthropics-skills" rmdir /s /q "%REPO_DIR%\external\anthropics-skills"
+    mkdir "%REPO_DIR%\external\anthropics-skills"
+    for /d %%d in ("%TMP_DIR%\anthropics-skills\skills\*") do (
+        if exist "%%d\SKILL.md" (
+            xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\anthropics-skills\%%~nxd\" >nul 2>nul
+        )
+    )
     echo [OK] anthropics-skills 已复制
 ) else (
     set /a SOURCE_ERRORS+=1
@@ -108,7 +113,8 @@ echo.
 echo [技能 2/8] awesome-claude-skills
 git clone --depth 1 --branch master https://github.com/ComposioHQ/awesome-claude-skills.git "%TMP_DIR%\awesome-claude-skills"
 if exist "%TMP_DIR%\awesome-claude-skills" (
-    if not exist "%REPO_DIR%\external\awesome-claude-skills" mkdir "%REPO_DIR%\external\awesome-claude-skills"
+    if exist "%REPO_DIR%\external\awesome-claude-skills" rmdir /s /q "%REPO_DIR%\external\awesome-claude-skills"
+    mkdir "%REPO_DIR%\external\awesome-claude-skills"
     for /d %%d in ("%TMP_DIR%\awesome-claude-skills\*") do (
         if exist "%%d\SKILL.md" (
             xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\awesome-claude-skills\%%~nxd\" >nul 2>nul
@@ -124,7 +130,8 @@ echo.
 echo [技能 3/8] claude-plugins-official
 git clone --depth 1 --branch main https://github.com/anthropics/claude-plugins-official.git "%TMP_DIR%\claude-plugins-official"
 if exist "%TMP_DIR%\claude-plugins-official\plugins" (
-    if not exist "%REPO_DIR%\external\claude-plugins-official" mkdir "%REPO_DIR%\external\claude-plugins-official"
+    if exist "%REPO_DIR%\external\claude-plugins-official" rmdir /s /q "%REPO_DIR%\external\claude-plugins-official"
+    mkdir "%REPO_DIR%\external\claude-plugins-official"
     for /d %%p in ("%TMP_DIR%\claude-plugins-official\plugins\*") do (
         for /d %%s in ("%%p\skills\*") do (
             if exist "%%s\SKILL.md" (
@@ -149,8 +156,13 @@ echo.
 echo [技能 4/8] baoyu-skills
 git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills"
 if exist "%TMP_DIR%\baoyu-skills\skills" (
-    if not exist "%REPO_DIR%\external\baoyu-skills" mkdir "%REPO_DIR%\external\baoyu-skills"
-    xcopy /e /i /y /q "%TMP_DIR%\baoyu-skills\skills" "%REPO_DIR%\external\baoyu-skills\" >nul
+    if exist "%REPO_DIR%\external\baoyu-skills" rmdir /s /q "%REPO_DIR%\external\baoyu-skills"
+    mkdir "%REPO_DIR%\external\baoyu-skills"
+    for /d %%d in ("%TMP_DIR%\baoyu-skills\skills\*") do (
+        if exist "%%d\SKILL.md" (
+            xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\baoyu-skills\%%~nxd\" >nul 2>nul
+        )
+    )
     echo [OK] baoyu-skills 已复制
 ) else (
     set /a SOURCE_ERRORS+=1
@@ -161,7 +173,8 @@ echo.
 echo [技能 5/8] axton-obsidian-visual-skills
 git clone --depth 1 --branch main https://github.com/axtonliu/axton-obsidian-visual-skills.git "%TMP_DIR%\axton-obsidian-visual-skills"
 if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
-    if not exist "%REPO_DIR%\external\axton-obsidian-visual-skills" mkdir "%REPO_DIR%\external\axton-obsidian-visual-skills"
+    if exist "%REPO_DIR%\external\axton-obsidian-visual-skills" rmdir /s /q "%REPO_DIR%\external\axton-obsidian-visual-skills"
+    mkdir "%REPO_DIR%\external\axton-obsidian-visual-skills"
     for /d %%d in ("%TMP_DIR%\axton-obsidian-visual-skills\*") do (
         if exist "%%d\SKILL.md" (
             xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\axton-obsidian-visual-skills\%%~nxd\" >nul 2>nul
@@ -177,8 +190,13 @@ echo.
 echo [技能 6/8] kepano-obsidian-skills
 git clone --depth 1 --branch main https://github.com/kepano/obsidian-skills.git "%TMP_DIR%\kepano-obsidian-skills"
 if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
-    if not exist "%REPO_DIR%\external\kepano-obsidian-skills" mkdir "%REPO_DIR%\external\kepano-obsidian-skills"
-    xcopy /e /i /y /q "%TMP_DIR%\kepano-obsidian-skills\skills" "%REPO_DIR%\external\kepano-obsidian-skills\" >nul
+    if exist "%REPO_DIR%\external\kepano-obsidian-skills" rmdir /s /q "%REPO_DIR%\external\kepano-obsidian-skills"
+    mkdir "%REPO_DIR%\external\kepano-obsidian-skills"
+    for /d %%d in ("%TMP_DIR%\kepano-obsidian-skills\skills\*") do (
+        if exist "%%d\SKILL.md" (
+            xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\kepano-obsidian-skills\%%~nxd\" >nul 2>nul
+        )
+    )
     echo [OK] kepano-obsidian-skills 已复制
 ) else (
     set /a SOURCE_ERRORS+=1
@@ -189,7 +207,8 @@ echo.
 echo [技能 7/8] taste-skill
 git clone --depth 1 --branch master https://github.com/Leonxlnx/taste-skill.git "%TMP_DIR%\taste-skill"
 if exist "%TMP_DIR%\taste-skill\skills" (
-    if not exist "%REPO_DIR%\external\taste-skill" mkdir "%REPO_DIR%\external\taste-skill"
+    if exist "%REPO_DIR%\external\taste-skill" rmdir /s /q "%REPO_DIR%\external\taste-skill"
+    mkdir "%REPO_DIR%\external\taste-skill"
     for /d %%d in ("%TMP_DIR%\taste-skill\skills\*") do (
         if exist "%%d\SKILL.md" (
             xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\taste-skill\%%~nxd\" >nul 2>nul
@@ -205,7 +224,9 @@ echo.
 echo [技能 8/8] html-ppt-skill
 git clone --depth 1 --branch main https://github.com/lewislulu/html-ppt-skill.git "%TMP_DIR%\html-ppt-skill"
 if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
-    if not exist "%REPO_DIR%\external\html-ppt-skill" mkdir "%REPO_DIR%\external\html-ppt-skill"
+    if exist "%REPO_DIR%\external\html-ppt-skill" rmdir /s /q "%REPO_DIR%\external\html-ppt-skill"
+    mkdir "%REPO_DIR%\external\html-ppt-skill"
+    if exist "%TMP_DIR%\html-ppt-skill\.git" rmdir /s /q "%TMP_DIR%\html-ppt-skill\.git"
     xcopy /e /i /y /q "%TMP_DIR%\html-ppt-skill" "%REPO_DIR%\external\html-ppt-skill\" >nul
     echo [OK] html-ppt-skill 已复制
 ) else (
@@ -219,7 +240,8 @@ echo [参考来源]
 echo [参考 1/1] awesome-design-md
 git clone --depth 1 --branch main https://github.com/VoltAgent/awesome-design-md.git "%TMP_DIR%\awesome-design-md"
 if exist "%TMP_DIR%\awesome-design-md\design-md" (
-    if not exist "%REPO_DIR%\external\awesome-design-md" mkdir "%REPO_DIR%\external\awesome-design-md"
+    if exist "%REPO_DIR%\external\awesome-design-md" rmdir /s /q "%REPO_DIR%\external\awesome-design-md"
+    mkdir "%REPO_DIR%\external\awesome-design-md"
     for /d %%d in ("%TMP_DIR%\awesome-design-md\design-md\*") do (
         xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\awesome-design-md\%%~nxd\" >nul 2>nul
     )
@@ -287,7 +309,7 @@ if errorlevel 1 (
 )
 if "%SOURCE_ERRORS%"=="0" (
     set "STATUS=SUCCESS"
-set "DETAIL=外部资源已同步，变更已提交并推送。"
+    set "DETAIL=外部资源已同步，变更已提交并推送。"
 ) else (
     set "STATUS=PARTIAL"
     set "DETAIL=已提交并推送可用更新，但有部分来源下载失败。"
@@ -309,7 +331,7 @@ if /i "%STATUS%"=="SUCCESS" (
     echo 结果：执行失败
 )
 echo 说明：%DETAIL%
-if not "%SOURCE_ERRORS%"=="0" echo 技能源警告数量：%SOURCE_ERRORS%
+if not "%SOURCE_ERRORS%"=="0" echo 来源警告数量：%SOURCE_ERRORS%
 call :line
 echo.
 
