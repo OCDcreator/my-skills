@@ -143,6 +143,113 @@ If the repo has no allowed autopilot branch yet, create one first. Prefer names 
 - Committed profiles must stay machine-neutral
 - Local absolute paths belong in external profile JSON passed through `--profile-path`
 
+## Operator visibility rules
+
+When a repo has more than one autopilot state file or old `round-*` directories, do **not** rely on bare `watch` or bare `status`. Always bind operator commands to the intended state line.
+
+Preferred commands after scaffolding:
+
+### Windows
+
+```powershell
+python .\automation\autopilot.py status --state-path automation\runtime\<state-file>.json
+python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80
+Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
+```
+
+### macOS
+
+```bash
+python3 ./automation/autopilot.py status --state-path automation/runtime/<state-file>.json
+python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80
+tail -n 80 -F automation/runtime/round-XYZ/progress.log
+```
+
+Operational guidance:
+
+- The scaffolded `watch` command now prints `round`, `phase`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
+- When the watched state is `active`, the live round log is usually `current_round + 1`; when the state is terminal, it is usually `current_round`.
+- If the log looks stale, compare `status --state-path ...` against the watched `progress.log` path before assuming the runner is stuck.
+
+## Sentinel / cutover rules
+
+Prefer the built-in `restart-after-next-commit` command over ad-hoc shell loops whenever you need to stop after the next successful round and relaunch unattended work.
+
+Use it in two standard modes:
+
+### 1. Config/profile/state cutover
+
+Use this when the replacement run only needs different config/profile/state arguments.
+
+#### Windows
+
+```powershell
+python .\automation\autopilot.py restart-after-next-commit `
+  --profile windows `
+  --state-path automation\runtime\<state-file>.json `
+  --restart-profile windows `
+  --restart-config-path automation\<new-config>.json `
+  --restart-state-path automation\runtime\<new-state-file>.json `
+  --restart-profile-path C:\Users\you\.config\codex-autopilot\windows.profile.json `
+  --restart-output-path automation\runtime\<new-run>.out `
+  --restart-pid-path automation\runtime\<new-run>.pid
+```
+
+#### macOS
+
+```bash
+python3 ./automation/autopilot.py restart-after-next-commit \
+  --profile mac \
+  --state-path automation/runtime/<state-file>.json \
+  --restart-profile mac \
+  --restart-config-path automation/<new-config>.json \
+  --restart-state-path automation/runtime/<new-state-file>.json \
+  --restart-profile-path /Users/you/.config/codex-autopilot/mac.profile.json \
+  --restart-output-path automation/runtime/<new-run>.out \
+  --restart-pid-path automation/runtime/<new-run>.pid
+```
+
+### 2. Code or prompt cutover via ref
+
+Use this when the next run should resume from a replacement commit prepared elsewhere, typically in a cutover worktree or sibling branch. This is the default answer when a user says “挂个哨兵，这一轮提交后切过去继续跑”.
+
+Workflow:
+
+1. Prepare the replacement commit on another ref.
+2. Launch `restart-after-next-commit` against the currently active state line.
+3. Pass `--restart-sync-ref <ref>` so the controller waits for that ref, fast-forwards to it, and then restarts the unattended loop.
+
+#### Windows
+
+```powershell
+python .\automation\autopilot.py restart-after-next-commit `
+  --profile windows `
+  --state-path automation\runtime\<state-file>.json `
+  --restart-sync-ref <cutover-ref> `
+  --restart-profile windows `
+  --restart-config-path automation\<config>.json `
+  --restart-state-path automation\runtime\<state-file>.json
+```
+
+#### macOS
+
+```bash
+python3 ./automation/autopilot.py restart-after-next-commit \
+  --profile mac \
+  --state-path automation/runtime/<state-file>.json \
+  --restart-sync-ref <cutover-ref> \
+  --restart-profile mac \
+  --restart-config-path automation/<config>.json \
+  --restart-state-path automation/runtime/<state-file>.json
+```
+
+Sentinel guidance:
+
+- Prefer `restart-after-next-commit` first; only write a custom local shell script when the cutover includes non-committed machine-local behavior that cannot live on a git ref.
+- Keep custom sentinels local and uncommitted under a user config path such as `~/.config/<project>/`.
+- When a repo has multiple concurrent state lines, always pass the exact `--state-path` for the run you are handing off.
+- If the user asks for a future unattended cutover, explicitly report the sentinel command, output log path, pid path, and watched state path.
+
 ## Final response pattern
 
 When you finish scaffolding, report:
