@@ -1,0 +1,23 @@
+{
+  "skill_name": "obsidian-plugin-release-manager",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "这个现有 Obsidian 插件仓库已经有 manifest.json、package.json 和 esbuild，但没有版本代号、BUILD_ID、release build 和测试库部署。请帮我补成一套完整的发布系统，要求 manifest 保持纯 semver，展示版本使用 Reed vX.Y.Z。",
+      "expected_output": "Assistant should trigger the skill, detect an existing Obsidian plugin repo, retrofit releaseCodename/BUILD_ID/DISPLAY_VERSION, add version check and bump commands, add release build plus test vault deployment, and keep manifest.json version pure semver.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我在从零做一个新的 Obsidian 插件模板，想从第一天就带版本号管理、版本代号、BUILD_ID、静默默认日志和测试库部署。请直接按一套标准脚手架方案来设计。",
+      "expected_output": "Assistant should trigger the skill, treat the task as a new plugin scaffold workflow, propose the standard semver + codename + BUILD_ID architecture, add build/release scripts, and include quiet-by-default logging and test vault deployment.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "给这个 Obsidian 插件做一套 Windows 和 macOS 都能用的 release build 流程：普通 build 不自动 bump，release build 自动 patch +1，然后部署到 test vault 并做哈希校验。manifest 里不要出现代号，但设置页和控制台要显示 Reed vX.Y.Z。",
+      "expected_output": "Assistant should trigger the skill, preserve pure semver in manifest.json, configure a cross-platform test vault deployment pattern, separate build from build:release, and make display surfaces show Reed vX.Y.Z plus BUILD_ID.",
+      "files": []
+    }
+  ]
+}

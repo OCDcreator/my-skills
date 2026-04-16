@@ -9,6 +9,7 @@ my-skills/
 ├── custom/                                    # 自有技能
 │   ├── fnos-fpk-dev/                          # 飞牛 fnOS FPK 开发
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
+│   ├── obsidian-plugin-release-manager/       # Obsidian 插件版本号与测试库部署
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
 │   ├── opencode-provider-config/              # OpenCode 模型配置
 │   ├── searxng/                               # SearXNG 联网搜索
@@ -35,6 +36,7 @@ my-skills/
 |------|------|
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
+| [obsidian-plugin-release-manager](custom/obsidian-plugin-release-manager/) | Obsidian plugin 的 semver + codename、BUILD_ID、release build 自动 patch bump 与 test vault deploy |
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
