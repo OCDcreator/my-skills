@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
-title my-skills - External Skills Update Helper
+title my-skills - External Resources Update Helper
 
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
@@ -23,12 +23,13 @@ set "SOURCE_ERRORS=0"
 set "COMMIT_DONE=0"
 
 call :line
-echo my-skills 外部技能更新助手
+echo my-skills 外部资源更新助手
 echo.
 echo 这个脚本的用途：
-echo 1. 从多个 GitHub 技能源下载最新内容
-echo 2. 复制到 external 目录
-echo 3. 如果有变化，就自动提交并推送
+echo 1. 从多个 GitHub 外部技能源下载最新内容
+echo 2. 从外部参考源下载最新设计参考
+echo 3. 复制到 external 目录
+echo 4. 如果有变化，就自动提交并推送
 echo.
 echo 当前仓库目录：
 echo %REPO_DIR%
@@ -88,10 +89,11 @@ if not exist "%REPO_DIR%\external" mkdir "%REPO_DIR%\external"
 echo [OK] 临时目录已准备
 echo.
 
-echo [步骤 4/7] 下载并复制外部技能...
+echo [步骤 4/7] 下载并复制外部来源...
 echo.
+echo [技能来源]
 
-echo [1/9] anthropics-skills
+echo [技能 1/8] anthropics-skills
 git clone --depth 1 --branch main https://github.com/anthropics/skills.git "%TMP_DIR%\anthropics-skills"
 if exist "%TMP_DIR%\anthropics-skills\skills" (
     if not exist "%REPO_DIR%\external\anthropics-skills" mkdir "%REPO_DIR%\external\anthropics-skills"
@@ -103,7 +105,7 @@ if exist "%TMP_DIR%\anthropics-skills\skills" (
 )
 echo.
 
-echo [2/9] awesome-claude-skills
+echo [技能 2/8] awesome-claude-skills
 git clone --depth 1 --branch master https://github.com/ComposioHQ/awesome-claude-skills.git "%TMP_DIR%\awesome-claude-skills"
 if exist "%TMP_DIR%\awesome-claude-skills" (
     if not exist "%REPO_DIR%\external\awesome-claude-skills" mkdir "%REPO_DIR%\external\awesome-claude-skills"
@@ -119,7 +121,7 @@ if exist "%TMP_DIR%\awesome-claude-skills" (
 )
 echo.
 
-echo [3/9] claude-plugins-official
+echo [技能 3/8] claude-plugins-official
 git clone --depth 1 --branch main https://github.com/anthropics/claude-plugins-official.git "%TMP_DIR%\claude-plugins-official"
 if exist "%TMP_DIR%\claude-plugins-official\plugins" (
     if not exist "%REPO_DIR%\external\claude-plugins-official" mkdir "%REPO_DIR%\external\claude-plugins-official"
@@ -144,7 +146,7 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
 )
 echo.
 
-echo [4/9] baoyu-skills
+echo [技能 4/8] baoyu-skills
 git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills"
 if exist "%TMP_DIR%\baoyu-skills\skills" (
     if not exist "%REPO_DIR%\external\baoyu-skills" mkdir "%REPO_DIR%\external\baoyu-skills"
@@ -156,7 +158,7 @@ if exist "%TMP_DIR%\baoyu-skills\skills" (
 )
 echo.
 
-echo [5/9] axton-obsidian-visual-skills
+echo [技能 5/8] axton-obsidian-visual-skills
 git clone --depth 1 --branch main https://github.com/axtonliu/axton-obsidian-visual-skills.git "%TMP_DIR%\axton-obsidian-visual-skills"
 if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
     if not exist "%REPO_DIR%\external\axton-obsidian-visual-skills" mkdir "%REPO_DIR%\external\axton-obsidian-visual-skills"
@@ -172,7 +174,7 @@ if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
 )
 echo.
 
-echo [6/9] kepano-obsidian-skills
+echo [技能 6/8] kepano-obsidian-skills
 git clone --depth 1 --branch main https://github.com/kepano/obsidian-skills.git "%TMP_DIR%\kepano-obsidian-skills"
 if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
     if not exist "%REPO_DIR%\external\kepano-obsidian-skills" mkdir "%REPO_DIR%\external\kepano-obsidian-skills"
@@ -184,7 +186,7 @@ if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
 )
 echo.
 
-echo [7/9] taste-skill
+echo [技能 7/8] taste-skill
 git clone --depth 1 --branch master https://github.com/Leonxlnx/taste-skill.git "%TMP_DIR%\taste-skill"
 if exist "%TMP_DIR%\taste-skill\skills" (
     if not exist "%REPO_DIR%\external\taste-skill" mkdir "%REPO_DIR%\external\taste-skill"
@@ -200,7 +202,7 @@ if exist "%TMP_DIR%\taste-skill\skills" (
 )
 echo.
 
-echo [8/9] html-ppt-skill
+echo [技能 8/8] html-ppt-skill
 git clone --depth 1 --branch main https://github.com/lewislulu/html-ppt-skill.git "%TMP_DIR%\html-ppt-skill"
 if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
     if not exist "%REPO_DIR%\external\html-ppt-skill" mkdir "%REPO_DIR%\external\html-ppt-skill"
@@ -212,7 +214,9 @@ if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
 )
 echo.
 
-echo [9/9] awesome-design-md
+echo.
+echo [参考来源]
+echo [参考 1/1] awesome-design-md
 git clone --depth 1 --branch main https://github.com/VoltAgent/awesome-design-md.git "%TMP_DIR%\awesome-design-md"
 if exist "%TMP_DIR%\awesome-design-md\design-md" (
     if not exist "%REPO_DIR%\external\awesome-design-md" mkdir "%REPO_DIR%\external\awesome-design-md"
@@ -243,10 +247,10 @@ set "DIFF_EXIT=%errorlevel%"
 if "%DIFF_EXIT%"=="0" (
     if "%SOURCE_ERRORS%"=="0" (
         set "STATUS=NO_CHANGES"
-        set "DETAIL=外部技能没有新变化，所以无需提交和推送。"
+        set "DETAIL=外部资源没有新变化，所以无需提交和推送。"
     ) else (
         set "STATUS=PARTIAL"
-        set "DETAIL=部分技能源下载失败，而且没有检测到可提交的新变化。"
+        set "DETAIL=部分来源下载失败，而且没有检测到可提交的新变化。"
     )
     goto :finish
 )
@@ -255,12 +259,12 @@ if not "%DIFF_EXIT%"=="1" (
     set "DETAIL=检查暂存区是否有变更时失败。"
     goto :finish
 )
-echo [OK] 检测到外部技能有变化
+echo [OK] 检测到外部来源有变化
 echo.
 
 for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "Get-Date -Format 'yyyy-MM-dd HH:mm'" 2^>nul`) do set "COMMIT_TS=%%i"
 if not defined COMMIT_TS set "COMMIT_TS=%date% %time%"
-set "COMMIT_MSG=sync external skills !COMMIT_TS!"
+set "COMMIT_MSG=sync external resources !COMMIT_TS!"
 
 echo [步骤 7/7] 提交并推送更新结果...
 echo [INFO] 提交信息: !COMMIT_MSG!
@@ -283,10 +287,10 @@ if errorlevel 1 (
 )
 if "%SOURCE_ERRORS%"=="0" (
     set "STATUS=SUCCESS"
-    set "DETAIL=外部技能已同步，变更已提交并推送。"
+set "DETAIL=外部资源已同步，变更已提交并推送。"
 ) else (
     set "STATUS=PARTIAL"
-    set "DETAIL=已提交并推送可用更新，但有部分技能源下载失败。"
+    set "DETAIL=已提交并推送可用更新，但有部分来源下载失败。"
 )
 goto :finish
 
