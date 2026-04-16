@@ -1,0 +1,47 @@
+{
+  "expectations": [
+    {
+      "text": "Explains that origin is the user's fork and upstream is the original repository.",
+      "passed": true,
+      "evidence": "The response clearly defines origin as the user's fork and upstream as the original repository."
+    },
+    {
+      "text": "Recommends keeping main as a stable integration branch and doing new work on feature branches.",
+      "passed": true,
+      "evidence": "The response says main is the stable integration branch and that new work should go to feat/* or fix/* branches."
+    },
+    {
+      "text": "Includes a safe upstream sync flow on main using fetch plus merge.",
+      "passed": true,
+      "evidence": "The response gives the exact main-branch sync flow with git fetch upstream and git merge upstream/main."
+    },
+    {
+      "text": "Warns against using main as the long-lived scratch branch.",
+      "passed": true,
+      "evidence": "The response explicitly warns not to develop long-term directly on main."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0,
+    "total": 4,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "tool_calls": {},
+    "total_tool_calls": 0,
+    "total_steps": 0,
+    "errors_encountered": 0,
+    "output_chars": 0,
+    "transcript_chars": 0
+  },
+  "timing": {
+    "total_duration_seconds": 0.0
+  },
+  "claims": [],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  }
+}

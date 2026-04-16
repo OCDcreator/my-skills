@@ -1,0 +1,10 @@
+{
+  "eval_id": 1,
+  "eval_name": "sync-main-with-personal-commits",
+  "prompt": "我的 fork 的 main 上已经有一些自己的提交，现在 upstream/main 又更新了。我不想丢失自己的修改，也不想把历史搞得太乱。现在最稳妥的同步步骤是什么？",
+  "assertions": [
+    "Uses git fetch upstream followed by git merge upstream/main while on local main as the default safe path.",
+    "Mentions checking for a clean worktree before syncing or tells the user to commit or stash pending changes.",
+    "Does not recommend force-pushing main as the default solution."
+  ]
+}

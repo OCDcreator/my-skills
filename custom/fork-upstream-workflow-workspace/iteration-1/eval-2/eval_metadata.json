@@ -1,0 +1,10 @@
+{
+  "eval_id": 2,
+  "eval_name": "feature-branch-rebase-vs-merge",
+  "prompt": "我在 feat/ui-tweak 分支开发到一半，上游 main 更新了。应该 merge 还是 rebase？分别在什么分支做？请给我命令和判断依据。",
+  "assertions": [
+    "Explains that syncing upstream/main belongs on main first, not directly on the feature branch by default.",
+    "Explains when rebase main on the feature branch is appropriate for cleaner personal history.",
+    "Includes commands for both updating main and updating the feature branch afterward."
+  ]
+}

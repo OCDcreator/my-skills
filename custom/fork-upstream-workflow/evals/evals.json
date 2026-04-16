@@ -1,0 +1,39 @@
+{
+  "skill_name": "fork-upstream-workflow",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "我 fork 了一个 GitHub 项目，origin 指向我的仓库，上游作者持续更新。我想长期保留自己的定制修改，同时定期同步作者更新。请给我一个适合个人开发者的 remote 和分支管理方案，并给出日常命令。",
+      "expected_output": "Explains origin/upstream roles, recommends stable main plus feature branches, and gives a practical daily workflow.",
+      "files": [],
+      "expectations": [
+        "Explains that origin is the user's fork and upstream is the original repository.",
+        "Recommends keeping main as a stable integration branch and doing new work on feature branches.",
+        "Includes a safe upstream sync flow on main using fetch plus merge.",
+        "Warns against using main as the long-lived scratch branch."
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "我的 fork 的 main 上已经有一些自己的提交，现在 upstream/main 又更新了。我不想丢失自己的修改，也不想把历史搞得太乱。现在最稳妥的同步步骤是什么？",
+      "expected_output": "Gives a conservative sync procedure for a fork main branch that already contains personal commits.",
+      "files": [],
+      "expectations": [
+        "Uses git fetch upstream followed by git merge upstream/main while on local main as the default safe path.",
+        "Mentions checking for a clean worktree before syncing or tells the user to commit or stash pending changes.",
+        "Does not recommend force-pushing main as the default solution."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "我在 feat/ui-tweak 分支开发到一半，上游 main 更新了。应该 merge 还是 rebase？分别在什么分支做？请给我命令和判断依据。",
+      "expected_output": "Distinguishes main-branch upstream merge from feature-branch rebase and explains the decision clearly.",
+      "files": [],
+      "expectations": [
+        "Explains that syncing upstream/main belongs on main first, not directly on the feature branch by default.",
+        "Explains when rebase main on the feature branch is appropriate for cleaner personal history.",
+        "Includes commands for both updating main and updating the feature branch afterward."
+      ]
+    }
+  ]
+}
