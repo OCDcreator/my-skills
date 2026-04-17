@@ -83,7 +83,9 @@ The scaffolded `watch` output shows:
 - `phase doc`
 - `focus`
 - the exact `progress.log` path being followed
-- a compact prefix on every streamed detail line, for example `[r006 p005 active f0]`
+- a default long prefix on every streamed detail line, for example `[round=006 phase=005 status=active failures=0]`
+
+Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[r006 p005 active f0]`.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 

@@ -169,7 +169,8 @@ tail -n 80 -F automation/runtime/round-XYZ/progress.log
 Operational guidance:
 
 - The scaffolded `watch` command now prints `round`, `phase`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
-- Every streamed detail line from `progress.log` is also prefixed with a compact live state tag such as `[r006 p005 active f0]`, so the current round/phase/status stays visible after the header scrolls away.
+- Every streamed detail line from `progress.log` is also prefixed with a live state tag, defaulting to the long form `[round=006 phase=005 status=active failures=0]` so the current round/phase/status stays visible after the header scrolls away.
+- Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[r006 p005 active f0]`.
 - When the watched state is `active`, the live round log is usually `current_round + 1`; when the state is terminal, it is usually `current_round`.
 - If the log looks stale, compare `status --state-path ...` against the watched `progress.log` path before assuming the runner is stuck.
 

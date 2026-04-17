@@ -1260,34 +1260,40 @@ def print_watch_snapshot(
     print("[watch] " + "=" * 72)
 
 
-def format_watch_detail_counter(value: Any, *, prefix: str, width: int = 3) -> str:
+def format_watch_detail_counter(value: Any, *, prefix: str = "", width: int = 3) -> str:
     text = clean_string(value)
     if not text:
-        return f"{prefix}{'?' * width}"
+        return f"{prefix}{'?' * width}" if prefix else "?"
     try:
-        return f"{prefix}{int(text):0{width}d}"
+        rendered = f"{int(text):0{width}d}"
     except (TypeError, ValueError):
-        return f"{prefix}{text}"
+        rendered = text
+    return f"{prefix}{rendered}" if prefix else rendered
 
 
 def build_watch_detail_prefix(
     *,
     state: dict[str, Any] | None,
     progress_path: Path | None,
+    prefix_format: str = "long",
 ) -> str:
     watched_round_number = parse_round_directory_number(progress_path.parent) if progress_path else None
     if watched_round_number is None:
         watched_round_number = expected_round_number_for_state(state)
 
-    round_token = format_watch_detail_counter(watched_round_number, prefix="r")
-    phase_token = format_watch_detail_counter(state.get("next_phase_number") if state else None, prefix="p")
-    failure_token = format_watch_detail_counter(
+    round_value = format_watch_detail_counter(watched_round_number, width=3)
+    phase_value = format_watch_detail_counter(state.get("next_phase_number") if state else None, width=3)
+    failure_value = format_watch_detail_counter(
         state.get("consecutive_failures") if state else None,
-        prefix="f",
         width=1,
     )
     status_token = clean_string(state.get("status")) if state else ""
-    return f"[{round_token} {phase_token} {status_token or 'unknown'} {failure_token}]"
+    if clean_string(prefix_format).lower() == "short":
+        return f"[r{round_value} p{phase_value} {status_token or 'unknown'} f{failure_value}]"
+    return (
+        f"[round={round_value} phase={phase_value} "
+        f"status={status_token or 'unknown'} failures={failure_value}]"
+    )
 
 
 def print_watch_detail_lines(
@@ -1295,10 +1301,15 @@ def print_watch_detail_lines(
     *,
     state: dict[str, Any] | None,
     progress_path: Path | None,
+    prefix_format: str = "long",
 ) -> None:
     if not lines:
         return
-    prefix = build_watch_detail_prefix(state=state, progress_path=progress_path)
+    prefix = build_watch_detail_prefix(
+        state=state,
+        progress_path=progress_path,
+        prefix_format=prefix_format,
+    )
     for line in lines:
         if line:
             print(f"{prefix} {line}")
@@ -1548,6 +1559,7 @@ def run_watch(args: argparse.Namespace) -> int:
                             tail_lines,
                             state=state,
                             progress_path=progress_path,
+                            prefix_format=args.prefix_format,
                         )
                         last_line_count = len(existing_lines)
 
@@ -1558,6 +1570,7 @@ def run_watch(args: argparse.Namespace) -> int:
                         current_lines[last_line_count:],
                         state=state,
                         progress_path=last_progress_path,
+                        prefix_format=args.prefix_format,
                     )
                     last_line_count = len(current_lines)
 
@@ -1735,6 +1748,12 @@ def build_parser() -> argparse.ArgumentParser:
     watch_parser.add_argument("--state-path", default="", help="Optional explicit state JSON path.")
     watch_parser.add_argument("--tail", type=int, default=20, help="How many lines to show when switching logs.")
     watch_parser.add_argument("--refresh-seconds", type=int, default=2, help="Polling interval.")
+    watch_parser.add_argument(
+        "--prefix-format",
+        choices=("long", "short"),
+        default="long",
+        help="Prefix style for streamed progress.log lines.",
+    )
     watch_parser.add_argument("--once", action="store_true", help="Print current status once and exit.")
     watch_parser.set_defaults(handler=run_watch)
 
