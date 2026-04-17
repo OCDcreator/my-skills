@@ -7,6 +7,9 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - `automation/autopilot.py`: cross-platform outer controller
 - `automation/Arm-AutopilotCutover.ps1`: Windows post-commit cutover wrapper
 - `automation/arm-autopilot-cutover.sh`: macOS post-commit cutover wrapper
+- `automation/start-autopilot.sh`: macOS start wrapper with optional background mode
+- `automation/watch-autopilot.sh`: macOS watch wrapper
+- `automation/launchd/com.example.codex-autopilot.plist`: launchd example for repo-local background launches
 - `automation/autopilot-config.json`: repo-specific objective, queue, validation, and runner settings
 - `automation/profiles/windows.json`: machine-neutral Windows defaults
 - `automation/profiles/mac.json`: machine-neutral macOS defaults
@@ -50,6 +53,13 @@ python3 ./automation/autopilot.py doctor --profile mac
 python3 ./automation/autopilot.py start --profile mac
 ```
 
+For a repo-local macOS wrapper flow, prefer:
+
+```bash
+./automation/start-autopilot.sh -- --profile mac
+./automation/watch-autopilot.sh --state-path automation/runtime/autopilot-state.json --tail 80
+```
+
 ### Helpful modes
 
 ```text
@@ -58,7 +68,16 @@ python automation/autopilot.py watch
 python automation/autopilot.py start --profile windows --dry-run --single-round
 python automation/autopilot.py start --profile windows --single-round
 python automation/autopilot.py restart-after-next-commit --profile windows
+./automation/start-autopilot.sh --background -- --profile mac
 ```
+
+## Deploy policy
+
+Prefer `deploy_policy=targeted` or `deploy_policy=never` for most unattended repos. Deploying after every successful round is usually unnecessary churn.
+
+- Use `deploy_policy=targeted` when only specific files or directories should trigger deploy
+- Keep `deploy_required_paths` narrow and repo-relative
+- Reserve `deploy_policy=always` for repos where every successful build must publish a runtime artifact
 
 ## Watching the right logs
 
@@ -91,6 +110,7 @@ The scaffolded `watch` output shows:
 - `focus`
 - the exact `progress.log` path being followed
 - a default long prefix on every streamed detail line, for example `[completion=25% round=006 phase=005 status=active failures=0]`
+- Vulture count and delta when `vulture_command` is configured
 
 Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[25% r006 p005 active f0]`.
 
@@ -222,12 +242,35 @@ python .\automation\autopilot.py start --profile windows --profile-path C:\Users
 python3 ./automation/autopilot.py start --profile mac --profile-path /Users/you/.config/codex-autopilot/mac.profile.json
 ```
 
+## macOS convenience scripts
+
+- `automation/start-autopilot.sh` (foreground by default, `--background` for nohup launches)
+- `automation/watch-autopilot.sh`
+- `automation/arm-autopilot-cutover.sh`
+
+To turn the scaffold into a LaunchAgent:
+
+1. Copy `automation/launchd/com.example.codex-autopilot.plist` to `~/Library/LaunchAgents/com.<repo>.codex-autopilot.plist`
+2. Replace every `/ABSOLUTE/PATH/TO/REPO` placeholder
+3. Load it with:
+
+```bash
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.<repo>.codex-autopilot.plist
+launchctl kickstart -k gui/$(id -u)/com.<repo>.codex-autopilot
+```
+
+To stop and unload it later:
+
+```bash
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.<repo>.codex-autopilot.plist
+```
+
 ## Windows convenience scripts
 
 - `automation/New-AutopilotWorktree.ps1`
 - `automation/Start-Autopilot.ps1` (interactive by default, `-Background` for no-window launches)
 - `automation/Watch-Autopilot.ps1`
 
-These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable. macOS should use `python3 ./automation/autopilot.py ...` directly.
+These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable.
 
 

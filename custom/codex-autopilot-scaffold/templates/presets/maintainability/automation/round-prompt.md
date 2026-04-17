@@ -34,6 +34,7 @@ Configured validation commands:
 - Typecheck: `{{typecheck_command}}`
 - Full test: `{{full_test_command}}`
 - Build: `{{build_command}}`
+- Vulture: `{{vulture_command}}`
 
 Required workflow:
 1. Use the plan tool before making substantive changes.
@@ -46,11 +47,12 @@ Required workflow:
 8. Run targeted tests first when code or tests change and a targeted test command pattern is configured.
 9. `[[VALIDATION_REQUIREMENT]]`
 10. When a validation command is blank, do not invent a substitute; record the gap in the phase doc instead.
-11. Update `docs/status/autopilot-round-roadmap.md` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
-12. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, the lane advanced, the completed roadmap queue item, and the next recommended slice.
-13. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
-14. If validation fails, attempt one focused repair. If it still fails, revert the round, do not commit, and return `failure`.
-15. If the queued objective is already complete, avoid unnecessary edits, update the roadmap accordingly, and return `goal_complete`.
+11. When Vulture is configured, use it as the dead-code observability command when ownership cleanup or unused code is relevant; record the finding count or any gap in the phase doc.
+12. Update `docs/status/autopilot-round-roadmap.md` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
+13. Write the round summary to `{{next_phase_doc}}`. Include scope, files changed, validation commands, Vulture findings when configured, the lane advanced, the completed roadmap queue item, and the next recommended slice.
+14. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
+15. If validation fails, attempt one focused repair. If it still fails, revert the round, do not commit, and return `failure`.
+16. If the queued objective is already complete, avoid unnecessary edits, update the roadmap accordingly, and return `goal_complete`.
 
 Response contract:
 - Your final response must be valid JSON matching the provided output schema.

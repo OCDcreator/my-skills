@@ -27,6 +27,7 @@ DEFAULT_PROFILE_NAME = "windows"
 LOCK_FILENAME = "autopilot.lock.json"
 ROUND_DIRECTORY_RE = re.compile(r"^round-(\d+)$")
 QUEUE_ITEM_STATUS_RE = re.compile(r"^### \[(DONE|NEXT|QUEUED)\]\s+")
+VULTURE_FINDING_RE = re.compile(r"^.+:\d+:\s+")
 SCHEMA_REQUIRED_TYPES: dict[str, tuple[type, ...]] = {
     "string": (str,),
     "boolean": (bool,),
@@ -192,6 +193,47 @@ def run_git_no_capture(args: list[str], *, check: bool = True) -> int:
     return int(process.returncode)
 
 
+def resolve_shell_command_args(command_text: str, config: dict[str, Any]) -> list[str]:
+    shell_preference = clean_string(config.get("shell_preference")).lower()
+    if os.name == "nt":
+        candidate_names = [shell_preference] if shell_preference else []
+        candidate_names.extend(["pwsh", "powershell", "cmd"])
+        seen: set[str] = set()
+        for candidate in candidate_names:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            if candidate == "cmd":
+                cmd_path = shutil.which("cmd") or os.environ.get("COMSPEC") or "cmd"
+                return [cmd_path, "/c", command_text]
+            resolved = shutil.which(candidate)
+            if resolved:
+                return [resolved, "-NoLogo", "-NoProfile", "-Command", command_text]
+    else:
+        candidate_names = [shell_preference] if shell_preference else []
+        candidate_names.extend(["zsh", "bash", "sh"])
+        seen: set[str] = set()
+        for candidate in candidate_names:
+            if not candidate or candidate in seen:
+                continue
+            seen.add(candidate)
+            resolved = shutil.which(candidate)
+            if resolved:
+                return [resolved, "-lc", command_text]
+    raise AutopilotError("No compatible shell was found to run configured text commands.")
+
+
+def run_shell_command(
+    command_text: str,
+    *,
+    config: dict[str, Any],
+    check: bool = True,
+    cwd: Path = REPO_ROOT,
+) -> CommandResult:
+    shell_args = resolve_shell_command_args(command_text, config)
+    return run_command(shell_args, check=check, cwd=cwd)
+
+
 def new_state(config: dict[str, Any]) -> dict[str, Any]:
     timestamp = now_timestamp()
     return {
@@ -205,6 +247,12 @@ def new_state(config: dict[str, Any]) -> dict[str, Any]:
         "last_next_focus": str(config["focus_hint"]),
         "last_result": None,
         "last_blocking_reason": None,
+        "vulture_command": clean_string(config.get("vulture_command")),
+        "vulture_current_count": None,
+        "vulture_previous_count": None,
+        "vulture_delta": None,
+        "vulture_updated_at": None,
+        "vulture_last_error": None,
         "started_at": timestamp,
         "updated_at": timestamp,
     }
@@ -467,6 +515,75 @@ def test_deployed_build_id(verify_path: str, build_id: str) -> bool:
     return build_id in deployed_artifact_path.read_text(encoding="utf-8", errors="replace")
 
 
+def count_vulture_findings(output_text: str) -> int:
+    lines = [line.strip() for line in output_text.splitlines() if line.strip()]
+    if not lines:
+        return 0
+    finding_lines = [line for line in lines if VULTURE_FINDING_RE.match(line)]
+    return len(finding_lines) if finding_lines else len(lines)
+
+
+def read_vulture_snapshot(config: dict[str, Any]) -> dict[str, Any] | None:
+    vulture_command = clean_string(config.get("vulture_command"))
+    if not vulture_command:
+        return None
+
+    result = run_shell_command(vulture_command, config=config, check=False)
+    finding_count = count_vulture_findings(result.stdout)
+    if result.returncode not in {0, 3} and not (finding_count > 0 and not clean_string(result.stderr)):
+        combined = "\n".join(part for part in (result.stdout, result.stderr) if clean_string(part))
+        return {
+            "command": vulture_command,
+            "count": None,
+            "error": combined or f"vulture command exited with code {result.returncode}",
+            "returncode": result.returncode,
+        }
+
+    return {
+        "command": vulture_command,
+        "count": finding_count,
+        "error": "",
+        "returncode": result.returncode,
+    }
+
+
+def refresh_vulture_metrics(state: dict[str, Any], config: dict[str, Any]) -> None:
+    snapshot = read_vulture_snapshot(config)
+    if snapshot is None:
+        state["vulture_command"] = ""
+        state["vulture_current_count"] = None
+        state["vulture_previous_count"] = None
+        state["vulture_delta"] = None
+        state["vulture_updated_at"] = None
+        state["vulture_last_error"] = None
+        return
+
+    state["vulture_command"] = snapshot["command"]
+    state["vulture_updated_at"] = now_timestamp()
+    if snapshot["error"]:
+        state["vulture_last_error"] = snapshot["error"]
+        return
+
+    previous_count = state.get("vulture_current_count")
+    current_count = int(snapshot["count"])
+    state["vulture_previous_count"] = previous_count
+    state["vulture_current_count"] = current_count
+    state["vulture_delta"] = None if previous_count is None else current_count - int(previous_count)
+    state["vulture_last_error"] = None
+
+
+def format_metric_delta(value: Any) -> str:
+    if value is None or clean_string(value) == "":
+        return "n/a"
+    try:
+        delta_value = int(value)
+    except (TypeError, ValueError):
+        return clean_string(value)
+    if delta_value > 0:
+        return f"+{delta_value}"
+    return str(delta_value)
+
+
 def pid_exists(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -498,8 +615,21 @@ def load_config(config_path_value: str, profile_name: str, profile_path_override
     base_config = read_json(config_path)
     _, profile_path, profile_config = load_profile(profile_name, profile_path_override)
     merged_config = dict(base_config)
-    merged_config.update(profile_config)
+    for key, value in profile_config.items():
+        if key in merged_config:
+            if value is None:
+                continue
+            if isinstance(value, str) and not clean_string(value):
+                continue
+            if isinstance(value, (list, dict)) and not value:
+                continue
+        merged_config[key] = value
     merged_config["profile_name"] = profile_name
+    merged_config.setdefault("shell_preference", "pwsh" if os.name == "nt" else "zsh")
+    merged_config.setdefault("deploy_policy", "never")
+    merged_config.setdefault("deploy_required_paths", [])
+    merged_config.setdefault("deploy_verify_path", "")
+    merged_config.setdefault("vulture_command", "")
     return merged_config, config_path, profile_path
 
 
@@ -1040,6 +1170,10 @@ def run_start(args: argparse.Namespace) -> int:
         profile_name=args.profile,
         force_lock=args.force_lock,
     ):
+        if clean_string(config.get("vulture_command")):
+            refresh_vulture_metrics(state, config)
+            save_state(state, state_path)
+
         while True:
             if args.single_round and rounds_executed >= 1:
                 info("Single round requested; stopping.")
@@ -1092,6 +1226,7 @@ def run_start(args: argparse.Namespace) -> int:
                     "typecheck_command": clean_string(config.get("typecheck_command")),
                     "full_test_command": clean_string(config.get("full_test_command")),
                     "build_command": config["build_command"],
+                    "vulture_command": clean_string(config.get("vulture_command")),
                     "runner_kind": clean_string(config.get("runner_kind")),
                     "runner_model": clean_string(config.get("runner_model")),
                     "commit_prefix": config["commit_prefix"],
@@ -1211,6 +1346,8 @@ def run_start(args: argparse.Namespace) -> int:
                     state["status"] = "complete"
                     info("Autopilot objective reported complete.")
 
+            if clean_string(config.get("vulture_command")):
+                refresh_vulture_metrics(state, config)
             append_history_entry(runtime_directory, history_entry)
             save_state(state, state_path)
 
@@ -1229,6 +1366,17 @@ def print_state_summary(state: dict[str, Any], *, runtime_directory: Path | None
         print(f"[status] next focus: {state.get('last_next_focus')}")
     if state.get("last_commit_sha"):
         print(f"[status] last commit: {state.get('last_commit_sha')}")
+    if clean_string(state.get("vulture_command")):
+        if clean_string(state.get("vulture_last_error")):
+            print(f"[status] vulture: error={compact_text(clean_string(state.get('vulture_last_error')), max_length=220)}")
+        else:
+            print(
+                "[status] vulture: "
+                f"count={state.get('vulture_current_count')} "
+                f"delta={format_metric_delta(state.get('vulture_delta'))}"
+            )
+            if state.get("vulture_updated_at"):
+                print(f"[status] vulture updated: {state.get('vulture_updated_at')}")
     if runtime_directory:
         lock_path = runtime_directory / LOCK_FILENAME
         lock_data = read_lock(lock_path)
@@ -1386,6 +1534,10 @@ def print_watch_snapshot(
         heading_parts.append(f"phase={phase_number}")
     if queue_progress and queue_progress.get("completion_percent") is not None:
         heading_parts.append(f"completion={queue_progress['completion_percent']}%")
+    if state and state.get("vulture_current_count") is not None:
+        heading_parts.append(f"vulture={state.get('vulture_current_count')}")
+    if state and state.get("vulture_delta") is not None:
+        heading_parts.append(f"vdelta={format_metric_delta(state.get('vulture_delta'))}")
     heading_parts.append(f"status={status_value or 'unknown'}")
     heading_parts.append(f"failures={failures_value or '0'}")
 
@@ -1402,6 +1554,15 @@ def print_watch_snapshot(
             print(f"[watch] focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=220)}")
         if state.get("last_commit_sha"):
             print(f"[watch] last commit: {state.get('last_commit_sha')}")
+        if clean_string(state.get("vulture_command")):
+            if clean_string(state.get("vulture_last_error")):
+                print(f"[watch] vulture error: {compact_text(clean_string(state.get('vulture_last_error')), max_length=220)}")
+            else:
+                print(
+                    "[watch] vulture: "
+                    f"count={state.get('vulture_current_count')} "
+                    f"delta={format_metric_delta(state.get('vulture_delta'))}"
+                )
         if queue_progress and queue_progress.get("completion_percent") is not None:
             print(
                 "[watch] queue progress: "
@@ -1839,6 +2000,21 @@ def run_doctor(args: argparse.Namespace) -> int:
             failures += 1
     else:
         print("[doctor] ok   deploy verify path: <not configured>")
+
+    vulture_command = clean_string(config.get("vulture_command"))
+    if vulture_command:
+        snapshot = read_vulture_snapshot(config)
+        if snapshot and not snapshot["error"]:
+            print(
+                "[doctor] ok   vulture command: "
+                f"{vulture_command} (findings={snapshot['count']}, exit={snapshot['returncode']})"
+            )
+        else:
+            error_text = snapshot["error"] if snapshot else "vulture snapshot unavailable"
+            print(f"[doctor] fail vulture command: {compact_text(clean_string(error_text), max_length=220)}")
+            failures += 1
+    else:
+        print("[doctor] info vulture command: <not configured>")
 
     branch_name = get_current_branch()
     allowed_prefixes = list(config.get("allowed_branch_prefixes", []))

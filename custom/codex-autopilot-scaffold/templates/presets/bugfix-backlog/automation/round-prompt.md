@@ -34,6 +34,7 @@ Configured validation commands:
 - Typecheck: `{{typecheck_command}}`
 - Full test: `{{full_test_command}}`
 - Build: `{{build_command}}`
+- Vulture: `{{vulture_command}}`
 
 Required workflow:
 1. Use the plan tool before making substantive changes.
@@ -43,11 +44,12 @@ Required workflow:
 5. Prefer reproducible, behavior-preserving fixes over broad cleanup.
 6. Run targeted tests first when relevant and then every configured validation command that is present.
 7. When a validation command is blank, do not invent one; record the gap in the phase doc.
-8. Update `docs/status/autopilot-round-roadmap.md` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
-9. Write the round summary to `{{next_phase_doc}}`. Include scope, changed files, validation results, and the next recommended slice.
-10. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
-11. If validation fails after one focused repair, revert the round, do not commit, and return `failure`.
-12. If the queued objective is already complete, avoid unnecessary edits, update the roadmap accordingly, and return `goal_complete`.
+8. When Vulture is configured, use it as the dead-code observability command only when the queued slice touches cleanup or unused-code risk; record the finding count or any gap in the phase doc.
+9. Update `docs/status/autopilot-round-roadmap.md` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
+10. Write the round summary to `{{next_phase_doc}}`. Include scope, changed files, validation results, Vulture findings when configured, and the next recommended slice.
+11. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
+12. If validation fails after one focused repair, revert the round, do not commit, and return `failure`.
+13. If the queued objective is already complete, avoid unnecessary edits, update the roadmap accordingly, and return `goal_complete`.
 
 Response contract:
 - Your final response must be valid JSON matching the provided output schema.

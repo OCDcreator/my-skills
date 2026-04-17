@@ -36,6 +36,18 @@
       "prompt": "解释一下编程里的 event loop 和 game loop 的区别，顺便举几个例子。",
       "expected_output": "Assistant should not use this skill because the request is conceptual and unrelated to autopilot scaffolding.",
       "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "把这套 repo-local Codex autopilot 装到我的 Python 项目里，quality-gate preset。仓库里已经有 vulture 配置，我希望后续 status/watch 能看到 dead-code finding 的数量和 delta。",
+      "expected_output": "Assistant should detect or preserve a Vulture command, scaffold the repo-local autopilot, and explain that status/watch report the current Vulture finding count and delta when configured.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "给这个 macOS 项目装 Codex autopilot scaffold，并且把 launchd 示例也脚手架进去。部署不要每轮都跑，只在 scripts/deploy/ 或 manifest.json 改动时才需要 deploy 验证。",
+      "expected_output": "Assistant should scaffold the macOS start/watch wrappers plus launchd example, and configure targeted deploy policy with explicit deploy-required paths instead of implying deploy on every successful round.",
+      "files": []
     }
   ]
 }

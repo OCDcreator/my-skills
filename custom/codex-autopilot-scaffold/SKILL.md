@@ -89,6 +89,10 @@ Useful overrides:
 --typecheck-command "custom typecheck command"
 --full-test-command "custom full test command"
 --build-command "custom build command"
+--vulture-command "python -m vulture src tests"
+--deploy-policy targeted
+--deploy-required-paths src/ manifest.json scripts/deploy/
+--deploy-verify-path dist/build-id.txt
 --runner-model "gpt-5.4"
 --force
 ```
@@ -131,6 +135,8 @@ If the operator explicitly wants a no-window unattended launch, do **not** start
 ```bash
 python3 ./automation/autopilot.py doctor --profile mac
 python3 ./automation/autopilot.py start --profile mac --dry-run --single-round
+./automation/start-autopilot.sh -- --profile mac --dry-run --single-round
+./automation/watch-autopilot.sh --state-path automation/runtime/autopilot-state.json --tail 80
 ```
 
 If the repo has no allowed autopilot branch yet, create one first. Prefer names like:
@@ -146,6 +152,10 @@ If the repo has no allowed autopilot branch yet, create one first. Prefer names 
   - `automation/New-AutopilotWorktree.ps1`
   - `automation/Start-Autopilot.ps1`
   - `automation/Watch-Autopilot.ps1`
+- macOS gets convenience wrappers:
+  - `automation/start-autopilot.sh`
+  - `automation/watch-autopilot.sh`
+  - `automation/launchd/com.example.codex-autopilot.plist`
 - Clarify the two Windows window layers when you scaffold or hand off:
   - child shell subwindows such as `cmd.exe` / `pwsh.exe`
   - the top-level launcher window such as `py.exe` / `python.exe`
@@ -153,6 +163,7 @@ If the repo has no allowed autopilot branch yet, create one first. Prefer names 
 - Hiding child subwindows is **not** enough to guarantee a no-window launch. If the user asked for zero visible windows, the scaffold and your instructions must also use `automation/Start-Autopilot.ps1 -Background`, implemented via a hidden `pwsh.exe` / Windows PowerShell host that launches `py` / `python` without a visible top-level console. Do **not** rely solely on `pythonw.exe` / `pyw.exe`; those shims can be unreliable on some Windows installs.
 - Committed profiles must stay machine-neutral
 - Local absolute paths belong in external profile JSON passed through `--profile-path`
+- Prefer `deploy_policy=targeted` over `deploy_policy=always`; deploying every successful round is usually unnecessary unless the repo truly publishes every round.
 
 ## Operator visibility rules
 
@@ -179,6 +190,7 @@ tail -n 80 -F automation/runtime/round-XYZ/progress.log
 Operational guidance:
 
 - The scaffolded `watch` command now prints `round`, `phase`, `queue progress`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
+- When `vulture_command` is configured, `status` and `watch` also report the latest finding count and delta from the previous successful snapshot.
 - Every streamed detail line from `progress.log` is also prefixed with a live state tag that includes queue completion percentage, defaulting to the long form `[completion=25% round=006 phase=005 status=active failures=0]` so the current progress/round/phase/status stays visible after the header scrolls away.
 - Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[25% r006 p005 active f0]`.
 - When the watched state is `active`, the live round log is usually `current_round + 1`; when the state is terminal, it is usually `current_round`.
@@ -288,6 +300,8 @@ Reusable scaffolded wrappers:
 ```
 
 Both wrappers also support config/profile/state-only cutovers by omitting `restart-sync-ref` and passing replacement paths directly.
+
+For a repo-local macOS LaunchAgent handoff, copy `automation/launchd/com.example.codex-autopilot.plist` into `~/Library/LaunchAgents/`, replace `/ABSOLUTE/PATH/TO/REPO`, then use `launchctl bootstrap gui/$(id -u) ...` and `launchctl kickstart -k ...`.
 
 ## Final response pattern
 

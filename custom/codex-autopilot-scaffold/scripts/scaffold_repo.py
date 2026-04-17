@@ -94,6 +94,7 @@ class DetectionResult:
     typecheck_command: str = ""
     full_test_command: str = ""
     build_command: str = ""
+    vulture_command: str = ""
     targeted_test_prefixes: list[str] = field(default_factory=list)
     command_sources: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -202,6 +203,27 @@ def path_has_token(path: Path, token: str) -> bool:
     return token in read_text(path)
 
 
+def package_script_command(scripts: dict[str, Any], script_name: str) -> str:
+    if script_name in scripts:
+        return f"npm run {script_name}"
+    return ""
+
+
+def discover_vulture_from_requirements(repo_root: Path) -> tuple[str, str]:
+    requirement_files = [
+        repo_root / "requirements.txt",
+        repo_root / "requirements-dev.txt",
+        repo_root / "dev-requirements.txt",
+    ]
+    for path in requirement_files:
+        if not path.exists():
+            continue
+        raw_text = read_text(path)
+        if re.search(r"(?im)^\s*vulture(?:[<>=~! ]|$)", raw_text):
+            return "python -m vulture .", path.name
+    return "", ""
+
+
 def detect_commands(repo_root: Path) -> DetectionResult:
     result = DetectionResult(repo_root=repo_root, repo_name=repo_root.name)
 
@@ -249,6 +271,16 @@ def detect_commands(repo_root: Path) -> DetectionResult:
             if source:
                 result.command_sources["build_command"] = source
 
+            value, source = first_non_empty(
+                [
+                    (package_script_command(scripts, "vulture"), "package.json:scripts.vulture"),
+                    (package_script_command(scripts, "deadcode"), "package.json:scripts.deadcode"),
+                ]
+            )
+            result.vulture_command = value
+            if source:
+                result.command_sources["vulture_command"] = source
+
     pyproject_toml = repo_root / "pyproject.toml"
     if pyproject_toml.exists():
         raw_text = read_text(pyproject_toml)
@@ -267,6 +299,16 @@ def detect_commands(repo_root: Path) -> DetectionResult:
             result.full_test_command = "pytest"
             result.command_sources["full_test_command"] = "pyproject.toml / tests/"
             result.targeted_test_prefixes = ["pytest ", "python -m pytest "]
+
+        if not result.vulture_command and ("vulture" in raw_text or isinstance(tool, dict) and "vulture" in tool):
+            result.vulture_command = "python -m vulture ."
+            result.command_sources["vulture_command"] = "pyproject.toml:tool.vulture"
+
+    if not result.vulture_command:
+        value, source = discover_vulture_from_requirements(repo_root)
+        result.vulture_command = value
+        if source:
+            result.command_sources["vulture_command"] = source
 
     cargo_toml = repo_root / "Cargo.toml"
     if cargo_toml.exists():
@@ -416,6 +458,7 @@ def build_validation_bullets(detection: DetectionResult) -> str:
         ("Typecheck", detection.typecheck_command, detection.command_sources.get("typecheck_command", "not inferred")),
         ("Full test", detection.full_test_command, detection.command_sources.get("full_test_command", "not inferred")),
         ("Build", detection.build_command, detection.command_sources.get("build_command", "not inferred")),
+        ("Vulture", detection.vulture_command, detection.command_sources.get("vulture_command", "not inferred")),
     ]
     lines = []
     for label, command, source in rows:
@@ -439,6 +482,7 @@ def apply_cli_overrides(detection: DetectionResult, args: argparse.Namespace) ->
         "typecheck_command": "typecheck_command",
         "full_test_command": "full_test_command",
         "build_command": "build_command",
+        "vulture_command": "vulture_command",
     }
     for arg_name, field_name in command_flags.items():
         value = clean_string(getattr(args, arg_name))
@@ -515,6 +559,7 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
     typecheck_command = detection.typecheck_command
     full_test_command = detection.full_test_command
     build_command = detection.build_command
+    vulture_command = detection.vulture_command
 
     validation_commands = [command for command in [lint_command, typecheck_command, full_test_command, build_command] if command]
     validation_requirement = "Run every configured validation command below on successful rounds." if validation_commands else "No validation command was inferred; do not guess. Add explicit commands before running unattended rounds."
@@ -537,6 +582,8 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "FULL_TEST_COMMAND_JSON": json.dumps(full_test_command, ensure_ascii=False),
         "BUILD_COMMAND": build_command,
         "BUILD_COMMAND_JSON": json.dumps(build_command, ensure_ascii=False),
+        "VULTURE_COMMAND": vulture_command,
+        "VULTURE_COMMAND_JSON": json.dumps(vulture_command, ensure_ascii=False),
         "TARGETED_TEST_REQUIRED_JSON": "true" if bool(detection.targeted_test_prefixes) else "false",
         "TARGETED_TEST_PREFIXES_JSON": json_token(detection.targeted_test_prefixes),
         "TARGETED_TEST_REQUIRED_PATHS_JSON": json_token(path_list),
@@ -555,6 +602,7 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "DEPLOY_AFTER_BUILD_JSON": "false",
         "DEPLOY_POLICY_JSON": json.dumps("never", ensure_ascii=False),
         "DEPLOY_REQUIRED_PATHS_JSON": "[]",
+        "DEPLOY_VERIFY_PATH_JSON": json.dumps("", ensure_ascii=False),
         "RUNNER_KIND_JSON": json.dumps("codex", ensure_ascii=False),
         "RUNNER_COMMAND_JSON": json.dumps("", ensure_ascii=False),
         "RUNNER_MODEL_JSON": json.dumps("", ensure_ascii=False),
@@ -563,6 +611,18 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "BUILD_VERIFY_PATH_JSON": json.dumps("", ensure_ascii=False),
     }
     return tokens
+
+
+def normalize_cli_path_list(values: list[str] | None) -> list[str]:
+    if not values:
+        return []
+    paths: list[str] = []
+    for value in values:
+        for part in str(value).split(","):
+            normalized = part.strip().replace("\\", "/")
+            if normalized:
+                paths.append(normalized)
+    return paths
 
 
 def override_tokens(tokens: dict[str, str], args: argparse.Namespace) -> dict[str, str]:
@@ -577,6 +637,7 @@ def override_tokens(tokens: dict[str, str], args: argparse.Namespace) -> dict[st
         "typecheck_command": "TYPECHECK_COMMAND",
         "full_test_command": "FULL_TEST_COMMAND",
         "build_command": "BUILD_COMMAND",
+        "vulture_command": "VULTURE_COMMAND",
     }
     for arg_name, token_name in command_flags.items():
         value = clean_string(getattr(args, arg_name))
@@ -586,6 +647,20 @@ def override_tokens(tokens: dict[str, str], args: argparse.Namespace) -> dict[st
 
     if clean_string(args.runner_model):
         overrides["RUNNER_MODEL_JSON"] = json.dumps(clean_string(args.runner_model), ensure_ascii=False)
+
+    deploy_policy = clean_string(args.deploy_policy).lower()
+    if deploy_policy:
+        overrides["DEPLOY_POLICY_JSON"] = json.dumps(deploy_policy, ensure_ascii=False)
+        overrides["DEPLOY_AFTER_BUILD_JSON"] = "true" if deploy_policy == "always" else "false"
+
+    deploy_verify_path = clean_string(args.deploy_verify_path)
+    if deploy_verify_path:
+        overrides["DEPLOY_VERIFY_PATH_JSON"] = json.dumps(deploy_verify_path, ensure_ascii=False)
+        overrides["BUILD_VERIFY_PATH_JSON"] = json.dumps(deploy_verify_path, ensure_ascii=False)
+
+    deploy_required_paths = normalize_cli_path_list(args.deploy_required_paths)
+    if deploy_required_paths:
+        overrides["DEPLOY_REQUIRED_PATHS_JSON"] = json_token(deploy_required_paths)
 
     return overrides
 
@@ -622,6 +697,7 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("  python automation/autopilot.py start --profile windows --dry-run --single-round")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
         print("  python3 ./automation/autopilot.py start --profile mac --dry-run --single-round")
+        print("  ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round")
 
     return 0
 
@@ -640,6 +716,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--typecheck-command", help="Override the inferred typecheck command.")
     parser.add_argument("--full-test-command", help="Override the inferred full test command.")
     parser.add_argument("--build-command", help="Override the inferred build command.")
+    parser.add_argument("--vulture-command", help="Override the inferred Vulture dead-code command.")
+    parser.add_argument(
+        "--deploy-policy",
+        choices=["never", "always", "targeted"],
+        help="Set when successful rounds must deploy after build. Prefer targeted over always for most repos.",
+    )
+    parser.add_argument("--deploy-verify-path", help="Path to an artifact used to verify deployed build IDs.")
+    parser.add_argument(
+        "--deploy-required-paths",
+        nargs="+",
+        help="Repo-relative files or directories that require deploy when --deploy-policy targeted is used.",
+    )
     parser.add_argument("--runner-model", help="Optional Codex model override to place into config.")
     parser.add_argument("--force", action="store_true", help="Overwrite existing generated files.")
     parser.add_argument("--print-next-steps", action="store_true", default=True, help="Print suggested doctor/dry-run commands.")
