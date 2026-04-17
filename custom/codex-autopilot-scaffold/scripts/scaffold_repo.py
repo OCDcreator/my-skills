@@ -512,6 +512,13 @@ def write_if_changed(path: Path, content: str, *, force: bool) -> str:
     return "written"
 
 
+def sync_executable_mode(source_path: Path, destination_path: Path) -> None:
+    if source_path.suffix.lower() != ".sh" and not (source_path.stat().st_mode & 0o111):
+        return
+    current_mode = destination_path.stat().st_mode
+    destination_path.chmod(current_mode | 0o755)
+
+
 def render_template_tree(
     source_root: Path,
     destination_root: Path,
@@ -529,6 +536,7 @@ def render_template_tree(
         destination_path = destination_root / relative_path
         rendered = render_tokens(read_text(source_path), tokens)
         results[normalize_repo_path(destination_path, destination_root)] = write_if_changed(destination_path, rendered, force=force)
+        sync_executable_mode(source_path, destination_path)
     return results
 
 
