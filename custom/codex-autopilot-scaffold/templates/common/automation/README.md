@@ -37,6 +37,12 @@ python .\automation\autopilot.py doctor --profile windows
 python .\automation\autopilot.py start --profile windows
 ```
 
+For a true no-window unattended launch on Windows, prefer the wrapper's background mode instead of starting `py.exe` in a new visible console. The wrapper should run through a hidden PowerShell host that launches `py` / `python` without depending on `pythonw` / `pyw` shims:
+
+```powershell
+.\automation\Start-Autopilot.ps1 -Background --% --profile windows
+```
+
 ### macOS
 
 ```bash
@@ -78,14 +84,15 @@ The scaffolded `watch` output shows:
 
 - `round`
 - `phase`
+- `queue progress`
 - `status`
 - `failures`
 - `phase doc`
 - `focus`
 - the exact `progress.log` path being followed
-- a default long prefix on every streamed detail line, for example `[round=006 phase=005 status=active failures=0]`
+- a default long prefix on every streamed detail line, for example `[completion=25% round=006 phase=005 status=active failures=0]`
 
-Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[r006 p005 active f0]`.
+Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[25% r006 p005 active f0]`.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 
@@ -216,7 +223,8 @@ python3 ./automation/autopilot.py start --profile mac --profile-path /Users/you/
 ## Windows convenience scripts
 
 - `automation/New-AutopilotWorktree.ps1`
-- `automation/Start-Autopilot.ps1`
+- `automation/Start-Autopilot.ps1` (interactive by default, `-Background` for no-window launches)
 - `automation/Watch-Autopilot.ps1`
 
-These are thin Windows wrappers around the Python CLI. macOS should use `python3 ./automation/autopilot.py ...` directly.
+These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable. macOS should use `python3 ./automation/autopilot.py ...` directly.
+

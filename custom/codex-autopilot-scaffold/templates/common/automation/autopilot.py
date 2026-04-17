@@ -35,6 +35,16 @@ SCHEMA_REQUIRED_TYPES: dict[str, tuple[type, ...]] = {
 }
 
 
+def ensure_console_streams() -> None:
+	if sys.stdout is None:
+		sys.stdout = open(os.devnull, "w", encoding="utf-8")
+	if sys.stderr is None:
+		sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
+ensure_console_streams()
+
+
 class AutopilotError(RuntimeError):
     pass
 
@@ -126,16 +136,16 @@ def windows_hidden_process_kwargs(
 
     popen_kwargs: dict[str, Any] = {}
     if creationflags:
-        popen_kwargs["creationflags"] = creationflags
+        popen_kwargs['creationflags'] = creationflags
 
-    startupinfo_factory = getattr(subprocess, "STARTUPINFO", None)
-    startf_use_show_window = int(getattr(subprocess, "STARTF_USESHOWWINDOW", 0))
-    sw_hide = int(getattr(subprocess, "SW_HIDE", 0))
+    startupinfo_factory = getattr(subprocess, 'STARTUPINFO', None)
+    startf_use_show_window = int(getattr(subprocess, 'STARTF_USESHOWWINDOW', 0))
+    sw_hide = int(getattr(subprocess, 'SW_HIDE', 0))
     if startupinfo_factory and startf_use_show_window:
         startupinfo = startupinfo_factory()
         startupinfo.dwFlags |= startf_use_show_window
         startupinfo.wShowWindow = sw_hide
-        popen_kwargs["startupinfo"] = startupinfo
+        popen_kwargs['startupinfo'] = startupinfo
 
     return popen_kwargs
 
@@ -1203,6 +1213,69 @@ def resolve_watch_state_path(runtime_directory: Path, explicit_state_path: str |
     return default_state_path
 
 
+def latest_round_directory(runtime_directory: Path) -> Path | None:
+    round_directories = sorted(
+        (path for path in runtime_directory.iterdir() if path.is_dir() and ROUND_DIRECTORY_RE.fullmatch(path.name)),
+        key=lambda path: parse_round_directory_number(path) or -1,
+    )
+    return round_directories[-1] if round_directories else None
+
+
+def infer_watch_roadmap_path(state: dict[str, Any] | None) -> Path | None:
+    if state is None:
+        return None
+
+    phase_doc_path = clean_string(state.get("last_phase_doc"))
+    if not phase_doc_path:
+        return None
+
+    normalized_phase_doc = phase_doc_path.replace("\\", "/")
+    match = re.match(r"^(?P<prefix>.+?)phase-\d+\.md$", normalized_phase_doc)
+    if not match:
+        return None
+
+    roadmap_path = resolve_repo_path(f"{match.group('prefix')}round-roadmap.md")
+    if roadmap_path.exists():
+        return roadmap_path
+    return None
+
+
+def read_watch_queue_progress(state: dict[str, Any] | None) -> dict[str, Any] | None:
+    roadmap_path = infer_watch_roadmap_path(state)
+    if roadmap_path is None:
+        return None
+
+    counts = {"DONE": 0, "NEXT": 0, "QUEUED": 0}
+    try:
+        roadmap_text = read_text(roadmap_path)
+    except OSError:
+        return None
+
+    for raw_line in roadmap_text.splitlines():
+        line = raw_line.strip()
+        match = re.match(r"^### \[(DONE|NEXT|QUEUED)\]\s+", line)
+        if not match:
+            continue
+        counts[match.group(1)] += 1
+
+    total = counts["DONE"] + counts["NEXT"] + counts["QUEUED"]
+    if total <= 0:
+        return {
+            "completion_percent": None,
+            "done_count": counts["DONE"],
+            "total_count": total,
+            "roadmap_path": roadmap_path,
+        }
+
+    completion_percent = round((counts["DONE"] / total) * 100)
+    return {
+        "completion_percent": completion_percent,
+        "done_count": counts["DONE"],
+        "total_count": total,
+        "roadmap_path": roadmap_path,
+    }
+
+
 def build_watch_state_signature(state: dict[str, Any] | None, *, state_path_exists: bool) -> tuple[str, ...]:
     if not state_path_exists or state is None:
         return ("missing",)
@@ -1228,6 +1301,7 @@ def print_watch_snapshot(
     phase_number = clean_string(state.get("next_phase_number")) if state else ""
     status_value = clean_string(state.get("status")) if state else ""
     failures_value = clean_string(state.get("consecutive_failures")) if state else ""
+    queue_progress = read_watch_queue_progress(state)
     heading_parts: list[str] = []
 
     if watched_round_number is not None and state_round and state_round == str(watched_round_number):
@@ -1239,6 +1313,8 @@ def print_watch_snapshot(
             heading_parts.append(f"state_round={state_round}")
     if phase_number:
         heading_parts.append(f"phase={phase_number}")
+    if queue_progress and queue_progress.get("completion_percent") is not None:
+        heading_parts.append(f"completion={queue_progress['completion_percent']}%")
     heading_parts.append(f"status={status_value or 'unknown'}")
     heading_parts.append(f"failures={failures_value or '0'}")
 
@@ -1255,6 +1331,12 @@ def print_watch_snapshot(
             print(f"[watch] focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=220)}")
         if state.get("last_commit_sha"):
             print(f"[watch] last commit: {state.get('last_commit_sha')}")
+        if queue_progress and queue_progress.get("completion_percent") is not None:
+            print(
+                "[watch] queue progress: "
+                f"{queue_progress['completion_percent']}% "
+                f"({queue_progress['done_count']}/{queue_progress['total_count']} done)"
+            )
     if progress_path is not None:
         print(f"[watch] progress log: {progress_path}")
     print("[watch] " + "=" * 72)
@@ -1269,6 +1351,36 @@ def format_watch_detail_counter(value: Any, *, prefix: str = "", width: int = 3)
     except (TypeError, ValueError):
         rendered = text
     return f"{prefix}{rendered}" if prefix else rendered
+
+
+def format_watch_completion_percent(value: Any) -> str:
+    text = clean_string(value)
+    if not text:
+        return "??%"
+    try:
+        clamped_value = max(0, min(100, int(text)))
+    except (TypeError, ValueError):
+        return f"{text}%"
+    return f"{clamped_value}%"
+
+
+def expected_round_number_for_state(state: dict[str, Any] | None) -> int | None:
+    if state is None:
+        return None
+    try:
+        completed_round = int(state.get("current_round", 0))
+    except (TypeError, ValueError):
+        return None
+    if clean_string(state.get("status")) == "active":
+        return completed_round + 1
+    return completed_round if completed_round > 0 else None
+
+
+def watched_round_directory(runtime_directory: Path, state: dict[str, Any] | None) -> Path | None:
+    expected_round_number = expected_round_number_for_state(state)
+    if expected_round_number is not None:
+        return runtime_directory / f"round-{expected_round_number:03d}"
+    return latest_round_directory(runtime_directory)
 
 
 def build_watch_detail_prefix(
@@ -1287,11 +1399,15 @@ def build_watch_detail_prefix(
         state.get("consecutive_failures") if state else None,
         width=1,
     )
+    queue_progress = read_watch_queue_progress(state)
+    completion_value = format_watch_completion_percent(
+        queue_progress.get("completion_percent") if queue_progress else None
+    )
     status_token = clean_string(state.get("status")) if state else ""
     if clean_string(prefix_format).lower() == "short":
-        return f"[r{round_value} p{phase_value} {status_token or 'unknown'} f{failure_value}]"
+        return f"[{completion_value} r{round_value} p{phase_value} {status_token or 'unknown'} f{failure_value}]"
     return (
-        f"[round={round_value} phase={phase_value} "
+        f"[completion={completion_value} round={round_value} phase={phase_value} "
         f"status={status_token or 'unknown'} failures={failure_value}]"
     )
 
@@ -1315,33 +1431,6 @@ def print_watch_detail_lines(
             print(f"{prefix} {line}")
         else:
             print(prefix)
-
-
-def latest_round_directory(runtime_directory: Path) -> Path | None:
-    round_directories = sorted(
-        (path for path in runtime_directory.iterdir() if path.is_dir() and ROUND_DIRECTORY_RE.fullmatch(path.name)),
-        key=lambda path: parse_round_directory_number(path) or -1,
-    )
-    return round_directories[-1] if round_directories else None
-
-
-def expected_round_number_for_state(state: dict[str, Any] | None) -> int | None:
-    if state is None:
-        return None
-    try:
-        completed_round = int(state.get("current_round", 0))
-    except (TypeError, ValueError):
-        return None
-    if clean_string(state.get("status")) == "active":
-        return completed_round + 1
-    return completed_round if completed_round > 0 else None
-
-
-def watched_round_directory(runtime_directory: Path, state: dict[str, Any] | None) -> Path | None:
-    expected_round_number = expected_round_number_for_state(state)
-    if expected_round_number is not None:
-        return runtime_directory / f"round-{expected_round_number:03d}"
-    return latest_round_directory(runtime_directory)
 
 
 def stop_process(pid: int, *, graceful_timeout_seconds: int = 30) -> None:
@@ -1417,20 +1506,6 @@ def remove_stale_lock(runtime_directory: Path, *, expected_pid: int | None = Non
 
     lock_path.unlink(missing_ok=True)
     info(f"Removed stale lock file at {lock_path}.")
-
-
-def remove_known_transient_artifacts() -> None:
-    for relative_path in (
-        Path("automation/__pycache__"),
-        Path("automation/runtime/__pycache__"),
-    ):
-        path = REPO_ROOT / relative_path
-        if path.is_dir():
-            shutil.rmtree(path)
-            info(f"Removed transient artifact {relative_path.as_posix()}.")
-        elif path.is_file():
-            path.unlink()
-            info(f"Removed transient artifact {relative_path.as_posix()}.")
 
 
 def build_restart_start_args(args: argparse.Namespace) -> list[str]:
@@ -1631,11 +1706,9 @@ def run_restart_after_next_commit(args: argparse.Namespace) -> int:
     remove_stale_lock(runtime_directory, expected_pid=current_pid if current_pid > 0 else None)
 
     stopped_head = get_head_sha()
-    remove_known_transient_artifacts()
 
     if args.hard_reset:
         run_git_no_capture(["reset", "--hard", "HEAD"], check=True)
-        remove_known_transient_artifacts()
 
     restart_sync_ref = clean_string(args.restart_sync_ref)
     if restart_sync_ref:
@@ -1645,7 +1718,6 @@ def run_restart_after_next_commit(args: argparse.Namespace) -> int:
             timeout_seconds=max(0, int(args.restart_sync_timeout_seconds)),
             refresh_seconds=max(1, int(args.restart_sync_refresh_seconds)),
         )
-        remove_known_transient_artifacts()
 
     restart_args = build_restart_start_args(args)
     restart_output_path = resolve_repo_path(args.restart_output_path)
@@ -1750,7 +1822,7 @@ def build_parser() -> argparse.ArgumentParser:
     watch_parser.add_argument("--refresh-seconds", type=int, default=2, help="Polling interval.")
     watch_parser.add_argument(
         "--prefix-format",
-        choices=("long", "short"),
+        choices=["long", "short"],
         default="long",
         help="Prefix style for streamed progress.log lines.",
     )

@@ -120,6 +120,12 @@ python .\automation\autopilot.py doctor --profile windows
 python .\automation\autopilot.py start --profile windows --dry-run --single-round
 ```
 
+If the operator explicitly wants a no-window unattended launch, do **not** start `py.exe` or `python.exe` in a fresh visible console. Prefer the scaffolded background wrapper, implemented through a hidden PowerShell host that launches `py` / `python` without a top-level window:
+
+```powershell
+.\automation\Start-Autopilot.ps1 -Background --% --profile windows
+```
+
 ### macOS
 
 ```bash
@@ -140,7 +146,11 @@ If the repo has no allowed autopilot branch yet, create one first. Prefer names 
   - `automation/New-AutopilotWorktree.ps1`
   - `automation/Start-Autopilot.ps1`
   - `automation/Watch-Autopilot.ps1`
-- Windows runner subprocesses should hide console windows by default so unattended rounds do not spawn blank `cmd.exe` popups.
+- Clarify the two Windows window layers when you scaffold or hand off:
+  - child shell subwindows such as `cmd.exe` / `pwsh.exe`
+  - the top-level launcher window such as `py.exe` / `python.exe`
+- `autopilot.py` must hide child shell subwindows by default so unattended rounds do not spawn blank `cmd.exe` popups.
+- Hiding child subwindows is **not** enough to guarantee a no-window launch. If the user asked for zero visible windows, the scaffold and your instructions must also use `automation/Start-Autopilot.ps1 -Background`, implemented via a hidden `pwsh.exe` / Windows PowerShell host that launches `py` / `python` without a visible top-level console. Do **not** rely solely on `pythonw.exe` / `pyw.exe`; those shims can be unreliable on some Windows installs.
 - Committed profiles must stay machine-neutral
 - Local absolute paths belong in external profile JSON passed through `--profile-path`
 
@@ -168,9 +178,9 @@ tail -n 80 -F automation/runtime/round-XYZ/progress.log
 
 Operational guidance:
 
-- The scaffolded `watch` command now prints `round`, `phase`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
-- Every streamed detail line from `progress.log` is also prefixed with a live state tag, defaulting to the long form `[round=006 phase=005 status=active failures=0]` so the current round/phase/status stays visible after the header scrolls away.
-- Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[r006 p005 active f0]`.
+- The scaffolded `watch` command now prints `round`, `phase`, `queue progress`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
+- Every streamed detail line from `progress.log` is also prefixed with a live state tag that includes queue completion percentage, defaulting to the long form `[completion=25% round=006 phase=005 status=active failures=0]` so the current progress/round/phase/status stays visible after the header scrolls away.
+- Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[25% r006 p005 active f0]`.
 - When the watched state is `active`, the live round log is usually `current_round + 1`; when the state is terminal, it is usually `current_round`.
 - If the log looks stale, compare `status --state-path ...` against the watched `progress.log` path before assuming the runner is stuck.
 
@@ -288,3 +298,4 @@ When you finish scaffolding, report:
 - files added
 - smoke-test commands run and their result
 - the next command the user or future agent should run
+
