@@ -183,6 +183,7 @@ Operational guidance:
 - Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[25% r006 p005 active f0]`.
 - When the watched state is `active`, the live round log is usually `current_round + 1`; when the state is terminal, it is usually `current_round`.
 - If the log looks stale, compare `status --state-path ...` against the watched `progress.log` path before assuming the runner is stuck.
+- In queue-driven backlog presets, `goal_complete` means the current `[NEXT]` slice was already satisfied. The controller should only stop the whole lane when the roadmap has no remaining `[NEXT]` or `[QUEUED]` items; otherwise it must keep the lane `active`, advance `next_phase_number`, and continue into the next queued slice.
 
 ## Sentinel / cutover rules
 
@@ -298,4 +299,5 @@ When you finish scaffolding, report:
 - files added
 - smoke-test commands run and their result
 - the next command the user or future agent should run
+
 

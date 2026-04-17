@@ -26,6 +26,7 @@ DEFAULT_RUNTIME_PATH = "automation/runtime"
 DEFAULT_PROFILE_NAME = "windows"
 LOCK_FILENAME = "autopilot.lock.json"
 ROUND_DIRECTORY_RE = re.compile(r"^round-(\d+)$")
+QUEUE_ITEM_STATUS_RE = re.compile(r"^### \[(DONE|NEXT|QUEUED)\]\s+")
 SCHEMA_REQUIRED_TYPES: dict[str, tuple[type, ...]] = {
     "string": (str,),
     "boolean": (bool,),
@@ -214,6 +215,69 @@ def save_state(state: dict[str, Any], state_path: Path) -> None:
     write_json(state_path, state)
 
 
+def infer_round_roadmap_path_from_phase_doc(phase_doc_path: str) -> Path | None:
+    normalized_phase_doc = clean_string(phase_doc_path).replace("\\", "/")
+    if not normalized_phase_doc:
+        return None
+
+    match = re.match(r"^(?P<prefix>.+?)phase-\d+\.md$", normalized_phase_doc)
+    if not match:
+        return None
+
+    roadmap_path = resolve_repo_path(f"{match.group('prefix')}round-roadmap.md")
+    if roadmap_path.exists():
+        return roadmap_path
+    return None
+
+
+def read_queue_status_counts_from_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
+    if state is None:
+        return None
+
+    roadmap_path = infer_round_roadmap_path_from_phase_doc(clean_string(state.get("last_phase_doc")))
+    if roadmap_path is None:
+        return None
+
+    counts = {"DONE": 0, "NEXT": 0, "QUEUED": 0}
+    try:
+        roadmap_text = read_text(roadmap_path)
+    except OSError:
+        return None
+
+    for raw_line in roadmap_text.splitlines():
+        line = raw_line.strip()
+        match = QUEUE_ITEM_STATUS_RE.match(line)
+        if not match:
+            continue
+        counts[match.group(1)] += 1
+
+    return {
+        "roadmap_path": roadmap_path,
+        "counts": counts,
+    }
+
+
+def has_unfinished_queue_work(state: dict[str, Any] | None) -> bool:
+    queue_status = read_queue_status_counts_from_state(state)
+    if queue_status is None:
+        return False
+
+    counts = queue_status["counts"]
+    return int(counts.get("NEXT", 0)) + int(counts.get("QUEUED", 0)) > 0
+
+
+def ensure_next_phase_after_completed_round(state: dict[str, Any]) -> None:
+    try:
+        current_round = int(state.get("current_round", 0))
+        next_phase_number = int(state.get("next_phase_number", 1))
+    except (TypeError, ValueError):
+        return
+
+    minimum_next_phase = current_round + 1
+    if next_phase_number < minimum_next_phase:
+        state["next_phase_number"] = minimum_next_phase
+
+
 def resume_state_if_threshold_allows(
     state: dict[str, Any],
     config: dict[str, Any],
@@ -225,6 +289,9 @@ def resume_state_if_threshold_allows(
         should_resume = int(state["current_round"]) < int(config["max_rounds"])
     elif previous_status == "stopped_failures":
         should_resume = int(state["consecutive_failures"]) < int(config["max_consecutive_failures"])
+    elif previous_status == "complete" and has_unfinished_queue_work(state):
+        ensure_next_phase_after_completed_round(state)
+        should_resume = True
 
     if not should_resume:
         return state
@@ -1137,8 +1204,12 @@ def run_start(args: argparse.Namespace) -> int:
                 state["next_phase_number"] = int(state["next_phase_number"]) + 1
                 info(f"Round {attempt_number} succeeded with commit {result['commit_sha']}.")
             elif result["status"] == "goal_complete":
-                state["status"] = "complete"
-                info("Autopilot objective reported complete.")
+                if has_unfinished_queue_work(state):
+                    ensure_next_phase_after_completed_round(state)
+                    info("Round reported goal_complete for the queued slice; roadmap still has pending work.")
+                else:
+                    state["status"] = "complete"
+                    info("Autopilot objective reported complete.")
 
             append_history_entry(runtime_directory, history_entry)
             save_state(state, state_path)

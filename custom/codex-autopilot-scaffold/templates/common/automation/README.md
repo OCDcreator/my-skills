@@ -96,6 +96,8 @@ Use `python automation/autopilot.py watch --prefix-format short` if you prefer t
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 
+For queue-driven backlog presets, a round result of `goal_complete` means the current `[NEXT]` slice was already done. If the roadmap still has another `[NEXT]` or any `[QUEUED]` work, the controller should resume as `active`, advance `next_phase_number`, and continue to the next queued slice instead of stopping the whole lane.
+
 ## Sentinel cutovers
 
 Use `restart-after-next-commit` when you want the current unattended run to finish its next successful round, stop cleanly, and relaunch with replacement settings.
@@ -227,4 +229,5 @@ python3 ./automation/autopilot.py start --profile mac --profile-path /Users/you/
 - `automation/Watch-Autopilot.ps1`
 
 These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable. macOS should use `python3 ./automation/autopilot.py ...` directly.
+
 
