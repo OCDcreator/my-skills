@@ -30,6 +30,20 @@ function Resolve-PythonCommand {
     throw "Neither 'py' nor 'python' was found in PATH."
 }
 
+function Remove-TransientAutopilotArtifacts {
+    $paths = @(
+        (Join-Path $PSScriptRoot "__pycache__"),
+        (Join-Path $PSScriptRoot "runtime\\__pycache__")
+    )
+
+    foreach ($path in $paths) {
+        if (Test-Path -LiteralPath $path) {
+            Remove-Item -LiteralPath $path -Recurse -Force
+            Write-Host "[cutover] removed transient artifact: $path"
+        }
+    }
+}
+
 $resolvedRestartProfile = if ($RestartProfile) { $RestartProfile } else { $Profile }
 $resolvedRestartConfigPath = if ($RestartConfigPath) { $RestartConfigPath } else { $ConfigPath }
 $resolvedRestartStatePath = if ($RestartStatePath) { $RestartStatePath } else { $StatePath }
@@ -80,6 +94,8 @@ if ($RestartSyncRef) {
 }
 Write-Host "[cutover] restart output path: $RestartOutputPath"
 Write-Host "[cutover] restart pid path: $RestartPidPath"
+
+Remove-TransientAutopilotArtifacts
 
 if ($pythonCommand.Length -eq 1) {
     & $pythonCommand[0] @invocationArgs

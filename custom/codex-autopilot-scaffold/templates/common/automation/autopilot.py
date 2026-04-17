@@ -1362,6 +1362,20 @@ def remove_stale_lock(runtime_directory: Path, *, expected_pid: int | None = Non
     info(f"Removed stale lock file at {lock_path}.")
 
 
+def remove_known_transient_artifacts() -> None:
+    for relative_path in (
+        Path("automation/__pycache__"),
+        Path("automation/runtime/__pycache__"),
+    ):
+        path = REPO_ROOT / relative_path
+        if path.is_dir():
+            shutil.rmtree(path)
+            info(f"Removed transient artifact {relative_path.as_posix()}.")
+        elif path.is_file():
+            path.unlink()
+            info(f"Removed transient artifact {relative_path.as_posix()}.")
+
+
 def build_restart_start_args(args: argparse.Namespace) -> list[str]:
     restart_profile = clean_string(args.restart_profile) or clean_string(args.profile) or DEFAULT_PROFILE_NAME
     restart_config_path = clean_string(args.restart_config_path) or clean_string(args.config_path) or DEFAULT_CONFIG_PATH
@@ -1552,9 +1566,11 @@ def run_restart_after_next_commit(args: argparse.Namespace) -> int:
     remove_stale_lock(runtime_directory, expected_pid=current_pid if current_pid > 0 else None)
 
     stopped_head = get_head_sha()
+    remove_known_transient_artifacts()
 
     if args.hard_reset:
         run_git_no_capture(["reset", "--hard", "HEAD"], check=True)
+        remove_known_transient_artifacts()
 
     restart_sync_ref = clean_string(args.restart_sync_ref)
     if restart_sync_ref:
@@ -1564,6 +1580,7 @@ def run_restart_after_next_commit(args: argparse.Namespace) -> int:
             timeout_seconds=max(0, int(args.restart_sync_timeout_seconds)),
             refresh_seconds=max(1, int(args.restart_sync_refresh_seconds)),
         )
+        remove_known_transient_artifacts()
 
     restart_args = build_restart_start_args(args)
     restart_output_path = resolve_repo_path(args.restart_output_path)

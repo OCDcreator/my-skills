@@ -95,6 +95,15 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOPILOT_PY="$SCRIPT_DIR/autopilot.py"
 
+remove_transient_autopilot_artifacts() {
+  for path in "$SCRIPT_DIR/__pycache__" "$SCRIPT_DIR/runtime/__pycache__"; do
+    if [[ -e "$path" ]]; then
+      rm -rf "$path"
+      echo "[cutover] removed transient artifact: $path"
+    fi
+  done
+}
+
 ARGS=(
   "$AUTOPILOT_PY"
   restart-after-next-commit
@@ -138,5 +147,7 @@ if [[ -n "$RESTART_SYNC_REF" ]]; then
 fi
 echo "[cutover] restart output path: $RESTART_OUTPUT_PATH"
 echo "[cutover] restart pid path: $RESTART_PID_PATH"
+
+remove_transient_autopilot_artifacts
 
 exec "${PYTHON_CMD[@]}" "${ARGS[@]}"

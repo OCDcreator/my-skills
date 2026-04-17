@@ -250,6 +250,7 @@ Sentinel guidance:
 - Keep custom sentinels local and uncommitted under a user config path such as `~/.config/<project>/`.
 - When a repo has multiple concurrent state lines, always pass the exact `--state-path` for the run you are handing off.
 - If the user asks for a future unattended cutover, explicitly report the sentinel command, output log path, pid path, and watched state path.
+- Sentinels must clean known transient Python bytecode directories (`automation/__pycache__/` and `automation/runtime/__pycache__/`) before relaunching; these can make the next `doctor` or `start` reject the worktree as dirty.
 
 Reusable scaffolded wrappers:
 
