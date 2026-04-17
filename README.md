@@ -29,6 +29,7 @@ my-skills/
 │   ├── kepano-obsidian-skills/                # Obsidian 官方 CLI/Canvas 技能
 │   ├── taste-skill/                            # 高级前端设计技能（多风格）
 │   ├── html-ppt-skill/                          # HTML PPT 演示文稿生成技能
+│   ├── ui-ux-pro-max-skill/                    # UI/UX Pro Max 设计智能工具包（7 技能）
 │   └── awesome-design-md/                       # 品牌/产品风格参考索引（getdesign.md 按需读取）
 ├── update.sh / update.bat                     # 同步外部技能与设计参考源
 ├── pull.sh / pull.bat                         # 拉取远端覆盖本地
@@ -65,6 +66,7 @@ my-skills/
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 Markdown/Bases/Canvas/CLI 技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 高级前端设计技能（多风格、参数可调） |
 | `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill) | HTML PPT 演示文稿生成技能（多主题/布局/动画） |
+| `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | UI/UX Pro Max 设计智能工具包（banner-design、brand、design、design-system、slides、ui-styling、ui-ux-pro-max 共 7 个技能） |
 
 ## 外部设计参考来源 (external/)
 

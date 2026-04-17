@@ -26,6 +26,7 @@ SKILL_SOURCES=(
   "kepano-obsidian-skills|https://github.com/kepano/obsidian-skills.git|main|skills"
   "taste-skill|https://github.com/Leonxlnx/taste-skill.git|master|skills"
   "html-ppt-skill|https://github.com/lewislulu/html-ppt-skill.git|main|."
+  "ui-ux-pro-max-skill|https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git|main|.claude/skills"
 )
 
 REFERENCE_SOURCES=(

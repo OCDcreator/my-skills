@@ -93,7 +93,7 @@ echo [步骤 4/7] 下载并复制外部来源...
 echo.
 echo [技能来源]
 
-echo [技能 1/8] anthropics-skills
+echo [技能 1/9] anthropics-skills
 git clone --depth 1 --branch main https://github.com/anthropics/skills.git "%TMP_DIR%\anthropics-skills"
 if exist "%TMP_DIR%\anthropics-skills\skills" (
     if exist "%REPO_DIR%\external\anthropics-skills" rmdir /s /q "%REPO_DIR%\external\anthropics-skills"
@@ -110,7 +110,7 @@ if exist "%TMP_DIR%\anthropics-skills\skills" (
 )
 echo.
 
-echo [技能 2/8] awesome-claude-skills
+echo [技能 2/9] awesome-claude-skills
 git clone --depth 1 --branch master https://github.com/ComposioHQ/awesome-claude-skills.git "%TMP_DIR%\awesome-claude-skills"
 if exist "%TMP_DIR%\awesome-claude-skills" (
     if exist "%REPO_DIR%\external\awesome-claude-skills" rmdir /s /q "%REPO_DIR%\external\awesome-claude-skills"
@@ -127,7 +127,7 @@ if exist "%TMP_DIR%\awesome-claude-skills" (
 )
 echo.
 
-echo [技能 3/8] claude-plugins-official
+echo [技能 3/9] claude-plugins-official
 git clone --depth 1 --branch main https://github.com/anthropics/claude-plugins-official.git "%TMP_DIR%\claude-plugins-official"
 if exist "%TMP_DIR%\claude-plugins-official\plugins" (
     if exist "%REPO_DIR%\external\claude-plugins-official" rmdir /s /q "%REPO_DIR%\external\claude-plugins-official"
@@ -153,7 +153,7 @@ if exist "%TMP_DIR%\claude-plugins-official\plugins" (
 )
 echo.
 
-echo [技能 4/8] baoyu-skills
+echo [技能 4/9] baoyu-skills
 git clone --depth 1 --branch main https://github.com/JimLiu/baoyu-skills.git "%TMP_DIR%\baoyu-skills"
 if exist "%TMP_DIR%\baoyu-skills\skills" (
     if exist "%REPO_DIR%\external\baoyu-skills" rmdir /s /q "%REPO_DIR%\external\baoyu-skills"
@@ -170,7 +170,7 @@ if exist "%TMP_DIR%\baoyu-skills\skills" (
 )
 echo.
 
-echo [技能 5/8] axton-obsidian-visual-skills
+echo [技能 5/9] axton-obsidian-visual-skills
 git clone --depth 1 --branch main https://github.com/axtonliu/axton-obsidian-visual-skills.git "%TMP_DIR%\axton-obsidian-visual-skills"
 if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
     if exist "%REPO_DIR%\external\axton-obsidian-visual-skills" rmdir /s /q "%REPO_DIR%\external\axton-obsidian-visual-skills"
@@ -187,7 +187,7 @@ if exist "%TMP_DIR%\axton-obsidian-visual-skills" (
 )
 echo.
 
-echo [技能 6/8] kepano-obsidian-skills
+echo [技能 6/9] kepano-obsidian-skills
 git clone --depth 1 --branch main https://github.com/kepano/obsidian-skills.git "%TMP_DIR%\kepano-obsidian-skills"
 if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
     if exist "%REPO_DIR%\external\kepano-obsidian-skills" rmdir /s /q "%REPO_DIR%\external\kepano-obsidian-skills"
@@ -204,7 +204,7 @@ if exist "%TMP_DIR%\kepano-obsidian-skills\skills" (
 )
 echo.
 
-echo [技能 7/8] taste-skill
+echo [技能 7/9] taste-skill
 git clone --depth 1 --branch master https://github.com/Leonxlnx/taste-skill.git "%TMP_DIR%\taste-skill"
 if exist "%TMP_DIR%\taste-skill\skills" (
     if exist "%REPO_DIR%\external\taste-skill" rmdir /s /q "%REPO_DIR%\external\taste-skill"
@@ -221,7 +221,7 @@ if exist "%TMP_DIR%\taste-skill\skills" (
 )
 echo.
 
-echo [技能 8/8] html-ppt-skill
+echo [技能 8/9] html-ppt-skill
 git clone --depth 1 --branch main https://github.com/lewislulu/html-ppt-skill.git "%TMP_DIR%\html-ppt-skill"
 if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
     if exist "%REPO_DIR%\external\html-ppt-skill" rmdir /s /q "%REPO_DIR%\external\html-ppt-skill"
@@ -232,6 +232,23 @@ if exist "%TMP_DIR%\html-ppt-skill\SKILL.md" (
 ) else (
     set /a SOURCE_ERRORS+=1
     echo [WARN] html-ppt-skill 下载失败或没有找到 SKILL.md
+)
+echo.
+
+echo [技能 9/9] ui-ux-pro-max-skill
+git clone --depth 1 --branch main https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git "%TMP_DIR%\ui-ux-pro-max-skill"
+if exist "%TMP_DIR%\ui-ux-pro-max-skill\.claude\skills" (
+    if exist "%REPO_DIR%\external\ui-ux-pro-max-skill" rmdir /s /q "%REPO_DIR%\external\ui-ux-pro-max-skill"
+    mkdir "%REPO_DIR%\external\ui-ux-pro-max-skill"
+    for /d %%d in ("%TMP_DIR%\ui-ux-pro-max-skill\.claude\skills\*") do (
+        if exist "%%d\SKILL.md" (
+            xcopy /e /i /y /q "%%d" "%REPO_DIR%\external\ui-ux-pro-max-skill\%%~nxd\" >nul 2>nul
+        )
+    )
+    echo [OK] ui-ux-pro-max-skill 已复制
+) else (
+    set /a SOURCE_ERRORS+=1
+    echo [WARN] ui-ux-pro-max-skill 下载失败或没有找到 .claude\skills 目录
 )
 echo.
 
