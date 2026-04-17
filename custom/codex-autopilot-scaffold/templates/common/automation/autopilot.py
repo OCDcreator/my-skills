@@ -1260,6 +1260,52 @@ def print_watch_snapshot(
     print("[watch] " + "=" * 72)
 
 
+def format_watch_detail_counter(value: Any, *, prefix: str, width: int = 3) -> str:
+    text = clean_string(value)
+    if not text:
+        return f"{prefix}{'?' * width}"
+    try:
+        return f"{prefix}{int(text):0{width}d}"
+    except (TypeError, ValueError):
+        return f"{prefix}{text}"
+
+
+def build_watch_detail_prefix(
+    *,
+    state: dict[str, Any] | None,
+    progress_path: Path | None,
+) -> str:
+    watched_round_number = parse_round_directory_number(progress_path.parent) if progress_path else None
+    if watched_round_number is None:
+        watched_round_number = expected_round_number_for_state(state)
+
+    round_token = format_watch_detail_counter(watched_round_number, prefix="r")
+    phase_token = format_watch_detail_counter(state.get("next_phase_number") if state else None, prefix="p")
+    failure_token = format_watch_detail_counter(
+        state.get("consecutive_failures") if state else None,
+        prefix="f",
+        width=1,
+    )
+    status_token = clean_string(state.get("status")) if state else ""
+    return f"[{round_token} {phase_token} {status_token or 'unknown'} {failure_token}]"
+
+
+def print_watch_detail_lines(
+    lines: list[str],
+    *,
+    state: dict[str, Any] | None,
+    progress_path: Path | None,
+) -> None:
+    if not lines:
+        return
+    prefix = build_watch_detail_prefix(state=state, progress_path=progress_path)
+    for line in lines:
+        if line:
+            print(f"{prefix} {line}")
+        else:
+            print(prefix)
+
+
 def latest_round_directory(runtime_directory: Path) -> Path | None:
     round_directories = sorted(
         (path for path in runtime_directory.iterdir() if path.is_dir() and ROUND_DIRECTORY_RE.fullmatch(path.name)),
@@ -1498,15 +1544,21 @@ def run_watch(args: argparse.Namespace) -> int:
                     existing_lines = progress_path.read_text(encoding="utf-8", errors="replace").splitlines()
                     if existing_lines:
                         tail_lines = existing_lines[-args.tail :]
-                        for line in tail_lines:
-                            print(line)
+                        print_watch_detail_lines(
+                            tail_lines,
+                            state=state,
+                            progress_path=progress_path,
+                        )
                         last_line_count = len(existing_lines)
 
             if last_progress_path and last_progress_path.exists():
                 current_lines = last_progress_path.read_text(encoding="utf-8", errors="replace").splitlines()
                 if len(current_lines) > last_line_count:
-                    for line in current_lines[last_line_count:]:
-                        print(line)
+                    print_watch_detail_lines(
+                        current_lines[last_line_count:],
+                        state=state,
+                        progress_path=last_progress_path,
+                    )
                     last_line_count = len(current_lines)
 
         if args.once:
