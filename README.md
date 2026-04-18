@@ -17,7 +17,8 @@ my-skills/
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
 │   ├── opencode-provider-config/              # OpenCode 模型配置
 │   ├── searxng/                               # SearXNG 联网搜索
-│   ├── skill-catalog-maintainer/              # 技能目录维护
+│   ├── skill-catalog-maintainer/              # 技能目录/README/AGENTS 维护
+│   ├── skill-router/                          # 任务先路由到 my-skills 中合适技能
 │   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
 │   ├── design-reference-router/                # 品牌/产品风格参考路由技能
 │   └── x-reader/                              # 视频/播客转录内容分析
@@ -51,7 +52,8 @@ my-skills/
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
-| [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录创建、分类、审计与维护规则同步 |
+| [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
+| [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |
 | [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
 | [x-reader](custom/x-reader/) | 视频/播客转录内容多维分析与结构化总结 |
 | [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |

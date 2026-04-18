@@ -1,6 +1,6 @@
 ---
 name: skill-catalog-maintainer
-description: Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, maintain, discover, or recommend AI agent skills for a project or task. Also use when creating or updating SKILLS.md, README skill tables, AGENTS.md maintenance rules, or when another project needs matching skill recommendations with source and install hints.
+description: Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, rename, or maintain skills and their metadata, or to update `SKILLS.md`, `README.md`, `AGENTS.md`, `update.sh`, or `update.bat` after skill changes.
 ---
 
 # Skill Catalog Maintainer
@@ -9,14 +9,16 @@ description: Use when working in a skills repository and the user asks to unders
 
 Keep a skills repository understandable. Build and maintain a concise catalog that answers: what does each skill do, when should it trigger, where did it come from, and which related skills overlap.
 
+This skill is for catalog maintenance. If the immediate job is to decide which skill should be loaded for real work, use `skill-router` first.
+
 ## Use This For
 
 - Explaining what skills in this repo are for
-- Finding which skills fit a specific development request or project need
 - Creating or updating `SKILLS.md`
 - Adding, removing, renaming, or reorganizing skills
 - Auditing duplicate or overlapping skill names across sources
 - Updating `README.md` and `AGENTS.md` after skill changes
+- Preparing source-aware install tables when cataloging skills for another project
 
 ## Inventory Workflow
 
@@ -27,30 +29,26 @@ Keep a skills repository understandable. Build and maintain a concise catalog th
 5. Classify by practical use case, not by repository source alone.
 6. Resolve install source information: for `custom/`, use this repository as the source; for `external/`, map the source prefix through `update.sh` `SOURCES` and `README.md`.
 
-## Discovery Workflow
+## Not For Routing
 
-Use this when the user is not asking to maintain the catalog itself, but is using this skill to discover which other skills should be loaded for real work.
+Do not use this skill as the first-step router for unrelated implementation work.
 
-1. Translate the user's request into a concrete job to be done, such as `frontend polish`, `bug diagnosis`, `provider config`, or `Obsidian automation`.
-2. Match that job against skill frontmatter `name`, `description`, and category; prefer skills whose trigger conditions directly match the task.
-3. Recommend both the primary implementation skill and any required process skill that should be loaded first.
-4. When multiple skills fit, give a short ordered recommendation with why each one applies and how they combine.
-5. If the user referenced this skill by path while asking for development help, treat that as a discovery request unless they explicitly ask for catalog maintenance only.
-6. If no direct match exists, return the closest skills and clearly say what gap remains.
+If the user is really asking:
 
-Prefer recommendations in this order:
+- “这个任务该用哪个技能？”
+- “先去我的技能仓库里找合适技能”
+- “帮我给另一个项目匹配应该加载哪些技能”
 
-- Required process skills first, such as `brainstorming`, `systematic-debugging`, or `test-driven-development`
-- Primary domain skill second, such as `frontend-design`, `pdf`, or `obsidian-cli`
-- Supporting follow-up skills last, only when they add clear value
+then do not run the Inventory Workflow, do not inspect candidate skill bodies, do not recommend implementation skills yourself, and do not produce install tables.
 
-For a discovery request, the answer should usually be a compact table like this:
+Respond with this handoff and stop:
 
 ```markdown
-| Priority | Skill | Why it matches | Local path | Next action |
+This is a routing request, not catalog maintenance.
+Load next: `skill-router`
 ```
 
-After recommending skills, explicitly tell the agent which skill to load next instead of stopping at catalog analysis.
+Even if the user asks for the final recommendation in the same prompt, hand off to `skill-router`; it owns repository discovery and final skill selection for real work.
 
 ## Catalog Shape
 
@@ -79,7 +77,7 @@ Keep descriptions short. Prefer the skill's own `description` field, then compre
 
 ## Project Recommendation Output
 
-When recommending skills for another project, include enough source data for another agent to install them without guessing:
+When cataloging or packaging skills for another project, include enough source data for another agent to install them without guessing:
 
 | Field | Meaning |
 |-------|---------|
