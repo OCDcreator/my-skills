@@ -15,14 +15,14 @@
   - Page 4 has no remaining blocking issue for this lane
   - The phase doc records exact edited artifact paths and the review result
 
-### [NEXT] P5 - Review and repair page 5
+### [DONE] P5 - Review and repair page 5
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make page 5 pass after page 4 is complete.
 - **Constraints**:
   - Do not start until page 4 is `[DONE]`
 
-### [QUEUED] P6 - Review and repair page 6
+### [NEXT] P6 - Review and repair page 6
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make page 6 pass after page 5 is complete.
