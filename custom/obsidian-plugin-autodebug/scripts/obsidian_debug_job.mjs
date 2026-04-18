@@ -9,11 +9,7 @@ import {
   nowIso,
   parseArgs,
 } from './obsidian_cdp_common.mjs';
-import {
-  detectRepoRuntime,
-  formatCommandTokens,
-} from './obsidian_debug_repo_runtime.mjs';
-import { normalizeScenarioAdapter } from './obsidian_debug_playwright_support.mjs';
+import { normalizeHotReloadMode } from './obsidian_debug_hot_reload_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const jobPathRaw = getStringOption(options, 'job', '').trim();
@@ -137,113 +133,15 @@ function commandFor({ phase, executable, args, cwd, platform, summary }) {
   };
 }
 
-function resolveBuildCommand({ build, repoTooling, warnings, blockers }) {
-  const explicitCommand = asArray(build.command);
-  const scriptName = stringValue(build.script, 'build');
-  const inferenceAllowed = build.inferFromRepo !== false;
-
-  if (explicitCommand.length > 0) {
-    const inferredCommand = repoTooling?.commands?.[scriptName];
-    if (
-      inferredCommand?.available
-      && explicitCommand[0] !== inferredCommand.command[0]
-    ) {
-      warnings.push(
-        `build.command explicitly uses ${formatCommandTokens(explicitCommand)}, while repo inference suggests ${inferredCommand.rendered}; keeping the explicit command.`,
-      );
-    }
-    return {
-      source: 'explicit',
-      scriptName,
-      command: explicitCommand,
-      rendered: formatCommandTokens(explicitCommand),
-      detail: 'Using explicit build.command from the job spec.',
-      available: true,
-    };
-  }
-
-  if (!inferenceAllowed) {
-    const detail = 'build.command is empty and build.inferFromRepo is false.';
-    blockers.push(`${detail} Provide an explicit build.command before run mode.`);
-    warnings.push(detail);
-    return {
-      source: 'none',
-      scriptName,
-      command: [],
-      rendered: '',
-      detail,
-      available: false,
-    };
-  }
-
-  if (!repoTooling?.packageJson) {
-    const detail = 'build.command is empty and package.json could not be read for repo-driven inference.';
-    blockers.push(detail);
-    warnings.push(detail);
-    return {
-      source: 'none',
-      scriptName,
-      command: [],
-      rendered: '',
-      detail,
-      available: false,
-    };
-  }
-
-  const inferredCommand = repoTooling.commands?.[scriptName];
-  if (!inferredCommand?.exists) {
-    const detail = `build.command is empty and package.json does not define scripts.${scriptName}.`;
-    blockers.push(detail);
-    warnings.push(detail);
-    return {
-      source: 'none',
-      scriptName,
-      command: [],
-      rendered: '',
-      detail,
-      available: false,
-    };
-  }
-
-  if (!inferredCommand.available) {
-    const detail = `build.command is empty; inferred ${repoTooling.inference.manager} for scripts.${scriptName}, but ${inferredCommand.detail}`;
-    blockers.push(detail);
-    warnings.push(detail);
-    return {
-      source: 'none',
-      scriptName,
-      command: [],
-      rendered: '',
-      detail,
-      available: false,
-    };
-  }
-
-  if (repoTooling.inference.weak) {
-    warnings.push(
-      `build.command is empty; using weak repo inference (${repoTooling.inference.confidence}) for ${inferredCommand.rendered}.`,
-    );
-  }
-
-  return {
-    source: 'inferred',
-    scriptName,
-    command: inferredCommand.command,
-    rendered: inferredCommand.rendered,
-    detail: `Inferred ${inferredCommand.rendered} from ${repoTooling.inference.reasons.join('; ') || 'repo tooling'}.`,
-    available: true,
-  };
-}
-
-function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoTooling, outputDirOverride = '' }) {
+function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = '' }) {
   const runtime = asObject(spec.runtime);
   const build = asObject(spec.build);
   const deploy = asObject(spec.deploy);
   const bootstrap = asObject(spec.bootstrap);
   const reload = asObject(spec.reload);
+  const hotReload = asObject(reload.hotReload);
   const logWatch = asObject(spec.logWatch);
   const scenario = asObject(spec.scenario);
-  const scenarioPlaywright = asObject(scenario.playwright);
   const assertions = asObject(spec.assertions);
   const comparison = asObject(spec.comparison);
   const capture = asObject(spec.capture);
@@ -256,18 +154,10 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   const pluginId = stringValue(runtime.pluginId, '');
   const testVaultPluginDir = stringValue(runtime.testVaultPluginDir, '');
   const useCdp = stringValue(reload.mode, 'cli').toLowerCase() === 'cdp' || booleanValue(reload.useCdp, false);
+  const hotReloadMode = normalizeHotReloadMode(stringValue(hotReload.mode, 'controlled'), 'controlled');
+  const hotReloadSettleMs = Math.max(0, numberValue(hotReload.settleMs, 0));
   const watchSeconds = enabled(logWatch, true) ? numberValue(logWatch.seconds, 20) : 0;
   const captureEnabled = enabled(capture, true);
-  const buildCommandInfo = resolveBuildCommand({ build, repoTooling, warnings, blockers });
-  const buildCommand = buildCommandInfo.available ? buildCommandInfo.command : [];
-  const skipBuild = !enabled(build, true) || buildCommand.length === 0;
-  const scenarioEnabled = enabled(scenario, false);
-  const scenarioAdapter = normalizeScenarioAdapter(
-    stringValue(scenario.adapter, Object.keys(scenarioPlaywright).length > 0 ? 'playwright' : 'cli'),
-  );
-  const scenarioRequiresPlaywright = scenarioEnabled && scenarioAdapter === 'playwright';
-  const scenarioCdpPort = numberValue(scenarioPlaywright.cdpPort ?? reload.cdp?.port, 0);
-  const scenarioPlaywrightSelectorTimeoutMs = numberValue(scenarioPlaywright.selectorTimeoutMs, 5000);
 
   if (!pluginId) {
     warnings.push('runtime.pluginId is empty; run mode requires a plugin id.');
@@ -275,10 +165,8 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   if (!testVaultPluginDir) {
     warnings.push('runtime.testVaultPluginDir is empty; run mode requires a test vault plugin directory.');
   }
-  if (scenarioRequiresPlaywright && scenarioCdpPort <= 0) {
-    const detail = 'scenario.adapter is playwright, but reload.cdp.port (or scenario.playwright.cdpPort) is missing.';
-    blockers.push(detail);
-    warnings.push(detail);
+  if (hotReloadMode === 'coexist' && watchSeconds <= 0 && !useCdp) {
+    warnings.push('reload.hotReload.mode is coexist, but logWatch.seconds is 0; background Hot Reload logs will not be captured.');
   }
 
   if (platform === 'windows') {
@@ -295,6 +183,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
     addValue(args, '-ObsidianCommand', runtime.obsidianCommand);
     addValue(args, '-DeployFrom', stringValue(deploy.from, 'dist'));
     addValue(args, '-OutputDir', outputDir);
+    const buildCommand = asArray(build.command);
     if (buildCommand.length > 0) {
       args.push('-BuildCommand', ...buildCommand);
     }
@@ -302,24 +191,20 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
     addValue(args, '-PollIntervalMs', numberValue(logWatch.pollIntervalMs, 1000));
     addValue(args, '-ConsoleLimit', numberValue(logWatch.consoleLimit, 200));
     addValue(args, '-DomSelector', stringValue(assertions.domSelector, '.workspace-leaf.mod-active'));
+    addValue(args, '-HotReloadMode', hotReloadMode);
+    addValue(args, '-HotReloadSettleMs', hotReloadSettleMs);
     addSwitch(args, '-UseCdp', useCdp);
     addValue(args, '-CdpHost', reload.cdp?.host);
     addValue(args, '-CdpPort', reload.cdp?.port);
     addValue(args, '-CdpTargetTitleContains', reload.cdp?.targetTitleContains);
     addValue(args, '-CdpReloadDelayMs', reload.cdp?.reloadDelayMs);
     addValue(args, '-CdpEvalAfterReload', reload.cdp?.evalAfterReload);
-    if (scenarioEnabled) {
+    if (enabled(scenario, false)) {
       addValue(args, '-ScenarioName', scenario.name);
       addValue(args, '-ScenarioPath', scenario.path);
       addValue(args, '-ScenarioCommandId', scenario.commandId);
       addValue(args, '-SurfaceProfilePath', scenario.surfaceProfile);
       addValue(args, '-ScenarioSleepMs', numberValue(scenario.sleepMs, 2000));
-      addValue(args, '-ScenarioAdapter', scenarioAdapter);
-      addValue(args, '-PlaywrightModule', scenarioPlaywright.module);
-      addSwitch(args, '-PlaywrightTrace', booleanValue(scenarioPlaywright.trace, false));
-      addValue(args, '-PlaywrightTracePath', scenarioPlaywright.tracePath);
-      addValue(args, '-PlaywrightScreenshotPath', scenarioPlaywright.screenshotPath);
-      addValue(args, '-PlaywrightSelectorTimeoutMs', scenarioPlaywrightSelectorTimeoutMs);
     }
     addValue(args, '-AssertionsPath', assertions.path);
     addValue(args, '-CompareDiagnosisPath', comparison.baselineDiagnosisPath);
@@ -331,22 +216,19 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
     addValue(args, '-BootstrapRestartWaitMs', numberValue(bootstrap.restartWaitMs, 8000));
     addValue(args, '-BootstrapEnableWaitMs', numberValue(bootstrap.enableWaitMs, 1000));
     addSwitch(args, '-DomText', booleanValue(assertions.domText, false));
-    addSwitch(args, '-SkipBuild', skipBuild);
+    addSwitch(args, '-SkipBuild', !enabled(build, true));
     addSwitch(args, '-SkipDeploy', !enabled(deploy, true));
     addSwitch(args, '-SkipReload', !enabled(reload, true));
     addSwitch(args, '-SkipScreenshot', !captureEnabled || capture.screenshot === false);
     addSwitch(args, '-SkipDom', !captureEnabled || capture.dom === false);
-    return {
-      ...commandFor({
+    return commandFor({
       phase: 'debug-cycle',
       executable: 'powershell',
       args,
       cwd,
       platform,
       summary: 'Run the Windows PowerShell build/deploy/reload/watch cycle.',
-      }),
-      buildCommandInfo,
-    };
+    });
   }
 
   const args = [path.join(scriptDir, 'obsidian_plugin_debug_cycle.sh')];
@@ -356,6 +238,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   addValue(args, '--obsidian-command', runtime.obsidianCommand);
   addValue(args, '--deploy-from', stringValue(deploy.from, 'dist'));
   addValue(args, '--output-dir', outputDir);
+  const buildCommand = asArray(build.command);
   if (buildCommand.length > 0) {
     addValue(args, '--build-command', buildCommand.join(' '));
   }
@@ -363,23 +246,19 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   addValue(args, '--poll-interval-ms', numberValue(logWatch.pollIntervalMs, 1000));
   addValue(args, '--console-limit', numberValue(logWatch.consoleLimit, 200));
   addValue(args, '--dom-selector', stringValue(assertions.domSelector, '.workspace-leaf.mod-active'));
+  addValue(args, '--hot-reload-mode', hotReloadMode);
+  addValue(args, '--hot-reload-settle-ms', hotReloadSettleMs);
   addValue(args, '--cdp-host', reload.cdp?.host);
   addValue(args, '--cdp-port', reload.cdp?.port);
   addValue(args, '--cdp-target-title-contains', reload.cdp?.targetTitleContains);
   addValue(args, '--cdp-reload-delay-ms', reload.cdp?.reloadDelayMs);
   addValue(args, '--cdp-eval-after-reload', reload.cdp?.evalAfterReload);
-  if (scenarioEnabled) {
+  if (enabled(scenario, false)) {
     addValue(args, '--scenario-name', scenario.name);
     addValue(args, '--scenario-path', scenario.path);
     addValue(args, '--scenario-command-id', scenario.commandId);
     addValue(args, '--surface-profile', scenario.surfaceProfile);
     addValue(args, '--scenario-sleep-ms', numberValue(scenario.sleepMs, 2000));
-    addValue(args, '--scenario-adapter', scenarioAdapter);
-    addValue(args, '--playwright-module', scenarioPlaywright.module);
-    addSwitch(args, '--playwright-trace', booleanValue(scenarioPlaywright.trace, false));
-    addValue(args, '--playwright-trace-path', scenarioPlaywright.tracePath);
-    addValue(args, '--playwright-screenshot-path', scenarioPlaywright.screenshotPath);
-    addValue(args, '--playwright-selector-timeout-ms', scenarioPlaywrightSelectorTimeoutMs);
   }
   addValue(args, '--assertions', assertions.path);
   addValue(args, '--compare-diagnosis', comparison.baselineDiagnosisPath);
@@ -392,22 +271,19 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   addValue(args, '--bootstrap-enable-wait-ms', numberValue(bootstrap.enableWaitMs, 1000));
   addSwitch(args, '--dom-text', booleanValue(assertions.domText, false));
   addSwitch(args, '--use-cdp', useCdp);
-  addSwitch(args, '--skip-build', skipBuild);
+  addSwitch(args, '--skip-build', !enabled(build, true));
   addSwitch(args, '--skip-deploy', !enabled(deploy, true));
   addSwitch(args, '--skip-reload', !enabled(reload, true));
   addSwitch(args, '--skip-screenshot', !captureEnabled || capture.screenshot === false);
   addSwitch(args, '--skip-dom', !captureEnabled || capture.dom === false);
-  return {
-    ...commandFor({
+  return commandFor({
     phase: 'debug-cycle',
     executable: 'bash',
     args,
     cwd,
     platform,
     summary: 'Run the Bash build/deploy/reload/watch cycle.',
-    }),
-    buildCommandInfo,
-  };
+  });
 }
 
 function buildStateCommands({ spec, platform, cwd, warnings }) {
@@ -597,23 +473,19 @@ function buildReportCommand({ spec, platform, cwd, cycleOutputDir }) {
   });
 }
 
-async function buildPlan(spec) {
+function buildPlan(spec) {
   const warnings = [];
-  const blockers = [];
   const job = asObject(spec.job);
   const runtime = asObject(spec.runtime);
   const profile = asObject(spec.profile);
   const jobId = stringValue(job.id, 'obsidian-debug-job');
   const cwd = path.resolve(cwdOverride || stringValue(runtime.cwd, process.cwd()));
-  const repoTooling = await detectRepoRuntime({ repoDir: cwd });
   const profileEnabled = enabled(profile, false);
   const cycleCommand = buildCycleCommand({
     spec,
     platform,
     cwd,
     warnings,
-    blockers,
-    repoTooling,
     outputDirOverride: profileEnabled ? '{{outputDir}}' : outputDirOverride,
   });
   const profileCommand = buildProfileCommand({ spec, platform, cwd, cycleCommand });
@@ -644,9 +516,6 @@ async function buildPlan(spec) {
     cwd,
     commandCount: commands.length,
     warnings,
-    blockers,
-    repoTooling,
-    buildCommand: cycleCommand.buildCommandInfo,
     commands,
   };
 }
@@ -665,9 +534,6 @@ function validateRunPlan(plan) {
     .join('\n');
   if (placeholderPattern.test(rendered)) {
     throw new Error('Run mode refused a job plan that still contains placeholder values.');
-  }
-  if (Array.isArray(plan.blockers) && plan.blockers.length > 0) {
-    throw new Error(`Run mode refused a job plan with blockers: ${plan.blockers.join(' | ')}`);
   }
 }
 
@@ -698,7 +564,7 @@ async function runPlan(plan) {
   }
 }
 
-const plan = await buildPlan(jobSpec);
+const plan = buildPlan(jobSpec);
 if (outputPath) {
   const resolvedOutput = path.resolve(outputPath);
   await ensureParentDirectory(resolvedOutput);

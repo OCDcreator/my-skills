@@ -147,7 +147,7 @@
   - Diagnosis/report artifacts can link Playwright traces/screenshots when available
   - Plugin-neutral fixtures or templates demonstrate the adapter without hard-coding one plugin
 
-### [NEXT] B13 - Hot Reload coordination doctor
+### [DONE] B13 - Hot Reload coordination doctor
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Detect repository/vault Hot Reload conditions and guide automation toward controlled reload or Hot Reload-friendly modes so startup logs stay trustworthy.
@@ -160,7 +160,7 @@
   - Job/cycle flows can opt into controlled reload or friendly coexistence modes
   - Reports make it clear when Hot Reload may have influenced captured timings/logs
 
-### [QUEUED] B14 - Sample-plugin scaffold and bootstrap mode
+### [NEXT] B14 - Sample-plugin scaffold and bootstrap mode
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Extend the framework from “debug an existing plugin” to “scaffold a minimal debug-ready plugin workspace” using generic sample-plugin patterns, manifest/bootstrap defaults, job specs, and assertions.
@@ -189,6 +189,6 @@
 ## Current state
 
 - B1-B10 are complete.
-- B11-B12 are complete.
-- B13 is the approved next slice.
-- B14-B15 are approved queued follow-ups; do not expand beyond them without another human approval.
+- B11-B13 are complete.
+- B14 is the approved next slice.
+- B15 is the approved queued follow-up; do not expand beyond it without another human approval.

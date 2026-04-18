@@ -278,18 +278,18 @@ const comparisonCandidateArtifacts = comparison?.candidate?.artifacts ?? {};
 const diagnosisArtifactStates = normalizeArtifactStates(diagnosis.artifactStates);
 const comparisonBaselineArtifactStates = normalizeArtifactStates(comparison?.baseline?.artifactStates);
 const screenshotDiffPath = comparison?.screenshotDiff?.diffPath ?? null;
+const hotReload = diagnosis.hotReload && typeof diagnosis.hotReload === 'object' && !Array.isArray(diagnosis.hotReload)
+  ? diagnosis.hotReload
+  : null;
 
 const domPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.dom));
 const consolePreview = trimPreview(await readTextOrNull(diagnosisArtifacts.consoleLog));
 const errorsPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.errorsLog));
 const cdpPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.cdpTrace));
 const baselineDomPreview = trimPreview(await readTextOrNull(comparisonBaselineArtifacts.dom));
-const playwrightTracePreview = trimPreview(await readTextOrNull(diagnosisArtifacts.playwrightTrace));
 const screenshotDiffExists = await exists(screenshotDiffPath);
 const candidateScreenshotExists = await exists(diagnosisArtifacts.screenshot);
-const candidatePlaywrightScreenshotExists = await exists(diagnosisArtifacts.playwrightScreenshot);
 const baselineScreenshotExists = await exists(comparisonBaselineArtifacts.screenshot);
-const baselinePlaywrightScreenshotExists = await exists(comparisonBaselineArtifacts.playwrightScreenshot);
 
 const artifactEntries = [
   { scope: 'candidate', label: 'diagnosis', path: path.resolve(diagnosisPath) },
@@ -301,8 +301,6 @@ const artifactEntries = [
   { scope: 'candidate', label: 'CDP trace', path: diagnosisArtifacts.cdpTrace, state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null },
   { scope: 'candidate', label: 'deploy report', path: diagnosisArtifacts.deployReport },
   { scope: 'candidate', label: 'scenario report', path: diagnosisArtifacts.scenarioReport },
-  { scope: 'candidate', label: 'Playwright trace', path: diagnosisArtifacts.playwrightTrace, state: diagnosisArtifactStates.playwrightTrace ?? null },
-  { scope: 'candidate', label: 'Playwright screenshot', path: diagnosisArtifacts.playwrightScreenshot, state: diagnosisArtifactStates.playwrightScreenshot ?? null },
   { scope: 'comparison', label: 'comparison JSON', path: comparisonPath ? path.resolve(comparisonPath) : null },
   {
     scope: 'comparison',
@@ -313,8 +311,6 @@ const artifactEntries = [
       : null,
   },
   { scope: 'baseline', label: 'baseline screenshot', path: comparisonBaselineArtifacts.screenshot ?? null, state: comparisonBaselineArtifactStates.screenshot ?? null },
-  { scope: 'baseline', label: 'baseline Playwright screenshot', path: comparisonBaselineArtifacts.playwrightScreenshot ?? null, state: comparisonBaselineArtifactStates.playwrightScreenshot ?? null },
-  { scope: 'baseline', label: 'baseline Playwright trace', path: comparisonBaselineArtifacts.playwrightTrace ?? null, state: comparisonBaselineArtifactStates.playwrightTrace ?? null },
   { scope: 'baseline', label: 'baseline DOM snapshot', path: comparisonBaselineArtifacts.dom ?? null, state: comparisonBaselineArtifactStates.dom ?? null },
   { scope: 'baseline', label: 'baseline console log', path: comparisonBaselineArtifacts.consoleLog ?? null, state: comparison?.baseline?.useCdp ? null : (comparisonBaselineArtifactStates.trace ?? null) },
   { scope: 'baseline', label: 'baseline errors log', path: comparisonBaselineArtifacts.errorsLog ?? null },
@@ -363,6 +359,7 @@ const html = `<!doctype html>
       <span class="badge ${escapeHtml(normalizeStatusClass(diagnosis.status))}">${escapeHtml(diagnosis.status)}</span>
       ${comparison ? renderStatusSummary('Compare', comparison.status) : ''}
       ${comparison ? renderStatusSummary('Visual', comparison.visualStatus ?? comparison.screenshotDiff?.status ?? 'n/a', comparison.screenshotDiff?.status === 'different' ? 'warn' : 'info') : ''}
+      ${hotReload ? renderStatusSummary('Hot Reload', hotReload.timingsTrust ?? 'n/a', hotReload.mayInfluenceTimings ? 'warning' : (hotReload.timingsTrust === 'deterministic' ? 'pass' : 'info')) : ''}
     </div>
     <strong>${escapeHtml(diagnosis.headline)}</strong>
     <p>Plugin: <code>${escapeHtml(diagnosis.pluginId)}</code> | Vault: <code>${escapeHtml(diagnosis.vaultName)}</code></p>
@@ -385,20 +382,6 @@ const html = `<!doctype html>
         path: baselineScreenshotExists ? comparisonBaselineArtifacts.screenshot : null,
         kind: 'image',
         state: comparisonBaselineArtifactStates.screenshot ?? null,
-      })}
-      ${renderPreviewCard({
-        title: 'Playwright Scenario Screenshot',
-        label: 'candidate Playwright screenshot',
-        path: candidatePlaywrightScreenshotExists ? diagnosisArtifacts.playwrightScreenshot : null,
-        kind: 'image',
-        state: diagnosisArtifactStates.playwrightScreenshot ?? null,
-      })}
-      ${renderPreviewCard({
-        title: 'Baseline Playwright Screenshot',
-        label: 'baseline Playwright screenshot',
-        path: baselinePlaywrightScreenshotExists ? comparisonBaselineArtifacts.playwrightScreenshot : null,
-        kind: 'image',
-        state: comparisonBaselineArtifactStates.playwrightScreenshot ?? null,
       })}
       ${renderPreviewCard({
         title: 'Screenshot Diff',
@@ -457,13 +440,6 @@ const html = `<!doctype html>
         state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null,
       })}
       ${renderPreviewCard({
-        title: 'Playwright Trace',
-        label: 'candidate Playwright trace',
-        path: diagnosisArtifacts.playwrightTrace,
-        preview: playwrightTracePreview,
-        state: diagnosisArtifactStates.playwrightTrace ?? null,
-      })}
-      ${renderPreviewCard({
         title: 'Baseline DOM Snapshot',
         label: 'baseline DOM snapshot',
         path: comparisonBaselineArtifacts.dom ?? null,
@@ -476,6 +452,26 @@ const html = `<!doctype html>
   <div class="card">
     <h2>Timings</h2>
     ${renderMetricTable(diagnosis.timings)}
+  </div>
+
+  <div class="card">
+    <h2>Hot Reload Coordination</h2>
+    ${hotReload ? `
+      <p>
+        ${renderStatusSummary('Mode', hotReload.mode ?? 'n/a', hotReload.mode === 'coexist' ? 'warning' : 'info')}
+        ${renderStatusSummary('Timing Trust', hotReload.timingsTrust ?? 'n/a', hotReload.mayInfluenceTimings ? 'warning' : (hotReload.timingsTrust === 'deterministic' ? 'pass' : 'info'))}
+      </p>
+      <p>${escapeHtml(hotReload.detail ?? 'No Hot Reload note recorded.')}</p>
+      <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Settle Window</td><td>${escapeHtml(hotReload.settleMs ?? 0)}</td></tr>
+        <tr><td>Reload Channel</td><td>${escapeHtml(hotReload.reloadChannel ?? 'none')}</td></tr>
+        <tr><td>Explicit Reload Requested</td><td>${escapeHtml(hotReload.explicitReloadRequested ? 'true' : 'false')}</td></tr>
+        <tr><td>Explicit Reload Performed</td><td>${escapeHtml(hotReload.explicitReloadPerformed ? 'true' : 'false')}</td></tr>
+        <tr><td>Pre-clear Settle</td><td>${escapeHtml(hotReload.preClearSettleApplied ? 'true' : 'false')}</td></tr>
+        <tr><td>Post-clear Wait</td><td>${escapeHtml(hotReload.postClearWaitApplied ? 'true' : 'false')}</td></tr>
+      </table>
+    ` : '<p>No Hot Reload coordination metadata recorded.</p>'}
   </div>
 
   <div class="card">

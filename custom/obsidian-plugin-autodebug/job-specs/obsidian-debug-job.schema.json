@@ -67,14 +67,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "inferFromRepo": {
-          "type": "boolean",
-          "description": "When true, infer npm/pnpm/yarn/bun from packageManager and lockfiles if command is omitted."
-        },
-        "script": {
-          "type": "string",
-          "description": "package.json script name to infer when command is omitted."
-        },
         "command": {
           "oneOf": [
             {
@@ -147,6 +139,21 @@
         "useCdp": {
           "type": "boolean"
         },
+        "hotReload": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "controlled",
+                "coexist"
+              ]
+            },
+            "settleMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
         "cdp": {
           "type": "object"
         }
@@ -178,10 +185,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "adapter": {
-          "type": "string",
-          "enum": ["cli", "playwright"]
-        },
         "name": {
           "type": "string"
         },
@@ -196,27 +199,6 @@
         },
         "sleepMs": {
           "type": "integer"
-        },
-        "playwright": {
-          "type": "object",
-          "properties": {
-            "module": {
-              "type": "string"
-            },
-            "trace": {
-              "type": "boolean"
-            },
-            "tracePath": {
-              "type": "string"
-            },
-            "screenshotPath": {
-              "type": "string"
-            },
-            "selectorTimeoutMs": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
         }
       }
     },

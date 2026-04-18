@@ -16,9 +16,11 @@
   },
   "build": {
     "enabled": true,
-    "inferFromRepo": true,
-    "script": "build",
-    "command": []
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ]
   },
   "deploy": {
     "enabled": true,
@@ -37,6 +39,10 @@
     "enabled": true,
     "mode": "cli",
     "useCdp": false,
+    "hotReload": {
+      "mode": "controlled",
+      "settleMs": 0
+    },
     "cdp": {
       "host": "127.0.0.1",
       "port": 9222,
@@ -53,19 +59,11 @@
   },
   "scenario": {
     "enabled": false,
-    "adapter": "cli",
     "name": "open-plugin-view",
     "path": "",
     "commandId": "your-plugin-id:open-view",
     "surfaceProfile": "",
-    "sleepMs": 2000,
-    "playwright": {
-      "module": "",
-      "trace": false,
-      "tracePath": "",
-      "screenshotPath": "",
-      "selectorTimeoutMs": 5000
-    }
+    "sleepMs": 2000
   },
   "assertions": {
     "path": "assertions/plugin-view-health.template.json",

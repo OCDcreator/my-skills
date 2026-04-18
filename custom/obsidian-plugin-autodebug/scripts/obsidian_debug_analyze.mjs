@@ -747,6 +747,46 @@ const runtimeContext = {
   vaultRoot: deriveVaultRoot(testVaultPluginDir),
 };
 const capturePlan = deriveCapturePlan(summary);
+const hotReloadRaw = summary.hotReload && typeof summary.hotReload === 'object' && !Array.isArray(summary.hotReload)
+  ? summary.hotReload
+  : {};
+const hotReloadMetadataRecorded = Object.keys(hotReloadRaw).length > 0;
+const hotReloadMode = (stringValue(hotReloadRaw.mode) || 'controlled') === 'coexist' ? 'coexist' : 'controlled';
+const hotReloadExplicitReloadPerformed = booleanValue(
+  hotReloadRaw.explicitReloadPerformed,
+  !hotReloadMetadataRecorded && hotReloadMode !== 'coexist' && capturePlan.trace?.requested === true,
+);
+const hotReloadMayInfluenceTimings = booleanValue(
+  hotReloadRaw.mayInfluenceTimings,
+  hotReloadMode === 'coexist' && capturePlan.trace?.requested === true,
+);
+const hotReloadTimingsTrust = stringValue(hotReloadRaw.timingsTrust)
+  || (hotReloadMayInfluenceTimings
+    ? 'hot-reload-influenced'
+    : hotReloadExplicitReloadPerformed
+      ? 'deterministic'
+      : 'reload-skipped');
+const hotReloadSummary = {
+  metadataRecorded: hotReloadMetadataRecorded,
+  mode: hotReloadMode,
+  settleMs: toFiniteNumber(hotReloadRaw.settleMs) ?? 0,
+  preClearSettleApplied: booleanValue(hotReloadRaw.preClearSettleApplied, false),
+  postClearWaitApplied: booleanValue(hotReloadRaw.postClearWaitApplied, false),
+  explicitReloadRequested: booleanValue(
+    hotReloadRaw.explicitReloadRequested,
+    hotReloadMode !== 'coexist' && capturePlan.trace?.requested === true,
+  ),
+  explicitReloadPerformed: hotReloadExplicitReloadPerformed,
+  reloadChannel: stringValue(hotReloadRaw.reloadChannel) || (hotReloadExplicitReloadPerformed ? (summary.useCdp ? 'cdp' : 'cli') : 'none'),
+  mayInfluenceTimings: hotReloadMayInfluenceTimings,
+  timingsTrust: hotReloadTimingsTrust,
+  detail: stringValue(hotReloadRaw.detail)
+    || (hotReloadMode === 'coexist'
+      ? 'Coexist mode captured startup without an explicit reload, so Hot Reload may have influenced timings and logs.'
+      : hotReloadExplicitReloadPerformed
+        ? 'Controlled mode captured a deliberate explicit reload.'
+        : 'Reload was skipped, so startup timings do not reflect a coordinated reload.'),
+};
 
 const consoleText = await readTextIfExists(summary.consoleLog);
 const errorsText = await readTextIfExists(summary.errorsLog);
@@ -755,37 +795,9 @@ const domText = await readTextIfExists(summary.dom);
 const deployReport = await readJsonIfExists(summary.deployReport);
 const cdpSummary = await readJsonIfExists(summary.cdpSummary);
 const scenarioReport = await readJsonIfExists(summary.scenarioReport);
-const scenarioPlaywright = scenarioReport?.playwright && typeof scenarioReport.playwright === 'object' && !Array.isArray(scenarioReport.playwright)
-  ? scenarioReport.playwright
-  : null;
-const scenarioArtifacts = scenarioReport?.artifacts && typeof scenarioReport.artifacts === 'object' && !Array.isArray(scenarioReport.artifacts)
-  ? scenarioReport.artifacts
-  : {};
-const playwrightTracePath = stringValue(
-  scenarioArtifacts.playwrightTrace
-  || scenarioPlaywright?.trace?.path,
-) || null;
-const playwrightScreenshotPath = stringValue(
-  scenarioArtifacts.playwrightScreenshot
-  || scenarioPlaywright?.screenshot?.path,
-) || null;
-const playwrightTraceExists = await pathExists(playwrightTracePath);
-const playwrightScreenshotExists = await pathExists(playwrightScreenshotPath);
 const assertionsDocument = assertionsPath ? ((await readJsonIfExists(assertionsPath)) ?? { assertions: [] }) : null;
 const screenshotExists = await pathExists(summary.screenshot);
 const domExists = await pathExists(summary.dom);
-const playwrightTracePlan = normalizeCapturePlanEntry(scenarioPlaywright?.trace, {
-  requested: Boolean(playwrightTracePath || scenarioPlaywright?.trace?.requested),
-  intentionallySkipped: false,
-  skipReason: null,
-  mode: 'playwright-trace',
-});
-const playwrightScreenshotPlan = normalizeCapturePlanEntry(scenarioPlaywright?.screenshot, {
-  requested: Boolean(playwrightScreenshotPath || scenarioPlaywright?.screenshot?.requested),
-  intentionallySkipped: false,
-  skipReason: null,
-  mode: 'playwright-screenshot',
-});
 
 const allLines = [
   ...splitLines(consoleText, summary.consoleLog),
@@ -875,6 +887,16 @@ if (summary.useCdp && cdpSummary?.reloadResult && capturePlan.trace.requested) {
   );
 }
 
+pushAssertion(
+  'hot-reload-coordination',
+  hotReloadSummary.timingsTrust === 'deterministic'
+    ? 'pass'
+    : hotReloadSummary.timingsTrust === 'hot-reload-influenced'
+      ? 'warn'
+      : 'skipped',
+  hotReloadSummary.detail,
+);
+
 const screenshotState = buildArtifactState({
   key: 'screenshot',
   label: 'Screenshot capture',
@@ -934,44 +956,6 @@ if (scenarioReport) {
       ? `Scenario ${scenarioReport.scenarioName} completed successfully.`
       : `Scenario ${scenarioReport.scenarioName} failed.`,
     [{ filePath: summary.scenarioReport, lineNumber: 1 }],
-  );
-}
-
-const playwrightTraceState = buildArtifactState({
-  key: 'playwrightTrace',
-  label: 'Playwright trace',
-  plan: playwrightTracePlan,
-  artifactPath: playwrightTracePath,
-  exists: playwrightTraceExists,
-  captured: booleanValue(scenarioPlaywright?.trace?.captured, playwrightTraceExists),
-  captureDetail: scenarioPlaywright?.trace?.detail || `Captured Playwright trace at ${playwrightTracePath}.`,
-  failureDetail: scenarioPlaywright?.trace?.detail || 'Playwright trace artifact is missing.',
-});
-if (playwrightTracePath || playwrightTracePlan.intentionallySkipped || playwrightTracePlan.requested) {
-  pushAssertion(
-    'playwright-trace-captured',
-    assertionStatusFromArtifactState(playwrightTraceState),
-    playwrightTraceState.detail,
-    playwrightTraceState.status === 'captured' ? artifactEvidence(playwrightTracePath) : [],
-  );
-}
-
-const playwrightScreenshotState = buildArtifactState({
-  key: 'playwrightScreenshot',
-  label: 'Playwright screenshot',
-  plan: playwrightScreenshotPlan,
-  artifactPath: playwrightScreenshotPath,
-  exists: playwrightScreenshotExists,
-  captured: booleanValue(scenarioPlaywright?.screenshot?.captured, playwrightScreenshotExists),
-  captureDetail: scenarioPlaywright?.screenshot?.detail || `Captured Playwright screenshot at ${playwrightScreenshotPath}.`,
-  failureDetail: scenarioPlaywright?.screenshot?.detail || 'Playwright screenshot artifact is missing.',
-});
-if (playwrightScreenshotPath || playwrightScreenshotPlan.intentionallySkipped || playwrightScreenshotPlan.requested) {
-  pushAssertion(
-    'playwright-screenshot-captured',
-    assertionStatusFromArtifactState(playwrightScreenshotState),
-    playwrightScreenshotState.detail,
-    playwrightScreenshotState.status === 'captured' ? artifactEvidence(playwrightScreenshotPath) : [],
   );
 }
 
@@ -1610,6 +1594,9 @@ const headline = highestSeveritySignature
       : 'Automation completed and the captured artifacts look healthy.');
 
 const recommendations = [...new Set([
+  ...(hotReloadSummary.mayInfluenceTimings
+    ? ['Re-run with reload.hotReload.mode=controlled and a settle window when you need deterministic startup timings.']
+    : []),
   ...matchedSignatures.flatMap((entry) => entry.nextActions ?? []),
   ...playbooks.flatMap((entry) => entry.actions ?? []),
 ])];
@@ -1622,6 +1609,7 @@ const diagnosis = {
   vaultName: summary.vaultName,
   useCdp: summary.useCdp,
   domSelector: domSelector || null,
+  hotReload: hotReloadSummary,
   runtime: {
     platform,
     repoDir: repoDir || null,
@@ -1642,15 +1630,11 @@ const diagnosis = {
     cdpTrace: summary.cdpTrace,
     cdpSummary: summary.cdpSummary,
     scenarioReport: summary.scenarioReport ?? null,
-    playwrightTrace: playwrightTracePath,
-    playwrightScreenshot: playwrightScreenshotPath,
     screenshot: summary.screenshot,
     dom: summary.dom,
   },
   artifactStates: {
     trace: traceState,
-    playwrightTrace: playwrightTraceState,
-    playwrightScreenshot: playwrightScreenshotState,
     screenshot: screenshotState,
     dom: domState,
   },
@@ -1666,7 +1650,6 @@ const diagnosis = {
   playbooksPath,
   scenario: scenarioReport
     ? {
-        adapter: scenarioReport.adapter ?? null,
         name: scenarioReport.scenarioName,
         success: scenarioReport.success,
         stepCount: Array.isArray(scenarioReport.steps) ? scenarioReport.steps.length : 0,
