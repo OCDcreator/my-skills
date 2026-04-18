@@ -43,7 +43,7 @@
   - Assertion failures are summarized in diagnosis and report outputs
   - Generic examples do not require a specific plugin
 
-### [NEXT] B4 - Baseline taxonomy, regression comparison, and retention
+### [DONE] B4 - Baseline taxonomy, regression comparison, and retention
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Classify baselines by platform, vault state, cold/warm mode, scenario, plugin id, and run label; compare against the closest matching baseline.
@@ -54,7 +54,7 @@
   - Baseline save/list/compare flows can select by tags
   - Retention rules protect recent useful artifacts and clean stale debug output
 
-### [QUEUED] B5 - Screenshot diff and report artifact previews
+### [NEXT] B5 - Screenshot diff and report artifact previews
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add screenshot comparison and richer HTML report sections for UI regressions that DOM checks miss.
@@ -88,5 +88,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B4 - Baseline taxonomy, regression comparison, and retention`.
+- The current `[NEXT]` is `B5 - Screenshot diff and report artifact previews`.
 - Successful rounds must keep the roadmap and phase docs aligned.

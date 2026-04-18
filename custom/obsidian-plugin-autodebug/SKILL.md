@@ -451,17 +451,44 @@ node scripts/obsidian_debug_baseline.mjs \
   --baseline-root .obsidian-debug/baselines \
   --name warm-start-healthy \
   --diagnosis .obsidian-debug/profile/run-01/diagnosis.json \
+  --platform windows \
+  --vault-state clean \
+  --run-mode warm \
+  --scenario open-plugin-view \
+  --plugin-id your-plugin-id \
+  --run-label sidebar-smoke \
   --profile .obsidian-debug/profile/profile-summary.json \
   --report .obsidian-debug/profile/report.html
 
 node scripts/obsidian_debug_baseline.mjs \
   --mode compare \
   --baseline-root .obsidian-debug/baselines \
-  --name warm-start-healthy \
+  --tags "pluginId=your-plugin-id|platform=windows|mode=warm|scenario=open-plugin-view" \
   --candidate-diagnosis .obsidian-debug/profile/run-03/diagnosis.json
 ```
 
-Baselines are especially useful when you are chasing performance drift: save one cold-start baseline and one warm-start baseline, then compare new runs against the correct class instead of mixing them together.
+List or filter saved baselines by the same taxonomy tags:
+
+```bash
+node scripts/obsidian_debug_baseline.mjs \
+  --mode list \
+  --baseline-root .obsidian-debug/baselines \
+  --tags "pluginId=your-plugin-id|platform=windows|mode=warm"
+```
+
+Baselines are especially useful when you are chasing performance drift: save one cold-start baseline and one warm-start baseline, then compare new runs against the closest matching class instead of mixing them together.
+
+Use retention pruning to keep recent useful artifacts while cleaning stale baseline output. `prune` is dry-run by default; add `--delete true` only after reviewing the plan:
+
+```bash
+node scripts/obsidian_debug_baseline.mjs \
+  --mode prune \
+  --baseline-root .obsidian-debug/baselines \
+  --tags "pluginId=your-plugin-id|platform=windows" \
+  --max-age-days 14 \
+  --keep-recent 5 \
+  --keep-per-class 1
+```
 
 Generate a portable HTML report from the machine-readable artifacts:
 
