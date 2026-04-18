@@ -31,6 +31,7 @@ const jobSpec = JSON.parse((await fs.readFile(jobPath, 'utf8')).replace(/^\uFEFF
 const platform = normalizePlatform(getStringOption(options, 'platform', 'auto'));
 const cwdOverride = getStringOption(options, 'cwd', '').trim();
 const outputPath = getStringOption(options, 'output', '').trim();
+const outputDirOverride = getStringOption(options, 'output-dir', '').trim();
 
 function normalizePlatform(value) {
   const normalized = value.trim().toLowerCase();
@@ -260,11 +261,13 @@ function buildStateCommands({ spec, platform, cwd, warnings }) {
   const state = asObject(spec.state);
   const runtime = asObject(spec.runtime);
   const commands = [];
-  const vaultSnapshot = asObject(state.vaultSnapshot);
-  const pluginReset = asObject(state.pluginReset);
+  const vaultSnapshotConfig = state.vaultSnapshot;
+  const pluginResetConfig = state.pluginReset;
+  const vaultSnapshot = asObject(vaultSnapshotConfig);
+  const pluginReset = asObject(pluginResetConfig);
   const pluginId = stringValue(runtime.pluginId, '');
 
-  if (enabled(vaultSnapshot, false)) {
+  if (enabled(vaultSnapshotConfig, false)) {
     const targets = asArray(vaultSnapshot.targets);
     if (targets.length === 0) {
       warnings.push('state.vaultSnapshot.enabled is true but no targets are configured.');
@@ -290,7 +293,7 @@ function buildStateCommands({ spec, platform, cwd, warnings }) {
     }
   }
 
-  if (enabled(pluginReset, false)) {
+  if (enabled(pluginResetConfig, false)) {
     const args = [
       path.join(scriptDir, 'obsidian_debug_reset_state.mjs'),
       '--mode',
@@ -330,10 +333,12 @@ function buildStateCommands({ spec, platform, cwd, warnings }) {
 function buildRestoreCommands({ spec, platform, cwd }) {
   const state = asObject(spec.state);
   const commands = [];
-  const vaultSnapshot = asObject(state.vaultSnapshot);
-  const pluginReset = asObject(state.pluginReset);
+  const vaultSnapshotConfig = state.vaultSnapshot;
+  const pluginResetConfig = state.pluginReset;
+  const vaultSnapshot = asObject(vaultSnapshotConfig);
+  const pluginReset = asObject(pluginResetConfig);
 
-  if (state.restoreAfterRun === true && enabled(pluginReset, false)) {
+  if (state.restoreAfterRun === true && enabled(pluginResetConfig, false)) {
     commands.push(commandFor({
       phase: 'state-reset-restore',
       executable: 'node',
@@ -350,7 +355,7 @@ function buildRestoreCommands({ spec, platform, cwd }) {
     }));
   }
 
-  if (state.restoreAfterRun === true && enabled(vaultSnapshot, false)) {
+  if (state.restoreAfterRun === true && enabled(vaultSnapshotConfig, false)) {
     commands.push(commandFor({
       phase: 'state-snapshot-restore',
       executable: 'node',
@@ -452,10 +457,10 @@ function buildPlan(spec) {
     platform,
     cwd,
     warnings,
-    outputDirOverride: profileEnabled ? '{{outputDir}}' : '',
+    outputDirOverride: profileEnabled ? '{{outputDir}}' : outputDirOverride,
   });
   const profileCommand = buildProfileCommand({ spec, platform, cwd, cycleCommand });
-  const outputDir = interpolate(stringValue(runtime.outputDir, `.obsidian-debug/${jobId}`), {
+  const outputDir = outputDirOverride || interpolate(stringValue(runtime.outputDir, `.obsidian-debug/${jobId}`), {
     jobId,
     platform,
   });

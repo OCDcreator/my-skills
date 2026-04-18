@@ -7,6 +7,11 @@ import {
   nowIso,
   parseArgs,
 } from './obsidian_cdp_common.mjs';
+import {
+  deriveVaultRoot,
+  normalizePlatform,
+  resolveTemplateCommand,
+} from './obsidian_debug_command_templates.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const summaryPath = getStringOption(options, 'summary').trim();
@@ -65,6 +70,10 @@ async function readJsonIfExists(filePath) {
   } catch {
     return null;
   }
+}
+
+function stringValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 async function pathExists(filePath) {
@@ -562,6 +571,31 @@ function evaluateStringExpectation(actualValue, assertion) {
 const summary = JSON.parse((await fs.readFile(summaryPath, 'utf8')).replace(/^\uFEFF/, ''));
 const signaturesDocument = (await readJsonIfExists(signaturesPath)) ?? { signatures: [] };
 const playbooksDocument = (await readJsonIfExists(playbooksPath)) ?? { playbooks: [] };
+const toolRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const outputDir = stringValue(summary.outputDir)
+  ? path.resolve(summary.outputDir)
+  : path.dirname(path.resolve(outputPath));
+const repoDir = stringValue(summary.repoDir)
+  ? path.resolve(summary.repoDir)
+  : '';
+const testVaultPluginDir = stringValue(summary.testVaultPluginDir)
+  ? path.resolve(summary.testVaultPluginDir)
+  : '';
+const platform = normalizePlatform('auto');
+const runtimeContext = {
+  toolRoot,
+  summaryPath: path.resolve(summaryPath),
+  diagnosisPath: path.resolve(outputPath),
+  playbooksPath: path.resolve(playbooksPath),
+  repoDir,
+  outputDir,
+  pluginId: stringValue(summary.pluginId),
+  vaultName: stringValue(summary.vaultName),
+  obsidianCommand: stringValue(summary.obsidianCommand),
+  domSelector: domSelector || '.workspace-leaf.mod-active',
+  testVaultPluginDir,
+  vaultRoot: deriveVaultRoot(testVaultPluginDir),
+};
 
 const consoleText = await readTextIfExists(summary.consoleLog);
 const errorsText = await readTextIfExists(summary.errorsLog);
@@ -1279,7 +1313,22 @@ const playbooks = (playbooksDocument.playbooks ?? [])
     title: playbook.title,
     summary: playbook.summary,
     files: playbook.files ?? [],
-    commands: playbook.commands ?? [],
+    commands: (playbook.commands ?? []).map((command, index) => resolveTemplateCommand(
+      typeof command === 'string'
+        ? {
+            id: `${playbook.id}-command-${index + 1}`,
+            label: `Command ${index + 1}`,
+            rendered: command,
+          }
+        : {
+            id: command.id ?? `${playbook.id}-command-${index + 1}`,
+            ...command,
+          },
+      {
+        variables: runtimeContext,
+        platform,
+      },
+    )),
     actions: playbook.actions ?? [],
     relatedSignatures: (playbook.match?.signatureAny ?? []).filter((id) => matchedSignatureIds.has(id)),
   }));
@@ -1309,6 +1358,16 @@ const diagnosis = {
   vaultName: summary.vaultName,
   useCdp: summary.useCdp,
   domSelector: domSelector || null,
+  runtime: {
+    platform,
+    repoDir: repoDir || null,
+    outputDir,
+    toolRoot,
+    summaryPath: path.resolve(summaryPath),
+    testVaultPluginDir: testVaultPluginDir || null,
+    vaultRoot: runtimeContext.vaultRoot || null,
+    obsidianCommand: runtimeContext.obsidianCommand || null,
+  },
   artifacts: {
     summary: path.resolve(summaryPath),
     buildLog: summary.buildLog,

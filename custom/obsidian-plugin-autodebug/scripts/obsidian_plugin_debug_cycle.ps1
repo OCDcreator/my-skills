@@ -496,6 +496,7 @@ if (-not $SkipDom) {
 
 $summary = [ordered]@{
   timestamp = Get-Timestamp
+  repoDir = (Get-Location).Path
   pluginId = $PluginId
   vaultName = $VaultName
   obsidianCommand = $resolvedObsidianCommand

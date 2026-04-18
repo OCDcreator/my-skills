@@ -494,6 +494,7 @@ fi
 cat > "$SUMMARY_PATH" <<EOF
 {
   "timestamp": "$(timestamp)",
+  "repoDir": "$(pwd -P)",
   "pluginId": "$PLUGIN_ID",
   "vaultName": "$VAULT_NAME",
   "obsidianCommand": "$OBS_CMD",

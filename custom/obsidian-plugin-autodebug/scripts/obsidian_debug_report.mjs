@@ -98,6 +98,48 @@ function renderAssertionRows(entries) {
   `, 4);
 }
 
+function normalizeSafetyClass(safety) {
+  switch (safety) {
+    case 'read-only':
+      return 'pass';
+    case 'writes-build-output':
+    case 'writes-local-state':
+      return 'warning';
+    case 'launches-app':
+    case 'review':
+      return 'info';
+    case 'destructive':
+      return 'fail';
+    default:
+      return 'info';
+  }
+}
+
+function renderPlaybookCommands(commands) {
+  if (!commands || commands.length === 0) {
+    return '<p><strong>Commands:</strong> None</p>';
+  }
+
+  return `
+    <div class="playbook-command-grid">
+      ${commands.map((command) => `
+        <div class="playbook-command">
+          <div class="meta">
+            <span class="badge ${escapeHtml(normalizeSafetyClass(command.safety))}">${escapeHtml(command.safety ?? 'review')}</span>
+            <span class="badge ${command.runnable ? 'pass' : 'warning'}">${command.runnable ? 'runnable' : 'needs context'}</span>
+            <span class="badge ${command.dryRunFriendly ? 'info' : 'warning'}">${command.dryRunFriendly ? 'dry-run friendly' : 'review before run'}</span>
+          </div>
+          <p><strong>${escapeHtml(command.label ?? command.id ?? 'Command')}</strong></p>
+          ${command.summary ? `<p>${escapeHtml(command.summary)}</p>` : ''}
+          ${command.rendered ? `<pre>${escapeHtml(command.rendered)}</pre>` : '<p class="muted">No rendered command</p>'}
+          ${command.cwd ? `<p><strong>CWD:</strong> <code>${escapeHtml(command.cwd)}</code></p>` : ''}
+          ${command.unresolvedPlaceholders?.length ? `<p class="muted"><strong>Missing context:</strong> ${command.unresolvedPlaceholders.map((entry) => `<code>${escapeHtml(entry)}</code>`).join(' ')}</p>` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderPlaybooks(playbooks) {
   if (!playbooks || playbooks.length === 0) {
     return '<p>None</p>';
@@ -109,7 +151,7 @@ function renderPlaybooks(playbooks) {
       <p>${escapeHtml(playbook.summary ?? '')}</p>
       <p><strong>ID:</strong> <code>${escapeHtml(playbook.id)}</code></p>
       <p><strong>Files:</strong> ${playbook.files?.length ? playbook.files.map((item) => `<code>${escapeHtml(item)}</code>`).join(' ') : 'None'}</p>
-      <p><strong>Commands:</strong> ${playbook.commands?.length ? playbook.commands.map((item) => `<code>${escapeHtml(item)}</code>`).join(' ') : 'None'}</p>
+      ${renderPlaybookCommands(playbook.commands ?? [])}
       <ul>${renderList(playbook.actions ?? [], (entry) => `<li>${escapeHtml(entry)}</li>`)}</ul>
     </div>
   `).join('');
@@ -267,6 +309,8 @@ const html = `<!doctype html>
     .artifact-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
     .artifact-card { background: #fcfcfd; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
     .artifact-card img { max-width: 100%; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; }
+    .playbook-command-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin: 12px 0; }
+    .playbook-command { border: 1px dashed #cbd5e1; border-radius: 10px; padding: 12px; background: #fff; }
     .muted { color: #6b7280; }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
     th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; font-size: 14px; vertical-align: top; }

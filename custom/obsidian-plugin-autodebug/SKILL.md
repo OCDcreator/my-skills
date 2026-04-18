@@ -290,10 +290,12 @@ node scripts/obsidian_debug_doctor.mjs \
   --test-vault-plugin-dir /path/to/testvault/.obsidian/plugins/opencodian \
   --obsidian-command obsidian \
   --cdp-port 9222 \
-  --output .obsidian-debug/doctor.json
+  --output .obsidian-debug/doctor.json \
+  --fix
 ```
 
 Treat `fail` checks as blockers. Treat `warn` checks as actionable context: for example, the macOS app binary can pass launch checks but still warn that the full Obsidian CLI developer commands are unavailable, in which case use the CDP-first flow.
+When you add `--fix`, the doctor keeps the run safe by generating a reviewable `doctor-fixes.ps1` or `doctor-fixes.sh` next to the JSON output instead of silently mutating the repo or vault.
 
 You can also run a scenario before the watch/capture phase. The built-in `open-plugin-view` scenario is useful when the plugin exposes a command such as `<plugin-id>:open-view` and you want DOM/screenshot capture to target the plugin pane:
 
@@ -408,6 +410,21 @@ node scripts/obsidian_debug_reset_state.mjs \
 ```
 
 `plugin-data-reset.json` is intentionally generic and conservative. For a real plugin, copy it and add only the plugin-local files/directories you truly want to clear.
+
+To compare clean-state versus restored-state behavior with the same job spec, use the matrix helper. It previews the reset plan, runs the job once after a reset, restores the captured snapshot, and runs the same job again against the restored state:
+
+```bash
+node scripts/obsidian_debug_state_matrix.mjs \
+  --job /path/to/plugin-repo/.obsidian-debug/job.json \
+  --platform auto \
+  --state-plan state-plans/plugin-data-reset.json \
+  --vault-root /path/to/test-vault \
+  --plugin-id your-plugin-id \
+  --output-root .obsidian-debug/state-matrix \
+  --dry-run
+```
+
+Switch `--dry-run` to `--mode run` once the previewed commands look safe. The helper writes separate `clean-state/` and `restored-state/` outputs so the resulting diagnoses, reports, and baselines stay comparable.
 
 ### Continuous watch mode
 
@@ -567,7 +584,7 @@ After each run, inspect `diagnosis.json` before diving into raw logs. Use it to 
 
 If `diagnosis.json` is inconclusive, then drop to the raw console/CDP logs and add a new signature to `rules/issue-signatures.json` so the next run catches that symptom automatically.
 
-`diagnosis.json` can also include reusable playbooks from `rules/issue-playbooks.json`. Keep them generic: they should point to likely file areas, reusable commands, and safe next actions that apply across many plugins, not only one repository.
+`diagnosis.json` can also include reusable playbooks from `rules/issue-playbooks.json`. Keep them generic: they should point to likely file areas, reusable commands, and safe next actions that apply across many plugins, not only one repository. The rendered playbook commands now carry safety labels plus runnable command strings for the current platform, so agents can distinguish read-only probes from commands that write local build or vault state.
 
 ### Built-in CDP scripts
 

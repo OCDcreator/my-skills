@@ -17,8 +17,47 @@
         "src/**/*storage*"
       ],
       "commands": [
-        "node scripts/obsidian_debug_reset_state.mjs --mode preview --state-plan state-plans/plugin-data-reset.json --vault-root <vault-root> --plugin-id <plugin-id>",
-        "node scripts/obsidian_debug_profile.mjs --runs 2 --command \"<cycle command>\" --root-output .obsidian-debug/profile-restore"
+        {
+          "id": "preview-reset-plan",
+          "label": "Preview plugin reset plan",
+          "summary": "Preview the generic plugin-local reset before comparing clean and restored state behavior.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_reset_state.mjs",
+            "--mode",
+            "preview",
+            "--state-plan",
+            "{{toolRoot}}/state-plans/plugin-data-reset.json",
+            "--vault-root",
+            "{{vaultRoot}}",
+            "--plugin-id",
+            "{{pluginId}}"
+          ]
+        },
+        {
+          "id": "doctor-with-fix-plan",
+          "label": "Generate a doctor fix plan",
+          "summary": "Capture missing build/deploy/CLI/CDP prerequisites and write a reviewable fix script next to the doctor report.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_doctor.mjs",
+            "--repo-dir",
+            "{{repoDir}}",
+            "--plugin-id",
+            "{{pluginId}}",
+            "--test-vault-plugin-dir",
+            "{{testVaultPluginDir}}",
+            "--obsidian-command",
+            "{{obsidianCommand}}",
+            "--output",
+            "{{outputDir}}/doctor.json",
+            "--fix"
+          ]
+        }
       ],
       "actions": [
         "Compare persisted restore metadata with the runtime catalog the plugin is querying after reload.",
@@ -45,8 +84,43 @@
         "src/**/*startup*"
       ],
       "commands": [
-        "node scripts/obsidian_debug_watch.mjs --watch-roots src --command \"npm run build\" --max-runs 1",
-        "node scripts/obsidian_debug_report.mjs --diagnosis <diagnosis.json> --profile <profile-summary.json> --output .obsidian-debug/report.html"
+        {
+          "id": "doctor-before-profile",
+          "label": "Run doctor before profiling",
+          "summary": "Catch missing prerequisites before trusting backend-readiness or view-open timings.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_doctor.mjs",
+            "--repo-dir",
+            "{{repoDir}}",
+            "--plugin-id",
+            "{{pluginId}}",
+            "--test-vault-plugin-dir",
+            "{{testVaultPluginDir}}",
+            "--obsidian-command",
+            "{{obsidianCommand}}",
+            "--output",
+            "{{outputDir}}/doctor.json",
+            "--fix"
+          ]
+        },
+        {
+          "id": "rerender-report",
+          "label": "Rebuild the HTML report",
+          "summary": "Produce a portable diagnosis report before comparing warm/cold timing classes.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_report.mjs",
+            "--diagnosis",
+            "{{diagnosisPath}}",
+            "--output",
+            "{{outputDir}}/report.html"
+          ]
+        }
       ],
       "actions": [
         "Keep visible shell state writes synchronous, but move backend snapshots and enrichments to background refresh where safe.",
@@ -72,9 +146,52 @@
         "scripts/obsidian_cdp_capture_ui.mjs"
       ],
       "commands": [
-        "obsidian dev:screenshot path=.obsidian-debug/screenshot.png",
-        "obsidian dev:dom selector=\"<plugin-root-selector>\" all",
-        "node scripts/obsidian_cdp_capture_ui.mjs --host 127.0.0.1 --port 9222 --selector \"<plugin-root-selector>\" --html-output .obsidian-debug/dom.html --screenshot-output .obsidian-debug/screenshot.png"
+        {
+          "id": "retry-cli-screenshot",
+          "label": "Retry CLI screenshot capture",
+          "summary": "Capture a fresh screenshot directly through the active Obsidian CLI command.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "{{obsidianCommand}}",
+          "args": [
+            "dev:screenshot",
+            "path={{outputDir}}/screenshot-retry.png"
+          ]
+        },
+        {
+          "id": "retry-cli-dom",
+          "label": "Retry CLI DOM capture",
+          "summary": "Re-query the suspected plugin root selector before trusting downstream UI assertions.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "{{obsidianCommand}}",
+          "args": [
+            "dev:dom",
+            "selector={{domSelector}}",
+            "all"
+          ]
+        },
+        {
+          "id": "fallback-cdp-capture",
+          "label": "Capture UI through CDP",
+          "summary": "Fallback capture path when CLI screenshot or DOM collection still misses the active plugin leaf.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_cdp_capture_ui.mjs",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9222",
+            "--selector",
+            "{{domSelector}}",
+            "--html-output",
+            "{{outputDir}}/dom-retry.html",
+            "--screenshot-output",
+            "{{outputDir}}/screenshot-retry.png"
+          ]
+        }
       ],
       "actions": [
         "Verify the selector targets the plugin pane instead of the previously active leaf.",

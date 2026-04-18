@@ -65,7 +65,7 @@
   - Pixel/region diff results are recorded in diagnosis or comparison output
   - HTML reports link screenshots, DOM snapshots, logs, and diffs
 
-### [NEXT] B6 - Executable playbooks, doctor --fix, and state matrices
+### [DONE] B6 - Executable playbooks, doctor --fix, and state matrices
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Turn diagnostic playbooks into safe command templates and add doctor/fix plus clean-state/restored-state matrix helpers.
@@ -76,7 +76,7 @@
   - Playbooks can suggest runnable next steps with safety labels
   - Doctor reports missing CLI/CDP/build/deploy prerequisites with optional fixes
 
-### [QUEUED] B7 - Cross-platform validation checkpoint
+### [NEXT] B7 - Cross-platform validation checkpoint
 
 - **Lane**: Checkpoint
 - **Goal**: Run or document Windows and macOS smoke tests for shipped automation slices and decide whether to continue the backlog lane.
@@ -88,5 +88,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B6 - Executable playbooks, doctor --fix, and state matrices`.
+- The current `[NEXT]` is `B7 - Cross-platform validation checkpoint`.
 - Successful rounds must keep the roadmap and phase docs aligned.
