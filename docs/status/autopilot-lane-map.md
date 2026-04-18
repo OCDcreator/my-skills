@@ -1,11 +1,11 @@
 # Autopilot Lane Map
 
 > **Preset**: `Bugfix / Backlog`
-> **Current `[NEXT]`**: `B1 - Config-driven debug job spec and platform-neutral command adapters`
+> **Current `[NEXT]`**: `B11 - Package-manager and runtime doctor coverage`
 
 ## Current priority
 
-- Start with the generic job spec and Windows/macOS command-adapter foundation
+- Start with package-manager/runtime doctor coverage so future automation can adapt itself to npm/pnpm/yarn/bun, Node/WebSocket/runtime prerequisites, and repo-owned Hot Reload conditions before deeper UI automation slices
 - Keep each round bounded to one Obsidian plugin autodebug framework slice
 - Validate with script-level smoke tests where available because this repo has no global build/test/lint
 
@@ -16,6 +16,8 @@
 - `custom/obsidian-plugin-autodebug/assertions/`
 - `custom/obsidian-plugin-autodebug/rules/`
 - `custom/obsidian-plugin-autodebug/state-plans/`
+- `custom/obsidian-plugin-autodebug/job-specs/`
+- `custom/obsidian-plugin-autodebug/fixtures/`
 
 ## Validation baseline
 
@@ -29,5 +31,5 @@
 
 - No broad polish or unrelated cleanup
 - Preserve plugin-agnostic behavior; project-specific names belong only in examples or validation artifacts
-- No queue expansion beyond the cross-platform validation checkpoint unless a human approves it
+- No queue expansion beyond approved B11-B15 unless a human approves it
 - Keep `automation/runtime/` ignored and local-only

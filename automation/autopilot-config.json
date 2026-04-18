@@ -1,8 +1,8 @@
 {
-  "objective": "Queue and execute Windows + macOS dual-platform generic custom/obsidian-plugin-autodebug framework enhancement slices: config-driven job specs, platform-neutral command adapters, generic view-open and selector discovery, richer assertions, baseline classification, screenshot diff, doctor/report/playbook automation, and cross-platform validation without hard-coding one plugin.",
+  "objective": "Queue and execute Windows + macOS dual-platform generic custom/obsidian-plugin-autodebug framework enhancement slices beyond B10: package-manager and runtime doctor coverage, optional Playwright and obsidian-testing-framework adapters, Hot Reload coordination checks, sample-plugin scaffold/bootstrap flows, and CI-ready quality-gate templates without hard-coding one plugin.",
   "starting_phase_doc": "docs/status/autopilot-phase-0.md",
-  "next_phase_number": 1,
-  "focus_hint": "B1 - Config-driven debug job spec and platform-neutral command adapters",
+  "next_phase_number": 11,
+  "focus_hint": "B11 - Package-manager and runtime doctor coverage",
   "max_rounds": 120,
   "max_consecutive_failures": 3,
   "lint_command": "",

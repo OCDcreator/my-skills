@@ -6,15 +6,15 @@
 
 ## Overall objective
 
-- Queue and execute Windows + macOS dual-platform generic custom/obsidian-plugin-autodebug framework enhancement slices: config-driven job specs, platform-neutral command adapters, generic view-open and selector discovery, richer assertions, baseline classification, screenshot diff, doctor/report/playbook automation, and cross-platform validation without hard-coding one plugin.
+- Queue and execute Windows + macOS dual-platform generic `custom/obsidian-plugin-autodebug` framework enhancement slices beyond B10: package-manager/runtime doctor coverage, optional Playwright and `obsidian-testing-framework` adapters, Hot Reload coordination checks, sample-plugin scaffold/bootstrap flows, and CI-ready quality-gate templates without hard-coding one plugin.
 - Keep each queued slice small, reproducible, and easy to validate
 - Prefer the highest-confidence bugfix or backlog item first
 
 ## Priority lanes
 
-- **P1. Generic orchestration**: job specs, shell-safe command adapters, watch loops, and deploy/reload/log phases that work on Windows PowerShell and macOS/Linux Bash without assuming one plugin
-- **P2. Generic diagnosis**: view-open strategy chains, selector discovery, richer assertions, baseline classification, screenshot diff, and reports
-- **P3. Safe automation**: executable playbooks, doctor/fix helpers, clean-state matrices, Windows + macOS smoke tests, and checkpointed handoffs
+- **P1. Environment and runtime doctoring**: Node/Corepack/package-manager detection, runtime prerequisites, Hot Reload coordination, and optional tool-adapter discovery that work on Windows PowerShell and macOS/Linux Bash without assuming one plugin
+- **P2. UI automation and testing adapters**: optional Playwright and `obsidian-testing-framework` integration, richer scenario execution, and trace/screenshot evidence with plugin-neutral defaults
+- **P3. Generic scaffolding and delivery**: sample-plugin scaffold/bootstrap, CI-ready quality-gate templates, and checkpointed dual-platform validation for future agents
 
 ## Guardrails
 
@@ -22,3 +22,4 @@
 - Keep each round inside the generic `custom/obsidian-plugin-autodebug` framework backlog
 - Preserve plugin-agnostic behavior; real plugin names may appear only as validation fixtures or examples
 - Do not modify existing skill files unless the active queue item explicitly requires it
+- Do not expand beyond the approved B11-B15 queue without another human approval
