@@ -29,7 +29,7 @@
     "quality/",
     "bugfix/"
   ],
-  "commit_prefix": "autopilot",
+  "commit_prefix": "",
   "phase_doc_prefix": "docs/status/autopilot-k2ph-review-phase-",
   "prompt_template": "automation/round-prompt-k2ph-review.md",
   "result_schema": "automation/round-result.schema.json",

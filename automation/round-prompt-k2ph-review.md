@@ -67,6 +67,7 @@ Response contract:
 - Your final response must be valid JSON matching the provided output schema.
 - Use actual repo-relative paths in `phase_doc_path` and `changed_files`.
 - Set `status` to one of `success`, `failure`, or `goal_complete`.
+- This lane disables the controller commit-message prefix gate because the only tracked changes may be documentation; choose a clear commit message and report the exact final subject.
 - On `success`, `commit_sha` and `commit_message` must be non-null.
 - On `goal_complete`, include `commit_sha` and `commit_message` if you created a bookkeeping commit; otherwise set them null.
 - On `failure`, `blocking_reason` must explain why the round stopped.
