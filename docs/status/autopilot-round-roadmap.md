@@ -160,7 +160,7 @@
   - Job/cycle flows can opt into controlled reload or friendly coexistence modes
   - Reports make it clear when Hot Reload may have influenced captured timings/logs
 
-### [NEXT] B14 - Sample-plugin scaffold and bootstrap mode
+### [DONE] B14 - Sample-plugin scaffold and bootstrap mode
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Extend the framework from “debug an existing plugin” to “scaffold a minimal debug-ready plugin workspace” using generic sample-plugin patterns, manifest/bootstrap defaults, job specs, and assertions.
@@ -173,7 +173,7 @@
   - Fresh-vault bootstrap works against the scaffolded sample on Windows and macOS
   - Docs clearly separate scaffolding flows from existing-plugin retrofit flows
 
-### [QUEUED] B15 - Optional testing-framework and CI templates
+### [NEXT] B15 - Optional testing-framework and CI templates
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add optional `obsidian-testing-framework` and CI-ready templates so agents can plug the framework into repeatable E2E/quality-gate pipelines after local smoke success.
@@ -190,5 +190,5 @@
 
 - B1-B10 are complete.
 - B11-B13 are complete.
-- B14 is the approved next slice.
-- B15 is the approved queued follow-up; do not expand beyond it without another human approval.
+- B14 is complete.
+- B15 is the approved next slice; do not expand beyond it without another human approval.

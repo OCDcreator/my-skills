@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, zero-touch bootstrap fresh-vault plugin discovery, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, watch console/errors, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, restore vault state, and produce diagnosis/HTML reports with reusable playbooks. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, 开机启动慢, 首次启动慢, fresh clean-vault, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
+description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, zero-touch bootstrap fresh-vault plugin discovery, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, produce diagnosis/HTML reports, and scaffold a minimal bootstrap-ready sample plugin workspace when no repo exists yet. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, fresh clean-vault, first-install bootstrap, sample plugin scaffold, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
 ---
 
 # Obsidian Plugin Autodebug
@@ -15,6 +15,8 @@ Use this skill to turn Obsidian plugin development into an unattended loop:
 6. inspect screenshot/DOM/CSS,
 7. diagnose the slow or broken step,
 8. patch and repeat.
+
+When a plugin repo does not exist yet, the same skill can scaffold a minimal sample plugin workspace plus a local fresh-vault target so the first smoke run starts from a known-good bootstrap fixture instead of an empty folder.
 
 ## Relationship To `obsidian-cli`
 
@@ -49,6 +51,25 @@ Before editing, quickly detect:
 - The repo’s own instructions for build, deploy, and validation. If an `AGENTS.md` requires a specific build/deploy order, follow it over this generic workflow.
 
 If the repo already has a release/deploy skill or script, reuse it instead of inventing a parallel deployment path.
+
+## Scaffold Flow Vs. Retrofit Flow
+
+Use the new scaffold flow only when you need to create a fresh plugin workspace or reproduce the autodebug loop against a generic sample plugin:
+
+```bash
+node /path/to/obsidian-plugin-autodebug/scripts/obsidian_debug_scaffold_plugin.mjs \
+  --output-dir /path/to/sample-plugin \
+  --plugin-id sample-plugin \
+  --plugin-name "Sample Plugin"
+```
+
+That command generates:
+
+- a minimal plugin workspace with `manifest.json`, `src/main.js`, `styles.css`, and a zero-dependency `scripts/build.mjs`,
+- a local `test-vault/` folder whose `.obsidian/plugins/<plugin-id>/` target is pre-populated from `dist/`,
+- an `autodebug/` folder containing a tailored job spec, surface profile, scenario, assertions, and a local schema copy.
+
+For an existing plugin repo, do **not** re-scaffold it. Keep the retrofit flow: copy `job-specs/generic-debug-job.template.json`, tailor the runtime/build/deploy values, and run the generic doctor/job/cycle scripts against that real repository.
 
 ## Default Autodebug Loop
 
@@ -193,7 +214,9 @@ Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable
 - `profile` / `report`: repeated-cycle timing summary and optional HTML report generation.
 - `state`: optional vault snapshot, plugin-local reset preview/reset, and restore-after-run handling.
 
-Start by copying `job-specs/generic-debug-job.template.json` into the plugin repository, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
+For an existing plugin repository, start by copying `job-specs/generic-debug-job.template.json` into the repo, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
+
+For a fresh sample plugin, let `scripts/obsidian_debug_scaffold_plugin.mjs` generate the workspace plus a bootstrap-ready `autodebug/<plugin-id>-debug-job.json` for you. The generated workspace keeps scaffold-specific files under `autodebug/` so the separation from existing-plugin retrofit flows stays explicit.
 
 If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. The bundled bootstrap script now handles that first-discovery reload/restart path automatically; only fall back to a manual vault reload or app restart when you intentionally disable bootstrap.
 
