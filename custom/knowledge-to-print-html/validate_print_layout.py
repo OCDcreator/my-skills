@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import struct
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -15,6 +16,11 @@ except ImportError as exc:  # pragma: no cover
         "Playwright is required. Install it first, for example: "
         "`python -m pip install playwright`."
     ) from exc
+
+
+A4_WIDTH_MM = 210
+A4_HEIGHT_MM = 297
+A4_ASPECT_RATIO = A4_WIDTH_MM / A4_HEIGHT_MM
 
 
 IMAGE_EVAL_JS = r"""
@@ -325,6 +331,23 @@ def page_sheet_locator(page: Any, page_number: int) -> Any:
     return page.locator(".sheet").nth(page_number - 1)
 
 
+def read_png_dimensions(path: Path) -> tuple[int, int]:
+    png_bytes = path.read_bytes()
+    if png_bytes[:8] != b"\x89PNG\r\n\x1a\n":
+        raise RuntimeError(f"Expected PNG screenshot artifact: {path}")
+    return struct.unpack(">II", png_bytes[16:24])
+
+
+def build_a4_clip(box: dict[str, float]) -> dict[str, float]:
+    width = float(box["width"])
+    return {
+        "x": float(box["x"]),
+        "y": float(box["y"]),
+        "width": width,
+        "height": width / A4_ASPECT_RATIO,
+    }
+
+
 def capture_page_artifacts(
     context: Any,
     base_url: str,
@@ -347,14 +370,26 @@ def capture_page_artifacts(
 
             isolation = isolate_page_for_capture(page, page_number)
             screenshot_path = output_dir / f"{prefix}-print-page-{page_number}.png"
-            page.screenshot(path=str(screenshot_path), full_page=True)
 
             target_locator = page_sheet_locator(page, page_number)
+            target_locator.scroll_into_view_if_needed()
+            bounding_box = target_locator.bounding_box()
+            if not bounding_box:
+                raise RuntimeError(f"Unable to measure page {page_number} for A4 clipping.")
+            page.screenshot(
+                path=str(screenshot_path),
+                clip=build_a4_clip(bounding_box),
+            )
 
             rect = target_locator.evaluate(RECT_EVAL_JS)
             visible_sheet_count = page.locator(".sheet").evaluate_all(
                 VISIBLE_SHEET_COUNT_EVAL_JS
             )
+            screenshot_width_px, screenshot_height_px = read_png_dimensions(
+                screenshot_path
+            )
+            screenshot_aspect_ratio = screenshot_width_px / screenshot_height_px
+            screenshot_uses_a4_aspect = abs(screenshot_aspect_ratio - A4_ASPECT_RATIO) <= 0.02
 
             page_artifacts.append(
                 {
@@ -365,6 +400,10 @@ def capture_page_artifacts(
                     "hidden": rect["hidden"],
                     "visibleSheetCount": visible_sheet_count,
                     "isolatedTargetPage": isolation["targetPage"],
+                    "screenshotWidthPx": screenshot_width_px,
+                    "screenshotHeightPx": screenshot_height_px,
+                    "screenshotAspectRatio": round(screenshot_aspect_ratio, 4),
+                    "usesA4Aspect": screenshot_uses_a4_aspect,
                 }
             )
         finally:
@@ -395,6 +434,9 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
         "hasBreakAvoidRule": analysis["rules"]["breakAvoid"],
         "hasPrintColorAdjust": analysis["rules"]["printColorAdjust"],
         "pdfPageCountMatches": summary["pdf"]["pageCount"] == analysis["sheetCount"],
+        "pageScreenshotsUseA4Aspect": all(
+            artifact["usesA4Aspect"] for artifact in summary["screenshots"]["pages"]
+        ),
     }
     optional_checks = {
         "pageQueryIsolatesSheets": all(

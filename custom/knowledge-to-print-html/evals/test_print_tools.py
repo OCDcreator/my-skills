@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+import struct
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
@@ -82,6 +83,50 @@ class PrintToolTests(unittest.TestCase):
             ]
             self.assertEqual(visible_counts, [1, 1, 1])
             self.assertTrue(report["optionalChecks"]["pageQueryIsolatesSheets"])
+
+    def test_validate_print_layout_exports_page_pngs_with_a4_ratio(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(MINIMAL_HANDOUT, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "a4",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads(
+                (out_dir / "a4-validation-report.json").read_text(encoding="utf-8")
+            )
+            expected_ratio = 210 / 297
+            self.assertTrue(report["checks"]["pageScreenshotsUseA4Aspect"])
+
+            for page in report["screenshots"]["pages"]:
+                screenshot_path = Path(page["path"])
+                png_bytes = screenshot_path.read_bytes()
+                self.assertEqual(png_bytes[:8], b"\x89PNG\r\n\x1a\n")
+                width, height = struct.unpack(">II", png_bytes[16:24])
+                actual_ratio = width / height
+
+                self.assertAlmostEqual(actual_ratio, expected_ratio, delta=0.02)
+                self.assertLess(height, 2200, "A4 page capture should not use the full viewport height.")
 
     def test_review_packets_create_explicit_subagent_prompt_files(self) -> None:
         from review_print_pages import write_review_packets
