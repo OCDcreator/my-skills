@@ -1,0 +1,11 @@
+{
+  "description": "Generic reset preset for plugin-local persisted state. Review the resolved targets in preview mode and customize or extend this plan before using it on a real vault.",
+  "targets": [
+    "{pluginDir}/data.json",
+    "{pluginDir}/cache",
+    "{pluginDir}/tmp"
+  ],
+  "recreateFiles": [
+    "{pluginDir}/data.json"
+  ]
+}

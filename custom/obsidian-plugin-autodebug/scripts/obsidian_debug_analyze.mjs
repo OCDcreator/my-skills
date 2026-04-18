@@ -26,6 +26,11 @@ const signaturesPath = getStringOption(
   'signatures',
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'rules', 'issue-signatures.json'),
 );
+const playbooksPath = getStringOption(
+  options,
+  'playbooks',
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'rules', 'issue-playbooks.json'),
+);
 
 function normalizeTimestamp(raw) {
   if (!raw) {
@@ -167,6 +172,7 @@ function getSeverityRank(severity) {
 
 const summary = JSON.parse((await fs.readFile(summaryPath, 'utf8')).replace(/^\uFEFF/, ''));
 const signaturesDocument = (await readJsonIfExists(signaturesPath)) ?? { signatures: [] };
+const playbooksDocument = (await readJsonIfExists(playbooksPath)) ?? { playbooks: [] };
 
 const consoleText = await readTextIfExists(summary.consoleLog);
 const errorsText = await readTextIfExists(summary.errorsLog);
@@ -487,6 +493,53 @@ if (
   status = 'warning';
 }
 
+const matchedSignatureIds = new Set(matchedSignatures.map((entry) => entry.id));
+const failedAssertionIds = new Set([
+  ...assertions.filter((entry) => entry.status === 'fail').map((entry) => entry.id),
+  ...customAssertions.filter((entry) => entry.status === 'fail').map((entry) => entry.id),
+]);
+
+function matchesPlaybook(playbook) {
+  const match = playbook?.match ?? {};
+  const signatureAny = match.signatureAny ?? [];
+  if (signatureAny.length > 0 && !signatureAny.some((id) => matchedSignatureIds.has(id))) {
+    return false;
+  }
+
+  const signatureAll = match.signatureAll ?? [];
+  if (signatureAll.length > 0 && !signatureAll.every((id) => matchedSignatureIds.has(id))) {
+    return false;
+  }
+
+  const assertionFailedAny = match.assertionFailedAny ?? [];
+  if (assertionFailedAny.length > 0 && !assertionFailedAny.some((id) => failedAssertionIds.has(id))) {
+    return false;
+  }
+
+  const assertionFailedAll = match.assertionFailedAll ?? [];
+  if (assertionFailedAll.length > 0 && !assertionFailedAll.every((id) => failedAssertionIds.has(id))) {
+    return false;
+  }
+
+  if (typeof match.useCdp === 'boolean' && Boolean(summary.useCdp) !== match.useCdp) {
+    return false;
+  }
+
+  return true;
+}
+
+const playbooks = (playbooksDocument.playbooks ?? [])
+  .filter((playbook) => matchesPlaybook(playbook))
+  .map((playbook) => ({
+    id: playbook.id,
+    title: playbook.title,
+    summary: playbook.summary,
+    files: playbook.files ?? [],
+    commands: playbook.commands ?? [],
+    actions: playbook.actions ?? [],
+    relatedSignatures: (playbook.match?.signatureAny ?? []).filter((id) => matchedSignatureIds.has(id)),
+  }));
+
 const highestSeveritySignature = [...matchedSignatures].sort(
   (left, right) => getSeverityRank(right.severity) - getSeverityRank(left.severity),
 )[0];
@@ -498,7 +551,10 @@ const headline = highestSeveritySignature
       ? 'Automation completed, but one or more required artifacts/assertions failed.'
       : 'Automation completed and the captured artifacts look healthy.');
 
-const recommendations = [...new Set(matchedSignatures.flatMap((entry) => entry.nextActions ?? []))];
+const recommendations = [...new Set([
+  ...matchedSignatures.flatMap((entry) => entry.nextActions ?? []),
+  ...playbooks.flatMap((entry) => entry.actions ?? []),
+])];
 
 const diagnosis = {
   generatedAt: nowIso(),
@@ -525,8 +581,10 @@ const diagnosis = {
   timings: timingMetrics,
   topSlowSteps,
   signatures: matchedSignatures,
+  playbooks,
   recommendations,
   assertionsPath: assertionsPath || null,
+  playbooksPath,
   scenario: scenarioReport
     ? {
         name: scenarioReport.scenarioName,

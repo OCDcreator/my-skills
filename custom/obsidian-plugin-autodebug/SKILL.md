@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, reload the plugin with the Obsidian CLI or CDP, watch console/errors, capture screenshots, inspect DOM/CSS, assert expected UI health, compare/profile runs, restore vault state, and produce diagnosis/HTML reports. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, 开机启动慢, 首次启动慢, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
+description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, watch console/errors, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, restore vault state, and produce diagnosis/HTML reports with reusable playbooks. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, 开机启动慢, 首次启动慢, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
 ---
 
 # Obsidian Plugin Autodebug
@@ -224,7 +224,7 @@ The CLI watch logs are incremental: repeated `dev:console` / `dev:errors` pollin
 - issue signatures from `rules/issue-signatures.json`,
 - deduplicated recommendations for the next debugging pass.
 
-Example assertions live under `assertions/`. For example, `assertions/opencodian-view-health.json` verifies that the open-view scenario succeeded, the DOM/screenshot artifacts exist, the root selector appears, and no `404` session-sync error was logged.
+Example assertions live under `assertions/`. Use `assertions/plugin-view-health.template.json` as the generic starting point for a new plugin, then replace the selector/error placeholders with your own expected UI markers. `assertions/opencodian-view-health.json` remains a concrete real-world example of the same pattern.
 
 To compare a new run against a previous diagnosis, pass `-CompareDiagnosisPath <old diagnosis.json>` on Windows or `--compare-diagnosis <old diagnosis.json>` on macOS/Linux. The scripts then write `.obsidian-debug/comparison.json` with timing deltas, added/removed signatures, and assertion regressions/fixes.
 
@@ -329,6 +329,53 @@ node scripts/obsidian_debug_vault_state.mjs \
   --snapshot-dir .obsidian-debug/vault-state
 ```
 
+For plugin-local state resets, use `scripts/obsidian_debug_reset_state.mjs`. Start with preview mode so you can inspect the resolved paths safely:
+
+```bash
+node scripts/obsidian_debug_reset_state.mjs \
+  --mode preview \
+  --state-plan state-plans/plugin-data-reset.json \
+  --vault-root /path/to/vault \
+  --plugin-id your-plugin-id
+```
+
+Then run the reset and later restore the same snapshot:
+
+```bash
+node scripts/obsidian_debug_reset_state.mjs \
+  --mode reset \
+  --state-plan state-plans/plugin-data-reset.json \
+  --vault-root /path/to/vault \
+  --plugin-id your-plugin-id \
+  --snapshot-dir .obsidian-debug/plugin-state-reset
+
+node scripts/obsidian_debug_reset_state.mjs \
+  --mode restore \
+  --snapshot-dir .obsidian-debug/plugin-state-reset
+```
+
+`plugin-data-reset.json` is intentionally generic and conservative. For a real plugin, copy it and add only the plugin-local files/directories you truly want to clear.
+
+### Continuous watch mode
+
+Use `scripts/obsidian_debug_watch.mjs` to automate the “save → build → deploy → reload → diagnose” loop. It watches one or more roots, debounces bursts of changes, and writes one run directory per trigger:
+
+```bash
+node scripts/obsidian_debug_watch.mjs \
+  --watch-roots "src|styles" \
+  --cwd /path/to/plugin-repo \
+  --root-output .obsidian-debug/watch \
+  --debounce-ms 1000 \
+  --command "bash /path/to/obsidian-plugin-autodebug/scripts/obsidian_plugin_debug_cycle.sh --plugin-id your-plugin-id --test-vault-plugin-dir /path/to/testvault/.obsidian/plugins/your-plugin-id --output-dir {{outputDir}} --watch-seconds 8"
+```
+
+Useful watch-mode switches:
+
+- `--max-runs 1` for CI-like or smoke-test validation,
+- `--once-on-start true` to force one run before any file change,
+- `--exclude ".git|node_modules|dist|.obsidian-debug"` to avoid noisy triggers,
+- `--timeout-ms 30000` so unattended experiments do not watch forever.
+
 Use `scripts/obsidian_debug_profile.mjs` when one run is too noisy to trust. The `--command` value is any shell command that runs one debug cycle. The profiler replaces `{{outputDir}}` with each run directory and `{{run}}` with the run number:
 
 ```bash
@@ -342,6 +389,26 @@ node scripts/obsidian_debug_profile.mjs \
 ```
 
 The profile summary reports average/min/max timings, status counts, signature counts, failed assertion counts, and per-run metadata. Use it to separate real regressions from normal startup variance.
+
+Use `scripts/obsidian_debug_baseline.mjs` to save a known-good run and compare later candidates against it:
+
+```bash
+node scripts/obsidian_debug_baseline.mjs \
+  --mode save \
+  --baseline-root .obsidian-debug/baselines \
+  --name warm-start-healthy \
+  --diagnosis .obsidian-debug/profile/run-01/diagnosis.json \
+  --profile .obsidian-debug/profile/profile-summary.json \
+  --report .obsidian-debug/profile/report.html
+
+node scripts/obsidian_debug_baseline.mjs \
+  --mode compare \
+  --baseline-root .obsidian-debug/baselines \
+  --name warm-start-healthy \
+  --candidate-diagnosis .obsidian-debug/profile/run-03/diagnosis.json
+```
+
+Baselines are especially useful when you are chasing performance drift: save one cold-start baseline and one warm-start baseline, then compare new runs against the correct class instead of mixing them together.
 
 Generate a portable HTML report from the machine-readable artifacts:
 
@@ -404,6 +471,8 @@ After each run, inspect `diagnosis.json` before diving into raw logs. Use it to 
 4. Which next-step recommendation is the best next edit or instrumentation pass?
 
 If `diagnosis.json` is inconclusive, then drop to the raw console/CDP logs and add a new signature to `rules/issue-signatures.json` so the next run catches that symptom automatically.
+
+`diagnosis.json` can also include reusable playbooks from `rules/issue-playbooks.json`. Keep them generic: they should point to likely file areas, reusable commands, and safe next actions that apply across many plugins, not only one repository.
 
 ### Built-in CDP scripts
 

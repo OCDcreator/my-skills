@@ -44,6 +44,23 @@ function renderList(items, mapper) {
   return items.map(mapper).join('');
 }
 
+function renderPlaybooks(playbooks) {
+  if (!playbooks || playbooks.length === 0) {
+    return '<p>None</p>';
+  }
+
+  return playbooks.map((playbook) => `
+    <div style="border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; margin-top: 12px;">
+      <strong>${escapeHtml(playbook.title ?? playbook.id)}</strong>
+      <p>${escapeHtml(playbook.summary ?? '')}</p>
+      <p><strong>ID:</strong> <code>${escapeHtml(playbook.id)}</code></p>
+      <p><strong>Files:</strong> ${playbook.files?.length ? playbook.files.map((item) => `<code>${escapeHtml(item)}</code>`).join(' ') : 'None'}</p>
+      <p><strong>Commands:</strong> ${playbook.commands?.length ? playbook.commands.map((item) => `<code>${escapeHtml(item)}</code>`).join(' ') : 'None'}</p>
+      <ul>${renderList(playbook.actions ?? [], (entry) => `<li>${escapeHtml(entry)}</li>`)}</ul>
+    </div>
+  `).join('');
+}
+
 const diagnosis = await readJsonOrNull(diagnosisPath);
 if (!diagnosis) {
   throw new Error(`Unable to read diagnosis JSON: ${diagnosisPath}`);
@@ -101,6 +118,11 @@ const html = `<!doctype html>
     <ul>
       ${renderList(diagnosis.signatures ?? [], (entry) => `<li><strong>${escapeHtml(entry.id)}</strong> — ${escapeHtml(entry.headline)}</li>`)}
     </ul>
+  </div>
+
+  <div class="card">
+    <h2>Playbooks</h2>
+    ${renderPlaybooks(diagnosis.playbooks ?? [])}
   </div>
 
   <div class="card">

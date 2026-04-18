@@ -1,0 +1,86 @@
+{
+  "playbooks": [
+    {
+      "id": "restore-or-session-drift",
+      "title": "Restore/session drift triage",
+      "summary": "The restored UI is trying to hydrate against missing runtime state. Confirm whether the persisted tab/session metadata is stale before changing network or SDK code.",
+      "match": {
+        "signatureAny": [
+          "session-sync-404"
+        ]
+      },
+      "files": [
+        "src/main.ts",
+        "src/**/*view*",
+        "src/**/*session*",
+        "src/**/*restore*",
+        "src/**/*storage*"
+      ],
+      "commands": [
+        "node scripts/obsidian_debug_reset_state.mjs --mode preview --state-plan state-plans/plugin-data-reset.json --vault-root <vault-root> --plugin-id <plugin-id>",
+        "node scripts/obsidian_debug_profile.mjs --runs 2 --command \"<cycle command>\" --root-output .obsidian-debug/profile-restore"
+      ],
+      "actions": [
+        "Compare persisted restore metadata with the runtime catalog the plugin is querying after reload.",
+        "Decide whether missing runtime state is expected after a cold start and should degrade gracefully.",
+        "Use reset-state or a clean vault snapshot to separate stale local state from real code regressions."
+      ]
+    },
+    {
+      "id": "backend-gated-visible-ui",
+      "title": "Visible UI blocked by backend readiness",
+      "summary": "The plugin shell can render earlier than the backend becomes ready. Separate shell readiness from post-render enrichment and measure them independently.",
+      "match": {
+        "signatureAny": [
+          "slow-chat-ready",
+          "slow-server-ready",
+          "slow-view-open"
+        ]
+      },
+      "files": [
+        "src/main.ts",
+        "src/**/*server*",
+        "src/**/*view*",
+        "src/**/*hydrate*",
+        "src/**/*startup*"
+      ],
+      "commands": [
+        "node scripts/obsidian_debug_watch.mjs --watch-roots src --command \"npm run build\" --max-runs 1",
+        "node scripts/obsidian_debug_report.mjs --diagnosis <diagnosis.json> --profile <profile-summary.json> --output .obsidian-debug/report.html"
+      ],
+      "actions": [
+        "Keep visible shell state writes synchronous, but move backend snapshots and enrichments to background refresh where safe.",
+        "Record startup-complete, view-open, backend-ready, and interactive-ready milestones in the same run.",
+        "Save a warm-start baseline so cold-start backend cost does not hide frontend regressions."
+      ]
+    },
+    {
+      "id": "artifact-capture-gap",
+      "title": "Artifact capture recovery",
+      "summary": "Screenshot or DOM artifacts are missing, so the run is not trustworthy enough for UI debugging yet.",
+      "match": {
+        "assertionFailedAny": [
+          "screenshot-captured",
+          "dom-root-present",
+          "screenshot-exists",
+          "dom-exists"
+        ]
+      },
+      "files": [
+        "scripts/obsidian_plugin_debug_cycle.ps1",
+        "scripts/obsidian_plugin_debug_cycle.sh",
+        "scripts/obsidian_cdp_capture_ui.mjs"
+      ],
+      "commands": [
+        "obsidian dev:screenshot path=.obsidian-debug/screenshot.png",
+        "obsidian dev:dom selector=\"<plugin-root-selector>\" all",
+        "node scripts/obsidian_cdp_capture_ui.mjs --host 127.0.0.1 --port 9222 --selector \"<plugin-root-selector>\" --html-output .obsidian-debug/dom.html --screenshot-output .obsidian-debug/screenshot.png"
+      ],
+      "actions": [
+        "Verify the selector targets the plugin pane instead of the previously active leaf.",
+        "Use a scenario or CDP post-reload eval to focus/open the plugin view before capture.",
+        "Do not trust downstream assertions until both DOM and screenshot capture succeed."
+      ]
+    }
+  ]
+}

@@ -4,13 +4,13 @@
     {
       "id": 1,
       "prompt": "帮我全自动排查这个 Obsidian 插件首次打开很慢的问题：构建、部署到测试库、重载插件、抓控制台日志并定位瓶颈。",
-      "expected_output": "Uses a build/deploy/reload/log-watch loop, separates plugin onload from view-open and server warmup timing, and reports the bottleneck with artifact paths.",
+      "expected_output": "Uses a build/deploy/reload/log-watch loop, separates plugin onload from view-open and runtime warmup timing, and reports the bottleneck with artifact paths.",
       "files": []
     },
     {
       "id": 2,
-      "prompt": "改完插件 UI 后，你来用 Obsidian CLI 自动 reload，然后截图和检查 DOM，确认设置页按钮存在且没有 console error。",
-      "expected_output": "Runs plugin reload, clears and checks dev errors, captures screenshot, queries relevant DOM selectors, and summarizes pass/fail evidence.",
+      "prompt": "改完一个 Obsidian 插件 UI 后，你来自动 reload，然后截图和检查 DOM，确认设置页按钮存在且没有 console error。",
+      "expected_output": "Runs plugin reload, clears and checks dev errors, captures screenshot, queries relevant DOM selectors, and summarizes pass/fail evidence for a generic plugin view/settings surface.",
       "files": []
     },
     {
@@ -23,6 +23,18 @@
       "id": 4,
       "prompt": "CLI 的 dev:console 抓不到插件启动早期日志，改用 CDP 自动重载插件并保存一份带时间戳的实时 console trace。",
       "expected_output": "Switches to the built-in CDP scripts, enables debug flags, reloads the plugin through app context, and saves a timestamped trace with clear artifact paths.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "把这个技能升级成保存时自动 watch：文件一改动就 build、deploy、reload、抓诊断，并把结果写到新的输出目录。",
+      "expected_output": "Uses the built-in watch runner with debouncing, output-dir templating, safe excludes, and one-run smoke validation or continuous watch mode.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "这个插件可能被脏 data.json 或缓存状态影响了。先安全预览要清理什么，再重置状态、保留快照，最后允许一键恢复。",
+      "expected_output": "Uses preview/reset/restore state automation with safe target resolution, snapshot preservation, and a generic plugin-local reset plan rather than hardcoding one repository.",
       "files": []
     }
   ]

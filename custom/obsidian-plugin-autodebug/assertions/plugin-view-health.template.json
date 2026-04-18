@@ -1,0 +1,29 @@
+{
+  "assertions": [
+    {
+      "id": "scenario-open-view",
+      "type": "scenario-success"
+    },
+    {
+      "id": "screenshot-exists",
+      "type": "artifact-exists",
+      "field": "screenshot"
+    },
+    {
+      "id": "dom-exists",
+      "type": "artifact-exists",
+      "field": "dom"
+    },
+    {
+      "id": "dom-has-plugin-root",
+      "type": "dom-contains",
+      "value": "<plugin-root-selector-or-marker>"
+    },
+    {
+      "id": "no-fatal-error-banner",
+      "type": "log-not-contains",
+      "value": "<known-fatal-error-substring>",
+      "source": "combined"
+    }
+  ]
+}
