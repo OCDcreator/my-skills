@@ -76,7 +76,7 @@
   - Playbooks can suggest runnable next steps with safety labels
   - Doctor reports missing CLI/CDP/build/deploy prerequisites with optional fixes
 
-### [NEXT] B7 - Cross-platform validation checkpoint
+### [DONE] B7 - Cross-platform validation checkpoint
 
 - **Lane**: Checkpoint
 - **Goal**: Run or document Windows and macOS smoke tests for shipped automation slices and decide whether to continue the backlog lane.
@@ -86,7 +86,29 @@
 - **Acceptance**:
   - The phase doc captures shipped slices, smoke results, remaining risks, and the stop/continue recommendation
 
+### [NEXT] B8 - Smoke-mode diagnosis honors intentional skips
+
+- **Lane**: Bugfix / backlog
+- **Goal**: Make smoke-style validation runs distinguish intentionally skipped screenshot/DOM/console artifacts from truly missing artifacts so lightweight CI-like checks can pass without faking full UI capture.
+- **Constraints**:
+  - Preserve blocking failures when artifact capture was requested but missing
+  - Keep diagnosis/report outputs backward compatible for existing full-capture runs
+- **Acceptance**:
+  - Smoke jobs can mark capture as intentionally skipped without forcing a blocking diagnosis failure
+  - Reports and comparison flows keep enough metadata to tell skipped capture apart from capture regressions
+
+### [QUEUED] B9 - Native macOS smoke host validation
+
+- **Lane**: Checkpoint follow-up
+- **Goal**: Re-run the shipped Bash/macOS automation slices on a native macOS host and record real CLI/CDP/screenshot smoke evidence.
+- **Constraints**:
+  - Use plugin-neutral fixtures or generic sample data
+  - Record host-specific failures as queue items instead of bundling unrelated fixes
+- **Acceptance**:
+  - The phase doc records native macOS smoke evidence for doctor, job/cycle, and state-matrix/report flows
+  - Remaining macOS-only gaps are isolated into follow-up backlog items
+
 ## Current state
 
-- The current `[NEXT]` is `B7 - Cross-platform validation checkpoint`.
+- The current `[NEXT]` is `B8 - Smoke-mode diagnosis honors intentional skips`.
 - Successful rounds must keep the roadmap and phase docs aligned.

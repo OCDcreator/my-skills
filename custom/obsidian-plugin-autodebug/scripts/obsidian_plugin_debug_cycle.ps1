@@ -120,7 +120,13 @@ function Invoke-ObsidianCli {
   if (-not $Quiet) {
     Write-Host "$Executable $($cliArgs -join ' ')"
   }
-  $output = & $Executable @cliArgs 2>&1
+  $previousErrorActionPreference = $ErrorActionPreference
+  $ErrorActionPreference = "Continue"
+  try {
+    $output = & $Executable @cliArgs 2>&1
+  } finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+  }
   $lastExitCodeVar = Get-Variable -Name LASTEXITCODE -ErrorAction SilentlyContinue
   $exitCode = if ($lastExitCodeVar) { [int]$lastExitCodeVar.Value } else { 0 }
   $text = ($output | ForEach-Object { "$_" }) -join [Environment]::NewLine
