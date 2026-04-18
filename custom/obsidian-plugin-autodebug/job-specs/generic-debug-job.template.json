@@ -39,6 +39,10 @@
     "enabled": true,
     "mode": "cli",
     "useCdp": false,
+    "hotReload": {
+      "mode": "controlled",
+      "settleMs": 0
+    },
     "cdp": {
       "host": "127.0.0.1",
       "port": 9222,

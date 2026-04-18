@@ -16,6 +16,9 @@ param(
   [int]$PollIntervalMs = 1000,
   [int]$ConsoleLimit = 200,
   [string]$DomSelector = ".workspace-leaf.mod-active",
+  [ValidateSet("controlled", "coexist")]
+  [string]$HotReloadMode = "controlled",
+  [int]$HotReloadSettleMs = 0,
   [switch]$UseCdp,
   [string]$CdpHost = "127.0.0.1",
   [int]$CdpPort = 9222,
@@ -46,6 +49,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if ($HotReloadSettleMs -lt 0) {
+  throw "-HotReloadSettleMs must be 0 or greater."
+}
 
 function New-OutputDirectory {
   param([string]$Path)
@@ -464,7 +471,8 @@ function Invoke-BootstrapPlugin {
 
 function Invoke-CdpReloadTrace {
   param(
-    [string]$OutputPath
+    [string]$OutputPath,
+    [switch]$SkipReload
   )
 
   $scriptPath = Join-Path $PSScriptRoot "obsidian_cdp_reload_and_trace.mjs"
@@ -489,6 +497,9 @@ function Invoke-CdpReloadTrace {
   }
   if ($CdpEvalAfterReload.Trim().Length -gt 0) {
     $args += @("--eval-after-reload", $CdpEvalAfterReload)
+  }
+  if ($SkipReload) {
+    $args += "--skip-reload"
   }
 
   Write-Section "CDP Reload Trace"
@@ -518,6 +529,10 @@ $cdpTracePath = Join-Path $resolvedOutputDir "cdp-reload-trace.log"
 $cdpSummaryPath = $null
 $resolvedBootstrapReportPath = $null
 $resolvedScenarioReportPath = $null
+$hotReloadPreClearSettleApplied = $false
+$hotReloadPostClearWaitApplied = $false
+$hotReloadExplicitReloadPerformed = $false
+$hotReloadReloadChannel = "none"
 
 Write-Section "Preflight"
 $versionText = Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "version" -AllowFailure -Quiet
@@ -535,16 +550,45 @@ if (-not $SkipBootstrap) {
   $resolvedBootstrapReportPath = Invoke-BootstrapPlugin -Executable $resolvedObsidianCommand -OutputPath $bootstrapReportPath
 }
 
+if ($HotReloadMode -eq "controlled" -and -not $SkipReload -and $HotReloadSettleMs -gt 0) {
+  Write-Section "Hot Reload Settle"
+  Write-Host "Waiting $HotReloadSettleMs ms before clearing buffers for a controlled explicit reload."
+  Start-Sleep -Milliseconds $HotReloadSettleMs
+  $hotReloadPreClearSettleApplied = $true
+}
+
 Write-Section "Clear Buffers"
 Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "dev:debug" -Arguments @("on") -AllowFailure | Out-Null
 Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "dev:console" -Arguments @("clear") -AllowFailure | Out-Null
 Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "dev:errors" -Arguments @("clear") -AllowFailure | Out-Null
 
 if ($UseCdp -and -not $SkipReload) {
-  $cdpSummaryPath = Invoke-CdpReloadTrace -OutputPath $cdpTracePath
+  if ($HotReloadMode -eq "coexist") {
+    $cdpSummaryPath = Invoke-CdpReloadTrace -OutputPath $cdpTracePath -SkipReload
+    $hotReloadReloadChannel = "cdp-observe"
+  } else {
+    $cdpSummaryPath = Invoke-CdpReloadTrace -OutputPath $cdpTracePath
+    $hotReloadExplicitReloadPerformed = $true
+    $hotReloadReloadChannel = "cdp"
+  }
 } elseif (-not $SkipReload) {
-  Write-Section "Reload Plugin"
-  Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "plugin:reload" -Arguments @("id=$PluginId") | Out-Null
+  if ($HotReloadMode -eq "coexist") {
+    Write-Section "Hot Reload Coexist"
+    Write-Host "Skipping explicit plugin reload and relying on background Hot Reload-friendly capture."
+    $hotReloadReloadChannel = "coexist-skip"
+  } else {
+    Write-Section "Reload Plugin"
+    Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "plugin:reload" -Arguments @("id=$PluginId") | Out-Null
+    $hotReloadExplicitReloadPerformed = $true
+    $hotReloadReloadChannel = "cli"
+  }
+}
+
+if ($HotReloadMode -eq "coexist" -and -not $SkipReload -and $HotReloadSettleMs -gt 0) {
+  Write-Section "Hot Reload Coexist"
+  Write-Host "Waiting $HotReloadSettleMs ms for background Hot Reload activity before running scenarios."
+  Start-Sleep -Milliseconds $HotReloadSettleMs
+  $hotReloadPostClearWaitApplied = $true
 }
 
 $resolvedScenarioReportPath = Invoke-ScenarioRunner -Executable $resolvedObsidianCommand -OutputPath $scenarioReportPath
@@ -567,6 +611,20 @@ if (-not $SkipDom) {
   }
   Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "dev:dom" -Arguments $domArgs -AllowFailure |
     Set-Content -LiteralPath $domPath -Encoding UTF8
+}
+
+$hotReloadMayInfluenceTimings = $false
+$hotReloadTimingsTrust = "deterministic"
+$hotReloadDetail = "Controlled mode issued an explicit reload without a Hot Reload settle delay."
+if ($SkipReload) {
+  $hotReloadTimingsTrust = "reload-skipped"
+  $hotReloadDetail = "Reload was skipped, so startup timings do not reflect a coordinated reload."
+} elseif ($HotReloadMode -eq "coexist") {
+  $hotReloadMayInfluenceTimings = $true
+  $hotReloadTimingsTrust = "hot-reload-influenced"
+  $hotReloadDetail = "Coexist mode avoided an explicit reload, so captured timings and logs may reflect background Hot Reload activity."
+} elseif ($hotReloadPreClearSettleApplied) {
+  $hotReloadDetail = "Controlled mode waited $HotReloadSettleMs ms before clearing buffers and issuing an explicit reload."
 }
 
 $summary = [ordered]@{
@@ -592,6 +650,18 @@ $summary = [ordered]@{
   dom = if ($SkipDom -or -not (Test-Path -LiteralPath $domPath)) { $null } else { $domPath }
   watchSeconds = $WatchSeconds
   consoleLimit = $ConsoleLimit
+  hotReload = [ordered]@{
+    mode = $HotReloadMode
+    settleMs = $HotReloadSettleMs
+    preClearSettleApplied = $hotReloadPreClearSettleApplied
+    postClearWaitApplied = $hotReloadPostClearWaitApplied
+    explicitReloadRequested = (-not $SkipReload) -and $HotReloadMode -ne "coexist"
+    explicitReloadPerformed = $hotReloadExplicitReloadPerformed
+    reloadChannel = $hotReloadReloadChannel
+    mayInfluenceTimings = $hotReloadMayInfluenceTimings
+    timingsTrust = $hotReloadTimingsTrust
+    detail = $hotReloadDetail
+  }
   capturePlan = [ordered]@{
     trace = [ordered]@{
       mode = if ($UseCdp) { "cdp-trace" } else { "console-watch" }

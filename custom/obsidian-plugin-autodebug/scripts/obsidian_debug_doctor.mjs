@@ -19,6 +19,10 @@ import {
   resolveTemplateCommand,
   scriptExtension,
 } from './obsidian_debug_command_templates.mjs';
+import {
+  buildHotReloadGuidance,
+  detectHotReloadContext,
+} from './obsidian_debug_hot_reload_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
@@ -233,6 +237,13 @@ const distManifestPath = path.join(distDir, 'manifest.json');
 const distStylesPath = path.join(distDir, 'styles.css');
 const manifest = await readJsonOrNull(manifestPath);
 const packageJson = await readJsonOrNull(packagePath);
+const repoRuntime = packageJson
+  ? {
+      scripts: {
+        scriptBodies: packageJson.scripts ?? {},
+      },
+    }
+  : null;
 const buildScriptExists = Boolean(packageJson?.scripts?.build);
 
 const buildFixes = buildScriptExists
@@ -311,6 +322,75 @@ const bootstrapFixes = expectedPluginId && testVaultPluginDir
       },
     ]
   : [];
+
+function buildHotReloadCycleFixes(mode, settleMs, summary) {
+  if (!expectedPluginId || !testVaultPluginDir) {
+    return [];
+  }
+
+  const normalizedSettleMs = Math.max(0, Number(settleMs) || 0);
+  if (platform === 'windows') {
+    return [
+      {
+        id: `hot-reload-${mode}-cycle`,
+        label: mode === 'coexist' ? 'Re-run in Hot Reload coexist mode' : 'Re-run in controlled reload mode',
+        summary,
+        safety: 'writes-local-state',
+        dryRunFriendly: false,
+        executable: 'powershell',
+        args: [
+          '-NoProfile',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          '{{toolRoot}}/scripts/obsidian_plugin_debug_cycle.ps1',
+          '-PluginId',
+          '{{pluginId}}',
+          '-TestVaultPluginDir',
+          '{{testVaultPluginDir}}',
+          '-ObsidianCommand',
+          '{{obsidianCommand}}',
+          ...(vaultName ? ['-VaultName', '{{vaultName}}'] : []),
+          '-HotReloadMode',
+          mode,
+          '-HotReloadSettleMs',
+          String(normalizedSettleMs),
+          '-SkipBuild',
+          '-SkipDeploy',
+        ],
+        cwd: '{{repoDir}}',
+      },
+    ];
+  }
+
+  return [
+    {
+      id: `hot-reload-${mode}-cycle`,
+      label: mode === 'coexist' ? 'Re-run in Hot Reload coexist mode' : 'Re-run in controlled reload mode',
+      summary,
+      safety: 'writes-local-state',
+      dryRunFriendly: false,
+      executable: 'bash',
+      args: [
+        '{{toolRoot}}/scripts/obsidian_plugin_debug_cycle.sh',
+        '--plugin-id',
+        '{{pluginId}}',
+        '--test-vault-plugin-dir',
+        '{{testVaultPluginDir}}',
+        '--obsidian-command',
+        '{{obsidianCommand}}',
+        ...(vaultName ? ['--vault-name', '{{vaultName}}'] : []),
+        '--hot-reload-mode',
+        mode,
+        '--hot-reload-settle-ms',
+        String(normalizedSettleMs),
+        '--skip-build',
+        '--skip-deploy',
+      ],
+      cwd: '{{repoDir}}',
+    },
+  ];
+}
 
 checks.push(
   manifest
@@ -431,7 +511,9 @@ if (obsidianHelp.ok) {
   );
 }
 
-if (obsidianHelp.ok && expectedPluginId && testVaultPluginDir) {
+let installedPlugins = [];
+let enabledPlugins = [];
+if (obsidianHelp.ok) {
   const installedPluginsResult = await runProcess(
     obsidianCommand,
     buildVaultScopedArgs('plugins', ['filter=community', 'versions', 'format=json']),
@@ -442,8 +524,86 @@ if (obsidianHelp.ok && expectedPluginId && testVaultPluginDir) {
     buildVaultScopedArgs('plugins:enabled', ['filter=community', 'versions', 'format=json']),
     10000,
   );
-  const installedPlugins = parsePluginList(installedPluginsResult.stdout || installedPluginsResult.text);
-  const enabledPlugins = parsePluginList(enabledPluginsResult.stdout || enabledPluginsResult.text);
+  installedPlugins = installedPluginsResult.ok ? parsePluginList(installedPluginsResult.stdout) : [];
+  enabledPlugins = enabledPluginsResult.ok ? parsePluginList(enabledPluginsResult.stdout) : [];
+}
+
+const hotReloadContext = await detectHotReloadContext({
+  repoRuntime,
+  testVaultPluginDir,
+  installedPlugins,
+  enabledPlugins,
+});
+const hotReloadGuidance = buildHotReloadGuidance(hotReloadContext);
+const hotReloadFixes = hotReloadContext.likelyPresent
+  ? [
+      ...buildHotReloadCycleFixes(
+        'controlled',
+        hotReloadGuidance.recommendedSettleMs || 1500,
+        'Wait for background Hot Reload churn to settle, clear buffers, then issue a deterministic explicit reload.',
+      ),
+      ...buildHotReloadCycleFixes(
+        'coexist',
+        hotReloadGuidance.recommendedSettleMs || 1500,
+        'Skip the explicit plugin reload and let a background Hot Reload helper drive startup while the capture stays in coexistence mode.',
+      ),
+    ]
+  : [];
+
+checks.push(
+  check(
+    hotReloadContext.vault.hotReloadEnabledIds.length > 0
+      ? 'warn'
+      : hotReloadContext.vault.hotReloadInstalledIds.length > 0
+        ? 'info'
+        : 'info',
+    'hot-reload-vault',
+    'reload',
+    hotReloadContext.vault.hotReloadEnabledIds.length > 0
+      ? `Vault Hot Reload helper(s) are enabled: ${hotReloadContext.vault.hotReloadEnabledIds.join(', ')}.`
+      : hotReloadContext.vault.hotReloadInstalledIds.length > 0
+        ? `Vault contains Hot Reload-like plugin ids, but none are enabled: ${hotReloadContext.vault.hotReloadInstalledIds.join(', ')}.`
+        : 'No Hot Reload-like community plugin ids were detected in the target vault state.',
+    {
+      hotReload: hotReloadContext,
+    },
+  ),
+);
+checks.push(
+  check(
+    'info',
+    'hot-reload-repo-signals',
+    'reload',
+    hotReloadContext.repo.watchScripts.length > 0 || hotReloadContext.repo.symlinkedEntries.length > 0
+      ? [
+          hotReloadContext.repo.watchScripts.length > 0
+            ? `Watch-capable repo scripts: ${hotReloadContext.repo.watchScripts.map((entry) => entry.name).join(', ')}`
+            : null,
+          hotReloadContext.repo.symlinkedEntries.length > 0
+            ? `Symlinked test-vault entries: ${hotReloadContext.repo.symlinkedEntries.map((entry) => path.basename(entry.path)).join(', ')}`
+            : null,
+        ].filter(Boolean).join('; ')
+      : 'Repo-side watch and symlink signals do not currently suggest a background Hot Reload loop.',
+    {
+      hotReload: hotReloadContext,
+    },
+  ),
+);
+checks.push(
+  check(
+    hotReloadContext.likelyActive ? 'warn' : 'info',
+    'hot-reload-coordination',
+    'reload',
+    hotReloadGuidance.detail,
+    {
+      hotReload: hotReloadContext,
+      guidance: hotReloadGuidance,
+    },
+    hotReloadFixes,
+  ),
+);
+
+if (obsidianHelp.ok && expectedPluginId && testVaultPluginDir) {
   const discoveredEntry = installedPlugins.find((entry) => entry.id === expectedPluginId) ?? null;
   const enabledEntry = enabledPlugins.find((entry) => entry.id === expectedPluginId) ?? null;
 
@@ -553,6 +713,10 @@ const report = {
     targetTitleContains: cdpTargetTitleContains || null,
   },
   categoryCounts,
+  hotReload: {
+    ...hotReloadContext,
+    guidance: hotReloadGuidance,
+  },
   checks,
   fixPlan: {
     requested: fixRequested,

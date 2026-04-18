@@ -13,6 +13,8 @@ POLL_INTERVAL_MS=1000
 CONSOLE_LIMIT=200
 DOM_SELECTOR=".workspace-leaf.mod-active"
 DOM_TEXT=0
+HOT_RELOAD_MODE="controlled"
+HOT_RELOAD_SETTLE_MS=0
 USE_CDP=0
 CDP_HOST="127.0.0.1"
 CDP_PORT=9222
@@ -52,6 +54,8 @@ while [[ $# -gt 0 ]]; do
     --poll-interval-ms) POLL_INTERVAL_MS="$2"; shift 2 ;;
     --console-limit) CONSOLE_LIMIT="$2"; shift 2 ;;
     --dom-selector) DOM_SELECTOR="$2"; shift 2 ;;
+    --hot-reload-mode) HOT_RELOAD_MODE="$2"; shift 2 ;;
+    --hot-reload-settle-ms) HOT_RELOAD_SETTLE_MS="$2"; shift 2 ;;
     --cdp-host) CDP_HOST="$2"; shift 2 ;;
     --cdp-port) CDP_PORT="$2"; shift 2 ;;
     --cdp-target-title-contains) CDP_TARGET_TITLE_CONTAINS="$2"; shift 2 ;;
@@ -92,6 +96,16 @@ fi
 
 if [[ -z "$TEST_VAULT_PLUGIN_DIR" ]]; then
   echo "--test-vault-plugin-dir is required" >&2
+  exit 1
+fi
+
+if [[ "$HOT_RELOAD_MODE" != "controlled" && "$HOT_RELOAD_MODE" != "coexist" ]]; then
+  echo "--hot-reload-mode must be controlled or coexist" >&2
+  exit 1
+fi
+
+if [[ "$HOT_RELOAD_SETTLE_MS" -lt 0 ]]; then
+  echo "--hot-reload-settle-ms must be 0 or greater" >&2
   exit 1
 fi
 
@@ -272,6 +286,16 @@ json_bool() {
   fi
 }
 
+wait_milliseconds() {
+  local duration_ms="${1:-0}"
+
+  if [[ "$duration_ms" -le 0 ]]; then
+    return
+  fi
+
+  sleep "$(awk "BEGIN { print ${duration_ms} / 1000 }")"
+}
+
 run_cli_scenario_if_requested() {
   local inferred_scenario_name="$SCENARIO_NAME"
   if [[ -z "$inferred_scenario_name" && -n "$SCENARIO_COMMAND_ID" ]]; then
@@ -435,6 +459,18 @@ fi
 
 run_bootstrap_if_needed
 
+HOT_RELOAD_PRE_CLEAR_SETTLE_APPLIED=0
+HOT_RELOAD_POST_CLEAR_WAIT_APPLIED=0
+HOT_RELOAD_EXPLICIT_RELOAD_PERFORMED=0
+HOT_RELOAD_RELOAD_CHANNEL="none"
+
+if [[ "$HOT_RELOAD_MODE" == "controlled" && "$SKIP_RELOAD" -eq 0 && "$HOT_RELOAD_SETTLE_MS" -gt 0 ]]; then
+  write_section "Hot Reload Settle"
+  echo "Waiting ${HOT_RELOAD_SETTLE_MS}ms before clearing buffers for a controlled explicit reload."
+  wait_milliseconds "$HOT_RELOAD_SETTLE_MS"
+  HOT_RELOAD_PRE_CLEAR_SETTLE_APPLIED=1
+fi
+
 write_section "Clear Buffers"
 if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
   obsidian_cli dev:debug on >/dev/null 2>&1 || true
@@ -460,10 +496,32 @@ if [[ "$USE_CDP" -eq 1 && "$SKIP_RELOAD" -eq 0 ]]; then
   if [[ -n "$CDP_EVAL_AFTER_RELOAD" ]]; then
     cdp_reload_args+=(--eval-after-reload "$CDP_EVAL_AFTER_RELOAD")
   fi
+  if [[ "$HOT_RELOAD_MODE" == "coexist" ]]; then
+    cdp_reload_args+=(--skip-reload)
+    HOT_RELOAD_RELOAD_CHANNEL="cdp-observe"
+  else
+    HOT_RELOAD_EXPLICIT_RELOAD_PERFORMED=1
+    HOT_RELOAD_RELOAD_CHANNEL="cdp"
+  fi
   node "${cdp_reload_args[@]}"
 elif [[ "$SKIP_RELOAD" -eq 0 ]]; then
-  write_section "Reload Plugin"
-  obsidian_cli plugin:reload "id=$PLUGIN_ID" >/dev/null
+  if [[ "$HOT_RELOAD_MODE" == "coexist" ]]; then
+    write_section "Hot Reload Coexist"
+    echo "Skipping explicit plugin reload and relying on background Hot Reload-friendly capture."
+    HOT_RELOAD_RELOAD_CHANNEL="coexist-skip"
+  else
+    write_section "Reload Plugin"
+    obsidian_cli plugin:reload "id=$PLUGIN_ID" >/dev/null
+    HOT_RELOAD_EXPLICIT_RELOAD_PERFORMED=1
+    HOT_RELOAD_RELOAD_CHANNEL="cli"
+  fi
+fi
+
+if [[ "$HOT_RELOAD_MODE" == "coexist" && "$SKIP_RELOAD" -eq 0 && "$HOT_RELOAD_SETTLE_MS" -gt 0 ]]; then
+  write_section "Hot Reload Coexist"
+  echo "Waiting ${HOT_RELOAD_SETTLE_MS}ms for background Hot Reload activity before running scenarios."
+  wait_milliseconds "$HOT_RELOAD_SETTLE_MS"
+  HOT_RELOAD_POST_CLEAR_WAIT_APPLIED=1
 fi
 
 run_cli_scenario_if_requested
@@ -572,6 +630,20 @@ elif [[ "$WATCH_SECONDS" -le 0 ]]; then
   TRACE_CAPTURE_SKIP_REASON="watch-window-disabled"
 fi
 
+HOT_RELOAD_MAY_INFLUENCE=0
+HOT_RELOAD_TIMINGS_TRUST="deterministic"
+HOT_RELOAD_DETAIL="Controlled mode issued an explicit reload without a Hot Reload settle delay."
+if [[ "$SKIP_RELOAD" -eq 1 ]]; then
+  HOT_RELOAD_TIMINGS_TRUST="reload-skipped"
+  HOT_RELOAD_DETAIL="Reload was skipped, so startup timings do not reflect a coordinated reload."
+elif [[ "$HOT_RELOAD_MODE" == "coexist" ]]; then
+  HOT_RELOAD_MAY_INFLUENCE=1
+  HOT_RELOAD_TIMINGS_TRUST="hot-reload-influenced"
+  HOT_RELOAD_DETAIL="Coexist mode avoided an explicit reload, so captured timings and logs may reflect background Hot Reload activity."
+elif [[ "$HOT_RELOAD_PRE_CLEAR_SETTLE_APPLIED" -eq 1 ]]; then
+  HOT_RELOAD_DETAIL="Controlled mode waited ${HOT_RELOAD_SETTLE_MS}ms before clearing buffers and issuing an explicit reload."
+fi
+
 cat > "$SUMMARY_PATH" <<EOF
 {
   "timestamp": "$(timestamp)",
@@ -596,6 +668,18 @@ cat > "$SUMMARY_PATH" <<EOF
   "dom": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'null' || json_path_or_null "$DOM_PATH" ),
   "watchSeconds": $WATCH_SECONDS,
   "consoleLimit": $CONSOLE_LIMIT,
+  "hotReload": {
+    "mode": "$HOT_RELOAD_MODE",
+    "settleMs": $HOT_RELOAD_SETTLE_MS,
+    "preClearSettleApplied": $( json_bool "$HOT_RELOAD_PRE_CLEAR_SETTLE_APPLIED" ),
+    "postClearWaitApplied": $( json_bool "$HOT_RELOAD_POST_CLEAR_WAIT_APPLIED" ),
+    "explicitReloadRequested": $( [[ "$SKIP_RELOAD" -eq 0 && "$HOT_RELOAD_MODE" != "coexist" ]] && printf 'true' || printf 'false' ),
+    "explicitReloadPerformed": $( json_bool "$HOT_RELOAD_EXPLICIT_RELOAD_PERFORMED" ),
+    "reloadChannel": $( json_string_or_null "$HOT_RELOAD_RELOAD_CHANNEL" ),
+    "mayInfluenceTimings": $( json_bool "$HOT_RELOAD_MAY_INFLUENCE" ),
+    "timingsTrust": $( json_string_or_null "$HOT_RELOAD_TIMINGS_TRUST" ),
+    "detail": $( json_string_or_null "$HOT_RELOAD_DETAIL" )
+  },
   "capturePlan": {
     "trace": {
       "mode": "$TRACE_CAPTURE_MODE",

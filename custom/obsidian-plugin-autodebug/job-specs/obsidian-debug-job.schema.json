@@ -139,6 +139,21 @@
         "useCdp": {
           "type": "boolean"
         },
+        "hotReload": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "controlled",
+                "coexist"
+              ]
+            },
+            "settleMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
         "cdp": {
           "type": "object"
         }

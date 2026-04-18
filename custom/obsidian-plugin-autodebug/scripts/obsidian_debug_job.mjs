@@ -9,6 +9,7 @@ import {
   nowIso,
   parseArgs,
 } from './obsidian_cdp_common.mjs';
+import { normalizeHotReloadMode } from './obsidian_debug_hot_reload_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const jobPathRaw = getStringOption(options, 'job', '').trim();
@@ -138,6 +139,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   const deploy = asObject(spec.deploy);
   const bootstrap = asObject(spec.bootstrap);
   const reload = asObject(spec.reload);
+  const hotReload = asObject(reload.hotReload);
   const logWatch = asObject(spec.logWatch);
   const scenario = asObject(spec.scenario);
   const assertions = asObject(spec.assertions);
@@ -152,6 +154,8 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   const pluginId = stringValue(runtime.pluginId, '');
   const testVaultPluginDir = stringValue(runtime.testVaultPluginDir, '');
   const useCdp = stringValue(reload.mode, 'cli').toLowerCase() === 'cdp' || booleanValue(reload.useCdp, false);
+  const hotReloadMode = normalizeHotReloadMode(stringValue(hotReload.mode, 'controlled'), 'controlled');
+  const hotReloadSettleMs = Math.max(0, numberValue(hotReload.settleMs, 0));
   const watchSeconds = enabled(logWatch, true) ? numberValue(logWatch.seconds, 20) : 0;
   const captureEnabled = enabled(capture, true);
 
@@ -160,6 +164,9 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   }
   if (!testVaultPluginDir) {
     warnings.push('runtime.testVaultPluginDir is empty; run mode requires a test vault plugin directory.');
+  }
+  if (hotReloadMode === 'coexist' && watchSeconds <= 0 && !useCdp) {
+    warnings.push('reload.hotReload.mode is coexist, but logWatch.seconds is 0; background Hot Reload logs will not be captured.');
   }
 
   if (platform === 'windows') {
@@ -184,6 +191,8 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addValue(args, '-PollIntervalMs', numberValue(logWatch.pollIntervalMs, 1000));
     addValue(args, '-ConsoleLimit', numberValue(logWatch.consoleLimit, 200));
     addValue(args, '-DomSelector', stringValue(assertions.domSelector, '.workspace-leaf.mod-active'));
+    addValue(args, '-HotReloadMode', hotReloadMode);
+    addValue(args, '-HotReloadSettleMs', hotReloadSettleMs);
     addSwitch(args, '-UseCdp', useCdp);
     addValue(args, '-CdpHost', reload.cdp?.host);
     addValue(args, '-CdpPort', reload.cdp?.port);
@@ -237,6 +246,8 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   addValue(args, '--poll-interval-ms', numberValue(logWatch.pollIntervalMs, 1000));
   addValue(args, '--console-limit', numberValue(logWatch.consoleLimit, 200));
   addValue(args, '--dom-selector', stringValue(assertions.domSelector, '.workspace-leaf.mod-active'));
+  addValue(args, '--hot-reload-mode', hotReloadMode);
+  addValue(args, '--hot-reload-settle-ms', hotReloadSettleMs);
   addValue(args, '--cdp-host', reload.cdp?.host);
   addValue(args, '--cdp-port', reload.cdp?.port);
   addValue(args, '--cdp-target-title-contains', reload.cdp?.targetTitleContains);

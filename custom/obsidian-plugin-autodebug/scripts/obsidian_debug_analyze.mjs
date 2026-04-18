@@ -747,6 +747,46 @@ const runtimeContext = {
   vaultRoot: deriveVaultRoot(testVaultPluginDir),
 };
 const capturePlan = deriveCapturePlan(summary);
+const hotReloadRaw = summary.hotReload && typeof summary.hotReload === 'object' && !Array.isArray(summary.hotReload)
+  ? summary.hotReload
+  : {};
+const hotReloadMetadataRecorded = Object.keys(hotReloadRaw).length > 0;
+const hotReloadMode = (stringValue(hotReloadRaw.mode) || 'controlled') === 'coexist' ? 'coexist' : 'controlled';
+const hotReloadExplicitReloadPerformed = booleanValue(
+  hotReloadRaw.explicitReloadPerformed,
+  !hotReloadMetadataRecorded && hotReloadMode !== 'coexist' && capturePlan.trace?.requested === true,
+);
+const hotReloadMayInfluenceTimings = booleanValue(
+  hotReloadRaw.mayInfluenceTimings,
+  hotReloadMode === 'coexist' && capturePlan.trace?.requested === true,
+);
+const hotReloadTimingsTrust = stringValue(hotReloadRaw.timingsTrust)
+  || (hotReloadMayInfluenceTimings
+    ? 'hot-reload-influenced'
+    : hotReloadExplicitReloadPerformed
+      ? 'deterministic'
+      : 'reload-skipped');
+const hotReloadSummary = {
+  metadataRecorded: hotReloadMetadataRecorded,
+  mode: hotReloadMode,
+  settleMs: toFiniteNumber(hotReloadRaw.settleMs) ?? 0,
+  preClearSettleApplied: booleanValue(hotReloadRaw.preClearSettleApplied, false),
+  postClearWaitApplied: booleanValue(hotReloadRaw.postClearWaitApplied, false),
+  explicitReloadRequested: booleanValue(
+    hotReloadRaw.explicitReloadRequested,
+    hotReloadMode !== 'coexist' && capturePlan.trace?.requested === true,
+  ),
+  explicitReloadPerformed: hotReloadExplicitReloadPerformed,
+  reloadChannel: stringValue(hotReloadRaw.reloadChannel) || (hotReloadExplicitReloadPerformed ? (summary.useCdp ? 'cdp' : 'cli') : 'none'),
+  mayInfluenceTimings: hotReloadMayInfluenceTimings,
+  timingsTrust: hotReloadTimingsTrust,
+  detail: stringValue(hotReloadRaw.detail)
+    || (hotReloadMode === 'coexist'
+      ? 'Coexist mode captured startup without an explicit reload, so Hot Reload may have influenced timings and logs.'
+      : hotReloadExplicitReloadPerformed
+        ? 'Controlled mode captured a deliberate explicit reload.'
+        : 'Reload was skipped, so startup timings do not reflect a coordinated reload.'),
+};
 
 const consoleText = await readTextIfExists(summary.consoleLog);
 const errorsText = await readTextIfExists(summary.errorsLog);
@@ -846,6 +886,16 @@ if (summary.useCdp && cdpSummary?.reloadResult && capturePlan.trace.requested) {
     summary.cdpSummary ? [{ filePath: summary.cdpSummary, lineNumber: 1 }] : artifactEvidence(summary.cdpTrace),
   );
 }
+
+pushAssertion(
+  'hot-reload-coordination',
+  hotReloadSummary.timingsTrust === 'deterministic'
+    ? 'pass'
+    : hotReloadSummary.timingsTrust === 'hot-reload-influenced'
+      ? 'warn'
+      : 'skipped',
+  hotReloadSummary.detail,
+);
 
 const screenshotState = buildArtifactState({
   key: 'screenshot',
@@ -1544,6 +1594,9 @@ const headline = highestSeveritySignature
       : 'Automation completed and the captured artifacts look healthy.');
 
 const recommendations = [...new Set([
+  ...(hotReloadSummary.mayInfluenceTimings
+    ? ['Re-run with reload.hotReload.mode=controlled and a settle window when you need deterministic startup timings.']
+    : []),
   ...matchedSignatures.flatMap((entry) => entry.nextActions ?? []),
   ...playbooks.flatMap((entry) => entry.actions ?? []),
 ])];
@@ -1556,6 +1609,7 @@ const diagnosis = {
   vaultName: summary.vaultName,
   useCdp: summary.useCdp,
   domSelector: domSelector || null,
+  hotReload: hotReloadSummary,
   runtime: {
     platform,
     repoDir: repoDir || null,

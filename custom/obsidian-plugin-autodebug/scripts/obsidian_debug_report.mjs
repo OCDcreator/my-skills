@@ -278,6 +278,9 @@ const comparisonCandidateArtifacts = comparison?.candidate?.artifacts ?? {};
 const diagnosisArtifactStates = normalizeArtifactStates(diagnosis.artifactStates);
 const comparisonBaselineArtifactStates = normalizeArtifactStates(comparison?.baseline?.artifactStates);
 const screenshotDiffPath = comparison?.screenshotDiff?.diffPath ?? null;
+const hotReload = diagnosis.hotReload && typeof diagnosis.hotReload === 'object' && !Array.isArray(diagnosis.hotReload)
+  ? diagnosis.hotReload
+  : null;
 
 const domPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.dom));
 const consolePreview = trimPreview(await readTextOrNull(diagnosisArtifacts.consoleLog));
@@ -356,6 +359,7 @@ const html = `<!doctype html>
       <span class="badge ${escapeHtml(normalizeStatusClass(diagnosis.status))}">${escapeHtml(diagnosis.status)}</span>
       ${comparison ? renderStatusSummary('Compare', comparison.status) : ''}
       ${comparison ? renderStatusSummary('Visual', comparison.visualStatus ?? comparison.screenshotDiff?.status ?? 'n/a', comparison.screenshotDiff?.status === 'different' ? 'warn' : 'info') : ''}
+      ${hotReload ? renderStatusSummary('Hot Reload', hotReload.timingsTrust ?? 'n/a', hotReload.mayInfluenceTimings ? 'warning' : (hotReload.timingsTrust === 'deterministic' ? 'pass' : 'info')) : ''}
     </div>
     <strong>${escapeHtml(diagnosis.headline)}</strong>
     <p>Plugin: <code>${escapeHtml(diagnosis.pluginId)}</code> | Vault: <code>${escapeHtml(diagnosis.vaultName)}</code></p>
@@ -448,6 +452,26 @@ const html = `<!doctype html>
   <div class="card">
     <h2>Timings</h2>
     ${renderMetricTable(diagnosis.timings)}
+  </div>
+
+  <div class="card">
+    <h2>Hot Reload Coordination</h2>
+    ${hotReload ? `
+      <p>
+        ${renderStatusSummary('Mode', hotReload.mode ?? 'n/a', hotReload.mode === 'coexist' ? 'warning' : 'info')}
+        ${renderStatusSummary('Timing Trust', hotReload.timingsTrust ?? 'n/a', hotReload.mayInfluenceTimings ? 'warning' : (hotReload.timingsTrust === 'deterministic' ? 'pass' : 'info'))}
+      </p>
+      <p>${escapeHtml(hotReload.detail ?? 'No Hot Reload note recorded.')}</p>
+      <table>
+        <tr><th>Field</th><th>Value</th></tr>
+        <tr><td>Settle Window</td><td>${escapeHtml(hotReload.settleMs ?? 0)}</td></tr>
+        <tr><td>Reload Channel</td><td>${escapeHtml(hotReload.reloadChannel ?? 'none')}</td></tr>
+        <tr><td>Explicit Reload Requested</td><td>${escapeHtml(hotReload.explicitReloadRequested ? 'true' : 'false')}</td></tr>
+        <tr><td>Explicit Reload Performed</td><td>${escapeHtml(hotReload.explicitReloadPerformed ? 'true' : 'false')}</td></tr>
+        <tr><td>Pre-clear Settle</td><td>${escapeHtml(hotReload.preClearSettleApplied ? 'true' : 'false')}</td></tr>
+        <tr><td>Post-clear Wait</td><td>${escapeHtml(hotReload.postClearWaitApplied ? 'true' : 'false')}</td></tr>
+      </table>
+    ` : '<p>No Hot Reload coordination metadata recorded.</p>'}
   </div>
 
   <div class="card">
