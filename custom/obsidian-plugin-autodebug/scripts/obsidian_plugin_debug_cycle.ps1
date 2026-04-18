@@ -25,6 +25,7 @@ param(
   [string]$ScenarioName = "",
   [string]$ScenarioPath = "",
   [string]$ScenarioCommandId = "",
+  [string]$SurfaceProfilePath = "",
   [int]$ScenarioSleepMs = 2000,
   [string]$AssertionsPath = "",
   [string]$CompareDiagnosisPath = "",
@@ -306,6 +307,18 @@ function Invoke-ScenarioRunner {
   }
   if ($ScenarioCommandId.Trim().Length -gt 0) {
     $args += @("--scenario-command-id", $ScenarioCommandId)
+  }
+  if ($SurfaceProfilePath.Trim().Length -gt 0) {
+    $args += @("--surface-profile", $SurfaceProfilePath)
+  }
+  if ($CdpHost.Trim().Length -gt 0) {
+    $args += @("--cdp-host", $CdpHost)
+  }
+  if ($CdpPort -gt 0) {
+    $args += @("--cdp-port", "$CdpPort")
+  }
+  if ($CdpTargetTitleContains.Trim().Length -gt 0) {
+    $args += @("--cdp-target-title-contains", $CdpTargetTitleContains)
   }
 
   Write-Section "Scenario"

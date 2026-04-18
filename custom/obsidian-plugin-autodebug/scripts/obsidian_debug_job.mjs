@@ -189,6 +189,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
       addValue(args, '-ScenarioName', scenario.name);
       addValue(args, '-ScenarioPath', scenario.path);
       addValue(args, '-ScenarioCommandId', scenario.commandId);
+      addValue(args, '-SurfaceProfilePath', scenario.surfaceProfile);
       addValue(args, '-ScenarioSleepMs', numberValue(scenario.sleepMs, 2000));
     }
     addValue(args, '-AssertionsPath', assertions.path);
@@ -233,6 +234,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addValue(args, '--scenario-name', scenario.name);
     addValue(args, '--scenario-path', scenario.path);
     addValue(args, '--scenario-command-id', scenario.commandId);
+    addValue(args, '--surface-profile', scenario.surfaceProfile);
     addValue(args, '--scenario-sleep-ms', numberValue(scenario.sleepMs, 2000));
   }
   addValue(args, '--assertions', assertions.path);

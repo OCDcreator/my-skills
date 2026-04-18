@@ -1,0 +1,82 @@
+{
+  "plugin": {
+    "id": "sample-plugin",
+    "name": "Sample Plugin"
+  },
+  "metadata": {
+    "preferredOpenCommandIds": [
+      "sample-plugin:open-view"
+    ],
+    "viewTypes": [
+      "sample-plugin-view"
+    ],
+    "settingsTabNames": [
+      "Sample Plugin"
+    ],
+    "selectorHints": [
+      ".sample-plugin-root"
+    ]
+  },
+  "commands": [
+    {
+      "id": "sample-plugin:open-view",
+      "label": "Open Sample Plugin view",
+      "surface": "view"
+    },
+    {
+      "id": "sample-plugin:open-settings",
+      "label": "Open Sample Plugin settings",
+      "surface": "settings"
+    }
+  ],
+  "dom": {
+    "elements": [
+      {
+        "tag": "section",
+        "classes": [
+          "workspace-leaf",
+          "mod-active",
+          "sample-plugin-root"
+        ],
+        "text": "Sample Plugin Ready",
+        "attributes": {
+          "data-type": "sample-plugin-view"
+        }
+      },
+      {
+        "tag": "h2",
+        "classes": [
+          "view-header-title"
+        ],
+        "text": "Sample Plugin"
+      },
+      {
+        "tag": "div",
+        "classes": [
+          "vertical-tab-nav-item",
+          "is-active"
+        ],
+        "text": "Sample Plugin",
+        "attributes": {
+          "data-tab": "sample-plugin"
+        }
+      },
+      {
+        "tag": "div",
+        "classes": [
+          "notice",
+          "is-warning"
+        ],
+        "role": "alert",
+        "text": "Connection failed"
+      },
+      {
+        "tag": "div",
+        "classes": [
+          "empty-state"
+        ],
+        "text": "No items yet"
+      }
+    ]
+  }
+}

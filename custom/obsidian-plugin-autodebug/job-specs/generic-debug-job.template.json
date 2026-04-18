@@ -49,6 +49,7 @@
     "name": "open-plugin-view",
     "path": "",
     "commandId": "your-plugin-id:open-view",
+    "surfaceProfile": "",
     "sleepMs": 2000
   },
   "assertions": {

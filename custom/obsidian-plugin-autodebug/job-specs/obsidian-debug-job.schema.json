@@ -148,6 +148,9 @@
         "commandId": {
           "type": "string"
         },
+        "surfaceProfile": {
+          "type": "string"
+        },
         "sleepMs": {
           "type": "integer"
         }

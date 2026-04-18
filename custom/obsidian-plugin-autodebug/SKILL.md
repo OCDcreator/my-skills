@@ -186,6 +186,7 @@ Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable
 - `runtime`: plugin id, test vault plugin directory, working directory, Obsidian command, vault name, and output directory.
 - `build` / `deploy` / `reload` / `logWatch`: build argv, deploy source, CLI or CDP reload mode, and console polling settings.
 - `scenario` / `assertions` / `comparison`: optional view-opening scenario, assertion JSON, DOM selector, and baseline diagnosis comparison.
+- `scenario.surfaceProfile`: optional plugin-surface metadata file that declares likely open commands, view types, settings tabs, and selector hints for generic view-open/discovery runs.
 - `profile` / `report`: repeated-cycle timing summary and optional HTML report generation.
 - `state`: optional vault snapshot, plugin-local reset preview/reset, and restore-after-run handling.
 
@@ -266,6 +267,8 @@ The CLI watch logs are incremental: repeated `dev:console` / `dev:errors` pollin
 - deduplicated recommendations for the next debugging pass.
 
 Example assertions live under `assertions/`. Use `assertions/plugin-view-health.template.json` as the generic starting point for a new plugin, then replace the selector/error placeholders with your own expected UI markers. `assertions/opencodian-view-health.json` remains a concrete real-world example of the same pattern.
+
+When a plugin does not have one obvious `commandId`, capture reusable view-open metadata in `surface-profiles/plugin-surface.template.json`. The scenario runner resolves strategies in this order: declared metadata first, then Obsidian commands/view types, then CDP DOM heuristics. `scenario-report.json` now includes a machine-readable `surfaceDiscovery` block with the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, and empty states.
 
 To compare a new run against a previous diagnosis, pass `-CompareDiagnosisPath <old diagnosis.json>` on Windows or `--compare-diagnosis <old diagnosis.json>` on macOS/Linux. The scripts then write `.obsidian-debug/comparison.json` with timing deltas, added/removed signatures, and assertion regressions/fixes.
 
@@ -466,7 +469,19 @@ Attach or open the HTML report when the user needs an easy review artifact; keep
 For custom workflows, point `--scenario-path` / `-ScenarioPath` at a JSON file shaped like `scenarios/open-plugin-view.json`. The built-in scenario runner currently supports:
 
 - `obsidian-cli` steps for vault-scoped Obsidian CLI commands,
+- `surface-open` steps that resolve the best generic plugin surface-open strategy,
 - `sleep` steps for deterministic settle windows between actions.
+
+Dry-run a synthetic surface profile without touching a real Obsidian app:
+
+```bash
+node scripts/obsidian_debug_scenario_runner.mjs \
+  --scenario-name open-plugin-view \
+  --plugin-id sample-plugin \
+  --surface-profile surface-profiles/synthetic-plugin-surface.fixture.json \
+  --dry-run \
+  --output .obsidian-debug/scenario-report.json
+```
 
 Then run the same `obsidian_plugin_debug_cycle.sh` command with `--use-cdp`. In that mode, the script can still:
 

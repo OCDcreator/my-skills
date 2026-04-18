@@ -22,6 +22,7 @@ CDP_EVAL_AFTER_RELOAD=""
 SCENARIO_NAME=""
 SCENARIO_PATH=""
 SCENARIO_COMMAND_ID=""
+SURFACE_PROFILE_PATH=""
 SCENARIO_SLEEP_MS=2000
 ASSERTIONS_PATH=""
 COMPARE_DIAGNOSIS_PATH=""
@@ -52,6 +53,7 @@ while [[ $# -gt 0 ]]; do
     --scenario-name) SCENARIO_NAME="$2"; shift 2 ;;
     --scenario-path) SCENARIO_PATH="$2"; shift 2 ;;
     --scenario-command-id) SCENARIO_COMMAND_ID="$2"; shift 2 ;;
+    --surface-profile) SURFACE_PROFILE_PATH="$2"; shift 2 ;;
     --scenario-sleep-ms) SCENARIO_SLEEP_MS="$2"; shift 2 ;;
     --assertions) ASSERTIONS_PATH="$2"; shift 2 ;;
     --compare-diagnosis) COMPARE_DIAGNOSIS_PATH="$2"; shift 2 ;;
@@ -267,6 +269,18 @@ run_cli_scenario_if_requested() {
   fi
   if [[ -n "$SCENARIO_COMMAND_ID" ]]; then
     scenario_args+=(--scenario-command-id "$SCENARIO_COMMAND_ID")
+  fi
+  if [[ -n "$SURFACE_PROFILE_PATH" ]]; then
+    scenario_args+=(--surface-profile "$SURFACE_PROFILE_PATH")
+  fi
+  if [[ -n "$CDP_HOST" ]]; then
+    scenario_args+=(--cdp-host "$CDP_HOST")
+  fi
+  if [[ "$CDP_PORT" -gt 0 ]]; then
+    scenario_args+=(--cdp-port "$CDP_PORT")
+  fi
+  if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
+    scenario_args+=(--cdp-target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
   fi
 
   node "${scenario_args[@]}"

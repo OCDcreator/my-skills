@@ -21,7 +21,7 @@
   - At least one Windows-style and one Bash-style dry-run/example command is documented
   - The phase doc records scope, changed files, and validation results
 
-### [NEXT] B2 - Generic view-open strategy chain and selector discovery
+### [DONE] B2 - Generic view-open strategy chain and selector discovery
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add plugin-neutral ways to open a plugin surface and discover likely root selectors, headings, settings surfaces, error banners, and empty states.
@@ -32,7 +32,7 @@
   - The strategy chain is documented and testable with a synthetic or real plugin fixture
   - Discovery output is machine-readable for downstream assertions
 
-### [QUEUED] B3 - Rich generic assertions and performance budgets
+### [NEXT] B3 - Rich generic assertions and performance budgets
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Extend assertions beyond simple DOM/log checks to cover counts, visibility, text regex, attributes, computed styles, grouped log rules, and timing budgets.
@@ -88,5 +88,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B2 - Generic view-open strategy chain and selector discovery`.
+- The current `[NEXT]` is `B3 - Rich generic assertions and performance budgets`.
 - Successful rounds must keep the roadmap and phase docs aligned.
