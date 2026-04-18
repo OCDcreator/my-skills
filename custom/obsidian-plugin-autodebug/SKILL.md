@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, watch console/errors, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, restore vault state, and produce diagnosis/HTML reports with reusable playbooks. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, 开机启动慢, 首次启动慢, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
+description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, zero-touch bootstrap fresh-vault plugin discovery, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, watch console/errors, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, restore vault state, and produce diagnosis/HTML reports with reusable playbooks. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, 开机启动慢, 首次启动慢, fresh clean-vault, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
 ---
 
 # Obsidian Plugin Autodebug
@@ -9,11 +9,12 @@ Use this skill to turn Obsidian plugin development into an unattended loop:
 
 1. build the plugin,
 2. deploy the generated files into a test vault,
-3. reload the plugin in a running Obsidian app,
-4. capture console/errors/logs,
-5. inspect screenshot/DOM/CSS,
-6. diagnose the slow or broken step,
-7. patch and repeat.
+3. bootstrap fresh-vault plugin discovery when the plugin is brand new,
+4. reload the plugin in a running Obsidian app,
+5. capture console/errors/logs,
+6. inspect screenshot/DOM/CSS,
+7. diagnose the slow or broken step,
+8. patch and repeat.
 
 ## Relationship To `obsidian-cli`
 
@@ -92,6 +93,8 @@ Copy only generated runtime artifacts into the test vault plugin directory:
 - `dist/assets/` → `<test-vault>/.obsidian/plugins/<plugin-id>/assets/` when bundled assets changed
 
 Verify deployment by hash or `BUILD_ID`. Do not reload until the copy has completed.
+
+If the plugin is brand new to that vault, run the bootstrap step immediately after deploy so Obsidian discovers the copied community plugin before the real reload/log-watch pass starts. The bundled cycle wrappers and job runner now do this automatically unless you explicitly skip bootstrap.
 
 ### 4. Reload
 
@@ -184,7 +187,7 @@ The OpenCodian debugging lesson: a `view-open` path that looked like an 8s plugi
 Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable across Windows PowerShell and macOS/Linux Bash. A job spec describes the same phases as the direct cycle wrappers without forcing agents to hand-write long platform-specific command templates:
 
 - `runtime`: plugin id, test vault plugin directory, working directory, Obsidian command, vault name, and output directory.
-- `build` / `deploy` / `reload` / `logWatch`: build argv, deploy source, CLI or CDP reload mode, and console polling settings.
+- `build` / `deploy` / `bootstrap` / `reload` / `logWatch`: build argv, deploy source, fresh-vault discovery bootstrap policy, CLI or CDP reload mode, and console polling settings.
 - `scenario` / `assertions` / `comparison`: optional view-opening scenario, assertion JSON, DOM selector, and baseline diagnosis comparison.
 - `scenario.surfaceProfile`: optional plugin-surface metadata file that declares likely open commands, view types, settings tabs, and selector hints for generic view-open/discovery runs.
 - `profile` / `report`: repeated-cycle timing summary and optional HTML report generation.
@@ -192,7 +195,7 @@ Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable
 
 Start by copying `job-specs/generic-debug-job.template.json` into the plugin repository, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
 
-If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. On the first deploy into a fresh vault, reload the vault or restart Obsidian once so the new community plugin is discovered before you expect `plugin-reload-loaded` to pass.
+If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. The bundled bootstrap script now handles that first-discovery reload/restart path automatically; only fall back to a manual vault reload or app restart when you intentionally disable bootstrap.
 
 Dry-run the PowerShell command plan:
 
@@ -250,6 +253,7 @@ The script writes:
 
 - `.obsidian-debug/build.log`
 - `.obsidian-debug/deploy-report.json`
+- `.obsidian-debug/bootstrap-report.json`
 - `.obsidian-debug/scenario-report.json` when a scenario runs
 - `.obsidian-debug/console-watch.log`
 - `.obsidian-debug/errors.log`
@@ -259,6 +263,8 @@ The script writes:
 - `.obsidian-debug/diagnosis.json`
 
 The CLI watch logs are incremental: repeated `dev:console` / `dev:errors` polling only appends the new tail instead of replaying the whole buffer every second. If no errors appear during the watch window, `errors.log` stays concise with a single “no errors captured” note.
+
+Bootstrap runs before the real reload by default. Use `-SkipBootstrap` on Windows or `--skip-bootstrap` on macOS/Linux only when you know the plugin is already discoverable and want to avoid the fresh-vault preflight.
 
 `diagnosis.json` adds:
 
@@ -290,13 +296,14 @@ node scripts/obsidian_debug_doctor.mjs \
   --repo-dir /path/to/plugin-repo \
   --plugin-id opencodian \
   --test-vault-plugin-dir /path/to/testvault/.obsidian/plugins/opencodian \
+  --vault-name testvault \
   --obsidian-command obsidian \
   --cdp-port 9222 \
   --output .obsidian-debug/doctor.json \
   --fix
 ```
 
-Treat `fail` checks as blockers. Treat `warn` checks as actionable context: for example, the macOS app binary can pass launch checks but still warn that the full Obsidian CLI developer commands are unavailable, in which case use the CDP-first flow.
+Treat `fail` checks as blockers. Treat `warn` checks as actionable context: for example, the macOS app binary can pass launch checks but still warn that the full Obsidian CLI developer commands are unavailable, in which case use the CDP-first flow. The doctor now also checks whether the current Node runtime exposes `globalThis.WebSocket` for CDP scripts and whether the target vault has already discovered/enabled the copied plugin; with `--fix`, it can emit a bootstrap command plan instead of making you rediscover that fresh-vault quirk manually.
 When you add `--fix`, the doctor keeps the run safe by generating a reviewable `doctor-fixes.ps1` or `doctor-fixes.sh` next to the JSON output instead of silently mutating the repo or vault.
 
 You can also run a scenario before the watch/capture phase. The built-in `open-plugin-view` scenario is useful when the plugin exposes a command such as `<plugin-id>:open-view` and you want DOM/screenshot capture to target the plugin pane:

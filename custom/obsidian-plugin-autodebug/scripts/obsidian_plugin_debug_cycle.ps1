@@ -29,6 +29,13 @@ param(
   [int]$ScenarioSleepMs = 2000,
   [string]$AssertionsPath = "",
   [string]$CompareDiagnosisPath = "",
+  [switch]$SkipBootstrap,
+  [int]$BootstrapAllowRestart = 1,
+  [int]$BootstrapPollIntervalMs = 1000,
+  [int]$BootstrapDiscoveryTimeoutMs = 12000,
+  [int]$BootstrapReloadWaitMs = 1500,
+  [int]$BootstrapRestartWaitMs = 8000,
+  [int]$BootstrapEnableWaitMs = 1000,
   [switch]$DomText,
   [switch]$SkipBuild,
   [switch]$SkipDeploy,
@@ -159,6 +166,22 @@ function Invoke-Build {
   }
 }
 
+function Get-Sha256Hash {
+  param([string]$Path)
+
+  $stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+      return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+    } finally {
+      $sha256.Dispose()
+    }
+  } finally {
+    $stream.Dispose()
+  }
+}
+
 function Copy-DeployArtifacts {
   param(
     [string]$SourceDir,
@@ -193,8 +216,8 @@ function Copy-DeployArtifacts {
 
     $targetFile = Join-Path $resolvedTarget $fileName
     Copy-Item -LiteralPath $sourceFile -Destination $targetFile -Force
-    $sourceHash = (Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash
-    $targetHash = (Get-FileHash -LiteralPath $targetFile -Algorithm SHA256).Hash
+    $sourceHash = Get-Sha256Hash -Path $sourceFile
+    $targetHash = Get-Sha256Hash -Path $targetFile
     $report += [ordered]@{
       file = $fileName
       source = $sourceFile
@@ -399,6 +422,46 @@ function Invoke-Comparison {
   }
 }
 
+function Invoke-BootstrapPlugin {
+  param(
+    [string]$Executable,
+    [string]$OutputPath
+  )
+
+  $scriptPath = Join-Path $PSScriptRoot "obsidian_debug_bootstrap_plugin.mjs"
+  if (-not (Test-Path -LiteralPath $scriptPath)) {
+    throw "Bootstrap script not found: $scriptPath"
+  }
+
+  $args = @(
+    $scriptPath,
+    "--plugin-id", $PluginId,
+    "--test-vault-plugin-dir", $TestVaultPluginDir,
+    "--obsidian-command", $Executable,
+    "--poll-interval-ms", "$BootstrapPollIntervalMs",
+    "--discovery-timeout-ms", "$BootstrapDiscoveryTimeoutMs",
+    "--reload-wait-ms", "$BootstrapReloadWaitMs",
+    "--restart-wait-ms", "$BootstrapRestartWaitMs",
+    "--enable-wait-ms", "$BootstrapEnableWaitMs",
+    "--allow-restart", $(if ($BootstrapAllowRestart -ne 0) { "true" } else { "false" }),
+    "--enable-plugin", "true",
+    "--output", $OutputPath
+  )
+
+  if ($VaultName.Trim().Length -gt 0) {
+    $args += @("--vault-name", $VaultName)
+  }
+
+  Write-Section "Bootstrap Plugin"
+  Write-Host "node $($args -join ' ')"
+  & node @args 2>&1 | ForEach-Object { Write-Host $_ }
+  if ($LASTEXITCODE -ne 0) {
+    throw "Bootstrap plugin failed with exit code $LASTEXITCODE"
+  }
+
+  return $OutputPath
+}
+
 function Invoke-CdpReloadTrace {
   param(
     [string]$OutputPath
@@ -450,8 +513,10 @@ $summaryPath = Join-Path $resolvedOutputDir "summary.json"
 $diagnosisPath = Join-Path $resolvedOutputDir "diagnosis.json"
 $scenarioReportPath = Join-Path $resolvedOutputDir "scenario-report.json"
 $comparisonPath = Join-Path $resolvedOutputDir "comparison.json"
+$bootstrapReportPath = Join-Path $resolvedOutputDir "bootstrap-report.json"
 $cdpTracePath = Join-Path $resolvedOutputDir "cdp-reload-trace.log"
 $cdpSummaryPath = $null
+$resolvedBootstrapReportPath = $null
 $resolvedScenarioReportPath = $null
 
 Write-Section "Preflight"
@@ -464,6 +529,10 @@ if (-not $SkipBuild) {
 
 if (-not $SkipDeploy) {
   Copy-DeployArtifacts -SourceDir $DeployFrom -TargetDir $TestVaultPluginDir -ReportPath $deployReportPath
+}
+
+if (-not $SkipBootstrap) {
+  $resolvedBootstrapReportPath = Invoke-BootstrapPlugin -Executable $resolvedObsidianCommand -OutputPath $bootstrapReportPath
 }
 
 Write-Section "Clear Buffers"
@@ -510,6 +579,7 @@ $summary = [ordered]@{
   outputDir = $resolvedOutputDir
   buildLog = if ($SkipBuild -or -not (Test-Path -LiteralPath $buildLogPath)) { $null } else { $buildLogPath }
   deployReport = if ($SkipDeploy -or -not (Test-Path -LiteralPath $deployReportPath)) { $null } else { $deployReportPath }
+  bootstrapReport = if ($SkipBootstrap -or -not $resolvedBootstrapReportPath -or -not (Test-Path -LiteralPath $resolvedBootstrapReportPath)) { $null } else { $resolvedBootstrapReportPath }
   scenarioReport = if ($resolvedScenarioReportPath -and (Test-Path -LiteralPath $resolvedScenarioReportPath)) { $resolvedScenarioReportPath } else { $null }
   assertionsPath = if ($AssertionsPath.Trim().Length -gt 0) { $AssertionsPath } else { $null }
   comparisonReport = if ($CompareDiagnosisPath.Trim().Length -gt 0) { $comparisonPath } else { $null }

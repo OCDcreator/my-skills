@@ -108,7 +108,20 @@
   - The phase doc records native macOS smoke evidence for doctor, job/cycle, and state-matrix/report flows
   - Remaining macOS-only gaps are isolated into follow-up backlog items
 
+### [DONE] B10 - Fresh-vault bootstrap and Node/WebSocket doctor follow-up
+
+- **Lane**: Bugfix / backlog
+- **Goal**: Close the remaining clean-vault first-install gap with zero-touch bootstrap and make doctor explicitly surface Node runtime WebSocket compatibility for CDP automation.
+- **Constraints**:
+  - Keep the bootstrap flow plugin-agnostic and cross-platform
+  - Avoid hard-coding one repository, one vault, or one plugin id
+  - Preserve the existing direct wrapper and job-spec entrypoints
+- **Acceptance**:
+  - Fresh-vault first-install flows can auto-discover and enable a newly copied plugin without manual reload/restart steps
+  - Doctor reports fresh-vault discovery status and Node/WebSocket CDP readiness with runnable remediation commands
+  - Windows and native macOS smoke validation record evidence for both additions
+
 ## Current state
 
 - No queued `[NEXT]` slice remains in this roadmap.
-- B1-B9 are complete. Future work should be added as a new queued slice instead of silently widening this completed lane.
+- B1-B10 are complete. Future work should be added as a new queued slice instead of silently widening this completed lane.

@@ -26,6 +26,13 @@ SURFACE_PROFILE_PATH=""
 SCENARIO_SLEEP_MS=2000
 ASSERTIONS_PATH=""
 COMPARE_DIAGNOSIS_PATH=""
+SKIP_BOOTSTRAP=0
+BOOTSTRAP_ALLOW_RESTART=1
+BOOTSTRAP_POLL_INTERVAL_MS=1000
+BOOTSTRAP_DISCOVERY_TIMEOUT_MS=12000
+BOOTSTRAP_RELOAD_WAIT_MS=1500
+BOOTSTRAP_RESTART_WAIT_MS=8000
+BOOTSTRAP_ENABLE_WAIT_MS=1000
 SKIP_BUILD=0
 SKIP_DEPLOY=0
 SKIP_RELOAD=0
@@ -57,6 +64,13 @@ while [[ $# -gt 0 ]]; do
     --scenario-sleep-ms) SCENARIO_SLEEP_MS="$2"; shift 2 ;;
     --assertions) ASSERTIONS_PATH="$2"; shift 2 ;;
     --compare-diagnosis) COMPARE_DIAGNOSIS_PATH="$2"; shift 2 ;;
+    --skip-bootstrap) SKIP_BOOTSTRAP=1; shift ;;
+    --bootstrap-allow-restart) BOOTSTRAP_ALLOW_RESTART="$2"; shift 2 ;;
+    --bootstrap-poll-interval-ms) BOOTSTRAP_POLL_INTERVAL_MS="$2"; shift 2 ;;
+    --bootstrap-discovery-timeout-ms) BOOTSTRAP_DISCOVERY_TIMEOUT_MS="$2"; shift 2 ;;
+    --bootstrap-reload-wait-ms) BOOTSTRAP_RELOAD_WAIT_MS="$2"; shift 2 ;;
+    --bootstrap-restart-wait-ms) BOOTSTRAP_RESTART_WAIT_MS="$2"; shift 2 ;;
+    --bootstrap-enable-wait-ms) BOOTSTRAP_ENABLE_WAIT_MS="$2"; shift 2 ;;
     --dom-text) DOM_TEXT=1; shift ;;
     --use-cdp) USE_CDP=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
@@ -130,6 +144,7 @@ SUMMARY_PATH="$OUTPUT_DIR/summary.json"
 DIAGNOSIS_PATH="$OUTPUT_DIR/diagnosis.json"
 SCENARIO_REPORT_PATH="$OUTPUT_DIR/scenario-report.json"
 COMPARISON_PATH="$OUTPUT_DIR/comparison.json"
+BOOTSTRAP_REPORT_PATH="$OUTPUT_DIR/bootstrap-report.json"
 CDP_TRACE_PATH="$OUTPUT_DIR/cdp-reload-trace.log"
 CDP_SUMMARY_PATH="$CDP_TRACE_PATH.summary.json"
 VERSION_PATH="$OUTPUT_DIR/obsidian-version.txt"
@@ -335,6 +350,33 @@ write_comparison() {
   node "${comparison_args[@]}"
 }
 
+run_bootstrap_if_needed() {
+  if [[ "$SKIP_BOOTSTRAP" -eq 1 || "$CLI_AVAILABLE" -ne 1 ]]; then
+    return
+  fi
+
+  write_section "Bootstrap Plugin"
+  bootstrap_args=(
+    "$SCRIPT_DIR/obsidian_debug_bootstrap_plugin.mjs"
+    --plugin-id "$PLUGIN_ID"
+    --test-vault-plugin-dir "$TEST_VAULT_PLUGIN_DIR"
+    --obsidian-command "$OBS_CMD"
+    --poll-interval-ms "$BOOTSTRAP_POLL_INTERVAL_MS"
+    --discovery-timeout-ms "$BOOTSTRAP_DISCOVERY_TIMEOUT_MS"
+    --reload-wait-ms "$BOOTSTRAP_RELOAD_WAIT_MS"
+    --restart-wait-ms "$BOOTSTRAP_RESTART_WAIT_MS"
+    --enable-wait-ms "$BOOTSTRAP_ENABLE_WAIT_MS"
+    --allow-restart "$BOOTSTRAP_ALLOW_RESTART"
+    --enable-plugin true
+    --output "$BOOTSTRAP_REPORT_PATH"
+  )
+  if [[ -n "$VAULT_NAME" ]]; then
+    bootstrap_args+=(--vault-name "$VAULT_NAME")
+  fi
+
+  node "${bootstrap_args[@]}"
+}
+
 write_section "Preflight"
 if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
   obsidian_cli --quiet version > "$VERSION_PATH" 2>&1 || true
@@ -390,6 +432,8 @@ if [[ "$SKIP_DEPLOY" -eq 0 ]]; then
     echo "]"
   } > "$DEPLOY_REPORT_PATH"
 fi
+
+run_bootstrap_if_needed
 
 write_section "Clear Buffers"
 if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
@@ -539,6 +583,7 @@ cat > "$SUMMARY_PATH" <<EOF
   "outputDir": "$OUTPUT_DIR",
   "buildLog": $( [[ "$SKIP_BUILD" -eq 0 ]] && json_path_or_null "$BUILD_LOG_PATH" || printf 'null' ),
   "deployReport": $( [[ "$SKIP_DEPLOY" -eq 0 ]] && json_path_or_null "$DEPLOY_REPORT_PATH" || printf 'null' ),
+  "bootstrapReport": $( [[ "$SKIP_BOOTSTRAP" -eq 0 ]] && json_path_or_null "$BOOTSTRAP_REPORT_PATH" || printf 'null' ),
   "scenarioReport": $( json_path_or_null "$SCENARIO_REPORT_PATH" ),
   "assertionsPath": $( [[ -n "$ASSERTIONS_PATH" ]] && printf '"%s"' "$ASSERTIONS_PATH" || printf 'null' ),
   "comparisonReport": $( [[ -n "$COMPARE_DIAGNOSIS_PATH" ]] && printf '"%s"' "$COMPARISON_PATH" || printf 'null' ),

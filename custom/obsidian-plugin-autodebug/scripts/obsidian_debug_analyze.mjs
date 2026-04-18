@@ -1570,6 +1570,7 @@ const diagnosis = {
     summary: path.resolve(summaryPath),
     buildLog: summary.buildLog,
     deployReport: summary.deployReport,
+    bootstrapReport: summary.bootstrapReport ?? null,
     consoleLog: summary.consoleLog,
     errorsLog: summary.errorsLog,
     cdpTrace: summary.cdpTrace,

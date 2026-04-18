@@ -65,6 +65,9 @@ function enabled(section, fallback = true) {
   if (!section || typeof section !== 'object' || Array.isArray(section)) {
     return fallback;
   }
+  if (!Object.prototype.hasOwnProperty.call(section, 'enabled')) {
+    return fallback;
+  }
   return section.enabled !== false;
 }
 
@@ -133,6 +136,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   const runtime = asObject(spec.runtime);
   const build = asObject(spec.build);
   const deploy = asObject(spec.deploy);
+  const bootstrap = asObject(spec.bootstrap);
   const reload = asObject(spec.reload);
   const logWatch = asObject(spec.logWatch);
   const scenario = asObject(spec.scenario);
@@ -195,6 +199,13 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     }
     addValue(args, '-AssertionsPath', assertions.path);
     addValue(args, '-CompareDiagnosisPath', comparison.baselineDiagnosisPath);
+    addSwitch(args, '-SkipBootstrap', !enabled(bootstrap, true));
+    addValue(args, '-BootstrapAllowRestart', booleanValue(bootstrap.allowRestart, true) ? 1 : 0);
+    addValue(args, '-BootstrapPollIntervalMs', numberValue(bootstrap.pollIntervalMs, 1000));
+    addValue(args, '-BootstrapDiscoveryTimeoutMs', numberValue(bootstrap.discoveryTimeoutMs, 12000));
+    addValue(args, '-BootstrapReloadWaitMs', numberValue(bootstrap.reloadWaitMs, 1500));
+    addValue(args, '-BootstrapRestartWaitMs', numberValue(bootstrap.restartWaitMs, 8000));
+    addValue(args, '-BootstrapEnableWaitMs', numberValue(bootstrap.enableWaitMs, 1000));
     addSwitch(args, '-DomText', booleanValue(assertions.domText, false));
     addSwitch(args, '-SkipBuild', !enabled(build, true));
     addSwitch(args, '-SkipDeploy', !enabled(deploy, true));
@@ -240,6 +251,13 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   }
   addValue(args, '--assertions', assertions.path);
   addValue(args, '--compare-diagnosis', comparison.baselineDiagnosisPath);
+  addSwitch(args, '--skip-bootstrap', !enabled(bootstrap, true));
+  addValue(args, '--bootstrap-allow-restart', booleanValue(bootstrap.allowRestart, true));
+  addValue(args, '--bootstrap-poll-interval-ms', numberValue(bootstrap.pollIntervalMs, 1000));
+  addValue(args, '--bootstrap-discovery-timeout-ms', numberValue(bootstrap.discoveryTimeoutMs, 12000));
+  addValue(args, '--bootstrap-reload-wait-ms', numberValue(bootstrap.reloadWaitMs, 1500));
+  addValue(args, '--bootstrap-restart-wait-ms', numberValue(bootstrap.restartWaitMs, 8000));
+  addValue(args, '--bootstrap-enable-wait-ms', numberValue(bootstrap.enableWaitMs, 1000));
   addSwitch(args, '--dom-text', booleanValue(assertions.domText, false));
   addSwitch(args, '--use-cdp', useCdp);
   addSwitch(args, '--skip-build', !enabled(build, true));

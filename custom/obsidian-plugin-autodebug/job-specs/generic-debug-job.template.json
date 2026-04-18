@@ -26,6 +26,15 @@
     "enabled": true,
     "from": "dist"
   },
+  "bootstrap": {
+    "enabled": true,
+    "allowRestart": true,
+    "pollIntervalMs": 1000,
+    "discoveryTimeoutMs": 12000,
+    "reloadWaitMs": 1500,
+    "restartWaitMs": 8000,
+    "enableWaitMs": 1000
+  },
   "reload": {
     "enabled": true,
     "mode": "cli",

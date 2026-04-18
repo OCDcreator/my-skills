@@ -7,6 +7,8 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  getWebSocketSupportDetail,
+  hasGlobalWebSocket,
   nowIso,
   parseArgs,
   resolveTarget,
@@ -23,6 +25,7 @@ const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd())
 const testVaultPluginDir = getStringOption(options, 'test-vault-plugin-dir', '').trim();
 const expectedPluginId = getStringOption(options, 'plugin-id', '').trim();
 const obsidianCommand = getStringOption(options, 'obsidian-command', 'obsidian').trim();
+const vaultName = getStringOption(options, 'vault-name', '').trim();
 const cdpHost = getStringOption(options, 'cdp-host', '127.0.0.1');
 const cdpPort = getNumberOption(options, 'cdp-port', 9222);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '');
@@ -33,6 +36,9 @@ const toolRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const defaultFixOutput = outputPath
   ? path.join(path.dirname(path.resolve(outputPath)), `doctor-fixes.${scriptExtension(platform)}`)
   : path.join(repoDir, '.obsidian-debug', `doctor-fixes.${scriptExtension(platform)}`);
+const defaultBootstrapOutput = outputPath
+  ? path.join(path.dirname(path.resolve(outputPath)), 'bootstrap-plugin.json')
+  : path.join(repoDir, '.obsidian-debug', 'bootstrap-plugin.json');
 const fixOutputPath = fixRequested
   ? path.resolve(getStringOption(options, 'fix-output', defaultFixOutput))
   : '';
@@ -46,11 +52,13 @@ const commandContext = {
   repoDir,
   testVaultPluginDir: testVaultPluginDir ? path.resolve(testVaultPluginDir) : '',
   pluginId: expectedPluginId,
+  vaultName,
   obsidianCommand,
   cdpHost,
   cdpPort,
   cdpTargetTitleContains,
   outputPath: outputPath ? path.resolve(outputPath) : '',
+  bootstrapOutputPath: path.resolve(defaultBootstrapOutput),
   fixOutputPath,
 };
 
@@ -142,6 +150,40 @@ function runProcess(command, args, timeoutMs = 5000) {
   });
 }
 
+function buildVaultScopedArgs(command, args = []) {
+  return [
+    ...(vaultName ? [`vault=${vaultName}`] : []),
+    command,
+    ...args,
+  ];
+}
+
+function parsePluginList(text) {
+  try {
+    const parsed = JSON.parse(String(text ?? '').replace(/^\uFEFF/, ''));
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((entry) => ({
+          id: typeof entry === 'string' ? entry : String(entry?.id ?? ''),
+          version: typeof entry === 'object' && entry ? entry.version ?? null : null,
+        }))
+        .filter((entry) => entry.id.length > 0);
+    }
+  } catch {
+    // Fall back to line parsing below.
+  }
+
+  return String(text ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.toLowerCase().startsWith('error:'))
+    .map((line) => ({
+      id: line.split(/\s+/)[0],
+      version: null,
+    }))
+    .filter((entry) => entry.id.length > 0);
+}
+
 async function readJsonOrNull(filePath) {
   try {
     return JSON.parse((await fs.readFile(filePath, 'utf8')).replace(/^\uFEFF/, ''));
@@ -168,6 +210,18 @@ checks.push(
     'runtime',
     `Node.js ${process.versions.node}`,
     { minimum: '18.0.0' },
+  ),
+);
+checks.push(
+  check(
+    hasGlobalWebSocket() ? 'pass' : 'warn',
+    'node-websocket-global',
+    'runtime',
+    getWebSocketSupportDetail(),
+    {
+      nodeVersion: process.versions.node,
+      websocketType: typeof globalThis.WebSocket,
+    },
   ),
 );
 
@@ -233,6 +287,30 @@ const cdpProbeFixes = [
     args: ['--input-type=module', '-e', cdpProbeSnippet, '{{cdpHost}}', '{{cdpPort}}'],
   },
 ];
+const bootstrapFixes = expectedPluginId && testVaultPluginDir
+  ? [
+      {
+        id: 'bootstrap-plugin-discovery',
+        label: 'Bootstrap fresh plugin discovery',
+        summary: 'Disables restricted mode, reloads the target vault, restarts Obsidian only if needed, and enables the plugin once it becomes discoverable.',
+        safety: 'writes-local-state',
+        dryRunFriendly: false,
+        executable: 'node',
+        args: [
+          '{{toolRoot}}/scripts/obsidian_debug_bootstrap_plugin.mjs',
+          '--plugin-id',
+          '{{pluginId}}',
+          '--test-vault-plugin-dir',
+          '{{testVaultPluginDir}}',
+          '--obsidian-command',
+          '{{obsidianCommand}}',
+          ...(vaultName ? ['--vault-name', '{{vaultName}}'] : []),
+          '--output',
+          '{{bootstrapOutputPath}}',
+        ],
+      },
+    ]
+  : [];
 
 checks.push(
   manifest
@@ -331,6 +409,80 @@ checks.push(
       ),
 );
 
+if (obsidianHelp.ok) {
+  const restrictResult = await runProcess(obsidianCommand, buildVaultScopedArgs('plugins:restrict'), 7000);
+  const restrictText = `${restrictResult.stdout}\n${restrictResult.stderr}`.trim().toLowerCase();
+  const restricted = restrictResult.ok && restrictText === 'on';
+  checks.push(
+    check(
+      restricted ? 'warn' : 'pass',
+      'restricted-mode',
+      'cli',
+      restricted
+        ? 'Restricted mode is enabled; fresh community plugin discovery will stay blocked until it is turned off.'
+        : 'Restricted mode is already off or not blocking community plugins.',
+      {
+        command: obsidianCommand,
+        vaultName: vaultName || null,
+        output: restrictText || null,
+      },
+      restricted ? bootstrapFixes : [],
+    ),
+  );
+}
+
+if (obsidianHelp.ok && expectedPluginId && testVaultPluginDir) {
+  const installedPluginsResult = await runProcess(
+    obsidianCommand,
+    buildVaultScopedArgs('plugins', ['filter=community', 'versions', 'format=json']),
+    10000,
+  );
+  const enabledPluginsResult = await runProcess(
+    obsidianCommand,
+    buildVaultScopedArgs('plugins:enabled', ['filter=community', 'versions', 'format=json']),
+    10000,
+  );
+  const installedPlugins = parsePluginList(installedPluginsResult.stdout || installedPluginsResult.text);
+  const enabledPlugins = parsePluginList(enabledPluginsResult.stdout || enabledPluginsResult.text);
+  const discoveredEntry = installedPlugins.find((entry) => entry.id === expectedPluginId) ?? null;
+  const enabledEntry = enabledPlugins.find((entry) => entry.id === expectedPluginId) ?? null;
+
+  checks.push(
+    check(
+      discoveredEntry ? 'pass' : 'warn',
+      'plugin-discovered',
+      'deploy',
+      discoveredEntry
+        ? `${expectedPluginId} is already discoverable in the target vault plugin catalog.`
+        : `${expectedPluginId} is not yet discoverable in the target vault plugin catalog; fresh-vault bootstrap is required before reload automation can confirm the plugin is loaded.`,
+      {
+        command: obsidianCommand,
+        vaultName: vaultName || null,
+        pluginId: expectedPluginId,
+        installedVersion: discoveredEntry?.version ?? null,
+      },
+      discoveredEntry ? [] : bootstrapFixes,
+    ),
+  );
+  checks.push(
+    check(
+      enabledEntry ? 'pass' : 'warn',
+      'plugin-enabled',
+      'deploy',
+      enabledEntry
+        ? `${expectedPluginId} is enabled in the target vault.`
+        : `${expectedPluginId} is not enabled in the target vault yet; bootstrap can enable it after discovery.`,
+      {
+        command: obsidianCommand,
+        vaultName: vaultName || null,
+        pluginId: expectedPluginId,
+        enabledVersion: enabledEntry?.version ?? null,
+      },
+      enabledEntry ? [] : bootstrapFixes,
+    ),
+  );
+}
+
 try {
   const target = await resolveTarget({
     host: cdpHost,
@@ -392,6 +544,7 @@ const report = {
   platform,
   repoDir,
   pluginId: expectedPluginId || manifest?.id || null,
+  vaultName: vaultName || null,
   testVaultPluginDir: testVaultPluginDir ? path.resolve(testVaultPluginDir) : null,
   obsidianCommand,
   cdp: {

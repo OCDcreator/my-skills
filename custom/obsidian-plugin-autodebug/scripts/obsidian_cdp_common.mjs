@@ -123,6 +123,24 @@ export async function resolveTarget({
   throw new Error(`No Obsidian app target found for ${targetUrl}`);
 }
 
+export function hasGlobalWebSocket() {
+  return typeof globalThis.WebSocket === 'function';
+}
+
+export function getWebSocketSupportDetail() {
+  return hasGlobalWebSocket()
+    ? `globalThis.WebSocket is available in Node.js ${process.versions.node}`
+    : `globalThis.WebSocket is unavailable in Node.js ${process.versions.node}; CDP helpers need a runtime with built-in WebSocket support (Node.js 22+ recommended) or an explicit polyfill.`;
+}
+
+export function ensureGlobalWebSocket() {
+  if (!hasGlobalWebSocket()) {
+    throw new Error(getWebSocketSupportDetail());
+  }
+
+  return globalThis.WebSocket;
+}
+
 export async function connectToCdp({
   host = '127.0.0.1',
   port = 9222,
@@ -131,7 +149,8 @@ export async function connectToCdp({
   onLine,
 }) {
   const target = await resolveTarget({ host, port, targetUrl, targetTitleContains });
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  const WebSocketCtor = ensureGlobalWebSocket();
+  const ws = new WebSocketCtor(target.webSocketDebuggerUrl);
 
   await new Promise((resolve, reject) => {
     ws.addEventListener('open', () => resolve(), { once: true });

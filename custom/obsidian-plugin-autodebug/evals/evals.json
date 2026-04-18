@@ -36,6 +36,18 @@
       "prompt": "这个插件可能被脏 data.json 或缓存状态影响了。先安全预览要清理什么，再重置状态、保留快照，最后允许一键恢复。",
       "expected_output": "Uses preview/reset/restore state automation with safe target resolution, snapshot preservation, and a generic plugin-local reset plan rather than hardcoding one repository.",
       "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "这是个 fresh clean-vault 首次安装场景。你来零接触 bootstrap：关闭 restricted mode、让新插件被 Obsidian 发现、必要时自动 reload/restart，再继续 reload + 抓诊断。",
+      "expected_output": "Uses the built-in bootstrap flow before reload/log capture, proves the plugin became discoverable/enabled in the target vault, and records a bootstrap report artifact.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "先跑 doctor，看这个 Obsidian 调试环境在 Node20/WebSocket/CDP 上有没有坑；如果 fresh vault 还没发现插件，也给出可执行修复方案。",
+      "expected_output": "Runs the doctor with vault-aware plugin discovery checks, reports Node runtime WebSocket support for CDP, and emits a bootstrap-ready fix plan when the plugin is not yet discoverable.",
+      "files": []
     }
   ]
 }

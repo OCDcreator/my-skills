@@ -93,6 +93,37 @@
         }
       }
     },
+    "bootstrap": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "allowRestart": {
+          "type": "boolean"
+        },
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "discoveryTimeoutMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reloadWaitMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "restartWaitMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enableWaitMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "reload": {
       "type": "object",
       "properties": {
