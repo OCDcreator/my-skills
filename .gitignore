@@ -3,3 +3,5 @@
 __pycache__/
 *.pyc
 automation/runtime/
+custom/knowledge-to-print-html/artifacts/
+custom/knowledge-to-print-html/evals/
