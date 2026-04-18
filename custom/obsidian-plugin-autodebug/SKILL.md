@@ -477,6 +477,7 @@ node scripts/obsidian_debug_baseline.mjs \
 ```
 
 Baselines are especially useful when you are chasing performance drift: save one cold-start baseline and one warm-start baseline, then compare new runs against the closest matching class instead of mixing them together.
+Baseline saves now preserve the captured screenshot, DOM snapshot, logs, and related machine-readable artifacts under the baseline directory so later comparisons and reports can stay self-contained.
 
 Use retention pruning to keep recent useful artifacts while cleaning stale baseline output. `prune` is dry-run by default; add `--delete true` only after reviewing the plan:
 
@@ -499,6 +500,8 @@ node scripts/obsidian_debug_report.mjs \
   --comparison .obsidian-debug/profile/run-03/comparison.json \
   --output .obsidian-debug/profile/report.html
 ```
+
+Comparison outputs now include a screenshot diff summary with changed-pixel counts, a changed-region bounding box, and an optional diff PNG when both screenshots exist. The HTML report links screenshots, DOM snapshots, logs, JSON artifacts, and any generated diff preview while degrading gracefully if those files are missing.
 
 Attach or open the HTML report when the user needs an easy review artifact; keep `diagnosis.json` as the canonical automation output.
 

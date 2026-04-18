@@ -54,7 +54,7 @@
   - Baseline save/list/compare flows can select by tags
   - Retention rules protect recent useful artifacts and clean stale debug output
 
-### [NEXT] B5 - Screenshot diff and report artifact previews
+### [DONE] B5 - Screenshot diff and report artifact previews
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add screenshot comparison and richer HTML report sections for UI regressions that DOM checks miss.
@@ -65,7 +65,7 @@
   - Pixel/region diff results are recorded in diagnosis or comparison output
   - HTML reports link screenshots, DOM snapshots, logs, and diffs
 
-### [QUEUED] B6 - Executable playbooks, doctor --fix, and state matrices
+### [NEXT] B6 - Executable playbooks, doctor --fix, and state matrices
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Turn diagnostic playbooks into safe command templates and add doctor/fix plus clean-state/restored-state matrix helpers.
@@ -88,5 +88,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B5 - Screenshot diff and report artifact previews`.
+- The current `[NEXT]` is `B6 - Executable playbooks, doctor --fix, and state matrices`.
 - Successful rounds must keep the roadmap and phase docs aligned.

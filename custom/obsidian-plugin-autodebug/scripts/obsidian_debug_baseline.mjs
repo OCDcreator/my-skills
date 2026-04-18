@@ -8,6 +8,11 @@ import {
   nowIso,
   parseArgs,
 } from './obsidian_cdp_common.mjs';
+import {
+  buildDebugComparison,
+  resolveArtifactPaths,
+  signatureId,
+} from './obsidian_debug_compare_core.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const mode = getStringOption(options, 'mode', '').trim().toLowerCase();
@@ -196,38 +201,6 @@ function buildTaxonomy({ diagnosis = null, profile = null, explicit = {}, includ
 
 function tagsMatch(actual, expected) {
   return String(actual ?? '').trim().toLowerCase() === String(expected ?? '').trim().toLowerCase();
-}
-
-function statusRank(status) {
-  switch (status) {
-    case 'fail':
-      return 5;
-    case 'warning':
-    case 'warn':
-      return 4;
-    case 'flaky':
-      return 3;
-    case 'expected':
-      return 2;
-    case 'pass':
-      return 1;
-    default:
-      return 0;
-  }
-}
-
-function signatureId(entry) {
-  return typeof entry === 'string' ? entry : entry?.id;
-}
-
-function toMapById(entries) {
-  const map = new Map();
-  for (const entry of entries ?? []) {
-    if (entry?.id) {
-      map.set(entry.id, entry);
-    }
-  }
-  return map;
 }
 
 async function readJson(filePath) {
@@ -419,104 +392,33 @@ function assertInsideBaselineRoot(targetDir) {
   }
 }
 
-function buildComparison(baselinePath, baseline, candidatePath, candidate, context = {}) {
-  const timingKeys = [...new Set([
-    ...Object.keys(baseline.timings ?? {}),
-    ...Object.keys(candidate.timings ?? {}),
-  ])];
+function cloneJson(value) {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
 
-  const timingDiffs = timingKeys.map((metric) => {
-    const baselineValue = baseline.timings?.[metric] ?? null;
-    const candidateValue = candidate.timings?.[metric] ?? null;
-    return {
-      metric,
-      baseline: baselineValue,
-      candidate: candidateValue,
-      delta:
-        Number.isFinite(baselineValue) && Number.isFinite(candidateValue)
-          ? candidateValue - baselineValue
-          : null,
-    };
-  });
+function relativeArtifactPath(baseDir, targetPath) {
+  return path.relative(baseDir, targetPath).replaceAll('\\', '/');
+}
 
-  const baselineSignatures = new Set((baseline.signatures ?? []).map(signatureId).filter(Boolean));
-  const candidateSignatures = new Set((candidate.signatures ?? []).map(signatureId).filter(Boolean));
+function copiedArtifactDestination(baselineDir, key, sourcePath) {
+  const extension = path.extname(sourcePath);
+  return path.join(baselineDir, 'artifacts', `${key}${extension}`);
+}
 
-  const addedSignatures = [...candidateSignatures].filter((id) => !baselineSignatures.has(id));
-  const removedSignatures = [...baselineSignatures].filter((id) => !candidateSignatures.has(id));
+async function copyDiagnosisArtifacts(diagnosis, sourceDiagnosisPath, baselineDir) {
+  const resolvedArtifacts = resolveArtifactPaths(diagnosis, sourceDiagnosisPath);
+  const copiedArtifacts = {};
 
-  const baselineAssertions = toMapById([
-    ...(baseline.assertions ?? []),
-    ...(baseline.customAssertions ?? []),
-  ]);
-  const candidateAssertions = toMapById([
-    ...(candidate.assertions ?? []),
-    ...(candidate.customAssertions ?? []),
-  ]);
-
-  const allAssertionIds = [...new Set([
-    ...baselineAssertions.keys(),
-    ...candidateAssertions.keys(),
-  ])];
-
-  const assertionChanges = allAssertionIds.map((id) => ({
-    id,
-    baseline: baselineAssertions.get(id)?.status ?? null,
-    candidate: candidateAssertions.get(id)?.status ?? null,
-  })).filter((entry) => entry.baseline !== entry.candidate);
-
-  const regressions = assertionChanges.filter((entry) => {
-    const baselineRank = statusRank(entry.baseline ?? 'pass');
-    const candidateRank = statusRank(entry.candidate ?? 'pass');
-    return candidateRank > baselineRank;
-  });
-
-  const fixes = assertionChanges.filter((entry) => {
-    const baselineRank = statusRank(entry.baseline ?? 'pass');
-    const candidateRank = statusRank(entry.candidate ?? 'pass');
-    return candidateRank < baselineRank;
-  });
-
-  const comparisonStatus = (() => {
-    const baselineRank = statusRank(baseline.status);
-    const candidateRank = statusRank(candidate.status);
-    if (candidateRank > baselineRank || regressions.length > 0 || addedSignatures.length > 0) {
-      return 'regressed';
+  for (const [key, sourcePath] of Object.entries(resolvedArtifacts)) {
+    if (!sourcePath || !(await exists(sourcePath))) {
+      continue;
     }
-    if (candidateRank < baselineRank || fixes.length > 0 || removedSignatures.length > 0) {
-      return 'improved';
-    }
-    return 'unchanged';
-  })();
+    const destinationPath = copiedArtifactDestination(baselineDir, key, sourcePath);
+    await copyIfExists(sourcePath, destinationPath);
+    copiedArtifacts[key] = relativeArtifactPath(baselineDir, destinationPath);
+  }
 
-  return {
-    generatedAt: nowIso(),
-    status: comparisonStatus,
-    baseline: {
-      path: path.resolve(baselinePath),
-      name: context.baselineName ?? null,
-      status: baseline.status,
-      headline: baseline.headline,
-      taxonomy: context.baselineTaxonomy ?? {},
-    },
-    candidate: {
-      path: path.resolve(candidatePath),
-      status: candidate.status,
-      headline: candidate.headline,
-      taxonomy: context.candidateTaxonomy ?? {},
-    },
-    baselineSelection: context.selection ?? null,
-    timingDiffs,
-    signatures: {
-      added: addedSignatures,
-      removed: removedSignatures,
-    },
-    assertions: {
-      changed: assertionChanges,
-      regressions,
-      fixes,
-    },
-  };
+  return copiedArtifacts;
 }
 
 const explicitTaxonomy = readExplicitTaxonomy();
@@ -551,7 +453,16 @@ if (mode === 'list') {
   await fs.rm(baselineDir, { recursive: true, force: true });
   await fs.mkdir(baselineDir, { recursive: true });
 
-  const savedDiagnosisPath = await copyIfExists(resolvedDiagnosisPath, path.join(baselineDir, 'diagnosis.json'));
+  const savedDiagnosisPath = path.join(baselineDir, 'diagnosis.json');
+  const copiedDiagnosisArtifacts = await copyDiagnosisArtifacts(diagnosis, resolvedDiagnosisPath, baselineDir);
+  const savedDiagnosis = {
+    ...cloneJson(diagnosis),
+    artifacts: {
+      ...(cloneJson(diagnosis.artifacts) ?? {}),
+      ...copiedDiagnosisArtifacts,
+    },
+  };
+  await fs.writeFile(savedDiagnosisPath, `${JSON.stringify(savedDiagnosis, null, 2)}\n`, 'utf8');
   const savedProfilePath = await copyIfExists(profilePath ? path.resolve(profilePath) : '', path.join(baselineDir, 'profile-summary.json'));
   const savedReportPath = await copyIfExists(reportPath ? path.resolve(reportPath) : '', path.join(baselineDir, 'report.html'));
   const savedComparisonPath = await copyIfExists(comparisonPath ? path.resolve(comparisonPath) : '', path.join(baselineDir, 'comparison.json'));
@@ -590,6 +501,7 @@ if (mode === 'list') {
       profile: savedProfilePath ? path.relative(baselineDir, savedProfilePath) : null,
       report: savedReportPath ? path.relative(baselineDir, savedReportPath) : null,
       comparison: savedComparisonPath ? path.relative(baselineDir, savedComparisonPath) : null,
+      captured: copiedDiagnosisArtifacts,
     },
     sourcePaths: {
       diagnosis: resolvedDiagnosisPath,
@@ -655,13 +567,17 @@ if (mode === 'list') {
 
   const selected = selection.selected;
   const baseline = await readJson(selected.diagnosisPath);
+  const resolvedOutputPath = path.resolve(
+    outputPath || path.join(path.dirname(path.resolve(candidateDiagnosisPath)), 'baseline-comparison.json'),
+  );
   const comparison = {
-    ...buildComparison(
-    selected.diagnosisPath,
-    baseline,
-    path.resolve(candidateDiagnosisPath),
-    candidateDiagnosis,
-    {
+    ...(await buildDebugComparison({
+      baselinePath: selected.diagnosisPath,
+      baseline,
+      candidatePath: path.resolve(candidateDiagnosisPath),
+      candidate: candidateDiagnosis,
+      outputPath: resolvedOutputPath,
+      context: {
       baselineName: selected.name,
       baselineTaxonomy: selected.metadata?.taxonomy ?? {},
       candidateTaxonomy: desiredTaxonomy,
@@ -675,13 +591,10 @@ if (mode === 'list') {
         ),
         candidateCount: selection.candidateCount ?? null,
       },
-    },
-    ),
+      },
+    })),
     baselineName: selected.name,
   };
-  const resolvedOutputPath = path.resolve(
-    outputPath || path.join(path.dirname(path.resolve(candidateDiagnosisPath)), 'baseline-comparison.json'),
-  );
   await ensureParentDirectory(resolvedOutputPath);
   await fs.writeFile(resolvedOutputPath, `${JSON.stringify(comparison, null, 2)}\n`, 'utf8');
   console.log(JSON.stringify({
