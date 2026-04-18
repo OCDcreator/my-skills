@@ -1,0 +1,514 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PLUGIN_ID=""
+TEST_VAULT_PLUGIN_DIR=""
+VAULT_NAME=""
+OBSIDIAN_COMMAND=""
+DEPLOY_FROM="dist"
+OUTPUT_DIR=".obsidian-debug"
+BUILD_COMMAND="npm run build"
+WATCH_SECONDS=20
+POLL_INTERVAL_MS=1000
+CONSOLE_LIMIT=200
+DOM_SELECTOR=".workspace-leaf.mod-active"
+DOM_TEXT=0
+USE_CDP=0
+CDP_HOST="127.0.0.1"
+CDP_PORT=9222
+CDP_TARGET_TITLE_CONTAINS=""
+CDP_RELOAD_DELAY_MS=800
+CDP_EVAL_AFTER_RELOAD=""
+SCENARIO_NAME=""
+SCENARIO_PATH=""
+SCENARIO_COMMAND_ID=""
+SCENARIO_SLEEP_MS=2000
+ASSERTIONS_PATH=""
+COMPARE_DIAGNOSIS_PATH=""
+SKIP_BUILD=0
+SKIP_DEPLOY=0
+SKIP_RELOAD=0
+SKIP_SCREENSHOT=0
+SKIP_DOM=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --plugin-id) PLUGIN_ID="$2"; shift 2 ;;
+    --test-vault-plugin-dir) TEST_VAULT_PLUGIN_DIR="$2"; shift 2 ;;
+    --vault-name) VAULT_NAME="$2"; shift 2 ;;
+    --obsidian-command) OBSIDIAN_COMMAND="$2"; shift 2 ;;
+    --deploy-from) DEPLOY_FROM="$2"; shift 2 ;;
+    --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
+    --build-command) BUILD_COMMAND="$2"; shift 2 ;;
+    --watch-seconds) WATCH_SECONDS="$2"; shift 2 ;;
+    --poll-interval-ms) POLL_INTERVAL_MS="$2"; shift 2 ;;
+    --console-limit) CONSOLE_LIMIT="$2"; shift 2 ;;
+    --dom-selector) DOM_SELECTOR="$2"; shift 2 ;;
+    --cdp-host) CDP_HOST="$2"; shift 2 ;;
+    --cdp-port) CDP_PORT="$2"; shift 2 ;;
+    --cdp-target-title-contains) CDP_TARGET_TITLE_CONTAINS="$2"; shift 2 ;;
+    --cdp-reload-delay-ms) CDP_RELOAD_DELAY_MS="$2"; shift 2 ;;
+    --cdp-eval-after-reload) CDP_EVAL_AFTER_RELOAD="$2"; shift 2 ;;
+    --scenario-name) SCENARIO_NAME="$2"; shift 2 ;;
+    --scenario-path) SCENARIO_PATH="$2"; shift 2 ;;
+    --scenario-command-id) SCENARIO_COMMAND_ID="$2"; shift 2 ;;
+    --scenario-sleep-ms) SCENARIO_SLEEP_MS="$2"; shift 2 ;;
+    --assertions) ASSERTIONS_PATH="$2"; shift 2 ;;
+    --compare-diagnosis) COMPARE_DIAGNOSIS_PATH="$2"; shift 2 ;;
+    --dom-text) DOM_TEXT=1; shift ;;
+    --use-cdp) USE_CDP=1; shift ;;
+    --skip-build) SKIP_BUILD=1; shift ;;
+    --skip-deploy) SKIP_DEPLOY=1; shift ;;
+    --skip-reload) SKIP_RELOAD=1; shift ;;
+    --skip-screenshot) SKIP_SCREENSHOT=1; shift ;;
+    --skip-dom) SKIP_DOM=1; shift ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$PLUGIN_ID" ]]; then
+  echo "--plugin-id is required" >&2
+  exit 1
+fi
+
+if [[ -z "$TEST_VAULT_PLUGIN_DIR" ]]; then
+  echo "--test-vault-plugin-dir is required" >&2
+  exit 1
+fi
+
+timestamp() {
+  date +"%Y-%m-%dT%H:%M:%S%z"
+}
+
+write_section() {
+  echo
+  echo "== $1 =="
+}
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLI_AVAILABLE=0
+OBS_CMD=""
+
+if command -v obsidian >/dev/null 2>&1; then
+  CLI_AVAILABLE=1
+  OBS_CMD="$(command -v obsidian)"
+elif [[ -n "$OBSIDIAN_COMMAND" ]] && command -v "$OBSIDIAN_COMMAND" >/dev/null 2>&1; then
+  CLI_AVAILABLE=1
+  OBS_CMD="$OBSIDIAN_COMMAND"
+elif [[ -n "$OBSIDIAN_COMMAND" ]]; then
+  OBS_CMD="$OBSIDIAN_COMMAND"
+elif [[ -x "/Applications/Obsidian.app/Contents/MacOS/Obsidian" ]]; then
+  OBS_CMD="/Applications/Obsidian.app/Contents/MacOS/Obsidian"
+else
+  echo "Unable to locate Obsidian command. Pass --obsidian-command explicitly." >&2
+  exit 1
+fi
+
+if [[ "$CLI_AVAILABLE" -eq 0 && "$USE_CDP" -eq 0 ]]; then
+  echo "Obsidian CLI is unavailable on this machine. Re-run with --use-cdp or install a CLI wrapper." >&2
+  exit 1
+fi
+
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
+BUILD_LOG_PATH="$OUTPUT_DIR/build.log"
+DEPLOY_REPORT_PATH="$OUTPUT_DIR/deploy-report.json"
+CONSOLE_LOG_PATH="$OUTPUT_DIR/console-watch.log"
+ERRORS_LOG_PATH="$OUTPUT_DIR/errors.log"
+SCREENSHOT_PATH="$OUTPUT_DIR/screenshot.png"
+if [[ "$DOM_TEXT" -eq 1 ]]; then
+  DOM_PATH="$OUTPUT_DIR/dom.txt"
+else
+  DOM_PATH="$OUTPUT_DIR/dom.html"
+fi
+SUMMARY_PATH="$OUTPUT_DIR/summary.json"
+DIAGNOSIS_PATH="$OUTPUT_DIR/diagnosis.json"
+SCENARIO_REPORT_PATH="$OUTPUT_DIR/scenario-report.json"
+COMPARISON_PATH="$OUTPUT_DIR/comparison.json"
+CDP_TRACE_PATH="$OUTPUT_DIR/cdp-reload-trace.log"
+CDP_SUMMARY_PATH="$CDP_TRACE_PATH.summary.json"
+VERSION_PATH="$OUTPUT_DIR/obsidian-version.txt"
+
+obsidian_cli() {
+  local quiet=0
+  if [[ "${1:-}" == "--quiet" ]]; then
+    quiet=1
+    shift
+  fi
+
+  local command="$1"
+  shift || true
+  local args=()
+  if [[ -n "$VAULT_NAME" ]]; then
+    args+=("vault=$VAULT_NAME")
+  fi
+  args+=("$command")
+  while [[ $# -gt 0 ]]; do
+    args+=("$1")
+    shift
+  done
+
+  if [[ "$quiet" -eq 0 ]]; then
+    echo "$OBS_CMD ${args[*]}" >&2
+  fi
+  "$OBS_CMD" "${args[@]}"
+}
+
+copy_file_with_hash() {
+  local source_file="$1"
+  local target_file="$2"
+  cp "$source_file" "$target_file"
+  local sha
+  sha="$(shasum -a 256 "$target_file" | awk '{print $1}')"
+  printf '%s' "$sha"
+}
+
+append_console_delta() {
+  local previous_snapshot_path="$1"
+  local current_snapshot_path="$2"
+  local output_path="$3"
+  local delta_path="$4"
+
+  awk '
+    NR == FNR {
+      previous[FNR] = $0
+      previous_count = FNR
+      next
+    }
+    {
+      current[FNR] = $0
+      current_count = FNR
+    }
+    END {
+      shared_prefix = 1
+      while (shared_prefix <= previous_count && shared_prefix <= current_count && previous[shared_prefix] == current[shared_prefix]) {
+        shared_prefix++
+      }
+      for (line_number = shared_prefix; line_number <= current_count; line_number++) {
+        print current[line_number]
+      }
+    }
+  ' "$previous_snapshot_path" "$current_snapshot_path" > "$delta_path"
+
+  while IFS= read -r line; do
+    if [[ -z "${line//[[:space:]]/}" ]]; then
+      continue
+    fi
+    printf '%s %s\n' "$(timestamp)" "$line" >> "$output_path"
+  done < "$delta_path"
+
+  cp "$current_snapshot_path" "$previous_snapshot_path"
+}
+
+append_error_delta() {
+  local previous_snapshot_path="$1"
+  local current_snapshot_path="$2"
+  local output_path="$3"
+
+  local current_snapshot
+  local previous_snapshot
+  current_snapshot="$(tr -d '\r' < "$current_snapshot_path" | sed '/^[[:space:]]*$/d')"
+  previous_snapshot="$(tr -d '\r' < "$previous_snapshot_path" | sed '/^[[:space:]]*$/d')"
+
+  cp "$current_snapshot_path" "$previous_snapshot_path"
+
+  if [[ -z "$current_snapshot" || "$current_snapshot" == "$previous_snapshot" || "$current_snapshot" == "No errors captured." ]]; then
+    return
+  fi
+
+  {
+    echo "$(timestamp)"
+    printf '%s\n\n' "$current_snapshot"
+  } >> "$output_path"
+}
+
+json_path_or_null() {
+  local path="$1"
+
+  if [[ -n "$path" && -e "$path" ]]; then
+    printf '"%s"' "$path"
+  else
+    printf 'null'
+  fi
+}
+
+run_cli_scenario_if_requested() {
+  local inferred_scenario_name="$SCENARIO_NAME"
+  if [[ -z "$inferred_scenario_name" && -n "$SCENARIO_COMMAND_ID" ]]; then
+    inferred_scenario_name="open-plugin-view"
+  fi
+
+  if [[ "$CLI_AVAILABLE" -ne 1 ]]; then
+    return
+  fi
+
+  if [[ -z "$inferred_scenario_name" && -z "$SCENARIO_PATH" ]]; then
+    return
+  fi
+
+  write_section "Scenario"
+  scenario_args=(
+    "$SCRIPT_DIR/obsidian_debug_scenario_runner.mjs"
+    --obsidian-command "$OBS_CMD"
+    --plugin-id "$PLUGIN_ID"
+    --vault-name "$VAULT_NAME"
+    --scenario-sleep-ms "$SCENARIO_SLEEP_MS"
+    --output "$SCENARIO_REPORT_PATH"
+  )
+
+  if [[ -n "$inferred_scenario_name" ]]; then
+    scenario_args+=(--scenario-name "$inferred_scenario_name")
+  fi
+  if [[ -n "$SCENARIO_PATH" ]]; then
+    scenario_args+=(--scenario-path "$SCENARIO_PATH")
+  fi
+  if [[ -n "$SCENARIO_COMMAND_ID" ]]; then
+    scenario_args+=(--scenario-command-id "$SCENARIO_COMMAND_ID")
+  fi
+
+  node "${scenario_args[@]}"
+}
+
+write_diagnosis() {
+  diagnosis_args=(
+    "$SCRIPT_DIR/obsidian_debug_analyze.mjs"
+    --summary "$SUMMARY_PATH"
+    --output "$DIAGNOSIS_PATH"
+  )
+  if [[ -n "$ASSERTIONS_PATH" ]]; then
+    diagnosis_args+=(--assertions "$ASSERTIONS_PATH")
+  fi
+  if [[ -n "$DOM_SELECTOR" ]]; then
+    diagnosis_args+=(--dom-selector "$DOM_SELECTOR")
+  fi
+  node "${diagnosis_args[@]}"
+}
+
+write_comparison() {
+  if [[ -z "$COMPARE_DIAGNOSIS_PATH" ]]; then
+    return
+  fi
+
+  comparison_args=(
+    "$SCRIPT_DIR/obsidian_debug_compare.mjs"
+    --baseline "$COMPARE_DIAGNOSIS_PATH"
+    --candidate "$DIAGNOSIS_PATH"
+    --output "$COMPARISON_PATH"
+  )
+  node "${comparison_args[@]}"
+}
+
+write_section "Preflight"
+if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
+  obsidian_cli --quiet version > "$VERSION_PATH" 2>&1 || true
+else
+  printf 'CLI unavailable; using CDP-only path via %s\n' "$OBS_CMD" > "$VERSION_PATH"
+fi
+
+if [[ "$SKIP_BUILD" -eq 0 ]]; then
+  write_section "Build"
+  echo "$BUILD_COMMAND"
+  bash -lc "$BUILD_COMMAND" 2>&1 | tee "$BUILD_LOG_PATH"
+fi
+
+if [[ "$SKIP_DEPLOY" -eq 0 ]]; then
+  write_section "Deploy"
+  if [[ ! -d "$DEPLOY_FROM" ]]; then
+    echo "Deploy source does not exist: $DEPLOY_FROM" >&2
+    exit 1
+  fi
+
+  mkdir -p "$TEST_VAULT_PLUGIN_DIR"
+  declare -a report_entries=()
+  for file_name in main.js manifest.json styles.css; do
+    source_file="$DEPLOY_FROM/$file_name"
+    if [[ ! -f "$source_file" ]]; then
+      if [[ "$file_name" == "main.js" || "$file_name" == "manifest.json" ]]; then
+        echo "Required deploy artifact missing: $source_file" >&2
+        exit 1
+      fi
+      continue
+    fi
+
+    target_file="$TEST_VAULT_PLUGIN_DIR/$file_name"
+    sha="$(copy_file_with_hash "$source_file" "$target_file")"
+    report_entries+=("{\"file\":\"$file_name\",\"source\":\"$source_file\",\"target\":\"$target_file\",\"sha256\":\"$sha\",\"matched\":true}")
+  done
+
+  if [[ -d "$DEPLOY_FROM/assets" ]]; then
+    rm -rf "$TEST_VAULT_PLUGIN_DIR/assets"
+    cp -R "$DEPLOY_FROM/assets" "$TEST_VAULT_PLUGIN_DIR/assets"
+    report_entries+=("{\"file\":\"assets/\",\"source\":\"$DEPLOY_FROM/assets\",\"target\":\"$TEST_VAULT_PLUGIN_DIR/assets\",\"sha256\":null,\"matched\":true}")
+  fi
+
+  {
+    echo "["
+    for ((i=0; i<${#report_entries[@]}; i+=1)); do
+      printf '  %s' "${report_entries[$i]}"
+      if [[ $i -lt $((${#report_entries[@]} - 1)) ]]; then
+        printf ','
+      fi
+      printf '\n'
+    done
+    echo "]"
+  } > "$DEPLOY_REPORT_PATH"
+fi
+
+write_section "Clear Buffers"
+if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
+  obsidian_cli dev:debug on >/dev/null 2>&1 || true
+  obsidian_cli dev:console clear >/dev/null 2>&1 || true
+  obsidian_cli dev:errors clear >/dev/null 2>&1 || true
+fi
+
+if [[ "$USE_CDP" -eq 1 && "$SKIP_RELOAD" -eq 0 ]]; then
+  write_section "CDP Reload Trace"
+  cdp_reload_args=(
+    "$SCRIPT_DIR/obsidian_cdp_reload_and_trace.mjs"
+    --plugin-id "$PLUGIN_ID"
+    --host "$CDP_HOST"
+    --port "$CDP_PORT"
+    --duration-seconds "$WATCH_SECONDS"
+    --reload-delay-ms "$CDP_RELOAD_DELAY_MS"
+    --output "$CDP_TRACE_PATH"
+    --summary "$CDP_SUMMARY_PATH"
+  )
+  if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
+    cdp_reload_args+=(--target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
+  fi
+  if [[ -n "$CDP_EVAL_AFTER_RELOAD" ]]; then
+    cdp_reload_args+=(--eval-after-reload "$CDP_EVAL_AFTER_RELOAD")
+  fi
+  node "${cdp_reload_args[@]}"
+elif [[ "$SKIP_RELOAD" -eq 0 ]]; then
+  write_section "Reload Plugin"
+  obsidian_cli plugin:reload "id=$PLUGIN_ID" >/dev/null
+fi
+
+run_cli_scenario_if_requested
+
+if [[ "$USE_CDP" -eq 0 ]]; then
+  write_section "Watch Console"
+  : > "$CONSOLE_LOG_PATH"
+  : > "$ERRORS_LOG_PATH"
+  console_previous_snapshot_path="$OUTPUT_DIR/.console-previous.log"
+  console_current_snapshot_path="$OUTPUT_DIR/.console-current.log"
+  console_delta_snapshot_path="$OUTPUT_DIR/.console-delta.log"
+  errors_previous_snapshot_path="$OUTPUT_DIR/.errors-previous.log"
+  errors_current_snapshot_path="$OUTPUT_DIR/.errors-current.log"
+  : > "$console_previous_snapshot_path"
+  : > "$errors_previous_snapshot_path"
+  end_epoch=$(( $(date +%s) + WATCH_SECONDS ))
+  while [[ $(date +%s) -lt $end_epoch ]]; do
+    obsidian_cli --quiet dev:console "limit=$CONSOLE_LIMIT" > "$console_current_snapshot_path" 2>&1 || true
+    append_console_delta "$console_previous_snapshot_path" "$console_current_snapshot_path" "$CONSOLE_LOG_PATH" "$console_delta_snapshot_path"
+
+    obsidian_cli --quiet dev:errors > "$errors_current_snapshot_path" 2>&1 || true
+    append_error_delta "$errors_previous_snapshot_path" "$errors_current_snapshot_path" "$ERRORS_LOG_PATH"
+    sleep "$(awk "BEGIN { print ${POLL_INTERVAL_MS} / 1000 }")"
+  done
+  rm -f "$console_previous_snapshot_path" "$console_current_snapshot_path" "$console_delta_snapshot_path" "$errors_previous_snapshot_path" "$errors_current_snapshot_path"
+  if [[ ! -s "$ERRORS_LOG_PATH" ]]; then
+    printf '%s No errors captured during watch window.\n' "$(timestamp)" > "$ERRORS_LOG_PATH"
+  fi
+else
+  if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
+    obsidian_cli --quiet dev:errors > "$ERRORS_LOG_PATH" 2>&1 || true
+  else
+    printf 'No separate CLI errors log in CDP-only mode. Inspect %s\n' "$CDP_TRACE_PATH" > "$ERRORS_LOG_PATH"
+  fi
+fi
+
+if [[ "$SKIP_SCREENSHOT" -eq 0 ]]; then
+  write_section "Screenshot"
+  if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
+    obsidian_cli --quiet dev:screenshot "path=$SCREENSHOT_PATH" > "$OUTPUT_DIR/screenshot-command.txt" 2>&1 || true
+  elif [[ "$USE_CDP" -eq 1 ]]; then
+    cdp_capture_args=(
+      "$SCRIPT_DIR/obsidian_cdp_capture_ui.mjs"
+      --host "$CDP_HOST"
+      --port "$CDP_PORT"
+      --selector "$DOM_SELECTOR"
+      --screenshot-output "$SCREENSHOT_PATH"
+      --summary "$OUTPUT_DIR/cdp-capture-ui.summary.json"
+    )
+    if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
+      cdp_capture_args+=(--target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
+    fi
+    node "${cdp_capture_args[@]}"
+  fi
+fi
+
+if [[ "$SKIP_DOM" -eq 0 ]]; then
+  write_section "DOM"
+  if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
+    dom_args=("selector=$DOM_SELECTOR" "all")
+    if [[ "$DOM_TEXT" -eq 1 ]]; then
+      dom_args+=("text")
+    fi
+    obsidian_cli --quiet dev:dom "${dom_args[@]}" > "$DOM_PATH" 2>&1 || true
+  elif [[ "$USE_CDP" -eq 1 ]]; then
+    if [[ "$DOM_TEXT" -eq 1 ]]; then
+      cdp_dom_args=(
+        "$SCRIPT_DIR/obsidian_cdp_capture_ui.mjs"
+        --host "$CDP_HOST"
+        --port "$CDP_PORT"
+        --selector "$DOM_SELECTOR"
+        --text-output "$DOM_PATH"
+        --summary "$OUTPUT_DIR/cdp-capture-ui.summary.json"
+      )
+    else
+      cdp_dom_args=(
+        "$SCRIPT_DIR/obsidian_cdp_capture_ui.mjs"
+        --host "$CDP_HOST"
+        --port "$CDP_PORT"
+        --selector "$DOM_SELECTOR"
+        --html-output "$DOM_PATH"
+        --summary "$OUTPUT_DIR/cdp-capture-ui.summary.json"
+      )
+    fi
+    if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
+      cdp_dom_args+=(--target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
+    fi
+    node "${cdp_dom_args[@]}"
+  fi
+fi
+
+cat > "$SUMMARY_PATH" <<EOF
+{
+  "timestamp": "$(timestamp)",
+  "pluginId": "$PLUGIN_ID",
+  "vaultName": "$VAULT_NAME",
+  "obsidianCommand": "$OBS_CMD",
+  "testVaultPluginDir": "$TEST_VAULT_PLUGIN_DIR",
+  "outputDir": "$OUTPUT_DIR",
+  "buildLog": $( [[ "$SKIP_BUILD" -eq 0 ]] && json_path_or_null "$BUILD_LOG_PATH" || printf 'null' ),
+  "deployReport": $( [[ "$SKIP_DEPLOY" -eq 0 ]] && json_path_or_null "$DEPLOY_REPORT_PATH" || printf 'null' ),
+  "scenarioReport": $( json_path_or_null "$SCENARIO_REPORT_PATH" ),
+  "assertionsPath": $( [[ -n "$ASSERTIONS_PATH" ]] && printf '"%s"' "$ASSERTIONS_PATH" || printf 'null' ),
+  "comparisonReport": $( [[ -n "$COMPARE_DIAGNOSIS_PATH" ]] && printf '"%s"' "$COMPARISON_PATH" || printf 'null' ),
+  "consoleLog": $( [[ "$USE_CDP" -eq 1 ]] && printf 'null' || json_path_or_null "$CONSOLE_LOG_PATH" ),
+  "errorsLog": $( json_path_or_null "$ERRORS_LOG_PATH" ),
+  "useCdp": $( [[ "$USE_CDP" -eq 1 ]] && printf 'true' || printf 'false' ),
+  "cdpTrace": $( [[ "$USE_CDP" -eq 1 && "$SKIP_RELOAD" -eq 0 ]] && json_path_or_null "$CDP_TRACE_PATH" || printf 'null' ),
+  "cdpSummary": $( [[ "$USE_CDP" -eq 1 && "$SKIP_RELOAD" -eq 0 ]] && json_path_or_null "$CDP_SUMMARY_PATH" || printf 'null' ),
+  "screenshot": $( [[ "$SKIP_SCREENSHOT" -eq 1 ]] && printf 'null' || json_path_or_null "$SCREENSHOT_PATH" ),
+  "dom": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'null' || json_path_or_null "$DOM_PATH" ),
+  "watchSeconds": $WATCH_SECONDS,
+  "consoleLimit": $CONSOLE_LIMIT
+}
+EOF
+
+write_section "Diagnosis"
+write_diagnosis
+
+if [[ -n "$COMPARE_DIAGNOSIS_PATH" ]]; then
+  write_section "Comparison"
+  write_comparison
+fi
+
+write_section "Done"
+echo "Summary: $SUMMARY_PATH"

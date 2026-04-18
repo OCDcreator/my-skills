@@ -1,0 +1,109 @@
+{
+  "signatures": [
+    {
+      "id": "server-connection-refused",
+      "type": "text",
+      "severity": "warning",
+      "matchAny": [
+        "ERR_CONNECTION_REFUSED",
+        "SDK health check failed, falling back to ServerManager health probe"
+      ],
+      "headline": "Plugin queried the OpenCode runtime before the local server became reachable.",
+      "likelyCause": "The UI or SDK health probe raced ahead of managed-server cold start.",
+      "nextActions": [
+        "Compare plugin startup time with ServerManager ready time.",
+        "Move non-critical server snapshots to deferred/background refreshes.",
+        "Check whether a stale managed local server should be restarted instead of reused."
+      ]
+    },
+    {
+      "id": "session-sync-404",
+      "type": "text",
+      "severity": "warning",
+      "matchAny": [
+        "SDK session.messages failed",
+        "SDK session.get failed",
+        "Failed to sync conversation messages from server",
+        "Request failed, status 404"
+      ],
+      "headline": "Conversation/session sync fell back because the server returned 404 for the active session.",
+      "likelyCause": "The restored tab/session no longer exists on the local server, or hydration is reading stale session identifiers.",
+      "nextActions": [
+        "Check conversation restore and hydration code paths for stale session IDs.",
+        "Compare persisted conversation/session metadata with the server's current session catalog.",
+        "Prefer graceful background fallback when missing sessions are expected during cold start."
+      ]
+    },
+    {
+      "id": "insecure-local-server",
+      "type": "text",
+      "severity": "info",
+      "matchAny": [
+        "OPENCODE_SERVER_PASSWORD is not set; server is unsecured."
+      ],
+      "headline": "Managed local server started without a password.",
+      "likelyCause": "Development environment is intentionally unsecured or missing server auth configuration.",
+      "nextActions": [
+        "If the test environment is shared, set a password or isolate the network path.",
+        "Document whether this is expected for local-only test vaults."
+      ]
+    },
+    {
+      "id": "slow-server-ready",
+      "type": "timing-threshold",
+      "severity": "warning",
+      "metric": "serverReadyMs",
+      "operator": "gte",
+      "value": 500,
+      "headline": "Local OpenCode server cold start dominates readiness.",
+      "likelyCause": "Managed server startup, health probing, or project config resolution is slower than the plugin UI startup path.",
+      "nextActions": [
+        "Measure spawn, health-check, and chat-ready milestones separately.",
+        "Delay server-dependent UI hydration until the server is healthy.",
+        "Cache or reuse safe warm state when the environment signature has not changed."
+      ]
+    },
+    {
+      "id": "slow-chat-ready",
+      "type": "timing-threshold",
+      "severity": "warning",
+      "metric": "chatReadyDelayMs",
+      "operator": "gte",
+      "value": 2000,
+      "headline": "The chat surface became interactive noticeably after reload completed.",
+      "likelyCause": "Foreground availability waits on background server readiness or post-reload hydration.",
+      "nextActions": [
+        "Keep the visible view-open path independent from background status refreshes.",
+        "Record server-ready and chat-ready milestones to separate UI cost from backend warmup."
+      ]
+    },
+    {
+      "id": "slow-startup",
+      "type": "timing-threshold",
+      "severity": "warning",
+      "metric": "startupCompletedMs",
+      "operator": "gte",
+      "value": 1000,
+      "headline": "Plugin startup itself is slow before the view even renders.",
+      "likelyCause": "Heavy synchronous work still runs in the plugin onload/startup path.",
+      "nextActions": [
+        "Split startup into labeled substeps and move non-essential work behind the initial render.",
+        "Inspect settings load, storage init, and conversation metadata preload costs."
+      ]
+    },
+    {
+      "id": "slow-view-open",
+      "type": "timing-threshold",
+      "severity": "warning",
+      "metric": "viewOpenCompletedMs",
+      "operator": "gte",
+      "value": 1000,
+      "headline": "View open/hydration is the visible bottleneck.",
+      "likelyCause": "Tab restore, conversation hydration, or server-backed UI refresh is blocking visible render.",
+      "nextActions": [
+        "Break the view-open path into restore, hydration-tail, and background refresh stages.",
+        "Make server-backed enrichments fire-and-forget when the visible shell can render first."
+      ]
+    }
+  ]
+}

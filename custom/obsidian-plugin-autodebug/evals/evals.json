@@ -1,0 +1,29 @@
+{
+  "skill_name": "obsidian-plugin-autodebug",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我全自动排查这个 Obsidian 插件首次打开很慢的问题：构建、部署到测试库、重载插件、抓控制台日志并定位瓶颈。",
+      "expected_output": "Uses a build/deploy/reload/log-watch loop, separates plugin onload from view-open and server warmup timing, and reports the bottleneck with artifact paths.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "改完插件 UI 后，你来用 Obsidian CLI 自动 reload，然后截图和检查 DOM，确认设置页按钮存在且没有 console error。",
+      "expected_output": "Runs plugin reload, clears and checks dev errors, captures screenshot, queries relevant DOM selectors, and summarizes pass/fail evidence.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "把当前插件发布到 test vault，确认 BUILD_ID 生效，然后实时看 dev console 20 秒。",
+      "expected_output": "Builds, copies runtime artifacts to the test vault plugin directory, verifies hash or BUILD_ID, reloads the plugin, and saves console-watch output.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "CLI 的 dev:console 抓不到插件启动早期日志，改用 CDP 自动重载插件并保存一份带时间戳的实时 console trace。",
+      "expected_output": "Switches to the built-in CDP scripts, enables debug flags, reloads the plugin through app context, and saves a timestamped trace with clear artifact paths.",
+      "files": []
+    }
+  ]
+}

@@ -11,6 +11,7 @@ my-skills/
 │   ├── fnos-fpk-dev/                          # 飞牛 fnOS FPK 开发
 │   ├── fork-upstream-workflow/                # fork 仓库个人维护与同步上游工作流
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
+│   ├── obsidian-plugin-autodebug/              # Obsidian 插件全自动调试开发循环
 │   ├── obsidian-plugin-debug-logging/          # Obsidian 插件调试日志治理
 │   ├── obsidian-plugin-release-manager/       # Obsidian 插件版本号与测试库部署
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
@@ -44,6 +45,7 @@ my-skills/
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [fork-upstream-workflow](custom/fork-upstream-workflow/) | 个人 fork 仓库的 `origin` / `upstream` / `main` / `feat/*` 维护策略与同步上游工作流 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
+| [obsidian-plugin-autodebug](custom/obsidian-plugin-autodebug/) | Obsidian 插件 build → deploy → reload → log watch → screenshot/DOM check 全自动调试开发循环，含环境 doctor、多轮 profile、断言、对比、HTML 报告与 vault 状态恢复 |
 | [obsidian-plugin-debug-logging](custom/obsidian-plugin-debug-logging/) | Obsidian 插件调试日志、诊断报告、BUILD_ID 与 Windows/macOS 日志导出治理 |
 | [obsidian-plugin-release-manager](custom/obsidian-plugin-release-manager/) | Obsidian plugin 的 semver + codename、BUILD_ID、release build 自动 patch bump 与 test vault deploy |
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |

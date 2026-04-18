@@ -1,0 +1,30 @@
+{
+  "name": "opencodian-view-health",
+  "description": "Basic plugin-view health assertions: scenario must succeed, key artifacts must exist, root DOM must be present, and no session 404 should appear.",
+  "assertions": [
+    {
+      "id": "scenario-open-view",
+      "type": "scenario-success"
+    },
+    {
+      "id": "screenshot-exists",
+      "type": "artifact-exists",
+      "field": "screenshot"
+    },
+    {
+      "id": "dom-exists",
+      "type": "artifact-exists",
+      "field": "dom"
+    },
+    {
+      "id": "dom-has-root",
+      "type": "dom-contains",
+      "value": "opencodian-container"
+    },
+    {
+      "id": "no-session-404",
+      "type": "log-not-contains",
+      "value": "Request failed, status 404"
+    }
+  ]
+}

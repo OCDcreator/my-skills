@@ -1,0 +1,17 @@
+{
+  "name": "open-plugin-view",
+  "description": "Open the plugin view command after reload so screenshot/DOM capture target the plugin surface instead of the previously active pane.",
+  "steps": [
+    {
+      "type": "obsidian-cli",
+      "command": "command",
+      "args": [
+        "id=${commandId}"
+      ]
+    },
+    {
+      "type": "sleep",
+      "ms": "${sleepAfterMs}"
+    }
+  ]
+}
