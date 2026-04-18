@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] P4 - Review and repair page 4
+### [DONE] P4 - Review and repair page 4
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make page 4 pass the sequential print-review gate for the salts handout.
@@ -15,7 +15,7 @@
   - Page 4 has no remaining blocking issue for this lane
   - The phase doc records exact edited artifact paths and the review result
 
-### [QUEUED] P5 - Review and repair page 5
+### [NEXT] P5 - Review and repair page 5
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make page 5 pass after page 4 is complete.
