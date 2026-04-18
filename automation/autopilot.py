@@ -132,6 +132,10 @@ def append_controller_requirements(prompt_text: str, config: dict[str, Any]) -> 
         "- On `success`, create exactly one final commit for the completed round before returning JSON.",
         "- The final JSON `commit_sha` must equal `git rev-parse HEAD`.",
         "- The final JSON `commit_message` must exactly equal `git log -1 --pretty=%s`.",
+        "- If `build_ran` is `true`, set a non-empty `build_id` taken from the actual build artifact, hash, or generated build marker.",
+        "- If no reliable build identifier was produced, set `build_ran` to `false` instead of inventing a `build_id`.",
+        "- If `deploy_ran` is `true`, only report it when this round actually performed a deploy step required by config.",
+        "- If `deploy_ran` is `true`, also set `deploy_verified` to `true` only after the configured deploy verification step really passed.",
     ]
     if commit_prefix:
         lines.append(

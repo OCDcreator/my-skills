@@ -42,6 +42,15 @@ Before starting unattended rounds, commit the scaffolded autopilot files so the 
 - The controller injects this rule into every rendered round prompt, including custom prompt templates.
 - If rounds complete useful work but fail with `Commit message must start with ...`, either amend the commit subject to the configured prefix or intentionally set `commit_prefix` to an empty string for that lane.
 
+## Build And Deploy Result Gate
+
+The controller also validates build/deploy result fields in the final JSON:
+
+- `build_ran=true` requires a non-empty `build_id`.
+- If the round did not produce a trustworthy build marker, report `build_ran=false` instead of fabricating a `build_id`.
+- `deploy_ran=true` is only valid when the round actually performed a deploy required by config.
+- `deploy_ran=true` also requires `deploy_verified=true`, and deploy verification may additionally check that the configured artifact contains the reported `build_id`.
+
 ### Windows
 
 ```powershell
@@ -281,4 +290,3 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.<repo>.codex-autopilot
 - `automation/Watch-Autopilot.ps1`
 
 These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable.
-

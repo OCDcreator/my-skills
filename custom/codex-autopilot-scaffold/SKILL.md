@@ -124,6 +124,15 @@ The controller validates successful round commits against `commit_prefix` in `au
 - The scaffolded controller also injects this requirement into every rendered round prompt, so custom prompts cannot silently omit it.
 - Treat repeated `Commit message must start with ...` failures as a lane configuration/prompt mismatch, not as a code-quality failure.
 
+### Build/deploy result gate
+
+The controller also validates `build_ran`, `build_id`, `deploy_ran`, and `deploy_verified` in the final JSON.
+
+- If `build_ran` is `true`, the round must report a real non-empty `build_id`.
+- If no trustworthy build identifier exists, the round should report `build_ran=false` rather than inventing one.
+- If `deploy_ran` is `true`, that deploy must actually have happened and must satisfy the configured verification checks.
+- The scaffolded controller injects these requirements into every rendered round prompt so custom prompts cannot silently omit them.
+
 Then run a smoke test in the target repo:
 
 ### Windows
@@ -322,4 +331,3 @@ When you finish scaffolding, report:
 - files added
 - smoke-test commands run and their result
 - the next command the user or future agent should run
-
