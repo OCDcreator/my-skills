@@ -5,3 +5,10 @@ __pycache__/
 automation/runtime/
 custom/knowledge-to-print-html/artifacts/
 custom/knowledge-to-print-html/evals/
+
+# Syncthing transient and conflict files
+~syncthing~*.tmp
+.syncthing.*.tmp
+*.sync-conflict-*
+.stfolder/
+.stversions/

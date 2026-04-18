@@ -122,6 +122,27 @@ def render_template(template_text: str, tokens: dict[str, Any]) -> str:
     return rendered
 
 
+def append_controller_requirements(prompt_text: str, config: dict[str, Any]) -> str:
+    commit_prefix = clean_string(config.get("commit_prefix"))
+    lines = [
+        "",
+        "## Controller-Enforced Requirements",
+        "",
+        "These requirements are injected by `automation/autopilot.py` and override any looser wording above.",
+        "- On `success`, create exactly one final commit for the completed round before returning JSON.",
+        "- The final JSON `commit_sha` must equal `git rev-parse HEAD`.",
+        "- The final JSON `commit_message` must exactly equal `git log -1 --pretty=%s`.",
+    ]
+    if commit_prefix:
+        lines.append(
+            f"- The successful round commit subject must start with `{commit_prefix}:`; "
+            "if it does not, amend the commit before returning `success`."
+        )
+    else:
+        lines.append("- This lane does not enforce a commit-message prefix.")
+    return f"{prompt_text.rstrip()}\n{chr(10).join(lines)}\n"
+
+
 def windows_hidden_process_kwargs(
     *,
     detached: bool = False,
@@ -1233,6 +1254,7 @@ def run_start(args: argparse.Namespace) -> int:
                     "platform_note": config.get("platform_note", ""),
                 },
             )
+            rendered_prompt = append_controller_requirements(rendered_prompt, config)
             prompt_path.write_bytes(rendered_prompt.encode("utf-8"))
 
             if args.dry_run:

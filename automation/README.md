@@ -33,6 +33,15 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 
 Before starting unattended rounds, commit the scaffolded autopilot files so the worktree is clean.
 
+## Commit Prefix Gate
+
+`automation/autopilot.py` validates successful round commits against `commit_prefix` in `automation/autopilot-config.json`.
+
+- Non-empty `commit_prefix`: successful commit subjects must start with `<commit_prefix>:` such as `autopilot:`.
+- Empty `commit_prefix`: no commit-message prefix is enforced.
+- The controller injects this rule into every rendered round prompt, including custom prompt templates.
+- If rounds complete useful work but fail with `Commit message must start with ...`, either amend the commit subject to the configured prefix or intentionally set `commit_prefix` to an empty string for that lane.
+
 ### Windows
 
 ```powershell
@@ -274,4 +283,3 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.<repo>.codex-autopilot
 - `automation/Watch-Autopilot.ps1`
 
 These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable.
-

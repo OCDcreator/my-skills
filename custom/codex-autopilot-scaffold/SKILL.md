@@ -115,6 +115,15 @@ It also prints:
 
 Commit the scaffold first, because the autopilot controller expects a clean worktree before unattended execution.
 
+### Commit prefix gate
+
+The controller validates successful round commits against `commit_prefix` in `automation/autopilot-config.json`.
+
+- If `commit_prefix` is non-empty, every successful round commit subject must start with `<commit_prefix>:` (for example, `autopilot:`).
+- If you create a custom lane or custom `round-prompt*.md`, keep that commit-message rule explicit in the prompt or set `commit_prefix` to an empty string deliberately.
+- The scaffolded controller also injects this requirement into every rendered round prompt, so custom prompts cannot silently omit it.
+- Treat repeated `Commit message must start with ...` failures as a lane configuration/prompt mismatch, not as a code-quality failure.
+
 Then run a smoke test in the target repo:
 
 ### Windows
@@ -313,5 +322,4 @@ When you finish scaffolding, report:
 - files added
 - smoke-test commands run and their result
 - the next command the user or future agent should run
-
 
