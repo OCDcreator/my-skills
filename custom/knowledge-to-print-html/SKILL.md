@@ -283,6 +283,8 @@ This writes a sequential review packet to `screens/py-latest/page-review/`, incl
 - `page-XX-review.json`
 - `page-XX-subagent-prompt.md`
 
+Single-page review screenshots are not generic viewport captures. They must be clipped to the exact printable page area so the exported PNG keeps true A4 page proportions for layout review. If the validator reports non-A4 page screenshots, the review packet is not acceptable for subagent review.
+
 Review page 1 first. Give the page screenshot, `page-XX-review.json`, and `page-XX-subagent-prompt.md` to a fresh review subagent. If page 1 fails, fix it, rerun the packet, and re-review page 1. Only then move to page 2.
 
 The subagent must review at least:

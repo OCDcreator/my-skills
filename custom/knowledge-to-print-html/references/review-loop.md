@@ -35,6 +35,16 @@ python review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.h
 7. Continue until all pages pass
 8. Run one final full-document validation pass before hand-off
 
+The page screenshot handed to the subagent must be a true printable-page clip:
+
+- clip to the exact printable page area for that `.sheet`
+- preserve true A4 page proportions in the PNG
+- do not substitute viewport-sized or stacked screenshots for page review
+
+Treat this as a hard gate, not a preference:
+
+- if the validator reports non-A4 page screenshots, stop and fix the capture pipeline before asking a subagent to review the page
+
 ## Subagent contract
 
 The subagent reviews. The main agent edits.
