@@ -755,9 +755,37 @@ const domText = await readTextIfExists(summary.dom);
 const deployReport = await readJsonIfExists(summary.deployReport);
 const cdpSummary = await readJsonIfExists(summary.cdpSummary);
 const scenarioReport = await readJsonIfExists(summary.scenarioReport);
+const scenarioPlaywright = scenarioReport?.playwright && typeof scenarioReport.playwright === 'object' && !Array.isArray(scenarioReport.playwright)
+  ? scenarioReport.playwright
+  : null;
+const scenarioArtifacts = scenarioReport?.artifacts && typeof scenarioReport.artifacts === 'object' && !Array.isArray(scenarioReport.artifacts)
+  ? scenarioReport.artifacts
+  : {};
+const playwrightTracePath = stringValue(
+  scenarioArtifacts.playwrightTrace
+  || scenarioPlaywright?.trace?.path,
+) || null;
+const playwrightScreenshotPath = stringValue(
+  scenarioArtifacts.playwrightScreenshot
+  || scenarioPlaywright?.screenshot?.path,
+) || null;
+const playwrightTraceExists = await pathExists(playwrightTracePath);
+const playwrightScreenshotExists = await pathExists(playwrightScreenshotPath);
 const assertionsDocument = assertionsPath ? ((await readJsonIfExists(assertionsPath)) ?? { assertions: [] }) : null;
 const screenshotExists = await pathExists(summary.screenshot);
 const domExists = await pathExists(summary.dom);
+const playwrightTracePlan = normalizeCapturePlanEntry(scenarioPlaywright?.trace, {
+  requested: Boolean(playwrightTracePath || scenarioPlaywright?.trace?.requested),
+  intentionallySkipped: false,
+  skipReason: null,
+  mode: 'playwright-trace',
+});
+const playwrightScreenshotPlan = normalizeCapturePlanEntry(scenarioPlaywright?.screenshot, {
+  requested: Boolean(playwrightScreenshotPath || scenarioPlaywright?.screenshot?.requested),
+  intentionallySkipped: false,
+  skipReason: null,
+  mode: 'playwright-screenshot',
+});
 
 const allLines = [
   ...splitLines(consoleText, summary.consoleLog),
@@ -906,6 +934,44 @@ if (scenarioReport) {
       ? `Scenario ${scenarioReport.scenarioName} completed successfully.`
       : `Scenario ${scenarioReport.scenarioName} failed.`,
     [{ filePath: summary.scenarioReport, lineNumber: 1 }],
+  );
+}
+
+const playwrightTraceState = buildArtifactState({
+  key: 'playwrightTrace',
+  label: 'Playwright trace',
+  plan: playwrightTracePlan,
+  artifactPath: playwrightTracePath,
+  exists: playwrightTraceExists,
+  captured: booleanValue(scenarioPlaywright?.trace?.captured, playwrightTraceExists),
+  captureDetail: scenarioPlaywright?.trace?.detail || `Captured Playwright trace at ${playwrightTracePath}.`,
+  failureDetail: scenarioPlaywright?.trace?.detail || 'Playwright trace artifact is missing.',
+});
+if (playwrightTracePath || playwrightTracePlan.intentionallySkipped || playwrightTracePlan.requested) {
+  pushAssertion(
+    'playwright-trace-captured',
+    assertionStatusFromArtifactState(playwrightTraceState),
+    playwrightTraceState.detail,
+    playwrightTraceState.status === 'captured' ? artifactEvidence(playwrightTracePath) : [],
+  );
+}
+
+const playwrightScreenshotState = buildArtifactState({
+  key: 'playwrightScreenshot',
+  label: 'Playwright screenshot',
+  plan: playwrightScreenshotPlan,
+  artifactPath: playwrightScreenshotPath,
+  exists: playwrightScreenshotExists,
+  captured: booleanValue(scenarioPlaywright?.screenshot?.captured, playwrightScreenshotExists),
+  captureDetail: scenarioPlaywright?.screenshot?.detail || `Captured Playwright screenshot at ${playwrightScreenshotPath}.`,
+  failureDetail: scenarioPlaywright?.screenshot?.detail || 'Playwright screenshot artifact is missing.',
+});
+if (playwrightScreenshotPath || playwrightScreenshotPlan.intentionallySkipped || playwrightScreenshotPlan.requested) {
+  pushAssertion(
+    'playwright-screenshot-captured',
+    assertionStatusFromArtifactState(playwrightScreenshotState),
+    playwrightScreenshotState.detail,
+    playwrightScreenshotState.status === 'captured' ? artifactEvidence(playwrightScreenshotPath) : [],
   );
 }
 
@@ -1576,11 +1642,15 @@ const diagnosis = {
     cdpTrace: summary.cdpTrace,
     cdpSummary: summary.cdpSummary,
     scenarioReport: summary.scenarioReport ?? null,
+    playwrightTrace: playwrightTracePath,
+    playwrightScreenshot: playwrightScreenshotPath,
     screenshot: summary.screenshot,
     dom: summary.dom,
   },
   artifactStates: {
     trace: traceState,
+    playwrightTrace: playwrightTraceState,
+    playwrightScreenshot: playwrightScreenshotState,
     screenshot: screenshotState,
     dom: domState,
   },
@@ -1596,6 +1666,7 @@ const diagnosis = {
   playbooksPath,
   scenario: scenarioReport
     ? {
+        adapter: scenarioReport.adapter ?? null,
         name: scenarioReport.scenarioName,
         success: scenarioReport.success,
         stepCount: Array.isArray(scenarioReport.steps) ? scenarioReport.steps.length : 0,

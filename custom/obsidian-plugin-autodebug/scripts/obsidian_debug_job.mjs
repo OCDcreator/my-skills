@@ -13,6 +13,7 @@ import {
   detectRepoRuntime,
   formatCommandTokens,
 } from './obsidian_debug_repo_runtime.mjs';
+import { normalizeScenarioAdapter } from './obsidian_debug_playwright_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const jobPathRaw = getStringOption(options, 'job', '').trim();
@@ -242,6 +243,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   const reload = asObject(spec.reload);
   const logWatch = asObject(spec.logWatch);
   const scenario = asObject(spec.scenario);
+  const scenarioPlaywright = asObject(scenario.playwright);
   const assertions = asObject(spec.assertions);
   const comparison = asObject(spec.comparison);
   const capture = asObject(spec.capture);
@@ -259,12 +261,24 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   const buildCommandInfo = resolveBuildCommand({ build, repoTooling, warnings, blockers });
   const buildCommand = buildCommandInfo.available ? buildCommandInfo.command : [];
   const skipBuild = !enabled(build, true) || buildCommand.length === 0;
+  const scenarioEnabled = enabled(scenario, false);
+  const scenarioAdapter = normalizeScenarioAdapter(
+    stringValue(scenario.adapter, Object.keys(scenarioPlaywright).length > 0 ? 'playwright' : 'cli'),
+  );
+  const scenarioRequiresPlaywright = scenarioEnabled && scenarioAdapter === 'playwright';
+  const scenarioCdpPort = numberValue(scenarioPlaywright.cdpPort ?? reload.cdp?.port, 0);
+  const scenarioPlaywrightSelectorTimeoutMs = numberValue(scenarioPlaywright.selectorTimeoutMs, 5000);
 
   if (!pluginId) {
     warnings.push('runtime.pluginId is empty; run mode requires a plugin id.');
   }
   if (!testVaultPluginDir) {
     warnings.push('runtime.testVaultPluginDir is empty; run mode requires a test vault plugin directory.');
+  }
+  if (scenarioRequiresPlaywright && scenarioCdpPort <= 0) {
+    const detail = 'scenario.adapter is playwright, but reload.cdp.port (or scenario.playwright.cdpPort) is missing.';
+    blockers.push(detail);
+    warnings.push(detail);
   }
 
   if (platform === 'windows') {
@@ -294,12 +308,18 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
     addValue(args, '-CdpTargetTitleContains', reload.cdp?.targetTitleContains);
     addValue(args, '-CdpReloadDelayMs', reload.cdp?.reloadDelayMs);
     addValue(args, '-CdpEvalAfterReload', reload.cdp?.evalAfterReload);
-    if (enabled(scenario, false)) {
+    if (scenarioEnabled) {
       addValue(args, '-ScenarioName', scenario.name);
       addValue(args, '-ScenarioPath', scenario.path);
       addValue(args, '-ScenarioCommandId', scenario.commandId);
       addValue(args, '-SurfaceProfilePath', scenario.surfaceProfile);
       addValue(args, '-ScenarioSleepMs', numberValue(scenario.sleepMs, 2000));
+      addValue(args, '-ScenarioAdapter', scenarioAdapter);
+      addValue(args, '-PlaywrightModule', scenarioPlaywright.module);
+      addSwitch(args, '-PlaywrightTrace', booleanValue(scenarioPlaywright.trace, false));
+      addValue(args, '-PlaywrightTracePath', scenarioPlaywright.tracePath);
+      addValue(args, '-PlaywrightScreenshotPath', scenarioPlaywright.screenshotPath);
+      addValue(args, '-PlaywrightSelectorTimeoutMs', scenarioPlaywrightSelectorTimeoutMs);
     }
     addValue(args, '-AssertionsPath', assertions.path);
     addValue(args, '-CompareDiagnosisPath', comparison.baselineDiagnosisPath);
@@ -348,12 +368,18 @@ function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoToolin
   addValue(args, '--cdp-target-title-contains', reload.cdp?.targetTitleContains);
   addValue(args, '--cdp-reload-delay-ms', reload.cdp?.reloadDelayMs);
   addValue(args, '--cdp-eval-after-reload', reload.cdp?.evalAfterReload);
-  if (enabled(scenario, false)) {
+  if (scenarioEnabled) {
     addValue(args, '--scenario-name', scenario.name);
     addValue(args, '--scenario-path', scenario.path);
     addValue(args, '--scenario-command-id', scenario.commandId);
     addValue(args, '--surface-profile', scenario.surfaceProfile);
     addValue(args, '--scenario-sleep-ms', numberValue(scenario.sleepMs, 2000));
+    addValue(args, '--scenario-adapter', scenarioAdapter);
+    addValue(args, '--playwright-module', scenarioPlaywright.module);
+    addSwitch(args, '--playwright-trace', booleanValue(scenarioPlaywright.trace, false));
+    addValue(args, '--playwright-trace-path', scenarioPlaywright.tracePath);
+    addValue(args, '--playwright-screenshot-path', scenarioPlaywright.screenshotPath);
+    addValue(args, '--playwright-selector-timeout-ms', scenarioPlaywrightSelectorTimeoutMs);
   }
   addValue(args, '--assertions', assertions.path);
   addValue(args, '--compare-diagnosis', comparison.baselineDiagnosisPath);

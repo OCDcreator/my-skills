@@ -284,9 +284,12 @@ const consolePreview = trimPreview(await readTextOrNull(diagnosisArtifacts.conso
 const errorsPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.errorsLog));
 const cdpPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.cdpTrace));
 const baselineDomPreview = trimPreview(await readTextOrNull(comparisonBaselineArtifacts.dom));
+const playwrightTracePreview = trimPreview(await readTextOrNull(diagnosisArtifacts.playwrightTrace));
 const screenshotDiffExists = await exists(screenshotDiffPath);
 const candidateScreenshotExists = await exists(diagnosisArtifacts.screenshot);
+const candidatePlaywrightScreenshotExists = await exists(diagnosisArtifacts.playwrightScreenshot);
 const baselineScreenshotExists = await exists(comparisonBaselineArtifacts.screenshot);
+const baselinePlaywrightScreenshotExists = await exists(comparisonBaselineArtifacts.playwrightScreenshot);
 
 const artifactEntries = [
   { scope: 'candidate', label: 'diagnosis', path: path.resolve(diagnosisPath) },
@@ -298,6 +301,8 @@ const artifactEntries = [
   { scope: 'candidate', label: 'CDP trace', path: diagnosisArtifacts.cdpTrace, state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null },
   { scope: 'candidate', label: 'deploy report', path: diagnosisArtifacts.deployReport },
   { scope: 'candidate', label: 'scenario report', path: diagnosisArtifacts.scenarioReport },
+  { scope: 'candidate', label: 'Playwright trace', path: diagnosisArtifacts.playwrightTrace, state: diagnosisArtifactStates.playwrightTrace ?? null },
+  { scope: 'candidate', label: 'Playwright screenshot', path: diagnosisArtifacts.playwrightScreenshot, state: diagnosisArtifactStates.playwrightScreenshot ?? null },
   { scope: 'comparison', label: 'comparison JSON', path: comparisonPath ? path.resolve(comparisonPath) : null },
   {
     scope: 'comparison',
@@ -308,6 +313,8 @@ const artifactEntries = [
       : null,
   },
   { scope: 'baseline', label: 'baseline screenshot', path: comparisonBaselineArtifacts.screenshot ?? null, state: comparisonBaselineArtifactStates.screenshot ?? null },
+  { scope: 'baseline', label: 'baseline Playwright screenshot', path: comparisonBaselineArtifacts.playwrightScreenshot ?? null, state: comparisonBaselineArtifactStates.playwrightScreenshot ?? null },
+  { scope: 'baseline', label: 'baseline Playwright trace', path: comparisonBaselineArtifacts.playwrightTrace ?? null, state: comparisonBaselineArtifactStates.playwrightTrace ?? null },
   { scope: 'baseline', label: 'baseline DOM snapshot', path: comparisonBaselineArtifacts.dom ?? null, state: comparisonBaselineArtifactStates.dom ?? null },
   { scope: 'baseline', label: 'baseline console log', path: comparisonBaselineArtifacts.consoleLog ?? null, state: comparison?.baseline?.useCdp ? null : (comparisonBaselineArtifactStates.trace ?? null) },
   { scope: 'baseline', label: 'baseline errors log', path: comparisonBaselineArtifacts.errorsLog ?? null },
@@ -380,6 +387,20 @@ const html = `<!doctype html>
         state: comparisonBaselineArtifactStates.screenshot ?? null,
       })}
       ${renderPreviewCard({
+        title: 'Playwright Scenario Screenshot',
+        label: 'candidate Playwright screenshot',
+        path: candidatePlaywrightScreenshotExists ? diagnosisArtifacts.playwrightScreenshot : null,
+        kind: 'image',
+        state: diagnosisArtifactStates.playwrightScreenshot ?? null,
+      })}
+      ${renderPreviewCard({
+        title: 'Baseline Playwright Screenshot',
+        label: 'baseline Playwright screenshot',
+        path: baselinePlaywrightScreenshotExists ? comparisonBaselineArtifacts.playwrightScreenshot : null,
+        kind: 'image',
+        state: comparisonBaselineArtifactStates.playwrightScreenshot ?? null,
+      })}
+      ${renderPreviewCard({
         title: 'Screenshot Diff',
         label: 'screenshot diff',
         path: screenshotDiffExists ? screenshotDiffPath : null,
@@ -434,6 +455,13 @@ const html = `<!doctype html>
         path: diagnosisArtifacts.cdpTrace,
         preview: cdpPreview,
         state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null,
+      })}
+      ${renderPreviewCard({
+        title: 'Playwright Trace',
+        label: 'candidate Playwright trace',
+        path: diagnosisArtifacts.playwrightTrace,
+        preview: playwrightTracePreview,
+        state: diagnosisArtifactStates.playwrightTrace ?? null,
       })}
       ${renderPreviewCard({
         title: 'Baseline DOM Snapshot',

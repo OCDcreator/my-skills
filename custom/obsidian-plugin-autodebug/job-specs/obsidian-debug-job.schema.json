@@ -178,6 +178,10 @@
         "enabled": {
           "type": "boolean"
         },
+        "adapter": {
+          "type": "string",
+          "enum": ["cli", "playwright"]
+        },
         "name": {
           "type": "string"
         },
@@ -192,6 +196,27 @@
         },
         "sleepMs": {
           "type": "integer"
+        },
+        "playwright": {
+          "type": "object",
+          "properties": {
+            "module": {
+              "type": "string"
+            },
+            "trace": {
+              "type": "boolean"
+            },
+            "tracePath": {
+              "type": "string"
+            },
+            "screenshotPath": {
+              "type": "string"
+            },
+            "selectorTimeoutMs": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },

@@ -134,7 +134,7 @@
   - Job/cycle runners can choose inferred package-manager commands or explain why inference is weak
   - Windows and macOS smoke evidence covers at least one npm-style and one non-npm-style path or fixture
 
-### [NEXT] B12 - Optional Playwright and UI trace adapter
+### [DONE] B12 - Optional Playwright and UI trace adapter
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add an optional Playwright-backed scenario adapter for richer UI interactions, locator assertions, and trace artifacts while preserving the existing CLI/CDP-first path.
@@ -147,7 +147,7 @@
   - Diagnosis/report artifacts can link Playwright traces/screenshots when available
   - Plugin-neutral fixtures or templates demonstrate the adapter without hard-coding one plugin
 
-### [QUEUED] B13 - Hot Reload coordination doctor
+### [NEXT] B13 - Hot Reload coordination doctor
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Detect repository/vault Hot Reload conditions and guide automation toward controlled reload or Hot Reload-friendly modes so startup logs stay trustworthy.
@@ -189,6 +189,6 @@
 ## Current state
 
 - B1-B10 are complete.
-- B11 is complete.
-- B12 is the approved next slice.
-- B13-B15 are approved queued follow-ups; do not expand beyond them without another human approval.
+- B11-B12 are complete.
+- B13 is the approved next slice.
+- B14-B15 are approved queued follow-ups; do not expand beyond them without another human approval.

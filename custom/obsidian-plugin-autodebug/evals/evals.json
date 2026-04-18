@@ -54,6 +54,12 @@
       "prompt": "这个仓库用 pnpm，不要再默认 npm。先用 doctor 识别 packageManager/lockfile/Corepack，再生成一个能在 Windows 和 macOS 复用的 job plan。",
       "expected_output": "Detects repo-owned package-manager signals such as packageManager, lockfiles, and build/dev/test scripts; reports Corepack/package-manager readiness; and emits a job plan that infers pnpm/yarn/bun commands instead of assuming npm-only workflows.",
       "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "这个插件的设置页需要更细的 UI 自动化。保留原来的 CLI/CDP 路径，但给我一个可选的 Playwright scenario：能点按钮、做 locator 断言，并把 trace/screenshot 链接进诊断报告。",
+      "expected_output": "Keeps the default CLI/CDP-first workflow available, detects whether Playwright is installed before opting in, supports Playwright locator steps through scenario config, and records trace/screenshot artifacts in diagnosis and HTML report outputs.",
+      "files": []
     }
   ]
 }

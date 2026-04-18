@@ -22,8 +22,14 @@ CDP_EVAL_AFTER_RELOAD=""
 SCENARIO_NAME=""
 SCENARIO_PATH=""
 SCENARIO_COMMAND_ID=""
+SCENARIO_ADAPTER="cli"
 SURFACE_PROFILE_PATH=""
 SCENARIO_SLEEP_MS=2000
+PLAYWRIGHT_MODULE=""
+PLAYWRIGHT_TRACE=0
+PLAYWRIGHT_TRACE_PATH=""
+PLAYWRIGHT_SCREENSHOT_PATH=""
+PLAYWRIGHT_SELECTOR_TIMEOUT_MS=5000
 ASSERTIONS_PATH=""
 COMPARE_DIAGNOSIS_PATH=""
 SKIP_BOOTSTRAP=0
@@ -60,8 +66,14 @@ while [[ $# -gt 0 ]]; do
     --scenario-name) SCENARIO_NAME="$2"; shift 2 ;;
     --scenario-path) SCENARIO_PATH="$2"; shift 2 ;;
     --scenario-command-id) SCENARIO_COMMAND_ID="$2"; shift 2 ;;
+    --scenario-adapter) SCENARIO_ADAPTER="$2"; shift 2 ;;
     --surface-profile) SURFACE_PROFILE_PATH="$2"; shift 2 ;;
     --scenario-sleep-ms) SCENARIO_SLEEP_MS="$2"; shift 2 ;;
+    --playwright-module) PLAYWRIGHT_MODULE="$2"; shift 2 ;;
+    --playwright-trace) PLAYWRIGHT_TRACE=1; shift ;;
+    --playwright-trace-path) PLAYWRIGHT_TRACE_PATH="$2"; shift 2 ;;
+    --playwright-screenshot-path) PLAYWRIGHT_SCREENSHOT_PATH="$2"; shift 2 ;;
+    --playwright-selector-timeout-ms) PLAYWRIGHT_SELECTOR_TIMEOUT_MS="$2"; shift 2 ;;
     --assertions) ASSERTIONS_PATH="$2"; shift 2 ;;
     --compare-diagnosis) COMPARE_DIAGNOSIS_PATH="$2"; shift 2 ;;
     --skip-bootstrap) SKIP_BOOTSTRAP=1; shift ;;
@@ -272,13 +284,13 @@ json_bool() {
   fi
 }
 
-run_cli_scenario_if_requested() {
+run_scenario_if_requested() {
   local inferred_scenario_name="$SCENARIO_NAME"
   if [[ -z "$inferred_scenario_name" && -n "$SCENARIO_COMMAND_ID" ]]; then
     inferred_scenario_name="open-plugin-view"
   fi
 
-  if [[ "$CLI_AVAILABLE" -ne 1 ]]; then
+  if [[ "$CLI_AVAILABLE" -ne 1 && "$SCENARIO_ADAPTER" != "playwright" ]]; then
     return
   fi
 
@@ -289,12 +301,16 @@ run_cli_scenario_if_requested() {
   write_section "Scenario"
   scenario_args=(
     "$SCRIPT_DIR/obsidian_debug_scenario_runner.mjs"
-    --obsidian-command "$OBS_CMD"
     --plugin-id "$PLUGIN_ID"
     --vault-name "$VAULT_NAME"
     --scenario-sleep-ms "$SCENARIO_SLEEP_MS"
+    --scenario-adapter "$SCENARIO_ADAPTER"
+    --cli-available "$( [[ "$CLI_AVAILABLE" -eq 1 ]] && printf 'true' || printf 'false' )"
     --output "$SCENARIO_REPORT_PATH"
   )
+  if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
+    scenario_args+=(--obsidian-command "$OBS_CMD")
+  fi
 
   if [[ -n "$inferred_scenario_name" ]]; then
     scenario_args+=(--scenario-name "$inferred_scenario_name")
@@ -316,6 +332,21 @@ run_cli_scenario_if_requested() {
   fi
   if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
     scenario_args+=(--cdp-target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
+  fi
+  if [[ -n "$PLAYWRIGHT_MODULE" ]]; then
+    scenario_args+=(--playwright-module "$PLAYWRIGHT_MODULE")
+  fi
+  if [[ "$PLAYWRIGHT_TRACE" -eq 1 ]]; then
+    scenario_args+=(--playwright-trace)
+  fi
+  if [[ -n "$PLAYWRIGHT_TRACE_PATH" ]]; then
+    scenario_args+=(--playwright-trace-path "$PLAYWRIGHT_TRACE_PATH")
+  fi
+  if [[ -n "$PLAYWRIGHT_SCREENSHOT_PATH" ]]; then
+    scenario_args+=(--playwright-screenshot-path "$PLAYWRIGHT_SCREENSHOT_PATH")
+  fi
+  if [[ -n "$PLAYWRIGHT_SELECTOR_TIMEOUT_MS" ]]; then
+    scenario_args+=(--playwright-selector-timeout-ms "$PLAYWRIGHT_SELECTOR_TIMEOUT_MS")
   fi
 
   node "${scenario_args[@]}"
@@ -466,7 +497,7 @@ elif [[ "$SKIP_RELOAD" -eq 0 ]]; then
   obsidian_cli plugin:reload "id=$PLUGIN_ID" >/dev/null
 fi
 
-run_cli_scenario_if_requested
+run_scenario_if_requested
 
 if [[ "$USE_CDP" -eq 0 ]]; then
   write_section "Watch Console"

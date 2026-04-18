@@ -24,6 +24,7 @@ import {
   formatCommandTokens,
   readJsonFileOrNull,
 } from './obsidian_debug_repo_runtime.mjs';
+import { detectPlaywrightSupport } from './obsidian_debug_playwright_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
@@ -34,6 +35,7 @@ const vaultName = getStringOption(options, 'vault-name', '').trim();
 const cdpHost = getStringOption(options, 'cdp-host', '127.0.0.1');
 const cdpPort = getNumberOption(options, 'cdp-port', 9222);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '');
+const playwrightModuleName = getStringOption(options, 'playwright-module', '').trim();
 const outputPath = getStringOption(options, 'output', '').trim();
 const platform = normalizePlatform(getStringOption(options, 'platform', 'auto'));
 const fixRequested = getBooleanOption(options, 'fix', false);
@@ -230,6 +232,10 @@ const distManifestPath = path.join(distDir, 'manifest.json');
 const distStylesPath = path.join(distDir, 'styles.css');
 const manifest = await readJsonFileOrNull(manifestPath);
 const repoRuntime = await detectRepoRuntime({ repoDir });
+const playwrightSupport = await detectPlaywrightSupport({
+  repoDir,
+  moduleName: playwrightModuleName,
+});
 const packageJson = repoRuntime.packageJson;
 const buildScriptExists = repoRuntime.scripts.important.build.exists;
 const inferredBuildCommand = repoRuntime.commands.build.available
@@ -463,6 +469,29 @@ checks.push(
       ),
     },
   ),
+);
+checks.push(
+  playwrightSupport.available
+    ? check(
+        'pass',
+        'playwright-adapter',
+        'runtime',
+        `Optional Playwright adapter is available via ${playwrightSupport.detail}.`,
+        {
+          playwright: playwrightSupport,
+        },
+      )
+    : check(
+        playwrightModuleName ? 'warn' : 'info',
+        'playwright-adapter',
+        'runtime',
+        playwrightModuleName
+          ? `Requested Playwright module ${playwrightModuleName} was not found. ${playwrightSupport.detail}`
+          : `Optional Playwright adapter is not installed in this repo. ${playwrightSupport.detail} Install playwright only when richer locator/trace automation is needed.`,
+        {
+          playwright: playwrightSupport,
+        },
+      ),
 );
 
 if (manifest && expectedPluginId) {
@@ -698,6 +727,7 @@ const report = {
     tools: repoRuntime.tools,
     commands: repoRuntime.commands,
     runtime: repoRuntime.runtime,
+    playwright: playwrightSupport,
   },
   checks,
   fixPlan: {

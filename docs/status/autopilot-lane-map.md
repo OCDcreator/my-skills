@@ -1,11 +1,11 @@
 # Autopilot Lane Map
 
 > **Preset**: `Bugfix / Backlog`
-> **Current `[NEXT]`**: `B11 - Package-manager and runtime doctor coverage`
+> **Current `[NEXT]`**: `B13 - Hot Reload coordination doctor`
 
 ## Current priority
 
-- Start with package-manager/runtime doctor coverage so future automation can adapt itself to npm/pnpm/yarn/bun, Node/WebSocket/runtime prerequisites, and repo-owned Hot Reload conditions before deeper UI automation slices
+- Start with Hot Reload coordination doctoring so future automation can separate deliberate reload flows from Hot Reload-influenced startup noise before moving on to scaffold and CI slices
 - Keep each round bounded to one Obsidian plugin autodebug framework slice
 - Validate with script-level smoke tests where available because this repo has no global build/test/lint
 
@@ -31,5 +31,5 @@
 
 - No broad polish or unrelated cleanup
 - Preserve plugin-agnostic behavior; project-specific names belong only in examples or validation artifacts
-- No queue expansion beyond approved B11-B15 unless a human approves it
+- No queue expansion beyond approved B13-B15 unless a human approves it
 - Keep `automation/runtime/` ignored and local-only

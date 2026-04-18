@@ -137,7 +137,7 @@ Save logs under a repo-local debug folder such as `.obsidian-debug/` or `tmp/`. 
 
 The preferred handoff now has two layers:
 
-- raw artifacts such as `console-watch.log`, `errors.log`, DOM, screenshot, and optional CDP trace,
+- raw artifacts such as `console-watch.log`, `errors.log`, DOM, screenshot, and optional CDP or Playwright traces/screenshots,
 - a generated `diagnosis.json` that turns those artifacts into assertions, timings, issue signatures, and next-step recommendations.
 
 ### 6. Screenshot And DOM Check
@@ -190,14 +190,15 @@ Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable
 
 - `runtime`: plugin id, test vault plugin directory, working directory, Obsidian command, vault name, and output directory.
 - `build` / `deploy` / `bootstrap` / `reload` / `logWatch`: explicit build argv or repo-driven package-manager inference, deploy source, fresh-vault discovery bootstrap policy, CLI or CDP reload mode, and console polling settings.
-- `scenario` / `assertions` / `comparison`: optional view-opening scenario, assertion JSON, DOM selector, and baseline diagnosis comparison.
+- `scenario` / `assertions` / `comparison`: optional view-opening scenario, assertion JSON, DOM selector, baseline diagnosis comparison, and an adapter choice between the existing CLI/CDP runner and an optional Playwright-backed path.
 - `scenario.surfaceProfile`: optional plugin-surface metadata file that declares likely open commands, view types, settings tabs, and selector hints for generic view-open/discovery runs.
+- `scenario.playwright`: optional module/trace/screenshot/timeout settings for richer locator interactions; it reuses `reload.cdp.port` to attach to the running Obsidian window instead of replacing the CLI/CDP-first flow.
 - `profile` / `report`: repeated-cycle timing summary and optional HTML report generation.
 - `state`: optional vault snapshot, plugin-local reset preview/reset, and restore-after-run handling.
 
 Start by copying `job-specs/generic-debug-job.template.json` into the plugin repository, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
 
-The template now leaves `build.command` empty on purpose. Keep `build.inferFromRepo: true` plus `build.script: "build"` when the repo already owns its npm/pnpm/yarn/bun workflow; add an explicit `build.command` array only when the repository needs a nonstandard wrapper.
+The template now leaves `build.command` empty on purpose. Keep `build.inferFromRepo: true` plus `build.script: "build"` when the repo already owns its npm/pnpm/yarn/bun workflow; add an explicit `build.command` array only when the repository needs a nonstandard wrapper. When `scenario.adapter` is `playwright`, keep `reload.cdp.port` configured so the adapter can attach through Chromium CDP while the rest of the job remains plugin-neutral.
 
 If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. The bundled bootstrap script now handles that first-discovery reload/restart path automatically; only fall back to a manual vault reload or app restart when you intentionally disable bootstrap.
 
@@ -531,7 +532,7 @@ node scripts/obsidian_debug_report.mjs \
   --output .obsidian-debug/profile/report.html
 ```
 
-Comparison outputs now include a screenshot diff summary with changed-pixel counts, a changed-region bounding box, and an optional diff PNG when both screenshots exist. The HTML report links screenshots, DOM snapshots, logs, JSON artifacts, and any generated diff preview while degrading gracefully if those files are missing.
+Comparison outputs now include a screenshot diff summary with changed-pixel counts, a changed-region bounding box, and an optional diff PNG when both screenshots exist. The HTML report links screenshots, DOM snapshots, logs, JSON artifacts, optional Playwright traces/screenshots, and any generated diff preview while degrading gracefully if those files are missing.
 
 Attach or open the HTML report when the user needs an easy review artifact; keep `diagnosis.json` as the canonical automation output.
 
@@ -539,7 +540,8 @@ For custom workflows, point `--scenario-path` / `-ScenarioPath` at a JSON file s
 
 - `obsidian-cli` steps for vault-scoped Obsidian CLI commands,
 - `surface-open` steps that resolve the best generic plugin surface-open strategy,
-- `sleep` steps for deterministic settle windows between actions.
+- `sleep` steps for deterministic settle windows between actions,
+- `locator-wait` / `locator-click` / `locator-fill` / `locator-press` / `locator-assert` / `page-screenshot` steps when `scenario.adapter` or `--scenario-adapter` is `playwright`.
 
 Dry-run a synthetic surface profile without touching a real Obsidian app:
 
@@ -551,6 +553,22 @@ node scripts/obsidian_debug_scenario_runner.mjs \
   --dry-run \
   --output .obsidian-debug/scenario-report.json
 ```
+
+For a richer Playwright-backed path, start from `scenarios/playwright-locator-health.template.json` and dry-run or run it with a repo-local Playwright dependency:
+
+```bash
+node scripts/obsidian_debug_scenario_runner.mjs \
+  --scenario-path scenarios/playwright-locator-health.template.json \
+  --scenario-adapter playwright \
+  --playwright-module playwright \
+  --plugin-id sample-plugin \
+  --surface-profile surface-profiles/synthetic-plugin-surface.fixture.json \
+  --cdp-port 9222 \
+  --playwright-trace \
+  --output .obsidian-debug/scenario-report.json
+```
+
+`scripts/obsidian_debug_doctor.mjs` now detects whether a repo-local Playwright package is available before you opt into that adapter, so you can keep the default CLI/CDP route lightweight on repos that do not need Playwright.
 
 Then run the same `obsidian_plugin_debug_cycle.sh` command with `--use-cdp`. In that mode, the script can still:
 

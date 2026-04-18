@@ -88,6 +88,8 @@ export function resolveArtifactPaths(diagnosis, diagnosisPath) {
     cdpTrace: resolveDocumentPath(diagnosisPath, artifacts.cdpTrace),
     cdpSummary: resolveDocumentPath(diagnosisPath, artifacts.cdpSummary),
     scenarioReport: resolveDocumentPath(diagnosisPath, artifacts.scenarioReport),
+    playwrightTrace: resolveDocumentPath(diagnosisPath, artifacts.playwrightTrace),
+    playwrightScreenshot: resolveDocumentPath(diagnosisPath, artifacts.playwrightScreenshot),
     screenshot: resolveDocumentPath(diagnosisPath, artifacts.screenshot),
     dom: resolveDocumentPath(diagnosisPath, artifacts.dom),
   };

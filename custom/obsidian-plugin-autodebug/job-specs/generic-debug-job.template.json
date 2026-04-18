@@ -53,11 +53,19 @@
   },
   "scenario": {
     "enabled": false,
+    "adapter": "cli",
     "name": "open-plugin-view",
     "path": "",
     "commandId": "your-plugin-id:open-view",
     "surfaceProfile": "",
-    "sleepMs": 2000
+    "sleepMs": 2000,
+    "playwright": {
+      "module": "",
+      "trace": false,
+      "tracePath": "",
+      "screenshotPath": "",
+      "selectorTimeoutMs": 5000
+    }
   },
   "assertions": {
     "path": "assertions/plugin-view-health.template.json",

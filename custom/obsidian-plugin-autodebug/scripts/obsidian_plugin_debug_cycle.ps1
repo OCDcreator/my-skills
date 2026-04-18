@@ -25,8 +25,14 @@ param(
   [string]$ScenarioName = "",
   [string]$ScenarioPath = "",
   [string]$ScenarioCommandId = "",
+  [string]$ScenarioAdapter = "cli",
   [string]$SurfaceProfilePath = "",
   [int]$ScenarioSleepMs = 2000,
+  [string]$PlaywrightModule = "",
+  [switch]$PlaywrightTrace,
+  [string]$PlaywrightTracePath = "",
+  [string]$PlaywrightScreenshotPath = "",
+  [int]$PlaywrightSelectorTimeoutMs = 5000,
   [string]$AssertionsPath = "",
   [string]$CompareDiagnosisPath = "",
   [switch]$SkipBootstrap,
@@ -322,6 +328,7 @@ function Invoke-ScenarioRunner {
     "--obsidian-command", $Executable,
     "--plugin-id", $PluginId,
     "--scenario-sleep-ms", "$ScenarioSleepMs",
+    "--scenario-adapter", $ScenarioAdapter,
     "--output", $OutputPath
   )
 
@@ -348,6 +355,21 @@ function Invoke-ScenarioRunner {
   }
   if ($CdpTargetTitleContains.Trim().Length -gt 0) {
     $args += @("--cdp-target-title-contains", $CdpTargetTitleContains)
+  }
+  if ($PlaywrightModule.Trim().Length -gt 0) {
+    $args += @("--playwright-module", $PlaywrightModule)
+  }
+  if ($PlaywrightTrace) {
+    $args += "--playwright-trace"
+  }
+  if ($PlaywrightTracePath.Trim().Length -gt 0) {
+    $args += @("--playwright-trace-path", $PlaywrightTracePath)
+  }
+  if ($PlaywrightScreenshotPath.Trim().Length -gt 0) {
+    $args += @("--playwright-screenshot-path", $PlaywrightScreenshotPath)
+  }
+  if ($PlaywrightSelectorTimeoutMs -gt 0) {
+    $args += @("--playwright-selector-timeout-ms", "$PlaywrightSelectorTimeoutMs")
   }
 
   Write-Section "Scenario"
