@@ -854,7 +854,14 @@ def resolve_runner_executable(config: dict[str, Any]) -> str:
             return str(runner_path)
         raise AutopilotError(f"Configured runner_command was not found: {configured_runner}")
 
-    return shutil.which("codex.cmd") or shutil.which("codex") or "codex"
+    if os.name == "nt":
+        for candidate in ("codex.exe", "codex", "codex.cmd"):
+            resolved = shutil.which(candidate)
+            if resolved:
+                return resolved
+        return "codex.exe"
+
+    return shutil.which("codex") or shutil.which("codex.cmd") or "codex"
 
 
 def invoke_runner_round(

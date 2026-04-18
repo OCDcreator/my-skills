@@ -40,6 +40,8 @@ python .\automation\autopilot.py doctor --profile windows
 python .\automation\autopilot.py start --profile windows
 ```
 
+On Windows, the controller now prefers a native `codex.exe` runner when it is available. If `doctor` still reports a `.cmd` wrapper on your machine, set `runner_command` to the full `codex.exe` path in a local override profile so successful rounds do not get stuck behind a shell wrapper.
+
 For a true no-window unattended launch on Windows, prefer the wrapper's background mode instead of starting `py.exe` in a new visible console. The wrapper should run through a hidden PowerShell host that launches `py` / `python` without depending on `pythonw` / `pyw` shims:
 
 ```powershell
@@ -272,5 +274,4 @@ launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.<repo>.codex-autopilot
 - `automation/Watch-Autopilot.ps1`
 
 These are thin Windows wrappers around the Python CLI. `autopilot.py` already hides child `cmd.exe` / `pwsh.exe` subprocess windows, and `Start-Autopilot.ps1 -Background` should use a hidden PowerShell host so the top-level launcher also stays windowless even when `pythonw` / `pyw` shims are unreliable.
-
 
