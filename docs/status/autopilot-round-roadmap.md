@@ -86,7 +86,7 @@
 - **Acceptance**:
   - The phase doc captures shipped slices, smoke results, remaining risks, and the stop/continue recommendation
 
-### [NEXT] B8 - Smoke-mode diagnosis honors intentional skips
+### [DONE] B8 - Smoke-mode diagnosis honors intentional skips
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make smoke-style validation runs distinguish intentionally skipped screenshot/DOM/console artifacts from truly missing artifacts so lightweight CI-like checks can pass without faking full UI capture.
@@ -97,7 +97,7 @@
   - Smoke jobs can mark capture as intentionally skipped without forcing a blocking diagnosis failure
   - Reports and comparison flows keep enough metadata to tell skipped capture apart from capture regressions
 
-### [QUEUED] B9 - Native macOS smoke host validation
+### [NEXT] B9 - Native macOS smoke host validation
 
 - **Lane**: Checkpoint follow-up
 - **Goal**: Re-run the shipped Bash/macOS automation slices on a native macOS host and record real CLI/CDP/screenshot smoke evidence.
@@ -110,5 +110,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B8 - Smoke-mode diagnosis honors intentional skips`.
+- The current `[NEXT]` is `B9 - Native macOS smoke host validation`.
 - Successful rounds must keep the roadmap and phase docs aligned.

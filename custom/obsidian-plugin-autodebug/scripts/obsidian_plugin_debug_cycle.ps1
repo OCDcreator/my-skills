@@ -522,6 +522,30 @@ $summary = [ordered]@{
   dom = if ($SkipDom -or -not (Test-Path -LiteralPath $domPath)) { $null } else { $domPath }
   watchSeconds = $WatchSeconds
   consoleLimit = $ConsoleLimit
+  capturePlan = [ordered]@{
+    trace = [ordered]@{
+      mode = if ($UseCdp) { "cdp-trace" } else { "console-watch" }
+      requested = if ($UseCdp) { -not $SkipReload } else { $WatchSeconds -gt 0 }
+      intentionallySkipped = if ($UseCdp) { $SkipReload.IsPresent } else { $WatchSeconds -le 0 }
+      skipReason = if ($UseCdp) {
+        if ($SkipReload) { "reload-skipped" } else { $null }
+      } elseif ($WatchSeconds -le 0) {
+        "watch-window-disabled"
+      } else {
+        $null
+      }
+    }
+    screenshot = [ordered]@{
+      requested = -not $SkipScreenshot
+      intentionallySkipped = $SkipScreenshot.IsPresent
+      skipReason = if ($SkipScreenshot) { "skip-screenshot-flag" } else { $null }
+    }
+    dom = [ordered]@{
+      requested = -not $SkipDom
+      intentionallySkipped = $SkipDom.IsPresent
+      skipReason = if ($SkipDom) { "skip-dom-flag" } else { $null }
+    }
+  }
 }
 
 $summary | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $summaryPath -Encoding UTF8

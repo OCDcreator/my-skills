@@ -74,9 +74,24 @@ function normalizeStatusClass(status) {
   switch (status) {
     case 'warning':
       return 'warn';
+    case 'captured':
+    case 'identical':
+    case 'unchanged':
+      return 'pass';
+    case 'different':
+    case 'changed':
+    case 'empty':
+    case 'missing':
+      return 'fail';
+    case 'skipped':
+      return 'skipped';
     default:
       return String(status ?? 'info');
   }
+}
+
+function normalizeArtifactStates(input) {
+  return input && typeof input === 'object' && !Array.isArray(input) ? input : {};
 }
 
 function renderTableRows(items, mapper, colspan = 1) {
@@ -203,12 +218,13 @@ function trimPreview(text, maxLines = 30, maxChars = 2400) {
   return `${clipped.slice(0, maxChars)}\n…`;
 }
 
-function renderPreviewCard({ title, label, path: artifactPath, preview, kind = 'text' }) {
+function renderPreviewCard({ title, label, path: artifactPath, preview, kind = 'text', state = null }) {
   if (!artifactPath) {
     return `
       <div class="artifact-card">
         <h3>${escapeHtml(title)}</h3>
-        <p class="muted">Missing</p>
+        ${state ? `<p><span class="badge ${escapeHtml(normalizeStatusClass(state.status))}">${escapeHtml(state.status)}</span></p>` : ''}
+        <p class="muted">${escapeHtml(state?.detail ?? 'Missing')}</p>
       </div>
     `;
   }
@@ -217,6 +233,7 @@ function renderPreviewCard({ title, label, path: artifactPath, preview, kind = '
     return `
       <div class="artifact-card">
         <h3>${escapeHtml(title)}</h3>
+        ${state ? `<p><span class="badge ${escapeHtml(normalizeStatusClass(state.status))}">${escapeHtml(state.status)}</span></p>` : ''}
         <p>${renderArtifactLink(artifactPath)}</p>
         <img src="${pathHref(artifactPath)}" alt="${escapeHtml(label)}">
       </div>
@@ -226,6 +243,7 @@ function renderPreviewCard({ title, label, path: artifactPath, preview, kind = '
   return `
     <div class="artifact-card">
       <h3>${escapeHtml(title)}</h3>
+      ${state ? `<p><span class="badge ${escapeHtml(normalizeStatusClass(state.status))}">${escapeHtml(state.status)}</span></p>` : ''}
       <p>${renderArtifactLink(artifactPath)}</p>
       ${preview ? `<pre>${escapeHtml(preview)}</pre>` : '<p class="muted">Preview unavailable</p>'}
     </div>
@@ -237,9 +255,10 @@ function renderArtifactRows(entries) {
     <tr>
       <td>${escapeHtml(entry.scope)}</td>
       <td>${escapeHtml(entry.label)}</td>
-      <td>${entry.path ? renderArtifactLink(entry.path) : 'Missing'}</td>
+      <td>${entry.state ? `<span class="badge ${escapeHtml(normalizeStatusClass(entry.state.status))}">${escapeHtml(entry.state.status)}</span>` : 'n/a'}</td>
+      <td>${entry.path ? renderArtifactLink(entry.path) : escapeHtml(entry.state?.detail ?? 'Missing')}</td>
     </tr>
-  `, 3);
+  `, 4);
 }
 
 function renderStatusSummary(label, value, cssClass = '') {
@@ -256,6 +275,8 @@ const profile = await readJsonOrNull(profilePath);
 const diagnosisArtifacts = resolveArtifactPaths(diagnosis, path.resolve(diagnosisPath));
 const comparisonBaselineArtifacts = comparison?.baseline?.artifacts ?? {};
 const comparisonCandidateArtifacts = comparison?.candidate?.artifacts ?? {};
+const diagnosisArtifactStates = normalizeArtifactStates(diagnosis.artifactStates);
+const comparisonBaselineArtifactStates = normalizeArtifactStates(comparison?.baseline?.artifactStates);
 const screenshotDiffPath = comparison?.screenshotDiff?.diffPath ?? null;
 
 const domPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.dom));
@@ -270,18 +291,25 @@ const baselineScreenshotExists = await exists(comparisonBaselineArtifacts.screen
 const artifactEntries = [
   { scope: 'candidate', label: 'diagnosis', path: path.resolve(diagnosisPath) },
   { scope: 'candidate', label: 'summary', path: diagnosisArtifacts.summary },
-  { scope: 'candidate', label: 'screenshot', path: diagnosisArtifacts.screenshot },
-  { scope: 'candidate', label: 'DOM snapshot', path: diagnosisArtifacts.dom },
-  { scope: 'candidate', label: 'console log', path: diagnosisArtifacts.consoleLog },
+  { scope: 'candidate', label: 'screenshot', path: diagnosisArtifacts.screenshot, state: diagnosisArtifactStates.screenshot ?? null },
+  { scope: 'candidate', label: 'DOM snapshot', path: diagnosisArtifacts.dom, state: diagnosisArtifactStates.dom ?? null },
+  { scope: 'candidate', label: 'console log', path: diagnosisArtifacts.consoleLog, state: diagnosis.useCdp ? null : (diagnosisArtifactStates.trace ?? null) },
   { scope: 'candidate', label: 'errors log', path: diagnosisArtifacts.errorsLog },
-  { scope: 'candidate', label: 'CDP trace', path: diagnosisArtifacts.cdpTrace },
+  { scope: 'candidate', label: 'CDP trace', path: diagnosisArtifacts.cdpTrace, state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null },
   { scope: 'candidate', label: 'deploy report', path: diagnosisArtifacts.deployReport },
   { scope: 'candidate', label: 'scenario report', path: diagnosisArtifacts.scenarioReport },
   { scope: 'comparison', label: 'comparison JSON', path: comparisonPath ? path.resolve(comparisonPath) : null },
-  { scope: 'comparison', label: 'screenshot diff', path: screenshotDiffPath },
-  { scope: 'baseline', label: 'baseline screenshot', path: comparisonBaselineArtifacts.screenshot ?? null },
-  { scope: 'baseline', label: 'baseline DOM snapshot', path: comparisonBaselineArtifacts.dom ?? null },
-  { scope: 'baseline', label: 'baseline console log', path: comparisonBaselineArtifacts.consoleLog ?? null },
+  {
+    scope: 'comparison',
+    label: 'screenshot diff',
+    path: screenshotDiffPath,
+    state: comparison?.screenshotDiff
+      ? { status: comparison.screenshotDiff.status, detail: comparison.screenshotDiff.reason ?? null }
+      : null,
+  },
+  { scope: 'baseline', label: 'baseline screenshot', path: comparisonBaselineArtifacts.screenshot ?? null, state: comparisonBaselineArtifactStates.screenshot ?? null },
+  { scope: 'baseline', label: 'baseline DOM snapshot', path: comparisonBaselineArtifacts.dom ?? null, state: comparisonBaselineArtifactStates.dom ?? null },
+  { scope: 'baseline', label: 'baseline console log', path: comparisonBaselineArtifacts.consoleLog ?? null, state: comparison?.baseline?.useCdp ? null : (comparisonBaselineArtifactStates.trace ?? null) },
   { scope: 'baseline', label: 'baseline errors log', path: comparisonBaselineArtifacts.errorsLog ?? null },
   { scope: 'profile', label: 'profile summary', path: profilePath ? path.resolve(profilePath) : null },
 ].filter((entry, index, all) => (
@@ -302,6 +330,7 @@ const html = `<!doctype html>
     .warning { background: #fef3c7; color: #92400e; }
     .warn { background: #fef3c7; color: #92400e; }
     .fail { background: #fee2e2; color: #991b1b; }
+    .skipped { background: #e5e7eb; color: #374151; }
     .expected { background: #e0e7ff; color: #3730a3; }
     .flaky { background: #fde68a; color: #92400e; }
     .info { background: #dbeafe; color: #1e3a8a; }
@@ -341,18 +370,23 @@ const html = `<!doctype html>
         label: 'candidate screenshot',
         path: candidateScreenshotExists ? diagnosisArtifacts.screenshot : null,
         kind: 'image',
+        state: diagnosisArtifactStates.screenshot ?? null,
       })}
       ${renderPreviewCard({
         title: 'Baseline Screenshot',
         label: 'baseline screenshot',
         path: baselineScreenshotExists ? comparisonBaselineArtifacts.screenshot : null,
         kind: 'image',
+        state: comparisonBaselineArtifactStates.screenshot ?? null,
       })}
       ${renderPreviewCard({
         title: 'Screenshot Diff',
         label: 'screenshot diff',
         path: screenshotDiffExists ? screenshotDiffPath : null,
         kind: 'image',
+        state: comparison?.screenshotDiff
+          ? { status: comparison.screenshotDiff.status, detail: comparison.screenshotDiff.reason ?? null }
+          : null,
       })}
     </div>
     ${comparison?.screenshotDiff ? `<p class="muted">
@@ -366,7 +400,7 @@ const html = `<!doctype html>
   <div class="card">
     <h2>Artifact Links</h2>
     <table>
-      <tr><th>Scope</th><th>Artifact</th><th>Path</th></tr>
+      <tr><th>Scope</th><th>Artifact</th><th>Status</th><th>Path / Detail</th></tr>
       ${renderArtifactRows(artifactEntries)}
     </table>
   </div>
@@ -379,12 +413,14 @@ const html = `<!doctype html>
         label: 'candidate DOM snapshot',
         path: diagnosisArtifacts.dom,
         preview: domPreview,
+        state: diagnosisArtifactStates.dom ?? null,
       })}
       ${renderPreviewCard({
         title: 'Candidate Console Log',
         label: 'candidate console log',
         path: diagnosisArtifacts.consoleLog,
         preview: consolePreview,
+        state: diagnosis.useCdp ? null : (diagnosisArtifactStates.trace ?? null),
       })}
       ${renderPreviewCard({
         title: 'Candidate Errors Log',
@@ -397,12 +433,14 @@ const html = `<!doctype html>
         label: 'candidate CDP trace',
         path: diagnosisArtifacts.cdpTrace,
         preview: cdpPreview,
+        state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null,
       })}
       ${renderPreviewCard({
         title: 'Baseline DOM Snapshot',
         label: 'baseline DOM snapshot',
         path: comparisonBaselineArtifacts.dom ?? null,
         preview: baselineDomPreview,
+        state: comparisonBaselineArtifactStates.dom ?? null,
       })}
     </div>
   </div>

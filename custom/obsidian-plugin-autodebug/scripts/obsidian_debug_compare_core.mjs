@@ -34,6 +34,10 @@ export function statusRank(status) {
   }
 }
 
+function trendRank(status) {
+  return status === 'skipped' ? null : statusRank(status);
+}
+
 export function signatureId(entry) {
   return typeof entry === 'string' ? entry : entry?.id;
 }
@@ -87,6 +91,12 @@ export function resolveArtifactPaths(diagnosis, diagnosisPath) {
     screenshot: resolveDocumentPath(diagnosisPath, artifacts.screenshot),
     dom: resolveDocumentPath(diagnosisPath, artifacts.dom),
   };
+}
+
+function normalizeArtifactStates(diagnosis) {
+  return diagnosis?.artifactStates && typeof diagnosis.artifactStates === 'object' && !Array.isArray(diagnosis.artifactStates)
+    ? diagnosis.artifactStates
+    : {};
 }
 
 function pngBytesPerPixel(colorType) {
@@ -334,7 +344,13 @@ function makeDiffOutputPath(outputPath, candidatePath) {
   return path.join(path.dirname(path.resolve(candidatePath)), 'comparison-screenshot-diff.png');
 }
 
-async function compareScreenshotArtifacts({ baselinePath, candidatePath, outputPath = '' }) {
+async function compareScreenshotArtifacts({
+  baselinePath,
+  candidatePath,
+  baselineState = null,
+  candidateState = null,
+  outputPath = '',
+}) {
   const diffPath = makeDiffOutputPath(outputPath, candidatePath ?? baselinePath ?? process.cwd());
   const result = {
     status: 'skipped',
@@ -354,11 +370,19 @@ async function compareScreenshotArtifacts({ baselinePath, candidatePath, outputP
   const baselineExists = await exists(baselinePath);
   const candidateExists = await exists(candidatePath);
   if (!baselineExists || !candidateExists) {
-    result.reason = !baselineExists && !candidateExists
-      ? 'baseline-and-candidate-screenshots-missing'
-      : !baselineExists
-        ? 'baseline-screenshot-missing'
-        : 'candidate-screenshot-missing';
+    const baselineSkipped = baselineState?.status === 'skipped';
+    const candidateSkipped = candidateState?.status === 'skipped';
+    result.reason = baselineSkipped && candidateSkipped
+      ? 'baseline-and-candidate-screenshots-intentionally-skipped'
+      : baselineSkipped
+        ? 'baseline-screenshot-intentionally-skipped'
+        : candidateSkipped
+          ? 'candidate-screenshot-intentionally-skipped'
+          : !baselineExists && !candidateExists
+            ? 'baseline-and-candidate-screenshots-missing'
+            : !baselineExists
+              ? 'baseline-screenshot-missing'
+              : 'candidate-screenshot-missing';
     await fs.rm(diffPath, { force: true }).catch(() => {});
     return result;
   }
@@ -508,22 +532,32 @@ export async function buildDebugComparison({
   })).filter((entry) => entry.baseline !== entry.candidate);
 
   const regressions = assertionChanges.filter((entry) => {
-    const baselineRank = statusRank(entry.baseline ?? 'pass');
-    const candidateRank = statusRank(entry.candidate ?? 'pass');
+    const baselineRank = trendRank(entry.baseline ?? 'pass');
+    const candidateRank = trendRank(entry.candidate ?? 'pass');
+    if (baselineRank === null || candidateRank === null) {
+      return false;
+    }
     return candidateRank > baselineRank;
   });
 
   const fixes = assertionChanges.filter((entry) => {
-    const baselineRank = statusRank(entry.baseline ?? 'pass');
-    const candidateRank = statusRank(entry.candidate ?? 'pass');
+    const baselineRank = trendRank(entry.baseline ?? 'pass');
+    const candidateRank = trendRank(entry.candidate ?? 'pass');
+    if (baselineRank === null || candidateRank === null) {
+      return false;
+    }
     return candidateRank < baselineRank;
   });
 
   const baselineArtifacts = resolveArtifactPaths(baseline, baselinePath);
   const candidateArtifacts = resolveArtifactPaths(candidate, candidatePath);
+  const baselineArtifactStates = normalizeArtifactStates(baseline);
+  const candidateArtifactStates = normalizeArtifactStates(candidate);
   const screenshotDiff = await compareScreenshotArtifacts({
     baselinePath: baselineArtifacts.screenshot,
     candidatePath: candidateArtifacts.screenshot,
+    baselineState: baselineArtifactStates.screenshot ?? null,
+    candidateState: candidateArtifactStates.screenshot ?? null,
     outputPath,
   });
 
@@ -552,15 +586,19 @@ export async function buildDebugComparison({
       name: context.baselineName ?? null,
       status: baseline.status,
       headline: baseline.headline,
+      useCdp: Boolean(baseline.useCdp),
       taxonomy: context.baselineTaxonomy ?? {},
       artifacts: baselineArtifacts,
+      artifactStates: baselineArtifactStates,
     },
     candidate: {
       path: path.resolve(candidatePath),
       status: candidate.status,
       headline: candidate.headline,
+      useCdp: Boolean(candidate.useCdp),
       taxonomy: context.candidateTaxonomy ?? {},
       artifacts: candidateArtifacts,
+      artifactStates: candidateArtifactStates,
     },
     baselineSelection: context.selection ?? null,
     timingDiffs,

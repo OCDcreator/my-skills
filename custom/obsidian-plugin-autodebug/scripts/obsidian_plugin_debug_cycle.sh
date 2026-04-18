@@ -237,6 +237,26 @@ json_path_or_null() {
   fi
 }
 
+json_string_or_null() {
+  local value="$1"
+
+  if [[ -n "$value" ]]; then
+    printf '"%s"' "$value"
+  else
+    printf 'null'
+  fi
+}
+
+json_bool() {
+  local value="${1:-0}"
+
+  if [[ "$value" -eq 1 ]]; then
+    printf 'true'
+  else
+    printf 'false'
+  fi
+}
+
 run_cli_scenario_if_requested() {
   local inferred_scenario_name="$SCENARIO_NAME"
   if [[ -z "$inferred_scenario_name" && -n "$SCENARIO_COMMAND_ID" ]]; then
@@ -491,6 +511,23 @@ if [[ "$SKIP_DOM" -eq 0 ]]; then
   fi
 fi
 
+TRACE_CAPTURE_MODE="console-watch"
+TRACE_CAPTURE_REQUESTED=1
+TRACE_CAPTURE_SKIPPED=0
+TRACE_CAPTURE_SKIP_REASON=""
+if [[ "$USE_CDP" -eq 1 ]]; then
+  TRACE_CAPTURE_MODE="cdp-trace"
+  if [[ "$SKIP_RELOAD" -eq 1 ]]; then
+    TRACE_CAPTURE_REQUESTED=0
+    TRACE_CAPTURE_SKIPPED=1
+    TRACE_CAPTURE_SKIP_REASON="reload-skipped"
+  fi
+elif [[ "$WATCH_SECONDS" -le 0 ]]; then
+  TRACE_CAPTURE_REQUESTED=0
+  TRACE_CAPTURE_SKIPPED=1
+  TRACE_CAPTURE_SKIP_REASON="watch-window-disabled"
+fi
+
 cat > "$SUMMARY_PATH" <<EOF
 {
   "timestamp": "$(timestamp)",
@@ -513,7 +550,25 @@ cat > "$SUMMARY_PATH" <<EOF
   "screenshot": $( [[ "$SKIP_SCREENSHOT" -eq 1 ]] && printf 'null' || json_path_or_null "$SCREENSHOT_PATH" ),
   "dom": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'null' || json_path_or_null "$DOM_PATH" ),
   "watchSeconds": $WATCH_SECONDS,
-  "consoleLimit": $CONSOLE_LIMIT
+  "consoleLimit": $CONSOLE_LIMIT,
+  "capturePlan": {
+    "trace": {
+      "mode": "$TRACE_CAPTURE_MODE",
+      "requested": $( json_bool "$TRACE_CAPTURE_REQUESTED" ),
+      "intentionallySkipped": $( json_bool "$TRACE_CAPTURE_SKIPPED" ),
+      "skipReason": $( json_string_or_null "$TRACE_CAPTURE_SKIP_REASON" )
+    },
+    "screenshot": {
+      "requested": $( [[ "$SKIP_SCREENSHOT" -eq 1 ]] && printf 'false' || printf 'true' ),
+      "intentionallySkipped": $( [[ "$SKIP_SCREENSHOT" -eq 1 ]] && printf 'true' || printf 'false' ),
+      "skipReason": $( [[ "$SKIP_SCREENSHOT" -eq 1 ]] && json_string_or_null "skip-screenshot-flag" || printf 'null' )
+    },
+    "dom": {
+      "requested": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'false' || printf 'true' ),
+      "intentionallySkipped": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'true' || printf 'false' ),
+      "skipReason": $( [[ "$SKIP_DOM" -eq 1 ]] && json_string_or_null "skip-dom-flag" || printf 'null' )
+    }
+  }
 }
 EOF
 

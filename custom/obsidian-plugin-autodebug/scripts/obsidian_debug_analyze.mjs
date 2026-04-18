@@ -76,6 +76,28 @@ function stringValue(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function booleanValue(value, fallback = false) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['false', '0', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return fallback;
+}
+
 async function pathExists(filePath) {
   if (!filePath) {
     return false;
@@ -215,6 +237,134 @@ function isWarningStatus(status) {
 
 function isPassingOrSkipped(status) {
   return status === 'pass' || status === 'skipped';
+}
+
+function humanizeSkipReason(reason) {
+  switch (reason) {
+    case 'watch-window-disabled':
+      return 'watch window disabled';
+    case 'reload-skipped':
+      return 'reload was skipped';
+    case 'skip-screenshot-flag':
+      return 'skip screenshot flag';
+    case 'skip-dom-flag':
+      return 'skip DOM flag';
+    default:
+      return stringValue(reason).replaceAll('-', ' ');
+  }
+}
+
+function formatSkipDetail(label, reason) {
+  const normalizedReason = humanizeSkipReason(reason);
+  return normalizedReason
+    ? `${label} was intentionally skipped (${normalizedReason}).`
+    : `${label} was intentionally skipped.`;
+}
+
+function normalizeCapturePlanEntry(raw, defaults = {}) {
+  const entry = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  return {
+    requested: booleanValue(entry.requested, defaults.requested ?? true),
+    intentionallySkipped: booleanValue(entry.intentionallySkipped, defaults.intentionallySkipped ?? false),
+    skipReason: stringValue(entry.skipReason) || defaults.skipReason || null,
+    mode: stringValue(entry.mode) || defaults.mode || null,
+  };
+}
+
+function deriveCapturePlan(summary) {
+  const raw = summary?.capturePlan;
+  const hasCapturePlan = raw && typeof raw === 'object' && !Array.isArray(raw);
+  return {
+    trace: normalizeCapturePlanEntry(hasCapturePlan ? raw.trace : null, {
+      requested: Boolean(stringValue(summary?.consoleLog) || stringValue(summary?.cdpTrace)),
+      intentionallySkipped: false,
+      skipReason: null,
+      mode: booleanValue(summary?.useCdp, false) ? 'cdp-trace' : 'console-watch',
+    }),
+    screenshot: normalizeCapturePlanEntry(hasCapturePlan ? raw.screenshot : null, {
+      requested: true,
+      intentionallySkipped: false,
+      skipReason: null,
+      mode: 'screenshot',
+    }),
+    dom: normalizeCapturePlanEntry(hasCapturePlan ? raw.dom : null, {
+      requested: true,
+      intentionallySkipped: false,
+      skipReason: null,
+      mode: 'dom',
+    }),
+  };
+}
+
+function artifactEvidence(filePath) {
+  return filePath ? [{ filePath, lineNumber: 1 }] : [];
+}
+
+function buildArtifactState({
+  key,
+  label,
+  plan,
+  artifactPath,
+  exists,
+  captured,
+  captureDetail,
+  failureDetail,
+  failureStatus = 'missing',
+}) {
+  const skipped = booleanValue(plan?.intentionallySkipped, false) || plan?.requested === false;
+  if (skipped) {
+    return {
+      key,
+      label,
+      status: 'skipped',
+      requested: false,
+      intentionallySkipped: true,
+      skipReason: plan?.skipReason ?? null,
+      mode: plan?.mode ?? null,
+      path: artifactPath || null,
+      exists: Boolean(exists),
+      detail: formatSkipDetail(label, plan?.skipReason ?? null),
+    };
+  }
+
+  if (captured) {
+    return {
+      key,
+      label,
+      status: 'captured',
+      requested: booleanValue(plan?.requested, true),
+      intentionallySkipped: false,
+      skipReason: null,
+      mode: plan?.mode ?? null,
+      path: artifactPath || null,
+      exists: Boolean(exists),
+      detail: captureDetail,
+    };
+  }
+
+  return {
+    key,
+    label,
+    status: failureStatus,
+    requested: booleanValue(plan?.requested, true),
+    intentionallySkipped: false,
+    skipReason: null,
+    mode: plan?.mode ?? null,
+    path: artifactPath || null,
+    exists: Boolean(exists),
+    detail: failureDetail,
+  };
+}
+
+function assertionStatusFromArtifactState(state) {
+  switch (state?.status) {
+    case 'captured':
+      return 'pass';
+    case 'skipped':
+      return 'skipped';
+    default:
+      return 'fail';
+  }
 }
 
 function compareNumber(actual, operator, expected) {
@@ -596,6 +746,7 @@ const runtimeContext = {
   testVaultPluginDir,
   vaultRoot: deriveVaultRoot(testVaultPluginDir),
 };
+const capturePlan = deriveCapturePlan(summary);
 
 const consoleText = await readTextIfExists(summary.consoleLog);
 const errorsText = await readTextIfExists(summary.errorsLog);
@@ -659,31 +810,64 @@ function pushAssertion(id, status, detail, evidence = []) {
   assertions.push({ id, status, severity: status === 'fail' ? 'fail' : null, detail, evidence });
 }
 
-if (summary.consoleLog || summary.cdpTrace) {
+const traceArtifactPath = capturePlan.trace.mode === 'cdp-trace' ? summary.cdpTrace : summary.consoleLog;
+const traceState = buildArtifactState({
+  key: 'trace',
+  label: 'Trace capture',
+  plan: capturePlan.trace,
+  artifactPath: traceArtifactPath,
+  exists: Boolean(traceArtifactPath),
+  captured: allLines.length > 0,
+  captureDetail: `Captured ${allLines.length} log lines.`,
+  failureDetail: 'No console/CDP trace lines were captured.',
+  failureStatus: traceArtifactPath ? 'empty' : 'missing',
+});
+if (traceArtifactPath || capturePlan.trace.intentionallySkipped || capturePlan.trace.requested) {
   pushAssertion(
     'trace-captured',
-    allLines.length > 0 ? 'pass' : 'fail',
-    allLines.length > 0 ? `Captured ${allLines.length} log lines.` : 'No console/CDP trace lines were captured.',
-    allLines.length > 0 ? [{ filePath: allLines[0].filePath, lineNumber: allLines[0].lineNumber }] : [],
+    assertionStatusFromArtifactState(traceState),
+    traceState.detail,
+    traceState.status === 'captured'
+      ? [{ filePath: allLines[0].filePath, lineNumber: allLines[0].lineNumber }]
+      : [],
   );
 }
 
+const screenshotState = buildArtifactState({
+  key: 'screenshot',
+  label: 'Screenshot capture',
+  plan: capturePlan.screenshot,
+  artifactPath: summary.screenshot,
+  exists: screenshotExists,
+  captured: screenshotExists,
+  captureDetail: `Screenshot artifact recorded at ${summary.screenshot}.`,
+  failureDetail: 'Screenshot artifact is missing.',
+});
 pushAssertion(
   'screenshot-captured',
-  screenshotExists ? 'pass' : 'fail',
-  screenshotExists ? `Screenshot artifact recorded at ${summary.screenshot}.` : 'Screenshot artifact is missing.',
-  screenshotExists ? [{ filePath: summary.screenshot, lineNumber: 1 }] : [],
+  assertionStatusFromArtifactState(screenshotState),
+  screenshotState.detail,
+  screenshotState.status === 'captured' ? artifactEvidence(summary.screenshot) : [],
 );
 
 const domMatched = ((cdpSummary?.count ?? null) > 0)
   || (domExists && typeof domText === 'string' && domText.trim().length > 0 && (domText.includes('<') || !domText.startsWith('No ')));
+const domState = buildArtifactState({
+  key: 'dom',
+  label: 'DOM capture',
+  plan: capturePlan.dom,
+  artifactPath: summary.dom,
+  exists: domExists,
+  captured: domMatched,
+  captureDetail: `DOM capture produced content${domSelector ? ` for selector ${domSelector}` : ''}.`,
+  failureDetail: `DOM capture is empty${domSelector ? ` for selector ${domSelector}` : ''}.`,
+  failureStatus: summary.dom ? 'empty' : 'missing',
+});
 pushAssertion(
   'dom-root-present',
-  domMatched ? 'pass' : 'fail',
-  domMatched
-    ? `DOM capture produced content${domSelector ? ` for selector ${domSelector}` : ''}.`
-    : `DOM capture is empty${domSelector ? ` for selector ${domSelector}` : ''}.`,
-  summary.dom ? [{ filePath: summary.dom, lineNumber: 1 }] : [],
+  assertionStatusFromArtifactState(domState),
+  domState.detail,
+  domState.status === 'captured' ? artifactEvidence(summary.dom) : [],
 );
 
 if (Array.isArray(deployReport)) {
@@ -1379,6 +1563,11 @@ const diagnosis = {
     scenarioReport: summary.scenarioReport ?? null,
     screenshot: summary.screenshot,
     dom: summary.dom,
+  },
+  artifactStates: {
+    trace: traceState,
+    screenshot: screenshotState,
+    dom: domState,
   },
   assertions,
   customAssertions,
