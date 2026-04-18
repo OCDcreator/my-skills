@@ -11,6 +11,7 @@ my-skills/
 │   ├── fnos-fpk-dev/                          # 飞牛 fnOS FPK 开发
 │   ├── fork-upstream-workflow/                # fork 仓库个人维护与同步上游工作流
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
+│   ├── knowledge-to-print-html/               # 知识点整理为适合打印 PDF 的 HTML 讲义
 │   ├── obsidian-plugin-autodebug/              # Obsidian 插件全自动调试开发循环
 │   ├── obsidian-plugin-debug-logging/          # Obsidian 插件调试日志治理
 │   ├── obsidian-plugin-release-manager/       # Obsidian 插件版本号与测试库部署
@@ -45,6 +46,7 @@ my-skills/
 | [codex-autopilot-scaffold](custom/codex-autopilot-scaffold/) | 把 Codex 风格 repo-local 无人值守 autopilot 脚手架注入任意项目，含 `maintainability`、`quality-gate recovery`、`bugfix/backlog` 三类 preset |
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [fork-upstream-workflow](custom/fork-upstream-workflow/) | 个人 fork 仓库的 `origin` / `upstream` / `main` / `feat/*` 维护策略与同步上游工作流 |
+| [knowledge-to-print-html](custom/knowledge-to-print-html/) | 把知识点、草稿和研究资料整理成适合打印 PDF 的 HTML 讲义，内置版式约束、打印验证与逐页子代理审版循环 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
 | [obsidian-plugin-autodebug](custom/obsidian-plugin-autodebug/) | 通用 Obsidian 插件 build → deploy → clean-vault bootstrap → reload → log watch → screenshot/DOM check 全自动调试开发循环，含 Node/WebSocket/CDP doctor、watch on save、state reset、baseline、playbook、多轮 profile、断言、对比、HTML 报告、native smoke fixture 与 vault 状态恢复 |
 | [obsidian-plugin-debug-logging](custom/obsidian-plugin-debug-logging/) | Obsidian 插件调试日志、诊断报告、BUILD_ID 与 Windows/macOS 日志导出治理 |
