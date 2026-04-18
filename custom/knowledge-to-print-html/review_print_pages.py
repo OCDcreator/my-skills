@@ -160,20 +160,35 @@ def build_subagent_prompt(page_packet: dict[str, Any]) -> str:
     )
 
     return (
+        "REQUIRED: You are a page-review subagent, not the editing agent.\n"
+        "Do not edit files. Do not rewrite the handout. Do not review any other page.\n"
         f"Review page {page_number} of a print-first teaching handout.\n"
         f"Screenshot: {screenshot_path}\n"
         f"Heuristic flags: {heuristic_summary}\n\n"
         "Decide whether this single page passes the print-review gate.\n"
-        "Return JSON with keys: page, pass, issues, fixes.\n"
-        "Rules:\n"
+        "Return only JSON with keys: page, pass, issues, fixes.\n"
+        "Each issue must include: type, severity, evidence, fix.\n"
+        "Review scope:\n"
         "- Fail if body text contains meta/process chrome such as print instructions, topic labels, provenance notes, or workflow narration.\n"
         "- Fail if a diagram is too small to read, text in a diagram overflows, or the diagram works only as decoration.\n"
         "- Fail if the page leaves a large empty lower region without a deliberate full-page composition reason.\n"
         "- Fail if visual hierarchy feels like a web hero or dashboard rather than a study handout.\n"
+        "- Fail if figures, callouts, tables, or code blocks are clipped, awkwardly split, or visually cramped.\n"
+        "- Fail if headings, examples, captions, and body text do not form a clear teaching hierarchy.\n"
         "- Issues must be concrete and page-local.\n"
         "- Fixes must describe how to change layout/content for this page before page "
         f"{page_number + 1} is reviewed."
     )
+
+
+def write_subagent_prompt_file(
+    review_dir: Path,
+    page_number: int,
+    prompt: str,
+) -> Path:
+    prompt_path = review_dir / f"page-{page_number:02d}-subagent-prompt.md"
+    prompt_path.write_text(prompt, encoding="utf-8")
+    return prompt_path
 
 
 def write_review_packets(
@@ -193,6 +208,18 @@ def write_review_packets(
         page_number = int(page["page"])
         screenshot = screenshot_index[page_number]
         flags = build_flags(page, thresholds, screenshot)
+        subagent_prompt = build_subagent_prompt(
+            {
+                "page": page_number,
+                "screenshot": screenshot["path"],
+                "heuristicFlags": flags,
+            }
+        )
+        subagent_prompt_path = write_subagent_prompt_file(
+            review_dir,
+            page_number,
+            subagent_prompt,
+        )
         packet = {
             "page": page_number,
             "screenshot": screenshot["path"],
@@ -204,13 +231,9 @@ def write_review_packets(
             },
             "heuristicFlags": flags,
             "heuristicPass": not any(flag["severity"] == "fail" for flag in flags),
-            "subagentPrompt": build_subagent_prompt(
-                {
-                    "page": page_number,
-                    "screenshot": screenshot["path"],
-                    "heuristicFlags": flags,
-                }
-            ),
+            "subagentRequired": True,
+            "subagentPromptPath": str(subagent_prompt_path),
+            "subagentPrompt": subagent_prompt,
         }
         pages.append(packet)
         packet_path = review_dir / f"page-{page_number:02d}-review.json"
@@ -223,10 +246,15 @@ def write_review_packets(
         "htmlPath": report["htmlPath"],
         "validationReport": str(report_path),
         "reviewMode": "sequential-page-gate",
+        "subagentRequired": True,
+        "nextPageToReview": pages[0]["page"] if pages else None,
+        "mainAgentRule": "The main agent must not self-approve a page. It edits only after a page-review subagent returns structured feedback.",
         "instructions": [
+            "STOP before any self-review: spawn/call one fresh page-review subagent for the current page.",
             "Review page 1 first.",
             "Do not review page N+1 until page N is fixed and revalidated.",
             "A page passes only when heuristics pass and the page-review subagent returns pass=true.",
+            "If no subagent tool is available, report the review as blocked instead of self-approving.",
             "After any page edit, rerun validate_print_layout.py and regenerate this review packet before continuing.",
         ],
         "thresholds": thresholds,
@@ -276,6 +304,12 @@ def main() -> int:
     print(f"Validation report: {report_path}")
     print(f"Review manifest: {manifest_path}")
     print(f"Pages queued: {len(manifest['pages'])}")
+    if manifest["pages"]:
+        first_page = manifest["pages"][0]
+        print(
+            "Next required action: spawn one page-review subagent with "
+            f"{first_page['subagentPromptPath']}"
+        )
     if failing_pages:
         print(f"Heuristic review required: {', '.join(str(page) for page in failing_pages)}")
     else:

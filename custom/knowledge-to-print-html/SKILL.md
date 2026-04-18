@@ -1,6 +1,6 @@
 ---
 name: knowledge-to-print-html
-description: Use when the user gives knowledge-point keywords plus rough notes or draft text and wants the agent to research the topic, enrich it with cases and citations, generate diagrams, and produce a beautiful print-first HTML handout for manual PDF export. Triggers include "知识点", "讲义", "图文并茂", "可打印 HTML", "打印成 PDF", "根据关键词整理", "把笔记做成教程页", or requests to turn notes into a polished learning page.
+description: Use when the user provides knowledge-point keywords, notes, draft text, or learning requirements and wants a polished, source-backed, diagram-rich, print-first HTML handout for A4/PDF. Trigger on "知识点", "讲义", "图文并茂", "可打印 HTML", "打印成 PDF", "根据关键词整理", "把笔记做成教程页", or printable learning-page requests.
 ---
 
 # Knowledge To Print HTML
@@ -71,6 +71,28 @@ Also follow:
 - `references/layout-guardrails.md`
 - `references/diagram-guardrails.md`
 - `references/review-loop.md`
+
+## Non-Negotiable Quality Gates
+
+This skill implements **Plan C: mandatory sequential page review** by default.
+
+Do not hand off `handout.html` until all of these are true:
+
+1. `validate_print_layout.py` has generated per-page screenshots where each screenshot contains exactly one `.sheet`.
+2. `review_print_pages.py` has generated `page-review-manifest.json` plus one `page-XX-subagent-prompt.md` per page.
+3. A fresh page-review subagent has reviewed page 1 using that page's prompt and screenshot.
+4. Page 1 has either passed or been fixed and revalidated.
+5. Only then may page 2 be sent to a fresh page-review subagent.
+6. The same gate repeats until every page passes.
+7. A final full-document validation runs after the last page passes.
+
+If the environment has no subagent/delegation tool, stop and report that the visual review gate is blocked. Do not self-approve pages as a substitute.
+
+Main agent and subagent roles are deliberately separate:
+
+- Main agent: researches, writes, edits HTML/CSS, reruns validation.
+- Page-review subagent: reviews exactly one page screenshot and returns structured feedback.
+- No parallel page edits. No batch approval of later pages.
 
 ## Skill Routing
 
@@ -255,9 +277,45 @@ Default mandatory page-review loop:
 python review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.html
 ```
 
-This writes a sequential review packet to `screens/py-latest/page-review/`. Review page 1 first, fix it if needed, rerun the packet, and only then move to page 2. Do not batch-review later pages before earlier pages pass.
+This writes a sequential review packet to `screens/py-latest/page-review/`, including:
 
-The default loop uses one fresh review subagent per page. The subagent reviews; the main agent edits.
+- `page-review-manifest.json`
+- `page-XX-review.json`
+- `page-XX-subagent-prompt.md`
+
+Review page 1 first. Give the page screenshot, `page-XX-review.json`, and `page-XX-subagent-prompt.md` to a fresh review subagent. If page 1 fails, fix it, rerun the packet, and re-review page 1. Only then move to page 2.
+
+The subagent must review at least:
+
+- meta/process text leaking into the handout body
+- diagram readability, size, and text overflow
+- large lower-page blank regions
+- clipped or cramped figures, tables, callouts, code, and captions
+- print-page balance and break quality
+- information hierarchy and teaching clarity
+- whether the page reads like a study handout rather than a web hero, dashboard, or marketing page
+
+The subagent must return only structured JSON:
+
+```json
+{
+  "page": 1,
+  "pass": false,
+  "issues": [
+    {
+      "type": "large_bottom_gap",
+      "severity": "fail",
+      "evidence": "The lower third of the page is empty after the final callout.",
+      "fix": "Move the next short section onto this page or enlarge the teaching diagram."
+    }
+  ],
+  "fixes": [
+    "Rebalance page 1 before reviewing page 2."
+  ]
+}
+```
+
+If the subagent returns `pass=false`, edit only what is needed for that page, regenerate screenshots and packets, and retry the same page. Do not review later pages while the current page is failing.
 
 Only then hand off `handout.html`.
 

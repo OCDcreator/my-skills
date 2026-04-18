@@ -184,6 +184,30 @@ VISIBLE_SHEET_COUNT_EVAL_JS = r"""
 elements => elements.filter((sheet) => !sheet.hidden).length
 """
 
+ISOLATE_PAGE_EVAL_JS = r"""
+pageNumber => {
+  const sheets = Array.from(document.querySelectorAll(".sheet"));
+  if (sheets.length === 0) return { visibleSheetCount: 0, targetFound: false };
+
+  const pageKey = String(pageNumber);
+  const sheetByDataPage = sheets.find((sheet) => sheet.dataset.page === pageKey);
+  const targetSheet = sheetByDataPage || sheets[pageNumber - 1] || sheets[0];
+
+  for (const sheet of sheets) {
+    const shouldShow = sheet === targetSheet;
+    sheet.hidden = !shouldShow;
+    sheet.toggleAttribute("aria-hidden", !shouldShow);
+    sheet.dataset.printReviewVisible = shouldShow ? "true" : "false";
+  }
+
+  return {
+    visibleSheetCount: sheets.filter((sheet) => !sheet.hidden).length,
+    targetFound: Boolean(targetSheet),
+    targetPage: targetSheet.dataset.page || String(sheets.indexOf(targetSheet) + 1),
+  };
+}
+"""
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -284,6 +308,23 @@ def analyze_document(page: Any) -> dict[str, Any]:
     }
 
 
+def isolate_page_for_capture(page: Any, page_number: int) -> dict[str, Any]:
+    isolation = page.evaluate(ISOLATE_PAGE_EVAL_JS, page_number)
+    if isolation["visibleSheetCount"] != 1:
+        raise RuntimeError(
+            f"Unable to isolate page {page_number}; "
+            f"visible sheets: {isolation['visibleSheetCount']}."
+        )
+    return isolation
+
+
+def page_sheet_locator(page: Any, page_number: int) -> Any:
+    data_page_locator = page.locator(f'.sheet[data-page="{page_number}"]')
+    if data_page_locator.count() > 0:
+        return data_page_locator.first
+    return page.locator(".sheet").nth(page_number - 1)
+
+
 def capture_page_artifacts(
     context: Any,
     base_url: str,
@@ -304,12 +345,11 @@ def capture_page_artifacts(
             page.wait_for_load_state("domcontentloaded")
             page.wait_for_timeout(settle_ms)
 
+            isolation = isolate_page_for_capture(page, page_number)
             screenshot_path = output_dir / f"{prefix}-print-page-{page_number}.png"
             page.screenshot(path=str(screenshot_path), full_page=True)
 
-            target_locator = page.locator(f'.sheet[data-page="{page_number}"]')
-            if target_locator.count() == 0:
-                target_locator = page.locator(".sheet").first
+            target_locator = page_sheet_locator(page, page_number)
 
             rect = target_locator.evaluate(RECT_EVAL_JS)
             visible_sheet_count = page.locator(".sheet").evaluate_all(
@@ -324,6 +364,7 @@ def capture_page_artifacts(
                     "height": rect["height"],
                     "hidden": rect["hidden"],
                     "visibleSheetCount": visible_sheet_count,
+                    "isolatedTargetPage": isolation["targetPage"],
                 }
             )
         finally:

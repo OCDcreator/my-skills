@@ -22,10 +22,11 @@ python review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.h
 
 3. Read `screens/py-latest/page-review/page-review-manifest.json`
 4. Start with page 1:
-   - spawn a fresh review subagent for that page
+   - spawn a fresh review subagent for that page; do not self-review
    - hand the page screenshot to that subagent
-   - include the page packet JSON and the prompt from that packet
-   - ask for structured `pass/fail`, issues, and fixes
+   - include `page-XX-review.json`
+   - include `page-XX-subagent-prompt.md`
+   - require structured JSON only
 5. If page 1 fails:
    - modify the HTML/CSS/content
    - rerun `review_print_pages.py`
@@ -42,7 +43,29 @@ Use exactly one review subagent per page at a time.
 
 Do not let multiple workers rewrite the same handout page in parallel.
 
-The review result must be structured and page-local:
+If the environment has no subagent/delegation tool, the review gate is blocked. The main agent must tell the user this instead of self-approving the page.
+
+The review result must be structured, page-local JSON:
+
+```json
+{
+  "page": 1,
+  "pass": false,
+  "issues": [
+    {
+      "type": "diagram_readability",
+      "severity": "fail",
+      "evidence": "Labels in the lower flowchart are too small to read at page scale.",
+      "fix": "Split the flowchart into two figures or enlarge it to full width."
+    }
+  ],
+  "fixes": [
+    "Rebuild page 1 before reviewing page 2."
+  ]
+}
+```
+
+Required fields:
 
 - `pass`
 - `issues`
@@ -50,11 +73,25 @@ The review result must be structured and page-local:
 
 Avoid vague feedback like “looks a bit crowded” or “maybe larger”.
 
+## What the subagent must check
+
+For each page, review all of these:
+
+- **Meta leakage** — print instructions, topic labels, provenance notes, “user-provided notes”, workflow narration, or other process chrome in the learner-facing body
+- **Diagram readability** — figures are large enough, teach a real concept, have readable labels, and do not contain text overflow or cramped arrows
+- **Page density** — the lower page region is not obviously empty unless the composition has a clear teaching reason
+- **Overflow and clipping** — figures, callouts, tables, code blocks, captions, and reference items stay inside the page
+- **Teaching hierarchy** — title, section headings, examples, captions, and takeaways have clear relative importance
+- **Print identity** — the page feels like a study handout, not a website hero, dashboard, mood board, or marketing page
+- **Page-local continuity** — blocks are not awkwardly split and the page can be understood in sequence
+
 ## What counts as a page-review failure
 
 - meta/process chrome appears in the handout body
 - diagrams are too small to read
 - diagram text overflows or becomes cramped
+- diagrams act as decoration instead of explanation
 - the page wastes a large lower section with obvious blank space
 - the page reads like web chrome rather than a teaching handout
 - blocks split awkwardly or feel visually unbalanced
+- the page passes heuristics but the screenshot still looks visually broken
