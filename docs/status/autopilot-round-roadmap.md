@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] B1 - Config-driven debug job spec and platform-neutral command adapters
+### [DONE] B1 - Config-driven debug job spec and platform-neutral command adapters
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Replace long ad-hoc cycle command templates with a generic job spec that describes build, deploy, reload, log watch, scenario, assertions, comparison, profile, report, and state handling.
@@ -21,7 +21,7 @@
   - At least one Windows-style and one Bash-style dry-run/example command is documented
   - The phase doc records scope, changed files, and validation results
 
-### [QUEUED] B2 - Generic view-open strategy chain and selector discovery
+### [NEXT] B2 - Generic view-open strategy chain and selector discovery
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add plugin-neutral ways to open a plugin surface and discover likely root selectors, headings, settings surfaces, error banners, and empty states.
@@ -88,5 +88,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B1 - Config-driven debug job spec and platform-neutral command adapters`.
+- The current `[NEXT]` is `B2 - Generic view-open strategy chain and selector discovery`.
 - Successful rounds must keep the roadmap and phase docs aligned.

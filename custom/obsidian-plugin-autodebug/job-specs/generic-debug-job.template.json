@@ -1,0 +1,101 @@
+{
+  "$schema": "./obsidian-debug-job.schema.json",
+  "version": 1,
+  "job": {
+    "id": "generic-plugin-health",
+    "label": "Generic plugin health cycle",
+    "description": "Plugin-agnostic build, deploy, reload, log-watch, scenario, assertion, comparison, profile, report, and state-handling plan."
+  },
+  "runtime": {
+    "cwd": ".",
+    "pluginId": "your-plugin-id",
+    "testVaultPluginDir": "/path/to/test-vault/.obsidian/plugins/your-plugin-id",
+    "vaultName": "",
+    "obsidianCommand": "obsidian",
+    "outputDir": ".obsidian-debug/{{jobId}}-{{platform}}"
+  },
+  "build": {
+    "enabled": true,
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ]
+  },
+  "deploy": {
+    "enabled": true,
+    "from": "dist"
+  },
+  "reload": {
+    "enabled": true,
+    "mode": "cli",
+    "useCdp": false,
+    "cdp": {
+      "host": "127.0.0.1",
+      "port": 9222,
+      "targetTitleContains": "",
+      "reloadDelayMs": 800,
+      "evalAfterReload": ""
+    }
+  },
+  "logWatch": {
+    "enabled": true,
+    "seconds": 20,
+    "pollIntervalMs": 1000,
+    "consoleLimit": 200
+  },
+  "scenario": {
+    "enabled": false,
+    "name": "open-plugin-view",
+    "path": "",
+    "commandId": "your-plugin-id:open-view",
+    "sleepMs": 2000
+  },
+  "assertions": {
+    "path": "assertions/plugin-view-health.template.json",
+    "domSelector": ".workspace-leaf.mod-active",
+    "domText": false
+  },
+  "comparison": {
+    "baselineDiagnosisPath": ""
+  },
+  "profile": {
+    "enabled": false,
+    "runs": 3,
+    "label": "generic-plugin-health",
+    "mode": "warm",
+    "rootOutput": ".obsidian-debug/profile"
+  },
+  "report": {
+    "enabled": false,
+    "diagnosis": "",
+    "profile": "",
+    "comparison": "",
+    "output": ".obsidian-debug/report.html"
+  },
+  "capture": {
+    "screenshot": true,
+    "dom": true
+  },
+  "state": {
+    "restoreAfterRun": false,
+    "vaultSnapshot": {
+      "enabled": false,
+      "snapshotDir": ".obsidian-debug/vault-state",
+      "allowMissing": true,
+      "targets": [
+        "/path/to/test-vault/.obsidian/plugins/your-plugin-id/data.json"
+      ]
+    },
+    "pluginReset": {
+      "enabled": false,
+      "mode": "preview",
+      "statePlan": "state-plans/plugin-data-reset.json",
+      "vaultRoot": "/path/to/test-vault",
+      "snapshotDir": ".obsidian-debug/plugin-state-reset",
+      "targets": [],
+      "recreateFiles": [],
+      "recreateDirs": []
+    }
+  }
+}

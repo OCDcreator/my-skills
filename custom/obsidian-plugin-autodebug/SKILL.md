@@ -179,6 +179,47 @@ Apply this fix pattern when safe:
 
 The OpenCodian debugging lesson: a `view-open` path that looked like an 8s plugin startup was actually `applyLoadedConversationHydrationTail()` awaiting a context usage server snapshot while the local OpenCode server was still starting. Making the snapshot refresh fire-and-forget reduced visible open time from seconds to milliseconds while preserving later token/cost updates.
 
+## Config-Driven Job Specs
+
+Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable across Windows PowerShell and macOS/Linux Bash. A job spec describes the same phases as the direct cycle wrappers without forcing agents to hand-write long platform-specific command templates:
+
+- `runtime`: plugin id, test vault plugin directory, working directory, Obsidian command, vault name, and output directory.
+- `build` / `deploy` / `reload` / `logWatch`: build argv, deploy source, CLI or CDP reload mode, and console polling settings.
+- `scenario` / `assertions` / `comparison`: optional view-opening scenario, assertion JSON, DOM selector, and baseline diagnosis comparison.
+- `profile` / `report`: repeated-cycle timing summary and optional HTML report generation.
+- `state`: optional vault snapshot, plugin-local reset preview/reset, and restore-after-run handling.
+
+Start by copying `job-specs/generic-debug-job.template.json` into the plugin repository, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
+
+Dry-run the PowerShell command plan:
+
+```powershell
+node "C:\path\to\obsidian-plugin-autodebug\scripts\obsidian_debug_job.mjs" `
+  --job "C:\path\to\plugin-repo\.obsidian-debug\job.json" `
+  --platform windows `
+  --dry-run
+```
+
+Dry-run the Bash command plan:
+
+```bash
+node /path/to/obsidian-plugin-autodebug/scripts/obsidian_debug_job.mjs \
+  --job /path/to/plugin-repo/.obsidian-debug/job.json \
+  --platform bash \
+  --dry-run
+```
+
+When the dry-run plan is safe, execute it:
+
+```bash
+node /path/to/obsidian-plugin-autodebug/scripts/obsidian_debug_job.mjs \
+  --job /path/to/plugin-repo/.obsidian-debug/job.json \
+  --platform auto \
+  --mode run
+```
+
+The direct PowerShell and Bash cycle wrappers below remain supported as fallback paths. Use them when a single ad-hoc pass is clearer than introducing a job file, or when a repository already has stricter build/deploy instructions that should stay outside the generic job runner.
+
 ## Bundled Scripts
 
 ### Windows CLI/CDP cycle
