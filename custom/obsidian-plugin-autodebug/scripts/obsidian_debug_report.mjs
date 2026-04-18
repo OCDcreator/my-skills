@@ -44,6 +44,34 @@ function renderList(items, mapper) {
   return items.map(mapper).join('');
 }
 
+function normalizeStatusClass(status) {
+  switch (status) {
+    case 'warning':
+      return 'warn';
+    default:
+      return String(status ?? 'info');
+  }
+}
+
+function renderTableRows(items, mapper, colspan = 1) {
+  if (!items || items.length === 0) {
+    return `<tr><td colspan="${colspan}">None</td></tr>`;
+  }
+  return items.map(mapper).join('');
+}
+
+function renderAssertionRows(entries) {
+  return renderTableRows(entries, (entry) => `
+    <tr>
+      <td><code>${escapeHtml(entry.id)}</code></td>
+      <td><span class="badge ${escapeHtml(normalizeStatusClass(entry.status))}">${escapeHtml(entry.status)}</span></td>
+      <td>${escapeHtml(entry.severity ?? '')}</td>
+      <td>${escapeHtml(entry.detail)}</td>
+    </tr>
+    ${entry.rules?.length ? `<tr><td colspan="4"><details><summary>Grouped log rules</summary><ul>${renderList(entry.rules, (rule) => `<li><code>${escapeHtml(rule.id)}</code> — ${escapeHtml(rule.status)} — ${escapeHtml(rule.detail)}</li>`)}</ul></details></td></tr>` : ''}
+  `, 4);
+}
+
 function renderPlaybooks(playbooks) {
   if (!playbooks || playbooks.length === 0) {
     return '<p>None</p>';
@@ -80,7 +108,10 @@ const html = `<!doctype html>
     .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; margin-right: 8px; }
     .pass { background: #d1fae5; color: #065f46; }
     .warning { background: #fef3c7; color: #92400e; }
+    .warn { background: #fef3c7; color: #92400e; }
     .fail { background: #fee2e2; color: #991b1b; }
+    .expected { background: #e0e7ff; color: #3730a3; }
+    .flaky { background: #fde68a; color: #92400e; }
     .info { background: #dbeafe; color: #1e3a8a; }
     .card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; margin: 16px 0; box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; }
@@ -92,7 +123,7 @@ const html = `<!doctype html>
 <body>
   <h1>Obsidian Debug Report</h1>
   <div class="card">
-    <div class="badge ${escapeHtml(diagnosis.status)}">${escapeHtml(diagnosis.status)}</div>
+    <div class="badge ${escapeHtml(normalizeStatusClass(diagnosis.status))}">${escapeHtml(diagnosis.status)}</div>
     <strong>${escapeHtml(diagnosis.headline)}</strong>
     <p>Plugin: <code>${escapeHtml(diagnosis.pluginId)}</code> | Vault: <code>${escapeHtml(diagnosis.vaultName)}</code></p>
   </div>
@@ -107,9 +138,16 @@ const html = `<!doctype html>
 
   <div class="card">
     <h2>Assertions</h2>
+    <p>
+      Total: <code>${escapeHtml(diagnosis.assertionSummary?.total ?? 0)}</code>
+      | Blocking: <code>${escapeHtml((diagnosis.assertionSummary?.blockingFailures ?? []).length)}</code>
+      | Warn: <code>${escapeHtml((diagnosis.assertionSummary?.warnings ?? []).length)}</code>
+      | Expected: <code>${escapeHtml((diagnosis.assertionSummary?.expected ?? []).length)}</code>
+      | Flaky: <code>${escapeHtml((diagnosis.assertionSummary?.flaky ?? []).length)}</code>
+    </p>
     <table>
-      <tr><th>ID</th><th>Status</th><th>Detail</th></tr>
-      ${renderList([...(diagnosis.assertions ?? []), ...(diagnosis.customAssertions ?? [])], (entry) => `<tr><td>${escapeHtml(entry.id)}</td><td>${escapeHtml(entry.status)}</td><td>${escapeHtml(entry.detail)}</td></tr>`)}
+      <tr><th>ID</th><th>Status</th><th>Severity</th><th>Detail</th></tr>
+      ${renderAssertionRows([...(diagnosis.assertions ?? []), ...(diagnosis.customAssertions ?? [])])}
     </table>
   </div>
 

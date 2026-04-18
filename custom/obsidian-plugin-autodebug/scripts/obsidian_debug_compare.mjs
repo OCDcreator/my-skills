@@ -23,8 +23,13 @@ const outputPath = getStringOption(
 function statusRank(status) {
   switch (status) {
     case 'fail':
-      return 3;
+      return 5;
     case 'warning':
+    case 'warn':
+      return 4;
+    case 'flaky':
+      return 3;
+    case 'expected':
       return 2;
     case 'pass':
       return 1;

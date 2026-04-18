@@ -32,7 +32,7 @@
   - The strategy chain is documented and testable with a synthetic or real plugin fixture
   - Discovery output is machine-readable for downstream assertions
 
-### [NEXT] B3 - Rich generic assertions and performance budgets
+### [DONE] B3 - Rich generic assertions and performance budgets
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Extend assertions beyond simple DOM/log checks to cover counts, visibility, text regex, attributes, computed styles, grouped log rules, and timing budgets.
@@ -43,7 +43,7 @@
   - Assertion failures are summarized in diagnosis and report outputs
   - Generic examples do not require a specific plugin
 
-### [QUEUED] B4 - Baseline taxonomy, regression comparison, and retention
+### [NEXT] B4 - Baseline taxonomy, regression comparison, and retention
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Classify baselines by platform, vault state, cold/warm mode, scenario, plugin id, and run label; compare against the closest matching baseline.
@@ -88,5 +88,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B3 - Rich generic assertions and performance budgets`.
+- The current `[NEXT]` is `B4 - Baseline taxonomy, regression comparison, and retention`.
 - Successful rounds must keep the roadmap and phase docs aligned.

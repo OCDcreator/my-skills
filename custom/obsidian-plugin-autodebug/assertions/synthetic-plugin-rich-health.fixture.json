@@ -1,47 +1,37 @@
 {
-  "name": "plugin-view-health-template",
-  "description": "Plugin-agnostic rich assertion template covering DOM counts/visibility/text, attributes/styles, grouped log rules, and timing budgets.",
+  "name": "synthetic-plugin-rich-health",
+  "description": "Synthetic plugin-neutral fixture covering rich generic assertions and non-blocking severities.",
   "assertions": [
     {
       "id": "scenario-open-view",
       "type": "scenario-success"
     },
     {
-      "id": "screenshot-exists",
-      "type": "artifact-exists",
-      "field": "screenshot"
-    },
-    {
-      "id": "dom-exists",
-      "type": "artifact-exists",
-      "field": "dom"
-    },
-    {
       "id": "plugin-root-count",
       "type": "dom-count",
-      "selector": "<plugin-root-selector>",
+      "selector": ".plugin-root",
       "min": 1,
       "severity": "fail"
     },
     {
       "id": "plugin-root-visible",
       "type": "dom-visible",
-      "selector": "<plugin-root-selector>",
+      "selector": ".plugin-root",
       "min": 1,
       "severity": "fail"
     },
     {
       "id": "plugin-status-text",
       "type": "dom-text-regex",
-      "selector": "<plugin-root-selector>",
-      "pattern": "<expected-heading-or-status-regex>",
+      "selector": ".plugin-root",
+      "pattern": "Ready|Healthy",
       "flags": "i",
       "severity": "fail"
     },
     {
       "id": "plugin-ready-attribute",
       "type": "dom-attribute",
-      "selector": "<plugin-root-selector>",
+      "selector": ".plugin-root",
       "attribute": "data-ready-state",
       "expected": "ready",
       "severity": "warn"
@@ -49,7 +39,7 @@
     {
       "id": "plugin-display-style",
       "type": "computed-style",
-      "selector": "<plugin-root-selector>",
+      "selector": ".plugin-root",
       "property": "display",
       "expected": "block",
       "severity": "warn"
@@ -60,13 +50,13 @@
       "severity": "fail",
       "rules": [
         {
-          "id": "no-fatal-banner",
-          "type": "not-contains",
-          "value": "<known-fatal-error-substring>",
+          "id": "plugin-ready-log",
+          "type": "contains",
+          "value": "Plugin ready",
           "source": "combined"
         },
         {
-          "id": "error-count-budget",
+          "id": "no-fatal-errors",
           "type": "count",
           "pattern": "ERROR|Unhandled",
           "flags": "gi",
@@ -79,23 +69,22 @@
       "id": "view-open-budget",
       "type": "timing-budget",
       "metric": "viewOpenCompletedMs",
-      "maxMs": 1500,
+      "maxMs": 1200,
       "severity": "warn"
     },
     {
-      "id": "cold-start-empty-state-allowed",
+      "id": "cold-start-empty-state",
       "type": "dom-text-regex",
-      "selector": "<plugin-empty-state-selector>",
-      "pattern": "<known-empty-state-regex>",
+      "selector": ".plugin-empty-state",
+      "pattern": "Loading data",
       "flags": "i",
       "severity": "expected"
     },
     {
-      "id": "server-ready-flaky-budget",
+      "id": "server-ready-budget",
       "type": "timing-budget",
       "metric": "serverReadyMs",
-      "maxMs": 5000,
-      "allowMissing": true,
+      "maxMs": 500,
       "severity": "flaky"
     }
   ]

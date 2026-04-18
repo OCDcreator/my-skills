@@ -43,6 +43,14 @@ const result = await session.evaluate(`(() => {
       textContent: node.textContent ?? '',
       display: globalThis.getComputedStyle(node).display,
       visibility: globalThis.getComputedStyle(node).visibility,
+      opacity: globalThis.getComputedStyle(node).opacity,
+      pointerEvents: globalThis.getComputedStyle(node).pointerEvents,
+      computedStyle: {
+        display: globalThis.getComputedStyle(node).display,
+        visibility: globalThis.getComputedStyle(node).visibility,
+        opacity: globalThis.getComputedStyle(node).opacity,
+        'pointer-events': globalThis.getComputedStyle(node).pointerEvents,
+      },
     })),
   };
 })()`);
@@ -89,6 +97,15 @@ await fs.writeFile(
       targetTitleContains,
       selector,
       count: value.count,
+      matches: value.matches.slice(0, 50).map((entry) => ({
+        textContent: String(entry.textContent ?? '').slice(0, 1000),
+        display: entry.display,
+        visibility: entry.visibility,
+        opacity: entry.opacity,
+        pointerEvents: entry.pointerEvents,
+        computedStyle: entry.computedStyle ?? {},
+      })),
+      matchesTruncated: value.matches.length > 50,
       htmlOutput: htmlOutput || null,
       textOutput: textOutput || null,
       screenshotOutput: screenshotOutput || null,

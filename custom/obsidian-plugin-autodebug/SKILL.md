@@ -266,7 +266,16 @@ The CLI watch logs are incremental: repeated `dev:console` / `dev:errors` pollin
 - issue signatures from `rules/issue-signatures.json`,
 - deduplicated recommendations for the next debugging pass.
 
-Example assertions live under `assertions/`. Use `assertions/plugin-view-health.template.json` as the generic starting point for a new plugin, then replace the selector/error placeholders with your own expected UI markers. `assertions/opencodian-view-health.json` remains a concrete real-world example of the same pattern.
+Example assertions live under `assertions/`. Use `assertions/plugin-view-health.template.json` as the generic starting point for a new plugin, then replace the selector/error placeholders with your own expected UI markers. `assertions/synthetic-plugin-rich-health.fixture.json` is a plugin-neutral runnable fixture for counts, visibility, text regex, attributes, computed styles, grouped log rules, and timing budgets. `assertions/opencodian-view-health.json` remains a concrete real-world example of the same pattern.
+
+The analyzer keeps assertion definitions declarative JSON and now supports:
+
+- selector counts and visibility budgets,
+- DOM/log text regex checks,
+- DOM attribute and computed-style checks,
+- grouped log rules with per-rule summaries,
+- timing budgets against named metrics or matched completed phases,
+- non-blocking assertion severities: `warn`, `expected`, and `flaky` alongside blocking `fail`.
 
 When a plugin does not have one obvious `commandId`, capture reusable view-open metadata in `surface-profiles/plugin-surface.template.json`. The scenario runner resolves strategies in this order: declared metadata first, then Obsidian commands/view types, then CDP DOM heuristics. `scenario-report.json` now includes a machine-readable `surfaceDiscovery` block with the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, and empty states.
 
