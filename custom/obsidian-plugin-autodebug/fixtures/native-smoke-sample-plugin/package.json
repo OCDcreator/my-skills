@@ -1,0 +1,11 @@
+{
+  "name": "native-smoke-sample-plugin",
+  "version": "0.0.1",
+  "description": "Generic native smoke fixture for Obsidian plugin autodebug validation",
+  "main": "main.js",
+  "scripts": {
+    "build": "node -e \"console.log('native smoke fixture already built')\""
+  },
+  "author": "my-skills",
+  "license": "MIT"
+}

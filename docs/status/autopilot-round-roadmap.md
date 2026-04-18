@@ -97,7 +97,7 @@
   - Smoke jobs can mark capture as intentionally skipped without forcing a blocking diagnosis failure
   - Reports and comparison flows keep enough metadata to tell skipped capture apart from capture regressions
 
-### [NEXT] B9 - Native macOS smoke host validation
+### [DONE] B9 - Native macOS smoke host validation
 
 - **Lane**: Checkpoint follow-up
 - **Goal**: Re-run the shipped Bash/macOS automation slices on a native macOS host and record real CLI/CDP/screenshot smoke evidence.
@@ -110,5 +110,5 @@
 
 ## Current state
 
-- The current `[NEXT]` is `B9 - Native macOS smoke host validation`.
-- Successful rounds must keep the roadmap and phase docs aligned.
+- No queued `[NEXT]` slice remains in this roadmap.
+- B1-B9 are complete. Future work should be added as a new queued slice instead of silently widening this completed lane.

@@ -192,6 +192,8 @@ Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable
 
 Start by copying `job-specs/generic-debug-job.template.json` into the plugin repository, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
 
+If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. On the first deploy into a fresh vault, reload the vault or restart Obsidian once so the new community plugin is discovered before you expect `plugin-reload-loaded` to pass.
+
 Dry-run the PowerShell command plan:
 
 ```powershell

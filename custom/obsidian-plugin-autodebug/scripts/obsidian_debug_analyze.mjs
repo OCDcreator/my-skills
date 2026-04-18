@@ -833,6 +833,20 @@ if (traceArtifactPath || capturePlan.trace.intentionallySkipped || capturePlan.t
   );
 }
 
+if (summary.useCdp && cdpSummary?.reloadResult && capturePlan.trace.requested) {
+  const reloadResult = cdpSummary.reloadResult;
+  const reloadStatus = reloadResult.ok && reloadResult.loaded ? 'pass' : 'fail';
+  const reloadDetail = reloadResult.ok && reloadResult.loaded
+    ? `CDP reload reported ${summary.pluginId || 'the plugin'} as loaded.`
+    : `CDP reload did not confirm ${summary.pluginId || 'the plugin'} as loaded${reloadResult.ok === false ? ' (reload returned ok=false)' : ''}.`;
+  pushAssertion(
+    'plugin-reload-loaded',
+    reloadStatus,
+    reloadDetail,
+    summary.cdpSummary ? [{ filePath: summary.cdpSummary, lineNumber: 1 }] : artifactEvidence(summary.cdpTrace),
+  );
+}
+
 const screenshotState = buildArtifactState({
   key: 'screenshot',
   label: 'Screenshot capture',

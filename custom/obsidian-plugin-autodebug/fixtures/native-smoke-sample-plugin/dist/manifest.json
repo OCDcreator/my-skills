@@ -1,0 +1,10 @@
+{
+  "id": "native-smoke-sample-plugin",
+  "name": "Native Smoke Sample Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.5",
+  "description": "Generic Obsidian plugin fixture used to verify native debug/deploy/reload automation.",
+  "author": "my-skills",
+  "authorUrl": "https://github.com/OCDcreator/my-skills",
+  "isDesktopOnly": false
+}
