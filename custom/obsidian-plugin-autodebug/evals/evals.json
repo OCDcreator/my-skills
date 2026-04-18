@@ -48,6 +48,12 @@
       "prompt": "先跑 doctor，看这个 Obsidian 调试环境在 Node20/WebSocket/CDP 上有没有坑；如果 fresh vault 还没发现插件，也给出可执行修复方案。",
       "expected_output": "Runs the doctor with vault-aware plugin discovery checks, reports Node runtime WebSocket support for CDP, and emits a bootstrap-ready fix plan when the plugin is not yet discoverable.",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "这个仓库用 pnpm，不要再默认 npm。先用 doctor 识别 packageManager/lockfile/Corepack，再生成一个能在 Windows 和 macOS 复用的 job plan。",
+      "expected_output": "Detects repo-owned package-manager signals such as packageManager, lockfiles, and build/dev/test scripts; reports Corepack/package-manager readiness; and emits a job plan that infers pnpm/yarn/bun commands instead of assuming npm-only workflows.",
+      "files": []
     }
   ]
 }

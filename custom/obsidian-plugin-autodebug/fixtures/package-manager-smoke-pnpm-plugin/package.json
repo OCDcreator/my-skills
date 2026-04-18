@@ -1,0 +1,14 @@
+{
+  "name": "package-manager-smoke-pnpm-plugin",
+  "version": "0.0.1",
+  "description": "Generic pnpm smoke fixture for Obsidian plugin autodebug validation",
+  "main": "main.js",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "node -e \"console.log('pnpm smoke fixture already built')\"",
+    "dev": "node -e \"console.log('pnpm smoke fixture dev')\"",
+    "test": "node -e \"console.log('pnpm smoke fixture test')\""
+  },
+  "author": "my-skills",
+  "license": "MIT"
+}

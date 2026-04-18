@@ -1,0 +1,10 @@
+{
+  "id": "package-manager-smoke-pnpm-plugin",
+  "name": "Package Manager Smoke PNPM Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.5",
+  "description": "Generic pnpm fixture used to validate repo-driven package-manager inference.",
+  "author": "my-skills",
+  "authorUrl": "https://github.com/OCDcreator/my-skills",
+  "isDesktopOnly": false
+}

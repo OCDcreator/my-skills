@@ -75,11 +75,13 @@ obsidian dev:errors clear
 
 ### 2. Build
 
-Prefer the repo’s documented command, often:
+Prefer the repo’s documented command. In npm-style repos this is often:
 
 ```bash
 npm run build
 ```
+
+When a repo uses `pnpm`, `yarn`, or `bun`, the bundled doctor/job runner now infers the right package-manager command from `package.json packageManager`, lockfiles, and `build/dev/test` scripts. If the direct executable is missing but Corepack is available, the inferred command can fall back to `corepack pnpm run build` or `corepack yarn run build` instead of assuming npm.
 
 For diagnosis changes, run targeted tests first when available, then the required gate from the repo instructions. Keep lint warnings as blockers if the repo says so.
 
@@ -187,13 +189,15 @@ The OpenCodian debugging lesson: a `view-open` path that looked like an 8s plugi
 Prefer `scripts/obsidian_debug_job.mjs` when a debug loop needs to be repeatable across Windows PowerShell and macOS/Linux Bash. A job spec describes the same phases as the direct cycle wrappers without forcing agents to hand-write long platform-specific command templates:
 
 - `runtime`: plugin id, test vault plugin directory, working directory, Obsidian command, vault name, and output directory.
-- `build` / `deploy` / `bootstrap` / `reload` / `logWatch`: build argv, deploy source, fresh-vault discovery bootstrap policy, CLI or CDP reload mode, and console polling settings.
+- `build` / `deploy` / `bootstrap` / `reload` / `logWatch`: explicit build argv or repo-driven package-manager inference, deploy source, fresh-vault discovery bootstrap policy, CLI or CDP reload mode, and console polling settings.
 - `scenario` / `assertions` / `comparison`: optional view-opening scenario, assertion JSON, DOM selector, and baseline diagnosis comparison.
 - `scenario.surfaceProfile`: optional plugin-surface metadata file that declares likely open commands, view types, settings tabs, and selector hints for generic view-open/discovery runs.
 - `profile` / `report`: repeated-cycle timing summary and optional HTML report generation.
 - `state`: optional vault snapshot, plugin-local reset preview/reset, and restore-after-run handling.
 
 Start by copying `job-specs/generic-debug-job.template.json` into the plugin repository, then replace only the generic placeholders such as `your-plugin-id` and `/path/to/test-vault`. Keep repo-local absolute paths in the runtime copy, not in committed shared templates.
+
+The template now leaves `build.command` empty on purpose. Keep `build.inferFromRepo: true` plus `build.script: "build"` when the repo already owns its npm/pnpm/yarn/bun workflow; add an explicit `build.command` array only when the repository needs a nonstandard wrapper.
 
 If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. The bundled bootstrap script now handles that first-discovery reload/restart path automatically; only fall back to a manual vault reload or app restart when you intentionally disable bootstrap.
 
@@ -303,7 +307,7 @@ node scripts/obsidian_debug_doctor.mjs \
   --fix
 ```
 
-Treat `fail` checks as blockers. Treat `warn` checks as actionable context: for example, the macOS app binary can pass launch checks but still warn that the full Obsidian CLI developer commands are unavailable, in which case use the CDP-first flow. The doctor now also checks whether the current Node runtime exposes `globalThis.WebSocket` for CDP scripts and whether the target vault has already discovered/enabled the copied plugin; with `--fix`, it can emit a bootstrap command plan instead of making you rediscover that fresh-vault quirk manually.
+Treat `fail` checks as blockers. Treat `warn` checks as actionable context: for example, the macOS app binary can pass launch checks but still warn that the full Obsidian CLI developer commands are unavailable, in which case use the CDP-first flow. The doctor now also checks whether the current Node runtime exposes `globalThis.WebSocket` for CDP scripts, whether Corepack or the inferred package manager is ready, which lockfiles and `packageManager` fields the repo declares, which `build/dev/test` scripts exist, and whether the target vault has already discovered/enabled the copied plugin. With `--fix`, it can emit a bootstrap/build command plan instead of making you rediscover those fresh-vault or package-manager quirks manually.
 When you add `--fix`, the doctor keeps the run safe by generating a reviewable `doctor-fixes.ps1` or `doctor-fixes.sh` next to the JSON output instead of silently mutating the repo or vault.
 
 You can also run a scenario before the watch/capture phase. The built-in `open-plugin-view` scenario is useful when the plugin exposes a command such as `<plugin-id>:open-view` and you want DOM/screenshot capture to target the plugin pane:

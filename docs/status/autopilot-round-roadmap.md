@@ -121,7 +121,7 @@
   - Doctor reports fresh-vault discovery status and Node/WebSocket CDP readiness with runnable remediation commands
   - Windows and native macOS smoke validation record evidence for both additions
 
-### [NEXT] B11 - Package-manager and runtime doctor coverage
+### [DONE] B11 - Package-manager and runtime doctor coverage
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Teach the generic doctor/job runner how to identify Node version, Corepack readiness, npm/pnpm/yarn/bun usage, lockfiles, package-manager fields, and repo build/dev/test scripts so future rounds stop assuming npm-only workflows.
@@ -134,7 +134,7 @@
   - Job/cycle runners can choose inferred package-manager commands or explain why inference is weak
   - Windows and macOS smoke evidence covers at least one npm-style and one non-npm-style path or fixture
 
-### [QUEUED] B12 - Optional Playwright and UI trace adapter
+### [NEXT] B12 - Optional Playwright and UI trace adapter
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add an optional Playwright-backed scenario adapter for richer UI interactions, locator assertions, and trace artifacts while preserving the existing CLI/CDP-first path.
@@ -189,5 +189,6 @@
 ## Current state
 
 - B1-B10 are complete.
-- B11 is the approved next slice.
-- B12-B15 are approved queued follow-ups; do not expand beyond them without another human approval.
+- B11 is complete.
+- B12 is the approved next slice.
+- B13-B15 are approved queued follow-ups; do not expand beyond them without another human approval.

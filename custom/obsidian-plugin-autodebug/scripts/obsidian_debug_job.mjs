@@ -9,6 +9,10 @@ import {
   nowIso,
   parseArgs,
 } from './obsidian_cdp_common.mjs';
+import {
+  detectRepoRuntime,
+  formatCommandTokens,
+} from './obsidian_debug_repo_runtime.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const jobPathRaw = getStringOption(options, 'job', '').trim();
@@ -132,7 +136,105 @@ function commandFor({ phase, executable, args, cwd, platform, summary }) {
   };
 }
 
-function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = '' }) {
+function resolveBuildCommand({ build, repoTooling, warnings, blockers }) {
+  const explicitCommand = asArray(build.command);
+  const scriptName = stringValue(build.script, 'build');
+  const inferenceAllowed = build.inferFromRepo !== false;
+
+  if (explicitCommand.length > 0) {
+    const inferredCommand = repoTooling?.commands?.[scriptName];
+    if (
+      inferredCommand?.available
+      && explicitCommand[0] !== inferredCommand.command[0]
+    ) {
+      warnings.push(
+        `build.command explicitly uses ${formatCommandTokens(explicitCommand)}, while repo inference suggests ${inferredCommand.rendered}; keeping the explicit command.`,
+      );
+    }
+    return {
+      source: 'explicit',
+      scriptName,
+      command: explicitCommand,
+      rendered: formatCommandTokens(explicitCommand),
+      detail: 'Using explicit build.command from the job spec.',
+      available: true,
+    };
+  }
+
+  if (!inferenceAllowed) {
+    const detail = 'build.command is empty and build.inferFromRepo is false.';
+    blockers.push(`${detail} Provide an explicit build.command before run mode.`);
+    warnings.push(detail);
+    return {
+      source: 'none',
+      scriptName,
+      command: [],
+      rendered: '',
+      detail,
+      available: false,
+    };
+  }
+
+  if (!repoTooling?.packageJson) {
+    const detail = 'build.command is empty and package.json could not be read for repo-driven inference.';
+    blockers.push(detail);
+    warnings.push(detail);
+    return {
+      source: 'none',
+      scriptName,
+      command: [],
+      rendered: '',
+      detail,
+      available: false,
+    };
+  }
+
+  const inferredCommand = repoTooling.commands?.[scriptName];
+  if (!inferredCommand?.exists) {
+    const detail = `build.command is empty and package.json does not define scripts.${scriptName}.`;
+    blockers.push(detail);
+    warnings.push(detail);
+    return {
+      source: 'none',
+      scriptName,
+      command: [],
+      rendered: '',
+      detail,
+      available: false,
+    };
+  }
+
+  if (!inferredCommand.available) {
+    const detail = `build.command is empty; inferred ${repoTooling.inference.manager} for scripts.${scriptName}, but ${inferredCommand.detail}`;
+    blockers.push(detail);
+    warnings.push(detail);
+    return {
+      source: 'none',
+      scriptName,
+      command: [],
+      rendered: '',
+      detail,
+      available: false,
+    };
+  }
+
+  if (repoTooling.inference.weak) {
+    warnings.push(
+      `build.command is empty; using weak repo inference (${repoTooling.inference.confidence}) for ${inferredCommand.rendered}.`,
+    );
+  }
+
+  return {
+    source: 'inferred',
+    scriptName,
+    command: inferredCommand.command,
+    rendered: inferredCommand.rendered,
+    detail: `Inferred ${inferredCommand.rendered} from ${repoTooling.inference.reasons.join('; ') || 'repo tooling'}.`,
+    available: true,
+  };
+}
+
+function buildCycleCommand({ spec, platform, cwd, warnings, blockers, repoTooling, outputDirOverride = '' }) {
   const runtime = asObject(spec.runtime);
   const build = asObject(spec.build);
   const deploy = asObject(spec.deploy);
@@ -154,6 +256,9 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   const useCdp = stringValue(reload.mode, 'cli').toLowerCase() === 'cdp' || booleanValue(reload.useCdp, false);
   const watchSeconds = enabled(logWatch, true) ? numberValue(logWatch.seconds, 20) : 0;
   const captureEnabled = enabled(capture, true);
+  const buildCommandInfo = resolveBuildCommand({ build, repoTooling, warnings, blockers });
+  const buildCommand = buildCommandInfo.available ? buildCommandInfo.command : [];
+  const skipBuild = !enabled(build, true) || buildCommand.length === 0;
 
   if (!pluginId) {
     warnings.push('runtime.pluginId is empty; run mode requires a plugin id.');
@@ -176,7 +281,6 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addValue(args, '-ObsidianCommand', runtime.obsidianCommand);
     addValue(args, '-DeployFrom', stringValue(deploy.from, 'dist'));
     addValue(args, '-OutputDir', outputDir);
-    const buildCommand = asArray(build.command);
     if (buildCommand.length > 0) {
       args.push('-BuildCommand', ...buildCommand);
     }
@@ -207,19 +311,22 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addValue(args, '-BootstrapRestartWaitMs', numberValue(bootstrap.restartWaitMs, 8000));
     addValue(args, '-BootstrapEnableWaitMs', numberValue(bootstrap.enableWaitMs, 1000));
     addSwitch(args, '-DomText', booleanValue(assertions.domText, false));
-    addSwitch(args, '-SkipBuild', !enabled(build, true));
+    addSwitch(args, '-SkipBuild', skipBuild);
     addSwitch(args, '-SkipDeploy', !enabled(deploy, true));
     addSwitch(args, '-SkipReload', !enabled(reload, true));
     addSwitch(args, '-SkipScreenshot', !captureEnabled || capture.screenshot === false);
     addSwitch(args, '-SkipDom', !captureEnabled || capture.dom === false);
-    return commandFor({
+    return {
+      ...commandFor({
       phase: 'debug-cycle',
       executable: 'powershell',
       args,
       cwd,
       platform,
       summary: 'Run the Windows PowerShell build/deploy/reload/watch cycle.',
-    });
+      }),
+      buildCommandInfo,
+    };
   }
 
   const args = [path.join(scriptDir, 'obsidian_plugin_debug_cycle.sh')];
@@ -229,7 +336,6 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   addValue(args, '--obsidian-command', runtime.obsidianCommand);
   addValue(args, '--deploy-from', stringValue(deploy.from, 'dist'));
   addValue(args, '--output-dir', outputDir);
-  const buildCommand = asArray(build.command);
   if (buildCommand.length > 0) {
     addValue(args, '--build-command', buildCommand.join(' '));
   }
@@ -260,19 +366,22 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   addValue(args, '--bootstrap-enable-wait-ms', numberValue(bootstrap.enableWaitMs, 1000));
   addSwitch(args, '--dom-text', booleanValue(assertions.domText, false));
   addSwitch(args, '--use-cdp', useCdp);
-  addSwitch(args, '--skip-build', !enabled(build, true));
+  addSwitch(args, '--skip-build', skipBuild);
   addSwitch(args, '--skip-deploy', !enabled(deploy, true));
   addSwitch(args, '--skip-reload', !enabled(reload, true));
   addSwitch(args, '--skip-screenshot', !captureEnabled || capture.screenshot === false);
   addSwitch(args, '--skip-dom', !captureEnabled || capture.dom === false);
-  return commandFor({
+  return {
+    ...commandFor({
     phase: 'debug-cycle',
     executable: 'bash',
     args,
     cwd,
     platform,
     summary: 'Run the Bash build/deploy/reload/watch cycle.',
-  });
+    }),
+    buildCommandInfo,
+  };
 }
 
 function buildStateCommands({ spec, platform, cwd, warnings }) {
@@ -462,19 +571,23 @@ function buildReportCommand({ spec, platform, cwd, cycleOutputDir }) {
   });
 }
 
-function buildPlan(spec) {
+async function buildPlan(spec) {
   const warnings = [];
+  const blockers = [];
   const job = asObject(spec.job);
   const runtime = asObject(spec.runtime);
   const profile = asObject(spec.profile);
   const jobId = stringValue(job.id, 'obsidian-debug-job');
   const cwd = path.resolve(cwdOverride || stringValue(runtime.cwd, process.cwd()));
+  const repoTooling = await detectRepoRuntime({ repoDir: cwd });
   const profileEnabled = enabled(profile, false);
   const cycleCommand = buildCycleCommand({
     spec,
     platform,
     cwd,
     warnings,
+    blockers,
+    repoTooling,
     outputDirOverride: profileEnabled ? '{{outputDir}}' : outputDirOverride,
   });
   const profileCommand = buildProfileCommand({ spec, platform, cwd, cycleCommand });
@@ -505,6 +618,9 @@ function buildPlan(spec) {
     cwd,
     commandCount: commands.length,
     warnings,
+    blockers,
+    repoTooling,
+    buildCommand: cycleCommand.buildCommandInfo,
     commands,
   };
 }
@@ -523,6 +639,9 @@ function validateRunPlan(plan) {
     .join('\n');
   if (placeholderPattern.test(rendered)) {
     throw new Error('Run mode refused a job plan that still contains placeholder values.');
+  }
+  if (Array.isArray(plan.blockers) && plan.blockers.length > 0) {
+    throw new Error(`Run mode refused a job plan with blockers: ${plan.blockers.join(' | ')}`);
   }
 }
 
@@ -553,7 +672,7 @@ async function runPlan(plan) {
   }
 }
 
-const plan = buildPlan(jobSpec);
+const plan = await buildPlan(jobSpec);
 if (outputPath) {
   const resolvedOutput = path.resolve(outputPath);
   await ensureParentDirectory(resolvedOutput);

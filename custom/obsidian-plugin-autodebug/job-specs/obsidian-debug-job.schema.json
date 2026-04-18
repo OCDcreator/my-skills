@@ -67,6 +67,14 @@
         "enabled": {
           "type": "boolean"
         },
+        "inferFromRepo": {
+          "type": "boolean",
+          "description": "When true, infer npm/pnpm/yarn/bun from packageManager and lockfiles if command is omitted."
+        },
+        "script": {
+          "type": "string",
+          "description": "package.json script name to infer when command is omitted."
+        },
         "command": {
           "oneOf": [
             {

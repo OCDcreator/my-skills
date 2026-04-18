@@ -16,11 +16,9 @@
   },
   "build": {
     "enabled": true,
-    "command": [
-      "npm",
-      "run",
-      "build"
-    ]
+    "inferFromRepo": true,
+    "script": "build",
+    "command": []
   },
   "deploy": {
     "enabled": true,

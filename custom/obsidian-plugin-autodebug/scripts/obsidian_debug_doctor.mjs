@@ -19,6 +19,11 @@ import {
   resolveTemplateCommand,
   scriptExtension,
 } from './obsidian_debug_command_templates.mjs';
+import {
+  detectRepoRuntime,
+  formatCommandTokens,
+  readJsonFileOrNull,
+} from './obsidian_debug_repo_runtime.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
@@ -184,14 +189,6 @@ function parsePluginList(text) {
     .filter((entry) => entry.id.length > 0);
 }
 
-async function readJsonOrNull(filePath) {
-  try {
-    return JSON.parse((await fs.readFile(filePath, 'utf8')).replace(/^\uFEFF/, ''));
-  } catch {
-    return null;
-  }
-}
-
 async function exists(filePath) {
   try {
     await fs.access(filePath);
@@ -231,20 +228,27 @@ const distDir = path.join(repoDir, 'dist');
 const distMainPath = path.join(distDir, 'main.js');
 const distManifestPath = path.join(distDir, 'manifest.json');
 const distStylesPath = path.join(distDir, 'styles.css');
-const manifest = await readJsonOrNull(manifestPath);
-const packageJson = await readJsonOrNull(packagePath);
-const buildScriptExists = Boolean(packageJson?.scripts?.build);
+const manifest = await readJsonFileOrNull(manifestPath);
+const repoRuntime = await detectRepoRuntime({ repoDir });
+const packageJson = repoRuntime.packageJson;
+const buildScriptExists = repoRuntime.scripts.important.build.exists;
+const inferredBuildCommand = repoRuntime.commands.build.available
+  ? repoRuntime.commands.build.command
+  : [];
+const inferredBuildCommandText = formatCommandTokens(inferredBuildCommand);
 
-const buildFixes = buildScriptExists
+const buildFixes = buildScriptExists && inferredBuildCommand.length > 0
   ? [
       {
         id: 'run-build',
         label: 'Build plugin output',
-        summary: 'Regenerate the deployable dist artifacts before retrying deploy/reload.',
+        summary: inferredBuildCommandText
+          ? `Regenerate the deployable dist artifacts with ${inferredBuildCommandText} before retrying deploy/reload.`
+          : 'Regenerate the deployable dist artifacts before retrying deploy/reload.',
         safety: 'writes-build-output',
         dryRunFriendly: false,
-        executable: 'npm',
-        args: ['run', 'build'],
+        executable: inferredBuildCommand[0],
+        args: inferredBuildCommand.slice(1),
         cwd: '{{repoDir}}',
       },
     ]
@@ -319,13 +323,146 @@ checks.push(
 );
 checks.push(
   packageJson
-    ? check('pass', 'repo-package', 'build', `Found package.json${buildScriptExists ? ' with build script' : ''}`, { path: packagePath })
+    ? check(
+        'pass',
+        'repo-package',
+        'build',
+        `Found package.json${repoRuntime.scripts.names.length > 0 ? ` with scripts: ${repoRuntime.scripts.names.join(', ')}` : ''}`,
+        {
+          path: packagePath,
+          scripts: repoRuntime.scripts.names,
+        },
+      )
     : check('warn', 'repo-package', 'build', 'package.json was not found or is invalid', { path: packagePath }),
 );
 checks.push(
   buildScriptExists
-    ? check('pass', 'build-script', 'build', 'package.json defines a build script', { path: packagePath })
+    ? check(
+        repoRuntime.commands.build.available ? 'pass' : 'warn',
+        'build-script',
+        'build',
+        repoRuntime.commands.build.available
+          ? `package.json defines scripts.build; inferred build command is ${repoRuntime.commands.build.rendered}`
+          : `package.json defines scripts.build, but no runnable package-manager command was found: ${repoRuntime.commands.build.detail}`,
+        {
+          path: packagePath,
+          inferredCommand: repoRuntime.commands.build.command,
+          via: repoRuntime.commands.build.via,
+        },
+      )
     : check('warn', 'build-script', 'build', 'package.json is missing scripts.build; build fixes stay informational only', { path: packagePath }),
+);
+checks.push(
+  repoRuntime.packageManagerField
+    ? check(
+        repoRuntime.packageManagerField.supported && repoRuntime.packageManagerField.valid ? 'pass' : 'warn',
+        'package-manager-field',
+        'runtime',
+        repoRuntime.packageManagerField.supported
+          ? `package.json declares packageManager=${repoRuntime.packageManagerField.raw}`
+          : `package.json declares unsupported packageManager=${repoRuntime.packageManagerField.raw}`,
+        {
+          path: packagePath,
+          packageManager: repoRuntime.packageManagerField,
+        },
+      )
+    : check(
+        'info',
+        'package-manager-field',
+        'runtime',
+        'package.json does not declare a packageManager field; lockfiles and fallback heuristics drive inference.',
+        { path: packagePath },
+      ),
+);
+checks.push(
+  repoRuntime.lockfiles.length > 0
+    ? check(
+        'pass',
+        'package-manager-lockfiles',
+        'build',
+        `Detected lockfiles: ${repoRuntime.lockfiles.map((lockfile) => lockfile.name).join(', ')}`,
+        {
+          lockfiles: repoRuntime.lockfiles.map((lockfile) => ({
+            name: lockfile.name,
+            manager: lockfile.manager,
+            path: lockfile.path,
+          })),
+        },
+      )
+    : check(
+        'info',
+        'package-manager-lockfiles',
+        'build',
+        'No package-manager lockfiles were detected; inference may be weaker on repos that omit packageManager.',
+        {},
+      ),
+);
+checks.push(
+  check(
+    repoRuntime.inference.weak ? 'warn' : 'pass',
+    'package-manager-inference',
+    'runtime',
+    `Inferred ${repoRuntime.inference.manager} with ${repoRuntime.inference.confidence} confidence from ${repoRuntime.inference.reasons.join('; ') || 'fallback heuristics'}.`,
+    {
+      inference: repoRuntime.inference,
+      suggestedCommands: Object.fromEntries(
+        Object.entries(repoRuntime.commands)
+          .filter(([, command]) => command.exists)
+          .map(([name, command]) => [name, command.command]),
+      ),
+    },
+  ),
+);
+checks.push(
+  check(
+    repoRuntime.runtime.corepackRelevant
+      ? repoRuntime.runtime.corepackReady ? 'pass' : 'warn'
+      : repoRuntime.tools.corepack.available ? 'info' : 'info',
+    'corepack-readiness',
+    'runtime',
+    repoRuntime.runtime.corepackRelevant
+      ? repoRuntime.runtime.corepackReady
+        ? repoRuntime.tools[repoRuntime.runtime.inferredManager]?.available
+          ? `${repoRuntime.runtime.inferredManager} is available directly; Corepack is optional for this repo.`
+          : `${repoRuntime.tools.corepack.detail} can launch ${repoRuntime.runtime.inferredManager} for this repo.`
+        : `${repoRuntime.runtime.inferredManager} is inferred for this repo, but neither ${repoRuntime.runtime.inferredManager} nor Corepack is available.`
+      : repoRuntime.tools.corepack.available
+        ? `${repoRuntime.tools.corepack.detail} is available, but this repo does not currently require a Corepack-managed package manager.`
+        : 'Corepack is unavailable; that is OK unless the repo expects pnpm or yarn through packageManager.',
+    {
+      tools: {
+        corepack: repoRuntime.tools.corepack,
+        npm: repoRuntime.tools.npm,
+        pnpm: repoRuntime.tools.pnpm,
+        yarn: repoRuntime.tools.yarn,
+        bun: repoRuntime.tools.bun,
+      },
+      inferredManager: repoRuntime.runtime.inferredManager,
+    },
+  ),
+);
+checks.push(
+  check(
+    ['build', 'dev', 'test'].some((name) => repoRuntime.scripts.important[name].exists) ? 'pass' : 'info',
+    'repo-script-catalog',
+    'build',
+    ['build', 'dev', 'test']
+      .filter((name) => repoRuntime.scripts.important[name].exists)
+      .map((name) => `${name} → ${repoRuntime.commands[name].available ? repoRuntime.commands[name].rendered : repoRuntime.scripts.important[name].body}`)
+      .join('; ') || 'No build/dev/test scripts were detected in package.json.',
+    {
+      scripts: Object.fromEntries(
+        ['build', 'dev', 'test'].map((name) => [
+          name,
+          {
+            exists: repoRuntime.scripts.important[name].exists,
+            body: repoRuntime.scripts.important[name].body,
+            inferredCommand: repoRuntime.commands[name].command,
+          },
+        ]),
+      ),
+    },
+  ),
 );
 
 if (manifest && expectedPluginId) {
@@ -553,6 +690,15 @@ const report = {
     targetTitleContains: cdpTargetTitleContains || null,
   },
   categoryCounts,
+  repoRuntime: {
+    packageManagerField: repoRuntime.packageManagerField,
+    lockfiles: repoRuntime.lockfiles,
+    scripts: repoRuntime.scripts,
+    inference: repoRuntime.inference,
+    tools: repoRuntime.tools,
+    commands: repoRuntime.commands,
+    runtime: repoRuntime.runtime,
+  },
   checks,
   fixPlan: {
     requested: fixRequested,
