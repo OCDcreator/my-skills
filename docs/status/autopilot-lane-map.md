@@ -1,11 +1,12 @@
 # Autopilot Lane Map
 
 > **Preset**: `Bugfix / Backlog`
-> **Current `[NEXT]`**: `B15 - Optional testing-framework and CI templates`
+> **Current `[NEXT]`**: `None - await new approved slice`
 
 ## Current priority
 
-- Move to optional testing-framework and CI-template work now that the framework can scaffold a minimal debug-ready plugin workspace and local fresh-vault target
+- B15 is complete; optional testing-framework detection and CI-template emission are now covered
+- Hold the lane until a human approves another backlog slice
 - Keep each round bounded to one Obsidian plugin autodebug framework slice
 - Validate with script-level smoke tests where available because this repo has no global build/test/lint
 

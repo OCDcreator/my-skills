@@ -66,6 +66,12 @@
       "prompt": "我现在还没有真正的插件仓库。先帮我生成一个最小的 sample-plugin 工作区和 test-vault，再给出能直接跑 bootstrap/debug job 的配置，和已有插件 retrofit 流程区分清楚。",
       "expected_output": "Scaffolds a minimal plugin-neutral sample workspace with local build output, a fresh-vault target, and generated autodebug job/assertion/surface files while clearly separating the sample scaffold flow from the existing-plugin retrofit flow.",
       "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "本地 smoke 已经通过了。现在给我一个可选的 obsidian-testing-framework 检测结果，再生成一套不依赖 secret 和本机绝对路径的 CI/headless 质量门模板，明确哪些步骤还只能本地桌面跑。",
+      "expected_output": "Reports whether obsidian-testing-framework is installed, merely declared, or absent; identifies any repo-owned scripts that already invoke it; emits headless quality-gate templates for Bash/PowerShell/GitHub Actions without machine-local absolute paths; and clearly separates CI-suitable checks from local-only Obsidian desktop phases.",
+      "files": []
     }
   ]
 }

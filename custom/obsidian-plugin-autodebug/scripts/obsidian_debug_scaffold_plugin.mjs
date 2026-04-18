@@ -8,6 +8,7 @@ import {
   nowIso,
   parseArgs,
 } from './obsidian_cdp_common.mjs';
+import { generateQualityGateTemplates } from './obsidian_debug_ci_templates.mjs';
 
 const SUPPORTED_PACKAGE_MANAGERS = new Set(['npm', 'pnpm', 'yarn', 'bun']);
 const PACKAGE_MANAGER_FIELDS = {
@@ -82,6 +83,7 @@ const report = {
   notes: [
     'Open the generated test-vault in Obsidian for a self-contained fresh-vault bootstrap path.',
     'Use the generated autodebug job for scaffold smoke runs; keep the generic template flow for existing plugin repositories.',
+    'Use autodebug/ci/ for headless quality gates; desktop reload/bootstrap capture remains local-only.',
   ],
 };
 
@@ -310,6 +312,24 @@ await writeTextFile('autodebug/obsidian-debug-job.schema.json', ensureTrailingNe
 await writeTextFile(`autodebug/${pluginId}-debug-job.json`, `${JSON.stringify(jobSpec, null, 2)}\n`);
 await writeTextFile('test-vault/Welcome.md', `# ${pluginName} Test Vault\n\nOpen this folder as a fresh Obsidian vault to exercise bootstrap mode against the scaffolded plugin.\n`);
 
+const ciTemplateReport = await generateQualityGateTemplates({
+  repoDir: workspaceDir,
+  jobPath: path.join('autodebug', `${pluginId}-debug-job.json`),
+  outputDir: path.join('autodebug', 'ci'),
+  toolRootRef: '.agents/skills/obsidian-plugin-autodebug',
+});
+for (const filePath of ciTemplateReport.files) {
+  if (!report.files.includes(filePath)) {
+    report.files.push(filePath);
+  }
+}
+report.ciTemplates = {
+  outputDir: path.relative(workspaceDir, ciTemplateReport.outputDir),
+  files: ciTemplateReport.files,
+  ciSuitable: ciTemplateReport.ciSuitable,
+  localOnly: ciTemplateReport.localOnly,
+};
+
 const distFiles = await buildDistArtifacts({
   workspaceDir,
   manifestText: `${JSON.stringify(manifest, null, 2)}\n`,
@@ -323,6 +343,8 @@ report.distFiles = distFiles.map((filePath) => path.relative(workspaceDir, fileP
 report.sampleCommands = {
   bashDryRun: `node /path/to/obsidian-plugin-autodebug/scripts/obsidian_debug_job.mjs --job ${path.join('autodebug', `${pluginId}-debug-job.json`)} --platform bash --dry-run`,
   windowsDryRun: `node C:\\path\\to\\obsidian-plugin-autodebug\\scripts\\obsidian_debug_job.mjs --job autodebug\\${pluginId}-debug-job.json --platform windows --dry-run`,
+  ciQualityGateBash: `AUTODEBUG_TOOL_ROOT=/path/to/obsidian-plugin-autodebug bash autodebug/ci/quality-gate.sh`,
+  ciQualityGateWindows: `$env:AUTODEBUG_TOOL_ROOT='C:\\path\\to\\obsidian-plugin-autodebug'; powershell -NoProfile -ExecutionPolicy Bypass -File autodebug\\ci\\quality-gate.ps1`,
 };
 
 if (outputPath) {
@@ -677,12 +699,14 @@ This workspace was scaffolded by \`obsidian-plugin-autodebug\`.
 - A zero-dependency local build script at \`scripts/build.mjs\`
 - A local fresh-vault target at \`${testVaultRoot}\`
 - Bootstrap-ready autodebug configs under \`autodebug/\`
+- Headless quality-gate templates under \`autodebug/ci/\`
 
 ## Scaffold flow
 
 1. Open \`${testVaultRoot}\` as an Obsidian vault once.
 2. Run \`npm run build\` (or the matching package-manager command if you change it).
 3. Use the generated autodebug job at \`${jobPath}\`.
+4. Run \`AUTODEBUG_TOOL_ROOT=/path/to/obsidian-plugin-autodebug bash autodebug/ci/quality-gate.sh\` for a headless build/test/dry-run gate.
 
 ## Existing-plugin retrofit flow
 
@@ -701,8 +725,10 @@ function buildAutodebugReadme({ pluginId, pluginName }) {
 - Scenario: \`scenarios/open-plugin-view.json\`
 - Surface profile: \`surface-profiles/${pluginId}-surface.json\`
 - Assertions: \`assertions/plugin-view-health.json\`
+- CI templates: \`ci/quality-gate.sh\`, \`ci/quality-gate.ps1\`, and \`ci/github-actions-quality-gate.yml\`
 
 This directory is generated for scaffold smoke runs. Existing plugin repositories can instead copy and tailor the shared templates from the skill source tree.
+The CI templates are headless by default; run the desktop bootstrap/reload/screenshot/CDP phases locally after the headless gate passes.
 `;
 }
 

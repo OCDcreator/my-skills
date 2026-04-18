@@ -173,7 +173,7 @@
   - Fresh-vault bootstrap works against the scaffolded sample on Windows and macOS
   - Docs clearly separate scaffolding flows from existing-plugin retrofit flows
 
-### [NEXT] B15 - Optional testing-framework and CI templates
+### [DONE] B15 - Optional testing-framework and CI templates
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add optional `obsidian-testing-framework` and CI-ready templates so agents can plug the framework into repeatable E2E/quality-gate pipelines after local smoke success.
@@ -191,4 +191,5 @@
 - B1-B10 are complete.
 - B11-B13 are complete.
 - B14 is complete.
-- B15 is the approved next slice; do not expand beyond it without another human approval.
+- B15 is complete.
+- No additional queued slice is approved; await human approval before expanding beyond B15.

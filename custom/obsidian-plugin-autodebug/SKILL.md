@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, zero-touch bootstrap fresh-vault plugin discovery, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, produce diagnosis/HTML reports, and scaffold a minimal bootstrap-ready sample plugin workspace when no repo exists yet. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, fresh clean-vault, first-install bootstrap, sample plugin scaffold, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
+description: Run a fully automated Obsidian plugin debug/development loop: environment doctor, build, deploy to a test vault, zero-touch bootstrap fresh-vault plugin discovery, reload the plugin with the Obsidian CLI or CDP, watch source changes, reset plugin state safely, capture screenshots, inspect DOM/CSS, assert expected UI health, save baselines, compare/profile runs, detect optional obsidian-testing-framework support, emit headless CI quality-gate templates, and scaffold a minimal bootstrap-ready sample plugin workspace when no repo exists yet. Use this whenever the user says 全自动调试, 自动开发 Obsidian 插件, fresh clean-vault, first-install bootstrap, sample plugin scaffold, dev console, 控制台日志, reload plugin, screenshot, DOM check, build + deploy + reload, Test Vault, profile startup, watch on save, reset plugin state, CI quality gate, obsidian-testing-framework, or asks an agent to run Obsidian and diagnose plugin behavior end-to-end.
 ---
 
 # Obsidian Plugin Autodebug
@@ -67,7 +67,7 @@ That command generates:
 
 - a minimal plugin workspace with `manifest.json`, `src/main.js`, `styles.css`, and a zero-dependency `scripts/build.mjs`,
 - a local `test-vault/` folder whose `.obsidian/plugins/<plugin-id>/` target is pre-populated from `dist/`,
-- an `autodebug/` folder containing a tailored job spec, surface profile, scenario, assertions, and a local schema copy.
+- an `autodebug/` folder containing a tailored job spec, surface profile, scenario, assertions, a local schema copy, and headless quality-gate templates under `autodebug/ci/`.
 
 For an existing plugin repo, do **not** re-scaffold it. Keep the retrofit flow: copy `job-specs/generic-debug-job.template.json`, tailor the runtime/build/deploy values, and run the generic doctor/job/cycle scripts against that real repository.
 
@@ -219,6 +219,31 @@ For an existing plugin repository, start by copying `job-specs/generic-debug-job
 For a fresh sample plugin, let `scripts/obsidian_debug_scaffold_plugin.mjs` generate the workspace plus a bootstrap-ready `autodebug/<plugin-id>-debug-job.json` for you. The generated workspace keeps scaffold-specific files under `autodebug/` so the separation from existing-plugin retrofit flows stays explicit.
 
 If you need a plugin-neutral fixture for native host smoke validation, reuse `fixtures/native-smoke-sample-plugin/`. It includes a loadable manifest plus a tiny bundled `dist/main.js` that logs on load/unload, so deploy/reload assertions exercise a real community plugin instead of a placeholder file copy. The bundled bootstrap script now handles that first-discovery reload/restart path automatically; only fall back to a manual vault reload or app restart when you intentionally disable bootstrap.
+
+## Headless Quality Gates And Optional `obsidian-testing-framework`
+
+After a local desktop smoke run passes, generate copy-ready headless quality-gate templates for CI or unattended local checks:
+
+```bash
+node scripts/obsidian_debug_ci_templates.mjs \
+  --repo-dir /path/to/plugin-repo \
+  --job /path/to/plugin-repo/.obsidian-debug/job.json \
+  --output-dir /path/to/plugin-repo/autodebug/ci \
+  --output /path/to/plugin-repo/.obsidian-debug/ci-templates.json
+```
+
+The doctor now reports three B15-specific signals:
+
+- `testing-framework-module` — whether `obsidian-testing-framework` is installed, merely declared, or absent.
+- `testing-framework-scripts` — which repo-owned `package.json` scripts already invoke that optional adapter.
+- `ci-quality-gate-templates` — a reminder that headless quality gates should stop at repo-owned install/build/test plus `obsidian_debug_job.mjs --dry-run`.
+
+Keep the split explicit:
+
+- **CI-suitable**: repo-owned install/build/test commands, optional `obsidian-testing-framework` package script, and cross-platform job dry-runs.
+- **Local-only**: fresh-vault bootstrap, real Obsidian reloads, CLI/CDP console capture, screenshots, DOM snapshots, and Playwright traces.
+
+The scaffold flow now emits `autodebug/ci/quality-gate.sh`, `autodebug/ci/quality-gate.ps1`, `autodebug/ci/github-actions-quality-gate.yml`, and `autodebug/ci/README.md`. For an existing plugin repo, generate the same files with `obsidian_debug_ci_templates.mjs` instead of re-scaffolding the project.
 
 Dry-run the PowerShell command plan:
 
