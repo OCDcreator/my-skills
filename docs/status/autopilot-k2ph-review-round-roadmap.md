@@ -22,7 +22,7 @@
 - **Constraints**:
   - Do not start until page 4 is `[DONE]`
 
-### [NEXT] P6 - Review and repair page 6
+### [DONE] P6 - Review and repair page 6
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make page 6 pass after page 5 is complete.
@@ -34,3 +34,4 @@
 - The target handout copy lives in the isolated worktree only.
 - This lane exists to avoid exploding one long interactive session.
 - Use one page as one queue slice; repeat the same page across multiple rounds if needed.
+- Pages 4-6 are now complete for this review lane; no queued slices remain.

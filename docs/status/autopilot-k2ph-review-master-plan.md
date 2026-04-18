@@ -1,6 +1,6 @@
 # Autopilot Master Plan
 
-> **Status**: [ACTIVE]
+> **Status**: [DONE]
 > **Preset**: `Bugfix / Backlog`
 > **Repository**: `my-skills`
 
@@ -9,6 +9,7 @@
 - Sequentially review and repair pages 4-6 of `custom/knowledge-to-print-html/artifacts/knowledge-handout/igcse-0620-preparation-of-salts/handout.html`
 - Keep one queued slice equal to one page gate
 - Prefer small, reproducible edits with a fresh review packet each round
+- Outcome: pages 4-6 all passed their sequential review slices in this lane.
 
 ## Guardrails
 
