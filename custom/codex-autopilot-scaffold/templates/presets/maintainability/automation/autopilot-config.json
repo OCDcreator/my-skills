@@ -1,8 +1,7 @@
 {
   "objective": [[OBJECTIVE_JSON]],
-  "starting_phase_doc": [[STARTING_PHASE_DOC_JSON]],
-  "next_phase_number": [[NEXT_PHASE_NUMBER]],
   "focus_hint": [[FOCUS_HINT_JSON]],
+  "next_phase_number": [[NEXT_PHASE_NUMBER]],
   "max_rounds": [[MAX_ROUNDS]],
   "max_consecutive_failures": [[MAX_CONSECUTIVE_FAILURES]],
   "lint_command": [[LINT_COMMAND_JSON]],
@@ -24,11 +23,11 @@
   "max_git_diff_stat_per_round": 3,
   "allowed_branch_prefixes": [[ALLOWED_BRANCH_PREFIXES_JSON]],
   "commit_prefix": [[COMMIT_PREFIX_JSON]],
-  "phase_doc_prefix": [[PHASE_DOC_PREFIX_JSON]],
   "prompt_template": [[PROMPT_TEMPLATE_JSON]],
   "result_schema": [[RESULT_SCHEMA_JSON]],
   "runner_kind": [[RUNNER_KIND_JSON]],
   "runner_command": [[RUNNER_COMMAND_JSON]],
   "runner_model": [[RUNNER_MODEL_JSON]],
-  "runner_extra_args": [[RUNNER_EXTRA_ARGS_JSON]]
+  "runner_extra_args": [[RUNNER_EXTRA_ARGS_JSON]],
+  "lanes": [[LANES_JSON]]
 }

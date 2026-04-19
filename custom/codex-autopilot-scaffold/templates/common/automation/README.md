@@ -16,16 +16,18 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - `automation/round-prompt.md`: per-round runner prompt template
 - `automation/round-result.schema.json`: structured final-response contract
 - `automation/runtime/`: ignored runtime state, logs, prompts, and round results
-- `docs/status/autopilot-master-plan.md`: strategy and lane priorities
-- `docs/status/autopilot-lane-map.md`: quick entrypoints for the current queue
-- `docs/status/autopilot-round-roadmap.md`: queued `[NEXT]` / `[QUEUED]` work items
+- `docs/status/autopilot-master-plan.md`: static cross-lane strategy overview
+- `docs/status/autopilot-lane-map.md`: static index of configured lane directories
+- `docs/status/lanes/<lane-id>/autopilot-round-roadmap.md`: lane-local queued `[NEXT]` / `[QUEUED]` work items
+- `docs/status/lanes/<lane-id>/autopilot-phase-0.md`: lane-local baseline phase document
 
 ## Core guarantees
 
 - Every round uses `codex exec` in a new non-interactive session
 - Loop control lives in the Python controller, not in a recursive prompt
 - Runtime state is machine-readable JSON
-- Failed rounds hard-reset the worktree to the round's starting `HEAD`
+- Queue routing is driven by explicit `lanes` in `automation/autopilot-config.json`
+- Failed rounds preserve the pre-reset `HEAD` under `refs/autopilot/safety/*`, stash dirty work, then reset to the round's starting `HEAD`
 - Successful rounds must write a phase doc and create a commit
 - A runtime lock prevents two machines from driving the same branch simultaneously
 
@@ -121,20 +123,21 @@ The scaffolded `watch` output shows:
 
 - `round`
 - `phase`
+- `lane`
 - `queue progress`
 - `status`
 - `failures`
 - `phase doc`
 - `focus`
 - the exact `progress.log` path being followed
-- a default long prefix on every streamed detail line, for example `[completion=25% round=006 phase=005 status=active failures=0]`
+- a default long prefix on every streamed detail line, for example `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]`
 - Vulture count and delta when `vulture_command` is configured
 
-Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[25% r006 p005 active f0]`.
+Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[b1-backlog-slice q1/3 r006 p005 active f0]`.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 
-For queue-driven backlog presets, a round result of `goal_complete` means the current `[NEXT]` slice was already done. If the roadmap still has another `[NEXT]` or any `[QUEUED]` work, the controller should resume as `active`, advance `next_phase_number`, and continue to the next queued slice instead of stopping the whole lane.
+For queue-driven presets, a round result of `goal_complete` means the current lane's `[NEXT]` slice was already done. If the active lane roadmap still has another `[NEXT]` or any `[QUEUED]` work, the controller keeps the same lane active and advances `next_phase_number`; if the lane is clear, it immediately switches to the next configured lane or marks the overall objective complete.
 
 ## Sentinel cutovers
 

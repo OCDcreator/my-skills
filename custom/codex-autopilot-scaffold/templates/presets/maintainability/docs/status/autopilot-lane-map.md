@@ -1,13 +1,20 @@
 # Autopilot Lane Map
 
 > **Preset**: `[[PRESET_LABEL]]`
-> **Current `[NEXT]`**: `R1 - First maintainability / refactor slice`
+> **Scheduling**: Sequential lane controller
+> **Note**: The active lane comes from `automation/autopilot-config.json`; this file is a static index.
 
-## Current priority
+## Lane directories
 
-- Keep the queue bounded and repo-specific
-- Reduce one maintainability hotspot at a time
-- Keep configured validation commands green
+- `m1-hotspot-slice`
+  - roadmap: `docs/status/lanes/m1-hotspot-slice/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md`
+- `m2-followup-slice`
+  - roadmap: `docs/status/lanes/m2-followup-slice/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/m2-followup-slice/autopilot-phase-0.md`
+- `m3-checkpoint`
+  - roadmap: `docs/status/lanes/m3-checkpoint/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/m3-checkpoint/autopilot-phase-0.md`
 
 ## Suggested entrypoints
 

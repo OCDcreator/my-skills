@@ -9,7 +9,7 @@ Use this skill to install a **repo-local Codex autopilot scaffold** into a targe
 
 - `python automation/autopilot.py doctor|start|watch|status|restart-after-next-commit`
 - `automation/Arm-AutopilotCutover.ps1` and `automation/arm-autopilot-cutover.sh` for reusable post-commit cutovers
-- queue-driven `docs/status/autopilot-*.md`
+- root status overview docs plus lane-local `docs/status/lanes/<lane-id>/autopilot-*.md`
 - machine-readable runtime state in `automation/runtime/`
 
 ## When this skill wins
@@ -33,7 +33,9 @@ Do **not** use this skill when the user really wants:
 This skill should only scaffold autopilot assets and adjacent docs/config:
 
 - `automation/`
-- `docs/status/autopilot-*`
+- `docs/status/autopilot-master-plan.md`
+- `docs/status/autopilot-lane-map.md`
+- `docs/status/lanes/<lane-id>/autopilot-*`
 - `.gitignore` entry for `automation/runtime/`
 
 Do not refactor the target app itself while scaffolding.
@@ -135,6 +137,8 @@ The controller also validates `build_ran`, `build_id`, `deploy_ran`, and `deploy
 
 Then run a smoke test in the target repo:
 
+Failed rounds preserve a safety ref under `refs/autopilot/safety/*` and stash dirty work before resetting to the round's starting `HEAD`, so operators can recover commits or concurrent local edits instead of losing them silently.
+
 ### Windows
 
 ```powershell
@@ -207,13 +211,13 @@ tail -n 80 -F automation/runtime/round-XYZ/progress.log
 
 Operational guidance:
 
-- The scaffolded `watch` command now prints `round`, `phase`, `queue progress`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
+- The scaffolded `watch` command now prints `round`, `phase`, `lane`, `queue progress`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
 - When `vulture_command` is configured, `status` and `watch` also report the latest finding count and delta from the previous successful snapshot.
-- Every streamed detail line from `progress.log` is also prefixed with a live state tag that includes queue completion percentage, defaulting to the long form `[completion=25% round=006 phase=005 status=active failures=0]` so the current progress/round/phase/status stays visible after the header scrolls away.
-- Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[25% r006 p005 active f0]`.
+- Every streamed detail line from `progress.log` is also prefixed with a live state tag that includes lane and queue counts, defaulting to the long form `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]` so the current lane/queue/round/phase/status stays visible after the header scrolls away.
+- Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[b1-backlog-slice q1/3 r006 p005 active f0]`.
 - When the watched state is `active`, the live round log is usually `current_round + 1`; when the state is terminal, it is usually `current_round`.
 - If the log looks stale, compare `status --state-path ...` against the watched `progress.log` path before assuming the runner is stuck.
-- In queue-driven backlog presets, `goal_complete` means the current `[NEXT]` slice was already satisfied. The controller should only stop the whole lane when the roadmap has no remaining `[NEXT]` or `[QUEUED]` items; otherwise it must keep the lane `active`, advance `next_phase_number`, and continue into the next queued slice.
+- In queue-driven presets, `goal_complete` means the active lane's current `[NEXT]` slice was already satisfied. The controller should only leave the lane when its roadmap has no remaining `[NEXT]` or `[QUEUED]` items; otherwise it must keep the lane `active`, advance `next_phase_number`, and continue into the next queued slice.
 
 ## Sentinel / cutover rules
 

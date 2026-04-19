@@ -81,6 +81,60 @@ PRESET_METADATA: dict[str, dict[str, Any]] = {
     },
 }
 
+PRESET_LANES: dict[str, list[dict[str, str]]] = {
+    "bugfix-backlog": [
+        {
+            "id": "b1-backlog-slice",
+            "label": "B1 - Highest-priority queued bug or backlog slice",
+            "focus_hint": "B1 - Highest-priority queued bug or backlog slice",
+        },
+        {
+            "id": "b2-backlog-slice",
+            "label": "B2 - Next queued bug or backlog slice",
+            "focus_hint": "B2 - Next queued bug or backlog slice",
+        },
+        {
+            "id": "b3-checkpoint",
+            "label": "B3 - Checkpoint after first backlog batch",
+            "focus_hint": "B3 - Checkpoint after first backlog batch",
+        },
+    ],
+    "quality-gate": [
+        {
+            "id": "q1-gate-recovery",
+            "label": "Q1 - Recover the first configured gate",
+            "focus_hint": "Q1 - Recover the first configured gate",
+        },
+        {
+            "id": "q2-gate-cleanup",
+            "label": "Q2 - Finish remaining configured gate cleanup",
+            "focus_hint": "Q2 - Finish remaining configured gate cleanup",
+        },
+        {
+            "id": "q3-checkpoint",
+            "label": "Q3 - Checkpoint after quality-gate recovery",
+            "focus_hint": "Q3 - Checkpoint after quality-gate recovery",
+        },
+    ],
+    "maintainability": [
+        {
+            "id": "m1-hotspot-slice",
+            "label": "R1 - First maintainability / refactor slice",
+            "focus_hint": "R1 - First maintainability / refactor slice",
+        },
+        {
+            "id": "m2-followup-slice",
+            "label": "R2 - Follow-up maintainability / refactor slice",
+            "focus_hint": "R2 - Follow-up maintainability / refactor slice",
+        },
+        {
+            "id": "m3-checkpoint",
+            "label": "R3 - Checkpoint after first refactor batch",
+            "focus_hint": "R3 - Checkpoint after first refactor batch",
+        },
+    ],
+}
+
 
 class ScaffoldError(RuntimeError):
     pass
@@ -163,6 +217,24 @@ def render_tokens(template_text: str, tokens: dict[str, str]) -> str:
 
 def json_token(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+def build_preset_lanes(preset: str) -> list[dict[str, str]]:
+    lanes: list[dict[str, str]] = []
+    for lane in PRESET_LANES[preset]:
+        lane_id = lane["id"]
+        lane_root = f"docs/status/lanes/{lane_id}"
+        lanes.append(
+            {
+                **lane,
+                "phase_doc_prefix": f"{lane_root}/autopilot-phase-",
+                "starting_phase_doc": f"{lane_root}/autopilot-phase-0.md",
+                "roadmap_path": f"{lane_root}/autopilot-round-roadmap.md",
+                "prompt_template": "automation/round-prompt.md",
+                "commit_prefix": "autopilot",
+            }
+        )
+    return lanes
 
 
 def first_non_empty(options: list[tuple[str, str]]) -> tuple[str, str]:
@@ -560,6 +632,7 @@ def ensure_runtime_gitignore(repo_root: Path, *, force: bool) -> str:
 
 def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
     metadata = PRESET_METADATA[preset]
+    lanes = build_preset_lanes(preset)
     path_list = build_path_list(detection.repo_root, detection)
     entrypoints = build_entrypoints(detection, preset)
 
@@ -602,8 +675,7 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "MAX_CONSECUTIVE_FAILURES": "3",
         "ALLOWED_BRANCH_PREFIXES_JSON": json_token(["autopilot/", "automation/", "quality/", "bugfix/"]),
         "COMMIT_PREFIX_JSON": json.dumps("autopilot", ensure_ascii=False),
-        "PHASE_DOC_PREFIX_JSON": json.dumps("docs/status/autopilot-phase-", ensure_ascii=False),
-        "STARTING_PHASE_DOC_JSON": json.dumps("docs/status/autopilot-phase-0.md", ensure_ascii=False),
+        "LANES_JSON": json_token(lanes),
         "NEXT_PHASE_NUMBER": "1",
         "PROMPT_TEMPLATE_JSON": json.dumps("automation/round-prompt.md", ensure_ascii=False),
         "RESULT_SCHEMA_JSON": json.dumps("automation/round-result.schema.json", ensure_ascii=False),

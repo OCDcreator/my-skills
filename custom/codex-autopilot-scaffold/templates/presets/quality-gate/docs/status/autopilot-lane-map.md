@@ -1,13 +1,20 @@
 # Autopilot Lane Map
 
 > **Preset**: `[[PRESET_LABEL]]`
-> **Current `[NEXT]`**: `Q1 - Recover the first configured gate`
+> **Scheduling**: Sequential lane controller
+> **Note**: The active lane comes from `automation/autopilot-config.json`; this file is a static index.
 
-## Current priority
+## Lane directories
 
-- Recover the highest-impact configured validation issue first
-- Keep changes tightly bounded to the queued hotspot
-- Record missing validation commands instead of guessing them
+- `q1-gate-recovery`
+  - roadmap: `docs/status/lanes/q1-gate-recovery/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/q1-gate-recovery/autopilot-phase-0.md`
+- `q2-gate-cleanup`
+  - roadmap: `docs/status/lanes/q2-gate-cleanup/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/q2-gate-cleanup/autopilot-phase-0.md`
+- `q3-checkpoint`
+  - roadmap: `docs/status/lanes/q3-checkpoint/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/q3-checkpoint/autopilot-phase-0.md`
 
 ## Suggested entrypoints
 

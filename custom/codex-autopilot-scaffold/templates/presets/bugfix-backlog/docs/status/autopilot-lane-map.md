@@ -1,13 +1,20 @@
 # Autopilot Lane Map
 
 > **Preset**: `[[PRESET_LABEL]]`
-> **Current `[NEXT]`**: `B1 - Highest-priority queued bug or backlog slice`
+> **Scheduling**: Sequential lane controller
+> **Note**: The active lane comes from `automation/autopilot-config.json`; this file is a static index.
 
-## Current priority
+## Lane directories
 
-- Start with the most reproducible queued issue
-- Keep the round bounded to one bugfix or backlog slice
-- Validate with every configured command that exists
+- `b1-backlog-slice`
+  - roadmap: `docs/status/lanes/b1-backlog-slice/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/b1-backlog-slice/autopilot-phase-0.md`
+- `b2-backlog-slice`
+  - roadmap: `docs/status/lanes/b2-backlog-slice/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/b2-backlog-slice/autopilot-phase-0.md`
+- `b3-checkpoint`
+  - roadmap: `docs/status/lanes/b3-checkpoint/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/b3-checkpoint/autopilot-phase-0.md`
 
 ## Suggested entrypoints
 
@@ -20,5 +27,5 @@
 ## Boundaries
 
 - No broad polish or unrelated cleanup
-- No queue expansion beyond the preset checkpoint
+- No queue expansion beyond the preset checkpoint unless a human edits the lane roadmap
 - Keep `automation/runtime/` ignored and local-only
