@@ -5,8 +5,10 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import {
   buildDebugComparison,
@@ -15,6 +17,23 @@ import {
 } from './obsidian_debug_compare_core.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_baseline.mjs --mode <save|compare|list|prune> [options]
+
+Modes:
+  save      --name <name> --diagnosis <path> [--profile <path>] [--report <path>]
+  compare   --candidate-diagnosis <path> (--name <name> | --tags "pluginId=...|platform=...")
+  list      [--name <name>] [--tags "pluginId=...|platform=..."]
+  prune     [--tags "..."] [--max-age-days <n>] [--keep-recent <n>] [--delete true]
+
+Common options:
+  --baseline-root <dir>     Baseline storage root.
+  --output <path>           JSON output for compare/list/prune.
+  --tags <k=v|k=v>          Taxonomy filters.
+`);
+}
+
 const mode = getStringOption(options, 'mode', '').trim().toLowerCase();
 if (!['save', 'compare', 'list', 'prune'].includes(mode)) {
   throw new Error('--mode must be save, compare, list, or prune');

@@ -68,7 +68,7 @@
         {
           "id": "error-count-budget",
           "type": "count",
-          "pattern": "ERROR|Unhandled",
+          "pattern": "\\b(?:error|unhandled)\\b",
           "flags": "gi",
           "source": "combined",
           "max": 0

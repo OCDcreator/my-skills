@@ -3,11 +3,32 @@ import path from 'node:path';
 import {
   ensureParentDirectory,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_reset_state.mjs --mode <preview|reset|restore> [options]
+
+Modes:
+  preview    Resolve targets without deleting anything.
+  reset      Snapshot then clear/recreate declared plugin-local state.
+  restore    Restore a previous snapshot.
+
+Options:
+  --vault-root <path>                Vault root for plugin-local paths.
+  --plugin-id <id>                   Plugin id under .obsidian/plugins.
+  --plugin-dir <path>                Explicit plugin directory override.
+  --state-plan <path>                JSON reset plan.
+  --targets <a|b>                    Pipe-separated target paths.
+  --snapshot-dir <dir>               Snapshot directory.
+`);
+}
+
 const mode = getStringOption(options, 'mode', '').trim().toLowerCase();
 if (!['preview', 'reset', 'restore'].includes(mode)) {
   throw new Error('--mode must be preview, reset, or restore');

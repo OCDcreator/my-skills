@@ -5,8 +5,10 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { generateQualityGateTemplates } from './obsidian_debug_ci_templates.mjs';
 
@@ -19,6 +21,24 @@ const PACKAGE_MANAGER_FIELDS = {
 };
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_scaffold_plugin.mjs --output-dir <dir> --plugin-id <id> [options]
+
+Required:
+  --output-dir <dir>        Workspace directory to create.
+  --plugin-id <id>          Obsidian plugin id for the sample workspace.
+
+Options:
+  --plugin-name <name>      Human-readable plugin name.
+  --package-manager <npm|pnpm|yarn|bun>
+  --test-vault-root <dir>   Fresh test vault root. Defaults inside workspace.
+  --vault-name <name>       Vault name used by generated job.
+  --obsidian-command <cmd>  Obsidian command reference. Defaults to obsidian.
+  --output <path>           Scaffold report JSON output path.
+`);
+}
+
 const outputDirRaw = getStringOption(options, 'output-dir', '').trim();
 if (!outputDirRaw) {
   throw new Error('--output-dir is required');

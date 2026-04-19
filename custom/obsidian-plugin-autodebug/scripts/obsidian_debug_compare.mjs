@@ -3,11 +3,26 @@ import path from 'node:path';
 import {
   ensureParentDirectory,
   getStringOption,
+  hasHelpOption,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { buildDebugComparison } from './obsidian_debug_compare_core.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_compare.mjs --baseline <diagnosis.json> --candidate <diagnosis.json> [options]
+
+Required:
+  --baseline <path>         Baseline diagnosis JSON.
+  --candidate <path>        Candidate diagnosis JSON.
+
+Options:
+  --output <path>           Comparison JSON output path. Defaults next to candidate.
+`);
+}
+
 const baselinePath = getStringOption(options, 'baseline').trim();
 const candidatePath = getStringOption(options, 'candidate').trim();
 if (!baselinePath || !candidatePath) {

@@ -4,11 +4,27 @@ import { pathToFileURL } from 'node:url';
 import {
   ensureParentDirectory,
   getStringOption,
+  hasHelpOption,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { resolveArtifactPaths } from './obsidian_debug_compare_core.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_report.mjs --diagnosis <diagnosis.json> [options]
+
+Required:
+  --diagnosis <path>        Diagnosis JSON from obsidian_debug_analyze.mjs.
+
+Options:
+  --output <path>           HTML report output path. Defaults next to diagnosis.
+  --comparison <path>       Optional comparison JSON.
+  --profile <path>          Optional profile summary JSON.
+`);
+}
+
 const diagnosisPath = getStringOption(options, 'diagnosis', '').trim();
 if (!diagnosisPath) {
   throw new Error('--diagnosis is required');

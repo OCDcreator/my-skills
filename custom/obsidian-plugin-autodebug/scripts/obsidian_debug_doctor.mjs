@@ -9,8 +9,10 @@ import {
   getStringOption,
   getWebSocketSupportDetail,
   hasGlobalWebSocket,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
   resolveTarget,
 } from './obsidian_cdp_common.mjs';
 import {
@@ -26,6 +28,23 @@ import {
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_doctor.mjs [options]
+
+Common options:
+  --repo-dir <path>                 Plugin repo directory. Defaults to cwd.
+  --plugin-id <id>                  Expected manifest/plugin id.
+  --test-vault-plugin-dir <path>    Target vault plugin directory.
+  --obsidian-command <command>      Obsidian CLI/app command. Defaults to obsidian.
+  --vault-name <name>               Vault name for CLI commands.
+  --cdp-host <host> --cdp-port <n>  CDP endpoint. Defaults to 127.0.0.1:9222.
+  --platform <auto|windows|bash>    Fix-plan command platform.
+  --output <path>                   Doctor JSON output path.
+  --fix                            Emit reviewable fix scripts/plan.
+`);
+}
+
 const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
 const testVaultPluginDir = getStringOption(options, 'test-vault-plugin-dir', '').trim();
 const expectedPluginId = getStringOption(options, 'plugin-id', '').trim();

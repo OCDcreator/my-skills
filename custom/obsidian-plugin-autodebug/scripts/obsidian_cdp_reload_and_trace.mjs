@@ -5,14 +5,35 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
   reloadPluginViaApp,
   setObsidianDebugFlags,
   writeTraceArtifacts,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_cdp_reload_and_trace.mjs --plugin-id <id> [options]
+
+Required:
+  --plugin-id <id>                    Plugin id to disable/enable through app context.
+
+Options:
+  --host <host> --port <n>            CDP endpoint. Defaults to 127.0.0.1:9222.
+  --target-title-contains <text>      Attach to a matching Obsidian window.
+  --duration-seconds <n>              Trace duration after reload.
+  --reload-delay-ms <n>               Delay before trace capture starts.
+  --eval-after-reload <javascript>    App-context expression after reload.
+  --output <path>                     Trace log output.
+  --summary <path>                    Summary JSON output.
+  --skip-reload true                  Watch without disabling/enabling the plugin.
+`);
+}
+
 const pluginId = getStringOption(options, 'plugin-id');
 if (!pluginId) {
   throw new Error('--plugin-id is required');

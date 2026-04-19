@@ -5,11 +5,30 @@ import {
   ensureParentDirectory,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_profile.mjs --command <template> [options]
+
+Required:
+  --command <template>      Command to run repeatedly; supports {{outputDir}} and {{run}}.
+
+Options:
+  --runs <n>                Number of runs. Defaults to 2.
+  --cwd <path>              Working directory for each run.
+  --root-output <dir>       Parent output directory for run folders.
+  --summary <path>          Profile summary JSON output.
+  --label <name>            Run label.
+  --mode <name>             Taxonomy mode such as warm or cold.
+`);
+}
+
 const runs = Math.max(1, getNumberOption(options, 'runs', 2));
 const commandTemplate = getStringOption(options, 'command', '').trim();
 const rootOutput = path.resolve(getStringOption(options, 'root-output', '.obsidian-debug/profile-runs'));

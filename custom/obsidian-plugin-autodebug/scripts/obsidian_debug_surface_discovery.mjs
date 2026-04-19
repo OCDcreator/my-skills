@@ -7,8 +7,10 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 function asObject(value) {
@@ -768,6 +770,22 @@ export { buildWorkspaceViewOpenExpression, buildSettingsTabOpenExpression };
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (hasHelpOption(options)) {
+    printHelpAndExit(`
+Usage: node scripts/obsidian_debug_surface_discovery.mjs [options]
+
+Options:
+  --surface-profile <path>           Surface profile JSON with metadata and DOM hints.
+  --plugin-id <id>                   Plugin id for heuristic discovery.
+  --plugin-name <name>               Human-readable plugin name.
+  --command-id <id>                  Preferred command id hint.
+  --cdp-host <host> --cdp-port <n>   Optional CDP DOM discovery endpoint.
+  --cli-available true               Allow CLI strategies in selection.
+  --dry-run                          Prefer first available strategy without app access.
+  --output <path>                    Discovery report JSON output.
+`);
+  }
+
   const outputPath = getStringOption(
     options,
     'output',

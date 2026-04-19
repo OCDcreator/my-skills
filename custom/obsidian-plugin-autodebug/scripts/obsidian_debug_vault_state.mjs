@@ -4,11 +4,28 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_vault_state.mjs --mode <snapshot|restore> [options]
+
+Modes:
+  snapshot   Copy declared vault/plugin files into a snapshot directory.
+  restore    Restore files from a previous snapshot.
+
+Options:
+  --snapshot-dir <dir>               Snapshot directory.
+  --targets <a|b>                    Pipe-separated files/directories for snapshot mode.
+  --allow-missing <true|false>       Allow missing snapshot targets.
+`);
+}
+
 const mode = getStringOption(options, 'mode', '').trim().toLowerCase();
 if (mode !== 'snapshot' && mode !== 'restore') {
   throw new Error('--mode must be snapshot or restore');

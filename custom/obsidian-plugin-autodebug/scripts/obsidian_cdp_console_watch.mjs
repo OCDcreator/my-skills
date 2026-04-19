@@ -5,13 +5,31 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
   setObsidianDebugFlags,
   writeTraceArtifacts,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_cdp_console_watch.mjs [options]
+
+Options:
+  --host <host> --port <n>            CDP endpoint. Defaults to 127.0.0.1:9222.
+  --target-title-contains <text>      Attach to a matching Obsidian window.
+  --duration-seconds <n>              Watch duration. Defaults to 15.
+  --output <path>                     Trace log output.
+  --summary <path>                    Summary JSON output.
+  --enable-debug true                 Enable Obsidian debug flags first.
+  --clear-console true                Clear buffers before watching.
+  --eval <javascript>                 Optional app-context expression before watch.
+`);
+}
+
 const host = getStringOption(options, 'host', '127.0.0.1');
 const port = getNumberOption(options, 'port', 9222);
 const targetUrl = getStringOption(options, 'target-url', 'app://obsidian.md/index.html');

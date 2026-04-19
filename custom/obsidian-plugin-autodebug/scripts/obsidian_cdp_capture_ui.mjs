@@ -5,11 +5,29 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_cdp_capture_ui.mjs [options]
+
+Options:
+  --host <host> --port <n>            CDP endpoint. Defaults to 127.0.0.1:9222.
+  --target-title-contains <text>      Attach to a matching Obsidian window.
+  --selector <css>                    DOM selector to capture.
+  --html-output <path>                Save matched HTML.
+  --text-output <path>                Save matched text.
+  --screenshot-output <path>          Save screenshot PNG.
+  --summary <path>                    Capture summary JSON output.
+  --all <true|false>                  Capture all matches or first match.
+`);
+}
+
 const host = getStringOption(options, 'host', '127.0.0.1');
 const port = Number(getStringOption(options, 'port', '9222'));
 const targetUrl = getStringOption(options, 'target-url', 'app://obsidian.md/index.html');

@@ -6,8 +6,10 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import {
   normalizePlatform,
@@ -15,6 +17,24 @@ import {
 } from './obsidian_debug_command_templates.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_state_matrix.mjs --job <job.json> --state-plan <plan.json> --vault-root <dir> --plugin-id <id> [options]
+
+Required:
+  --job <path>                       Debug job to run in both states.
+  --state-plan <path>                Plugin-local reset plan.
+  --vault-root <dir>                 Target vault root.
+  --plugin-id <id>                   Plugin id.
+
+Options:
+  --dry-run                          Preview commands only.
+  --run                              Execute reset/job/restore matrix.
+  --platform <auto|windows|bash>     Command platform.
+  --output-root <dir>                Matrix output root.
+`);
+}
+
 const jobPathRaw = getStringOption(options, 'job', '').trim();
 const statePlanRaw = getStringOption(options, 'state-plan', '').trim();
 const vaultRootRaw = getStringOption(options, 'vault-root', '').trim();

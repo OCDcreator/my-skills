@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 import {
   ensureParentDirectory,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import {
   deriveVaultRoot,
@@ -14,6 +16,22 @@ import {
 } from './obsidian_debug_command_templates.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_analyze.mjs --summary <summary.json> [options]
+
+Required:
+  --summary <path>          Debug-cycle summary JSON.
+
+Options:
+  --output <path>           Diagnosis JSON output path. Defaults next to summary.
+  --assertions <path>       Optional assertion JSON.
+  --dom-selector <selector> Selector used for DOM health evidence.
+  --signatures <path>       Issue signature rules JSON.
+  --playbooks <path>        Issue playbooks JSON.
+`);
+}
+
 const summaryPath = getStringOption(options, 'summary').trim();
 if (!summaryPath) {
   throw new Error('--summary is required');

@@ -6,11 +6,32 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_watch.mjs --watch-roots <a|b> --command <template> [options]
+
+Required:
+  --watch-roots <paths>     Pipe-separated paths to watch.
+  --command <template>      Command to run; supports {{outputDir}} and {{run}}.
+
+Options:
+  --cwd <path>              Working directory. Defaults to cwd.
+  --root-output <dir>       Parent output directory for run folders.
+  --once-on-start true      Trigger one run before file changes.
+  --max-runs <n>            Stop after n runs; 0 means unlimited.
+  --debounce-ms <n>         Debounce file-change bursts.
+  --timeout-ms <n>          Per-run timeout.
+  --exclude <a|b>           Pipe-separated path substrings to ignore.
+`);
+}
+
 const watchRootsRaw = getStringOption(options, 'watch-roots', '').trim();
 const commandTemplate = getStringOption(options, 'command', '').trim();
 const workingDirectory = path.resolve(getStringOption(options, 'cwd', process.cwd()));

@@ -6,12 +6,32 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { normalizeHotReloadMode } from './obsidian_debug_hot_reload_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_job.mjs --job <job.json> [options]
+
+Required:
+  --job <path>              Config-driven debug job spec.
+
+Options:
+  --dry-run                 Print the platform command plan without running it.
+  --run                     Execute the generated command plan.
+  --mode <dry-run|run>      Explicit mode; defaults to dry-run.
+  --platform <auto|windows|bash>
+  --cwd <path>              Override job working directory.
+  --output <path>           Save command plan JSON.
+  --output-dir <path>       Override cycle output directory.
+`);
+}
+
 const jobPathRaw = getStringOption(options, 'job', '').trim();
 if (!jobPathRaw) {
   throw new Error('--job is required');

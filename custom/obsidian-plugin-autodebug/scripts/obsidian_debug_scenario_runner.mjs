@@ -8,8 +8,10 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import {
   buildSettingsTabOpenExpression,
@@ -26,6 +28,23 @@ import {
 } from './obsidian_debug_playwright_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_scenario_runner.mjs [options]
+
+Common options:
+  --scenario-name <name>             Built-in scenario name.
+  --scenario-path <path>             Scenario JSON path.
+  --plugin-id <id>                   Plugin id for substitutions.
+  --obsidian-command <cmd>           Required for CLI-backed steps.
+  --vault-name <name>                Vault name for CLI commands.
+  --surface-profile <path>           Plugin surface metadata.
+  --adapter <cli|cdp|playwright>     Scenario adapter when supported.
+  --dry-run                          Resolve strategy without touching Obsidian.
+  --output <path>                    Scenario report JSON output.
+`);
+}
+
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const scenarioName = getStringOption(options, 'scenario-name', '').trim();
 const explicitScenarioPath = getStringOption(options, 'scenario-path', '').trim();

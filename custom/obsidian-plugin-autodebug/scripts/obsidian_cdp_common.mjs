@@ -55,6 +55,15 @@ export function getBooleanOption(options, key, fallback = false) {
   return fallback;
 }
 
+export function hasHelpOption(options) {
+  return options.has('help') || options.has('h');
+}
+
+export function printHelpAndExit(text) {
+  console.log(String(text).trim());
+  process.exit(0);
+}
+
 export async function ensureParentDirectory(filePath) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
 }

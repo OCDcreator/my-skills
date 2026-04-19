@@ -4,8 +4,10 @@ import { fileURLToPath } from 'node:url';
 import {
   ensureParentDirectory,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
@@ -357,6 +359,24 @@ export async function generateQualityGateTemplates({
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (hasHelpOption(options)) {
+    printHelpAndExit(`
+Usage: node scripts/obsidian_debug_ci_templates.mjs --job <job.json> [options]
+
+Required:
+  --job <path>                       Autodebug job spec used for dry-run gates.
+
+Options:
+  --repo-dir <path>                  Plugin repo directory. Defaults to cwd.
+  --output-dir <dir>                 Template output dir. Defaults to autodebug/ci.
+  --output <path>                    JSON report output.
+  --tool-root-ref <path>             Portable tool-root reference in generated templates.
+  --install-command <command>        Override detected install command.
+  --ci-output-dir <dir>              CI artifact output directory.
+  --testing-framework-module <name>  Optional testing framework module name.
+`);
+  }
+
   const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
   const jobPath = getStringOption(options, 'job', '').trim();
   const outputDir = getStringOption(options, 'output-dir', DEFAULT_OUTPUT_DIR).trim() || DEFAULT_OUTPUT_DIR;

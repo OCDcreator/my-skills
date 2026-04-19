@@ -6,11 +6,31 @@ import {
   getBooleanOption,
   getNumberOption,
   getStringOption,
+  hasHelpOption,
   nowIso,
   parseArgs,
+  printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
+if (hasHelpOption(options)) {
+  printHelpAndExit(`
+Usage: node scripts/obsidian_debug_bootstrap_plugin.mjs --plugin-id <id> [options]
+
+Required:
+  --plugin-id <id>                    Plugin id to discover/enable.
+
+Options:
+  --obsidian-command <cmd>            Obsidian CLI command. Defaults to obsidian.
+  --vault-name <name>                 Target vault name for CLI commands.
+  --test-vault-plugin-dir <path>      Target vault plugin directory.
+  --output <path>                     Bootstrap report JSON output.
+  --allow-restart <true|false>        Allow restart fallback.
+  --enable-plugin <true|false>        Enable after discovery.
+  --skip-restrict-off true            Do not toggle restricted mode off.
+`);
+}
+
 const pluginId = getStringOption(options, 'plugin-id', '').trim();
 if (!pluginId) {
   throw new Error('--plugin-id is required');
