@@ -25,6 +25,8 @@ import {
   buildHotReloadGuidance,
   detectHotReloadContext,
 } from './obsidian_debug_hot_reload_support.mjs';
+import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
+import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
@@ -130,6 +132,34 @@ function check(status, id, category, detail, data = {}, fixSpecs = []) {
     detail,
     fixes: resolveFixes(fixSpecs),
     ...data,
+  };
+}
+
+function supportStatus(entry) {
+  return entry?.available ? 'pass' : entry?.declared ? 'warn' : 'info';
+}
+
+function listedScriptNames(scripts = []) {
+  return scripts
+    .map((entry) => entry?.name)
+    .filter((entry) => typeof entry === 'string' && entry.trim().length > 0)
+    .join(', ');
+}
+
+function commandFixSpec({ id, label, summary, safety, commandEntry }) {
+  if (!commandEntry?.available || !Array.isArray(commandEntry.command) || commandEntry.command.length === 0) {
+    return null;
+  }
+
+  return {
+    id,
+    label,
+    summary,
+    safety,
+    dryRunFriendly: false,
+    executable: commandEntry.command[0],
+    args: commandEntry.command.slice(1),
+    cwd: '{{repoDir}}',
   };
 }
 
@@ -256,31 +286,24 @@ const distMainPath = path.join(distDir, 'main.js');
 const distManifestPath = path.join(distDir, 'manifest.json');
 const distStylesPath = path.join(distDir, 'styles.css');
 const manifest = await readJsonOrNull(manifestPath);
-const packageJson = await readJsonOrNull(packagePath);
-const repoRuntime = packageJson
-  ? {
-      scripts: {
-        scriptBodies: packageJson.scripts ?? {},
-      },
-    }
-  : null;
+const runtimeSupport = await detectRepoRuntime({ repoDir });
+const packageJson = runtimeSupport.packageJson ?? await readJsonOrNull(packagePath);
+const repoRuntime = runtimeSupport.packageJson ? runtimeSupport : null;
+const ecosystemSupport = await detectEcosystemSupport({ repoDir });
 const testingFramework = await detectTestingFrameworkSupport({ repoDir });
-const buildScriptExists = Boolean(packageJson?.scripts?.build);
+const buildScriptExists = Boolean(runtimeSupport.scripts?.important?.build?.exists);
+const lintScriptExists = Boolean(runtimeSupport.scripts?.important?.lint?.exists);
 
-const buildFixes = buildScriptExists
-  ? [
-      {
-        id: 'run-build',
-        label: 'Build plugin output',
-        summary: 'Regenerate the deployable dist artifacts before retrying deploy/reload.',
-        safety: 'writes-build-output',
-        dryRunFriendly: false,
-        executable: 'npm',
-        args: ['run', 'build'],
-        cwd: '{{repoDir}}',
-      },
-    ]
-  : [];
+const buildFix = buildScriptExists
+  ? commandFixSpec({
+      id: 'run-build',
+      label: 'Build plugin output',
+      summary: 'Regenerate the deployable dist artifacts before retrying deploy/reload.',
+      safety: 'writes-build-output',
+      commandEntry: runtimeSupport.commands?.build,
+    })
+  : null;
+const buildFixes = buildFix ? [buildFix] : [];
 const deployFixes = testVaultPluginDir
   ? [
       {
@@ -430,6 +453,119 @@ checks.push(
 );
 checks.push(
   check(
+    runtimeSupport.packageManagerField?.supported
+      ? 'pass'
+      : runtimeSupport.packageManagerField
+        ? 'warn'
+        : 'info',
+    'package-manager-field',
+    'runtime',
+    runtimeSupport.packageManagerField
+      ? runtimeSupport.packageManagerField.supported
+        ? `package.json declares packageManager=${runtimeSupport.packageManagerField.raw}.`
+        : `package.json declares packageManager=${runtimeSupport.packageManagerField.raw}, but the value is unsupported or malformed.`
+      : 'package.json does not declare packageManager; runtime inference falls back to lockfiles and available tools.',
+    {
+      packageManagerField: runtimeSupport.packageManagerField,
+    },
+  ),
+);
+checks.push(
+  check(
+    runtimeSupport.inference.weak ? 'info' : 'pass',
+    'package-manager-inference',
+    'runtime',
+    `Inferred ${runtimeSupport.inference.manager} (${runtimeSupport.inference.confidence} confidence): ${runtimeSupport.inference.reasons.join('; ')}`,
+    {
+      inference: runtimeSupport.inference,
+      lockfiles: runtimeSupport.lockfiles,
+    },
+  ),
+);
+checks.push(
+  check(
+    runtimeSupport.runtime.corepackReady ? 'pass' : 'warn',
+    'package-manager-tooling',
+    'runtime',
+    runtimeSupport.runtime.corepackReady
+      ? `Package-manager tooling is ready for inferred ${runtimeSupport.runtime.inferredManager}.`
+      : `Package-manager tooling is not yet ready for inferred ${runtimeSupport.runtime.inferredManager}. ${runtimeSupport.tools?.[runtimeSupport.runtime.inferredManager]?.detail ?? ''}`.trim(),
+    {
+      runtime: runtimeSupport.runtime,
+      tools: runtimeSupport.tools,
+    },
+  ),
+);
+checks.push(
+  check(
+    lintScriptExists ? 'pass' : 'info',
+    'lint-script',
+    'lint',
+    lintScriptExists
+      ? 'package.json defines a lint script that can run before build/deploy.'
+      : 'package.json does not define scripts.lint; pre-build lint stays optional until the repo owns one.',
+    {
+      path: packagePath,
+      command: runtimeSupport.commands?.lint?.rendered ?? null,
+    },
+  ),
+);
+checks.push(
+  check(
+    supportStatus(ecosystemSupport.tools.obsidianDevUtils),
+    'obsidian-dev-utils-module',
+    'build',
+    ecosystemSupport.tools.obsidianDevUtils.available
+      ? `${ecosystemSupport.tools.obsidianDevUtils.detail} Prefer repo-owned dev/build scripts when they already route through it.`
+      : ecosystemSupport.tools.obsidianDevUtils.detail,
+    {
+      tool: ecosystemSupport.tools.obsidianDevUtils,
+    },
+  ),
+);
+checks.push(
+  check(
+    ecosystemSupport.tools.obsidianDevUtils.scripts.length > 0 ? 'pass' : 'info',
+    'obsidian-dev-utils-scripts',
+    'build',
+    ecosystemSupport.tools.obsidianDevUtils.scripts.length > 0
+      ? `Found repo-owned obsidian-dev-utils-aligned script(s): ${listedScriptNames(ecosystemSupport.tools.obsidianDevUtils.scripts)}.`
+      : 'No repo-owned script explicitly advertises obsidian-dev-utils usage.',
+    {
+      scripts: ecosystemSupport.tools.obsidianDevUtils.scripts,
+    },
+  ),
+);
+checks.push(
+  check(
+    supportStatus(ecosystemSupport.tools.eslintObsidianmd),
+    'eslint-plugin-obsidianmd-module',
+    'lint',
+    ecosystemSupport.tools.eslintObsidianmd.available
+      ? `${ecosystemSupport.tools.eslintObsidianmd.detail} Use a repo-owned lint script before build to catch manifest/sample-code issues earlier.`
+      : ecosystemSupport.tools.eslintObsidianmd.detail,
+    {
+      tool: ecosystemSupport.tools.eslintObsidianmd,
+    },
+  ),
+);
+checks.push(
+  check(
+    ecosystemSupport.tools.eslintObsidianmd.scripts.length > 0 || lintScriptExists ? 'pass' : 'info',
+    'eslint-plugin-obsidianmd-scripts',
+    'lint',
+    ecosystemSupport.tools.eslintObsidianmd.scripts.length > 0
+      ? `Found repo-owned lint script(s) that reference eslint-plugin-obsidianmd: ${listedScriptNames(ecosystemSupport.tools.eslintObsidianmd.scripts)}.`
+      : lintScriptExists
+        ? 'A repo-owned lint script exists; wire eslint-plugin-obsidianmd into that script when the repo wants official Obsidian lint coverage.'
+        : 'No repo-owned lint script currently references eslint-plugin-obsidianmd.',
+    {
+      scripts: ecosystemSupport.tools.eslintObsidianmd.scripts,
+    },
+  ),
+);
+checks.push(
+  check(
     testingFramework.available ? 'pass' : testingFramework.declared ? 'warn' : 'info',
     'testing-framework-module',
     'test',
@@ -448,6 +584,32 @@ checks.push(
 );
 checks.push(
   check(
+    supportStatus(ecosystemSupport.tools.obsidianE2E),
+    'obsidian-e2e-module',
+    'test',
+    ecosystemSupport.tools.obsidianE2E.available
+      ? `${ecosystemSupport.tools.obsidianE2E.detail} This is a Vitest-first optional Obsidian integration test path.`
+      : ecosystemSupport.tools.obsidianE2E.detail,
+    {
+      tool: ecosystemSupport.tools.obsidianE2E,
+    },
+  ),
+);
+checks.push(
+  check(
+    ecosystemSupport.tools.obsidianE2E.scripts.length > 0 ? 'pass' : 'info',
+    'obsidian-e2e-scripts',
+    'test',
+    ecosystemSupport.tools.obsidianE2E.scripts.length > 0
+      ? `Found repo-owned obsidian-e2e script(s): ${listedScriptNames(ecosystemSupport.tools.obsidianE2E.scripts)}.`
+      : 'No package.json script explicitly wires obsidian-e2e yet.',
+    {
+      scripts: ecosystemSupport.tools.obsidianE2E.scripts,
+    },
+  ),
+);
+checks.push(
+  check(
     testingFramework.scripts.length > 0 ? 'pass' : 'info',
     'testing-framework-scripts',
     'test',
@@ -461,6 +623,43 @@ checks.push(
 );
 checks.push(
   check(
+    supportStatus(ecosystemSupport.tools.wdioObsidianService),
+    'wdio-obsidian-service-module',
+    'test',
+    ecosystemSupport.tools.wdioObsidianService.available
+      ? `${ecosystemSupport.tools.wdioObsidianService.detail} This can move real plugin E2E into CI when the repo owns a WDIO suite.`
+      : ecosystemSupport.tools.wdioObsidianService.detail,
+    {
+      tool: ecosystemSupport.tools.wdioObsidianService,
+    },
+  ),
+);
+checks.push(
+  check(
+    ecosystemSupport.tools.wdioObsidianService.scripts.length > 0 ? 'pass' : 'info',
+    'wdio-obsidian-service-scripts',
+    'test',
+    ecosystemSupport.tools.wdioObsidianService.scripts.length > 0
+      ? `Found repo-owned WDIO/Obsidian service script(s): ${listedScriptNames(ecosystemSupport.tools.wdioObsidianService.scripts)}.`
+      : 'No package.json script explicitly wires wdio-obsidian-service yet.',
+    {
+      scripts: ecosystemSupport.tools.wdioObsidianService.scripts,
+    },
+  ),
+);
+checks.push(
+  check(
+    ecosystemSupport.scripts.pluginEntryValidation.present ? 'pass' : 'info',
+    'plugin-entry-validation-scripts',
+    'ci',
+    ecosystemSupport.scripts.pluginEntryValidation.detail,
+    {
+      scripts: ecosystemSupport.scripts.pluginEntryValidation.scripts,
+    },
+  ),
+);
+checks.push(
+  check(
     'info',
     'ci-quality-gate-templates',
     'ci',
@@ -468,8 +667,11 @@ checks.push(
     {
       templateScript: path.join(toolRoot, 'scripts', 'obsidian_debug_ci_templates.mjs'),
       ciSuitable: [
-        'repo-owned install/build/test commands',
+        'repo-owned install/lint/build/test commands',
+        'optional plugin-entry validation script',
+        'optional obsidian-e2e package script',
         'optional obsidian-testing-framework package script',
+        'optional wdio-obsidian-service package script',
         'obsidian_debug_job.mjs dry-run plans',
       ],
       localOnly: [
@@ -601,6 +803,44 @@ if (obsidianHelp.ok) {
   installedPlugins = installedPluginsResult.ok ? parsePluginList(installedPluginsResult.stdout) : [];
   enabledPlugins = enabledPluginsResult.ok ? parsePluginList(enabledPluginsResult.stdout) : [];
 }
+
+const logstravaganzaInstalled = installedPlugins.find((entry) => entry.id === 'logstravaganza') ?? null;
+const logstravaganzaEnabled = enabledPlugins.find((entry) => entry.id === 'logstravaganza') ?? null;
+const mobileHotReloadInstalled = installedPlugins.find((entry) => entry.id === 'mobile-hot-reload') ?? null;
+const mobileHotReloadEnabled = enabledPlugins.find((entry) => entry.id === 'mobile-hot-reload') ?? null;
+
+checks.push(
+  check(
+    logstravaganzaEnabled ? 'pass' : logstravaganzaInstalled ? 'info' : 'info',
+    'logstravaganza-vault',
+    'capture',
+    logstravaganzaEnabled
+      ? 'Vault enables Logstravaganza; its NDJSON files can serve as a persistent secondary console/error log source alongside CLI/CDP capture.'
+      : logstravaganzaInstalled
+        ? 'Vault contains Logstravaganza but it is not enabled; persistent NDJSON log capture remains available if you turn it on.'
+        : 'Logstravaganza was not detected in the target vault; persistent secondary file logging remains optional.',
+    {
+      installedVersion: logstravaganzaInstalled?.version ?? null,
+      enabledVersion: logstravaganzaEnabled?.version ?? null,
+    },
+  ),
+);
+checks.push(
+  check(
+    mobileHotReloadEnabled ? 'warn' : mobileHotReloadInstalled ? 'info' : 'info',
+    'mobile-hot-reload-vault',
+    'reload',
+    mobileHotReloadEnabled
+      ? 'Vault enables Mobile Hot Reload; treat it as intentional cross-device watch context because background sync can influence reload timing.'
+      : mobileHotReloadInstalled
+        ? 'Vault contains Mobile Hot Reload but it is not enabled; cross-device hot reload remains optional.'
+        : 'Mobile Hot Reload was not detected in the target vault.',
+    {
+      installedVersion: mobileHotReloadInstalled?.version ?? null,
+      enabledVersion: mobileHotReloadEnabled?.version ?? null,
+    },
+  ),
+);
 
 const hotReloadContext = await detectHotReloadContext({
   repoRuntime,
@@ -795,11 +1035,40 @@ const report = {
     scripts: testingFramework.scripts,
     detail: testingFramework.detail,
   },
+  repoRuntime: {
+    packageManagerField: runtimeSupport.packageManagerField,
+    inference: runtimeSupport.inference,
+    runtime: runtimeSupport.runtime,
+    tools: runtimeSupport.tools,
+    scripts: runtimeSupport.scripts,
+    commands: runtimeSupport.commands,
+  },
+  ecosystem: {
+    tools: ecosystemSupport.tools,
+    scripts: ecosystemSupport.scripts,
+    vaultPlugins: {
+      logstravaganza: {
+        installed: Boolean(logstravaganzaInstalled),
+        enabled: Boolean(logstravaganzaEnabled),
+        installedVersion: logstravaganzaInstalled?.version ?? null,
+        enabledVersion: logstravaganzaEnabled?.version ?? null,
+      },
+      mobileHotReload: {
+        installed: Boolean(mobileHotReloadInstalled),
+        enabled: Boolean(mobileHotReloadEnabled),
+        installedVersion: mobileHotReloadInstalled?.version ?? null,
+        enabledVersion: mobileHotReloadEnabled?.version ?? null,
+      },
+    },
+  },
   ciTemplates: {
     script: path.join(toolRoot, 'scripts', 'obsidian_debug_ci_templates.mjs'),
     ciSuitable: [
-      'repo-owned install/build/test commands',
+      'repo-owned install/lint/build/test commands',
+      'optional plugin-entry validation script',
+      'optional obsidian-e2e package script',
       'optional obsidian-testing-framework package script',
+      'optional wdio-obsidian-service package script',
       'obsidian_debug_job.mjs dry-run plans',
     ],
     localOnly: [

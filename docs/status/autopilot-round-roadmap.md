@@ -186,10 +186,64 @@
   - The framework can emit or document CI-ready quality-gate templates for local/headless checks
   - The phase doc records what remains local-only versus CI-suitable
 
+### [DONE] B16 - Optional ecosystem integration pass
+
+- **Lane**: Bugfix / backlog
+- **Goal**: Integrate the reviewed optional Obsidian ecosystem tools into doctor/docs/CI without turning them into mandatory dependencies: official lint rules, repo-owned `obsidian-dev-utils` flows, optional `obsidian-e2e` / `obsidian-testing-framework` / `wdio-obsidian-service` gates, persistent vault logging, MCP/CDP alternates, cross-device hot reload context, and release-adjacent validation routing.
+- **Constraints**:
+  - Keep repo-owned scripts authoritative instead of inventing parallel wrappers
+  - Treat optional tools as additive signals, not hard requirements
+  - Keep release automation routed to release-management flows rather than the default debug loop
+- **Acceptance**:
+  - Doctor surfaces optional ecosystem support when it is installed, declared, or visible in the target vault
+  - CI templates can wire optional lint, plugin-entry validation, and repo-owned Obsidian E2E scripts without machine-local paths
+  - Docs explain how `Logstravaganza`, MCP, `generator-obsidian-plugin`, `mobile-hot-reload`, `obsidian-typings`, and release-adjacent checks fit the debug workflow
+
+### [NEXT] B17 - Persistent vault log ingestion via Logstravaganza
+
+- **Lane**: Bugfix / backlog
+- **Goal**: Extend generic capture, diagnosis, and report flows so they can ingest `Logstravaganza` NDJSON logs from a vault when available, correlate them with existing console/CDP evidence, and preserve structured source metadata for downstream analysis.
+- **Constraints**:
+  - Keep file-based vault logging optional and additive; the framework must still work when no vault logger is installed
+  - Prefer repo/vault-driven discovery of log paths over hard-coded machine-local locations
+  - Preserve existing console/CDP capture paths and make merged log provenance explicit in reports
+- **Acceptance**:
+  - Doctor can detect usable `Logstravaganza` context and explain how the framework will consume it
+  - Capture/analysis/report flows can import structured vault logs when present and degrade cleanly when absent
+  - Fixture or sample artifacts validate NDJSON parsing, source attribution, and no-logger fallback behavior
+
+### [QUEUED] B18 - Preflight lint and plugin-entry validation gates
+
+- **Lane**: Bugfix / backlog
+- **Goal**: Turn optional `eslint-plugin-obsidianmd` and ReviewBot-style plugin-entry validation into reusable preflight checks that run before build/deploy flows and can be emitted into generated CI templates.
+- **Constraints**:
+  - Keep repository-owned lint scripts authoritative instead of inventing mandatory replacement commands
+  - Treat plugin-entry validation as optional and avoid network, secret, or machine-local path requirements
+  - Surface manifest/template residue issues early without widening scope into unrelated release automation
+- **Acceptance**:
+  - Doctor/runtime detection can identify runnable lint and plugin-entry preflight commands with remediation hints
+  - Generated CI templates can emit optional lint and plugin-entry validation steps before build/deploy
+  - Fixtures, templates, or docs demonstrate that manifest and template-residue failures can be caught pre-build
+
+### [QUEUED] B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring
+
+- **Lane**: Bugfix / backlog
+- **Goal**: Make optional `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service` support actionable by shipping detector-backed fixture/script patterns and CI wiring instead of documentation-only references.
+- **Constraints**:
+  - Keep every adapter optional and repo-owned; do not bundle Obsidian binaries or machine-local paths
+  - Prefer existing repository scripts when present and only infer commands when the repo leaves them implicit
+  - Preserve compatibility with the existing CLI/CDP-first path when no E2E adapter is installed
+- **Acceptance**:
+  - Doctor can distinguish declared dependencies from runnable adapter scripts and explain gaps clearly
+  - Generated templates or fixtures demonstrate both Vitest-style and WebdriverIO-style Obsidian E2E lanes
+  - CI wiring can target the chosen adapter without forcing one framework across all plugin repos
+
 ## Current state
 
 - B1-B10 are complete.
 - B11-B13 are complete.
 - B14 is complete.
 - B15 is complete.
-- No additional queued slice is approved; await human approval before expanding beyond B15.
+- B16 is complete.
+- B17 is next.
+- B18-B19 are queued.

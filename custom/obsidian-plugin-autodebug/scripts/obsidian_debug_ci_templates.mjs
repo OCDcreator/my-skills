@@ -9,6 +9,7 @@ import {
   parseArgs,
   printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
+import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
 import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
@@ -61,6 +62,18 @@ function firstTestingFrameworkScript(testingFramework) {
   return testingFramework.scripts?.[0]?.name ?? '';
 }
 
+function firstToolScript(tool) {
+  return tool?.scripts?.[0]?.name ?? '';
+}
+
+function statusText(tool, missingText) {
+  return tool.available
+    ? `installed as \`${tool.moduleName}\`${tool.version ? ` (${tool.version})` : ''}`
+    : tool.declared
+      ? `declared as \`${tool.moduleName}\` but not installed in this checkout`
+      : missingText;
+}
+
 function renderBashQualityGate(defaults) {
   return `#!/usr/bin/env bash
 set -euo pipefail
@@ -73,9 +86,13 @@ AUTODEBUG_TOOL_ROOT="\${AUTODEBUG_TOOL_ROOT:-${envDefault(defaults.toolRootRef)}
 AUTODEBUG_JOB_PATH="\${AUTODEBUG_JOB_PATH:-${envDefault(defaults.jobPath)}}"
 AUTODEBUG_INSTALL_COMMAND="\${AUTODEBUG_INSTALL_COMMAND:-${envDefault(defaults.installCommand)}}"
 AUTODEBUG_PACKAGE_RUNNER="\${AUTODEBUG_PACKAGE_RUNNER:-${envDefault(defaults.packageRunner)}}"
+AUTODEBUG_LINT_SCRIPT="\${AUTODEBUG_LINT_SCRIPT:-${envDefault(defaults.lintScript)}}"
 AUTODEBUG_BUILD_SCRIPT="\${AUTODEBUG_BUILD_SCRIPT:-${envDefault(defaults.buildScript)}}"
 AUTODEBUG_TEST_SCRIPT="\${AUTODEBUG_TEST_SCRIPT:-${envDefault(defaults.testScript)}}"
+AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT="\${AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT:-${envDefault(defaults.pluginEntryValidationScript)}}"
+AUTODEBUG_OBSIDIAN_E2E_SCRIPT="\${AUTODEBUG_OBSIDIAN_E2E_SCRIPT:-${envDefault(defaults.obsidianE2EScript)}}"
 AUTODEBUG_TESTING_FRAMEWORK_SCRIPT="\${AUTODEBUG_TESTING_FRAMEWORK_SCRIPT:-${envDefault(defaults.testingFrameworkScript)}}"
+AUTODEBUG_WDIO_SCRIPT="\${AUTODEBUG_WDIO_SCRIPT:-${envDefault(defaults.wdioScript)}}"
 AUTODEBUG_OUTPUT_DIR="\${AUTODEBUG_OUTPUT_DIR:-${envDefault(defaults.outputDir)}}"
 
 run_optional_command() {
@@ -106,9 +123,13 @@ run_optional_script() {
 mkdir -p "\${AUTODEBUG_OUTPUT_DIR}"
 
 run_optional_command "install" "\${AUTODEBUG_INSTALL_COMMAND}"
+run_optional_script "lint" "\${AUTODEBUG_LINT_SCRIPT}"
 run_optional_script "build" "\${AUTODEBUG_BUILD_SCRIPT}"
 run_optional_script "repo test" "\${AUTODEBUG_TEST_SCRIPT}"
+run_optional_script "plugin entry validation" "\${AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT}"
+run_optional_script "obsidian-e2e" "\${AUTODEBUG_OBSIDIAN_E2E_SCRIPT}"
 run_optional_script "obsidian-testing-framework" "\${AUTODEBUG_TESTING_FRAMEWORK_SCRIPT}"
+run_optional_script "wdio-obsidian-service" "\${AUTODEBUG_WDIO_SCRIPT}"
 
 node "\${AUTODEBUG_TOOL_ROOT}/scripts/obsidian_debug_job.mjs" \\
   --job "\${AUTODEBUG_JOB_PATH}" \\
@@ -129,9 +150,13 @@ $ToolRoot = if ($env:AUTODEBUG_TOOL_ROOT) { $env:AUTODEBUG_TOOL_ROOT } else { '$
 $JobPath = if ($env:AUTODEBUG_JOB_PATH) { $env:AUTODEBUG_JOB_PATH } else { '${defaults.jobPath.replaceAll("'", "''")}' }
 $InstallCommand = if ($env:AUTODEBUG_INSTALL_COMMAND) { $env:AUTODEBUG_INSTALL_COMMAND } else { '${defaults.installCommand.replaceAll("'", "''")}' }
 $PackageRunner = if ($env:AUTODEBUG_PACKAGE_RUNNER) { $env:AUTODEBUG_PACKAGE_RUNNER } else { '${defaults.packageRunner.replaceAll("'", "''")}' }
+$LintScript = if ($env:AUTODEBUG_LINT_SCRIPT) { $env:AUTODEBUG_LINT_SCRIPT } else { '${defaults.lintScript.replaceAll("'", "''")}' }
 $BuildScript = if ($env:AUTODEBUG_BUILD_SCRIPT) { $env:AUTODEBUG_BUILD_SCRIPT } else { '${defaults.buildScript.replaceAll("'", "''")}' }
 $TestScript = if ($env:AUTODEBUG_TEST_SCRIPT) { $env:AUTODEBUG_TEST_SCRIPT } else { '${defaults.testScript.replaceAll("'", "''")}' }
+$PluginEntryValidationScript = if ($env:AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT) { $env:AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT } else { '${defaults.pluginEntryValidationScript.replaceAll("'", "''")}' }
+$ObsidianE2EScript = if ($env:AUTODEBUG_OBSIDIAN_E2E_SCRIPT) { $env:AUTODEBUG_OBSIDIAN_E2E_SCRIPT } else { '${defaults.obsidianE2EScript.replaceAll("'", "''")}' }
 $TestingFrameworkScript = if ($env:AUTODEBUG_TESTING_FRAMEWORK_SCRIPT) { $env:AUTODEBUG_TESTING_FRAMEWORK_SCRIPT } else { '${defaults.testingFrameworkScript.replaceAll("'", "''")}' }
+$WdioScript = if ($env:AUTODEBUG_WDIO_SCRIPT) { $env:AUTODEBUG_WDIO_SCRIPT } else { '${defaults.wdioScript.replaceAll("'", "''")}' }
 $OutputDir = if ($env:AUTODEBUG_OUTPUT_DIR) { $env:AUTODEBUG_OUTPUT_DIR } else { '${defaults.outputDir.replaceAll("'", "''")}' }
 
 function Invoke-OptionalCommand {
@@ -166,9 +191,13 @@ function Invoke-OptionalScript {
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 Invoke-OptionalCommand -Label 'install' -Command $InstallCommand
+Invoke-OptionalScript -Label 'lint' -ScriptName $LintScript
 Invoke-OptionalScript -Label 'build' -ScriptName $BuildScript
 Invoke-OptionalScript -Label 'repo test' -ScriptName $TestScript
+Invoke-OptionalScript -Label 'plugin entry validation' -ScriptName $PluginEntryValidationScript
+Invoke-OptionalScript -Label 'obsidian-e2e' -ScriptName $ObsidianE2EScript
 Invoke-OptionalScript -Label 'obsidian-testing-framework' -ScriptName $TestingFrameworkScript
+Invoke-OptionalScript -Label 'wdio-obsidian-service' -ScriptName $WdioScript
 
 $JobRunner = Join-Path $ToolRoot 'scripts/obsidian_debug_job.mjs'
 $JobPlan = Join-Path $OutputDir 'job-plan-windows.json'
@@ -196,9 +225,13 @@ jobs:
       AUTODEBUG_JOB_PATH: ${yamlQuote(defaults.jobPath)}
       AUTODEBUG_INSTALL_COMMAND: ${yamlQuote(defaults.installCommand)}
       AUTODEBUG_PACKAGE_RUNNER: ${yamlQuote(defaults.packageRunner)}
+      AUTODEBUG_LINT_SCRIPT: ${yamlQuote(defaults.lintScript)}
       AUTODEBUG_BUILD_SCRIPT: ${yamlQuote(defaults.buildScript)}
       AUTODEBUG_TEST_SCRIPT: ${yamlQuote(defaults.testScript)}
+      AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT: ${yamlQuote(defaults.pluginEntryValidationScript)}
+      AUTODEBUG_OBSIDIAN_E2E_SCRIPT: ${yamlQuote(defaults.obsidianE2EScript)}
       AUTODEBUG_TESTING_FRAMEWORK_SCRIPT: ${yamlQuote(defaults.testingFrameworkScript)}
+      AUTODEBUG_WDIO_SCRIPT: ${yamlQuote(defaults.wdioScript)}
       AUTODEBUG_OUTPUT_DIR: ${yamlQuote(defaults.outputDir)}
 
     steps:
@@ -220,7 +253,7 @@ jobs:
 `;
 }
 
-function renderReadme(defaults, testingFramework) {
+function renderReadme(defaults, testingFramework, ecosystem) {
   const testingScript = defaults.testingFrameworkScript
     ? `\`${defaults.packageRunner} ${defaults.testingFrameworkScript}\``
     : 'not configured by package.json scripts';
@@ -229,6 +262,27 @@ function renderReadme(defaults, testingFramework) {
     : testingFramework.declared
       ? `declared as \`${testingFramework.moduleName}\` but not installed in this checkout`
       : 'not declared in this checkout';
+  const wdioScript = defaults.wdioScript
+    ? `\`${defaults.packageRunner} ${defaults.wdioScript}\``
+    : 'not configured by package.json scripts';
+  const obsidianE2EScript = defaults.obsidianE2EScript
+    ? `\`${defaults.packageRunner} ${defaults.obsidianE2EScript}\``
+    : 'not configured by package.json scripts';
+  const pluginEntryScript = defaults.pluginEntryValidationScript
+    ? `\`${defaults.packageRunner} ${defaults.pluginEntryValidationScript}\``
+    : 'not configured by package.json scripts';
+  const eslintStatus = statusText(
+    ecosystem.tools.eslintObsidianmd,
+    'not declared in this checkout',
+  );
+  const obsidianE2EStatus = statusText(
+    ecosystem.tools.obsidianE2E,
+    'not declared in this checkout',
+  );
+  const wdioStatus = statusText(
+    ecosystem.tools.wdioObsidianService,
+    'not declared in this checkout',
+  );
 
   return `# Obsidian Autodebug Quality Gates
 
@@ -237,9 +291,13 @@ These generated templates keep CI/headless checks separate from local desktop sm
 ## CI-Suitable Steps
 
 - Optional install command from \`AUTODEBUG_INSTALL_COMMAND\` (blank by default so repo-owned install policy stays explicit).
+- Repo-owned lint script: \`${defaults.lintScript || '(none detected)'}\`.
 - Repo-owned build script: \`${defaults.buildScript || '(none detected)'}\`.
 - Repo-owned test script: \`${defaults.testScript || '(none detected)'}\`.
+- Optional plugin-entry validation script: ${pluginEntryScript}.
+- Optional \`obsidian-e2e\` script: ${obsidianE2EScript}.
 - Optional \`obsidian-testing-framework\` script: ${testingScript}.
+- Optional \`wdio-obsidian-service\` script: ${wdioScript}.
 - Cross-platform dry-run plan generation through \`${defaults.toolRootRef}/scripts/obsidian_debug_job.mjs\`.
 
 ## Local-Only Steps
@@ -260,7 +318,10 @@ These generated templates keep CI/headless checks separate from local desktop sm
 - \`AUTODEBUG_PACKAGE_RUNNER=${defaults.packageRunner}\`
 - \`AUTODEBUG_OUTPUT_DIR=${defaults.outputDir}\`
 
+\`eslint-plugin-obsidianmd\` is ${eslintStatus}.
+\`obsidian-e2e\` is ${obsidianE2EStatus}.
 \`obsidian-testing-framework\` is ${testingStatus}. Re-run the doctor after installing dependencies if this should become an active E2E gate.
+\`wdio-obsidian-service\` is ${wdioStatus}. When the repo owns a WDIO suite, this can move real plugin E2E into CI instead of keeping it desktop-only.
 `;
 }
 
@@ -280,22 +341,40 @@ export async function generateQualityGateTemplates({
 
   const resolvedOutputDir = path.resolve(resolvedRepoDir, outputDir);
   const repoRuntime = await detectRepoRuntime({ repoDir: resolvedRepoDir, probeTools: false });
+  const ecosystem = await detectEcosystemSupport({ repoDir: resolvedRepoDir });
   const testingFramework = await detectTestingFrameworkSupport({
     repoDir: resolvedRepoDir,
     moduleName: testingFrameworkModule,
   });
   const inferredManager = repoRuntime.inference?.manager ?? 'npm';
+  const lintScript = repoRuntime.scripts?.important?.lint?.exists ? 'lint' : '';
   const testScript = repoRuntime.scripts?.important?.test?.exists ? 'test' : '';
   const detectedTestingFrameworkScript = firstTestingFrameworkScript(testingFramework);
+  const detectedPluginEntryValidationScript = firstToolScript(ecosystem.scripts.pluginEntryValidation);
+  const detectedObsidianE2EScript = firstToolScript(ecosystem.tools.obsidianE2E);
+  const detectedWdioScript = firstToolScript(ecosystem.tools.wdioObsidianService);
   const defaults = {
     toolRootRef: normalizeToolRootRef(toolRootRef),
     jobPath: relativeFromRepo(resolvedRepoDir, jobPath),
     installCommand: String(installCommand ?? '').trim(),
     packageRunner: recommendedPackageRunner(inferredManager),
+    lintScript,
     buildScript: repoRuntime.scripts?.important?.build?.exists ? 'build' : '',
     testScript,
+    pluginEntryValidationScript: detectedPluginEntryValidationScript
+      && ![lintScript, testScript].includes(detectedPluginEntryValidationScript)
+      ? detectedPluginEntryValidationScript
+      : '',
+    obsidianE2EScript: detectedObsidianE2EScript
+      && ![lintScript, testScript].includes(detectedObsidianE2EScript)
+      ? detectedObsidianE2EScript
+      : '',
     testingFrameworkScript: detectedTestingFrameworkScript && detectedTestingFrameworkScript !== testScript
       ? detectedTestingFrameworkScript
+      : '',
+    wdioScript: detectedWdioScript
+      && ![lintScript, testScript].includes(detectedWdioScript)
+      ? detectedWdioScript
       : '',
     outputDir: ciOutputDir,
     templateDir: toPosixPath(path.relative(resolvedRepoDir, resolvedOutputDir) || '.'),
@@ -304,7 +383,7 @@ export async function generateQualityGateTemplates({
   const files = [
     {
       path: path.join(resolvedOutputDir, 'README.md'),
-      content: renderReadme(defaults, testingFramework),
+      content: renderReadme(defaults, testingFramework, ecosystem),
     },
     {
       path: path.join(resolvedOutputDir, 'quality-gate.sh'),
@@ -342,9 +421,16 @@ export async function generateQualityGateTemplates({
       scripts: testingFramework.scripts,
       detail: testingFramework.detail,
     },
+    ecosystem: {
+      tools: ecosystem.tools,
+      scripts: ecosystem.scripts,
+    },
     ciSuitable: [
-      'repo-owned install/build/test commands',
+      'repo-owned install/lint/build/test commands',
+      'optional plugin-entry validation script',
+      'optional obsidian-e2e package script',
       'optional obsidian-testing-framework package script',
+      'optional wdio-obsidian-service package script',
       'autodebug job dry-run plan generation',
     ],
     localOnly: [

@@ -71,6 +71,8 @@ On macOS, if no full Obsidian CLI is available, launch Obsidian with a debug por
 bash scripts/obsidian_mac_restart_cdp.sh /Applications/Obsidian.app 9222
 ```
 
+If your agent runtime already exposes `obsidian-devtools-mcp` or a DevTools MCP target bound to the Obsidian Electron window, you can drive that instead of the bundled CDP scripts. Keep the built-in scripts as the portable fallback.
+
 ## Scenario And UI Assertions
 
 - Use `scenarios/open-plugin-view.json` when a plugin has a known open-view command or view type.
@@ -109,7 +111,7 @@ The bundled `rules/opencodian-issue-signatures.json` and `rules/opencodian-issue
 | Snapshot/restore vault files | `scripts/obsidian_debug_vault_state.mjs` | Use before experiments that mutate vault/plugin files. |
 | Preview/reset plugin-local state | `scripts/obsidian_debug_reset_state.mjs` | Start with `--mode preview`; reset preserves a snapshot. |
 | Compare clean vs restored state | `scripts/obsidian_debug_state_matrix.mjs` | Runs the same job against reset and restored state. |
-| Watch-on-save loop | `scripts/obsidian_debug_watch.mjs` | Command template supports `{{outputDir}}` and `{{run}}`. |
+| Watch-on-save loop | `scripts/obsidian_debug_watch.mjs` | Command template supports `{{outputDir}}` and `{{run}}`; if the vault intentionally uses `mobile-hot-reload`, treat it as cross-device watch context instead of deterministic timing mode. |
 | Repeated timing profile | `scripts/obsidian_debug_profile.mjs` | Use multiple runs to separate variance from regression. |
 | Save/list/compare/prune baselines | `scripts/obsidian_debug_baseline.mjs` | Tag baselines by plugin, platform, mode, and scenario. |
 
@@ -122,6 +124,15 @@ Start plugin-local reset plans from `state-plans/plugin-data-reset.json`, then c
 - `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` detection fixture.
 - `evals/evals.json`: behavior prompts for checking skill coverage after edits.
 
+## Optional Ecosystem Tools
+
+- `obsidian-dev-utils`: when the repo already uses it, prefer its repo-owned `dev` / `build` / `lint` / `test` scripts over rebuilding a parallel local loop.
+- `eslint-plugin-obsidianmd`: wire it through a repo-owned lint script before build when the repo wants official manifest/template validation.
+- `Logstravaganza`: if the target vault enables it, collect its NDJSON log files as persistent secondary evidence in addition to CLI/CDP output.
+- `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service`: optional CI/headless adapters that should stay repo-owned rather than hard-coded by the skill.
+- `generator-obsidian-plugin`: prefer this when the user needs a production-ready plugin project scaffold instead of a minimal debug fixture.
+- `semantic-release-obsidian-plugin`: release automation belongs in release-management flows, not the default local debug loop.
+
 ## CI And Headless Quality Gates
 
 Generate CI templates only after a local desktop smoke run passes:
@@ -132,7 +143,7 @@ node scripts/obsidian_debug_ci_templates.mjs --repo-dir <repo> --job <repo>/.obs
 
 Keep the split explicit:
 
-- CI-suitable: install/build/test commands, optional `obsidian-testing-framework` repo script, job dry-runs.
+- CI-suitable: install/lint/build/test commands, optional plugin-entry validation scripts, optional `obsidian-e2e`, `obsidian-testing-framework`, or `wdio-obsidian-service` repo scripts, and job dry-runs.
 - Local-only: fresh-vault bootstrap, desktop Obsidian reload, CLI/CDP console capture, screenshots, DOM snapshots, Playwright traces.
 
 ## Troubleshooting

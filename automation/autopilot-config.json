@@ -1,8 +1,8 @@
 {
-  "objective": "Queue and execute Windows + macOS dual-platform generic custom/obsidian-plugin-autodebug framework enhancement slices beyond B10: package-manager and runtime doctor coverage, optional Playwright and obsidian-testing-framework adapters, Hot Reload coordination checks, sample-plugin scaffold/bootstrap flows, and CI-ready quality-gate templates without hard-coding one plugin.",
-  "starting_phase_doc": "docs/status/autopilot-phase-0.md",
-  "next_phase_number": 11,
-  "focus_hint": "B11 - Package-manager and runtime doctor coverage",
+  "objective": "Queue and execute the remaining approved Windows + macOS generic custom/obsidian-plugin-autodebug ecosystem slices beyond B16: Logstravaganza-backed persistent vault log ingestion, official lint and plugin-entry preflight validation, and repo-owned Obsidian E2E adapter fixtures plus CI wiring without hard-coding one plugin or machine-local path.",
+  "starting_phase_doc": "docs/status/autopilot-phase-16.md",
+  "next_phase_number": 17,
+  "focus_hint": "B17 - Persistent vault log ingestion via Logstravaganza",
   "max_rounds": 120,
   "max_consecutive_failures": 3,
   "lint_command": "",

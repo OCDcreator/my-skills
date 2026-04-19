@@ -6,15 +6,15 @@
 
 ## Overall objective
 
-- Queue and execute Windows + macOS dual-platform generic `custom/obsidian-plugin-autodebug` framework enhancement slices beyond B10: package-manager/runtime doctor coverage, optional Playwright and `obsidian-testing-framework` adapters, Hot Reload coordination checks, sample-plugin scaffold/bootstrap flows, and CI-ready quality-gate templates without hard-coding one plugin.
+- Queue and execute the remaining approved Windows + macOS generic `custom/obsidian-plugin-autodebug` ecosystem slices beyond B16: persistent vault log ingestion, official lint/plugin-entry preflight validation, and repo-owned Obsidian E2E adapter fixtures plus CI wiring without hard-coding one plugin.
 - Keep each queued slice small, reproducible, and easy to validate
 - Prefer the highest-confidence bugfix or backlog item first
 
 ## Priority lanes
 
-- **P1. Environment and runtime doctoring**: Node/Corepack/package-manager detection, runtime prerequisites, Hot Reload coordination, and optional tool-adapter discovery that work on Windows PowerShell and macOS/Linux Bash without assuming one plugin
-- **P2. UI automation and testing adapters**: optional Playwright and `obsidian-testing-framework` integration, richer scenario execution, and trace/screenshot evidence with plugin-neutral defaults
-- **P3. Generic scaffolding and delivery**: sample-plugin scaffold/bootstrap, CI-ready quality-gate templates, and checkpointed dual-platform validation for future agents
+- **P1. Persistent log capture and diagnosis**: vault-level structured logging discovery, NDJSON ingestion, and merged console/CDP plus file-log evidence with plugin-neutral defaults
+- **P2. Preflight validation gates**: official lint/plugin-entry checks that surface manifest and template issues before build/deploy while respecting repository-owned scripts
+- **P3. Repo-owned Obsidian E2E adapters**: optional `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service` fixture plus CI wiring that preserves the existing CLI/CDP-first path
 
 ## Guardrails
 
@@ -22,4 +22,4 @@
 - Keep each round inside the generic `custom/obsidian-plugin-autodebug` framework backlog
 - Preserve plugin-agnostic behavior; real plugin names may appear only as validation fixtures or examples
 - Do not modify existing skill files unless the active queue item explicitly requires it
-- Do not expand beyond the approved B11-B15 queue without another human approval
+- Do not expand beyond the approved B17-B19 queue without another human approval

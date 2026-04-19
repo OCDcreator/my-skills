@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 
 const SUPPORTED_PACKAGE_MANAGERS = ['npm', 'pnpm', 'yarn', 'bun'];
 const COREPACK_MANAGERS = new Set(['pnpm', 'yarn']);
-const IMPORTANT_SCRIPTS = ['build', 'dev', 'test'];
+const IMPORTANT_SCRIPTS = ['build', 'dev', 'test', 'lint'];
 const LOCKFILE_DEFINITIONS = [
   { name: 'package-lock.json', manager: 'npm', evidence: 'lockfile' },
   { name: 'npm-shrinkwrap.json', manager: 'npm', evidence: 'lockfile' },
@@ -379,7 +379,8 @@ export async function detectRepoRuntime({ repoDir, probeTools = true } = {}) {
 
   const inferredManager = inference.manager;
   const corepackRelevant = COREPACK_MANAGERS.has(inferredManager);
-  const corepackReady = !corepackRelevant || tools[inferredManager]?.available || tools.corepack?.available;
+  const managerAvailable = Boolean(tools[inferredManager]?.available);
+  const corepackReady = managerAvailable || (corepackRelevant && Boolean(tools.corepack?.available));
 
   return {
     repoDir: resolvedRepoDir,
@@ -394,6 +395,7 @@ export async function detectRepoRuntime({ repoDir, probeTools = true } = {}) {
     runtime: {
       inferredManager,
       corepackRelevant,
+      managerAvailable,
       corepackReady,
     },
   };
