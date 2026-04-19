@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Use when developing or debugging Obsidian community plugins end-to-end: build/deploy/reload loops, fresh test vault bootstrap, Obsidian CLI/CDP console capture, screenshots, DOM assertions, startup profiling, watch-on-save, plugin state reset, CI quality gates, or sample plugin scaffolding.
+description: Use when developing, debugging, or pre-release checking an Obsidian community plugin, extension, or add-on and the user mentions white screens after reload, slow startup, manual refresh loops, a plugin not showing up in a fresh vault, console or DevTools capture, screenshots, DOM assertions, watch-on-save, state reset, or automated smoke testing before release.
 ---
 
 # Obsidian Plugin Autodebug
@@ -16,10 +16,12 @@ Use this skill when the user asks for:
 - full Obsidian plugin smoke/debug cycles: build, deploy, reload, capture, diagnose;
 - fresh clean-vault or first-install bootstrap problems;
 - dev console, startup logs, CDP traces, screenshots, DOM/CSS inspection, or UI assertions;
-- slow startup, slow view-open, hydration, server warmup, or timing regression analysis;
+- slow startup, slow view-open, view/data hydration, server warmup, or timing regression analysis;
 - watch-on-save automation, state reset, baseline comparison, profiling, or HTML reports;
 - CI/headless quality-gate templates that stay separate from desktop-only checks;
-- a minimal sample plugin workspace when no real plugin repo exists yet.
+- a minimal sample plugin workspace when no real plugin repo exists yet;
+- plugin white screens after reload, plugins that do not show up in a fresh vault, or manual refresh loops;
+- pre-release smoke checks before publishing an Obsidian plugin.
 
 Do not use it for normal note/vault operations. Use `obsidian-cli` directly for reading notes, creating files, searching vault content, or simple one-shot vault management.
 
@@ -72,7 +74,8 @@ If the repo already has a release/deploy script or skill, reuse it instead of in
 | Situation | Preferred path |
 | --- | --- |
 | Existing plugin repo | Copy `job-specs/generic-debug-job.template.json`, tailor runtime/build/deploy values, run doctor, dry-run, then execute. |
-| No plugin repo yet | If you need a real production-ready plugin repo, start from `generator-obsidian-plugin`. Use `scripts/obsidian_debug_scaffold_plugin.mjs` only when you want a minimal debug fixture, test vault, job spec, assertions, scenario, and CI templates. |
+| No plugin repo yet, production scaffold needed | Start from `generator-obsidian-plugin`. |
+| No plugin repo yet, minimal debug fixture needed | Use `scripts/obsidian_debug_scaffold_plugin.mjs` when you want a lightweight fixture plus test vault, job spec, assertions, scenario, and CI templates. |
 | CLI developer commands work | Use CLI-first reload/log/screenshot/DOM capture. |
 | CLI cannot see Obsidian but app can expose CDP | Start Obsidian with a debug port and use CDP capture/reload scripts. |
 | One-off local pass | Use `scripts/obsidian_plugin_debug_cycle.ps1` or `scripts/obsidian_plugin_debug_cycle.sh`. |
@@ -135,11 +138,11 @@ When the user reports “startup is slow” or “first open is slow,” split t
 1. plugin `onload` / startup total;
 2. deferred runtime warmup such as local server start;
 3. view open / tab restore;
-4. conversation/message hydration;
+4. view/data hydration or async data loading;
 5. post-render UI tail;
 6. background refreshes.
 
-Add timing logs around each suspected phase. For Obsidian plugin UI, `onload` can be fast while the visible sidebar is slow because view hydration waits for a server-dependent request.
+Add timing logs around each suspected phase. For Obsidian plugin UI, `onload` can be fast while the visible sidebar is slow because view/data hydration waits for a server-dependent request.
 
 Safe fix pattern:
 
@@ -168,11 +171,16 @@ Use watch mode for “save → build → deploy → reload → diagnose” loops
 
 When the surrounding repo or target vault already uses these tools, integrate with them instead of fighting them:
 
+**Auto-detect and integrate when already present**
+
 - `obsidian-dev-utils`: prefer repo-owned `dev` / `build` / `lint` / `test` scripts that already route through it.
 - `eslint-plugin-obsidianmd`: run it through a repo-owned lint script before build when the repo wants official Obsidian manifest/template checks.
 - `Logstravaganza`: use it as persistent secondary console/error evidence, especially for mobile or user-supplied repro logs; doctor/capture/report now preserve NDJSON source metadata so merged evidence stays attributable.
 - `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service`: keep them optional; doctor and CI templates should surface them only when the repo already owns matching scripts or dependencies.
 - `mobile-hot-reload`: treat it as intentional cross-device watch context because it can influence reload timing and log ordering.
+
+**Recommend only when the user or repo actually needs them**
+
 - `generator-obsidian-plugin`: recommend it when the user wants a real plugin project scaffold rather than a minimal debug fixture.
 - `semantic-release-obsidian-plugin`: release automation belongs in `obsidian-plugin-release-manager`, not the default autodebug loop.
 
