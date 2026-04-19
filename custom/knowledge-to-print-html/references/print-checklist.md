@@ -82,7 +82,7 @@ code {
 - Prefer SVG diagrams for sharp print output
 - Ensure all images have a purpose and caption
 - Check SVG visual enclosure: every outer frame / 外框 must contain the labels, pills, icons, and child boxes it groups
-- Check compact SVG cards for inner padding and visual balance: the final line must not hug the bottom edge, and left/right spacing must not look obviously uneven
+- Check compact SVG cards and medium structured frames for inner padding and visual balance: the final line or child box must not hug the bottom edge, and left/right spacing must not look obviously uneven
 - Avoid dense background textures that make home printing muddy
 - If a cover treatment is dramatic, keep the reading pages calmer
 
@@ -112,7 +112,7 @@ Before hand-off, confirm:
 - long tables do not overflow the printable area
 - text inside panels, callouts, table cells, code blocks, tags, and grid items does not overflow or clip inside its own container
 - SVG outer frame/card boundaries actually wrap the content they visually claim to contain
-- compact SVG text boxes keep healthy inner padding instead of technically fitting while hugging one edge
+- compact SVG text boxes and medium structured frames keep healthy inner padding instead of technically fitting while hugging one edge
 - code blocks wrap or scroll safely
 - important sections do not break in obviously bad places
 - references section appears in the final artifact

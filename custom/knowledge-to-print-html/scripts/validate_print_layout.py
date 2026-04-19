@@ -32,6 +32,10 @@ SVG_FRAME_MIN_HEIGHT = 80.0
 SVG_FRAME_BACKGROUND_AREA_RATIO = 0.75
 SVG_FRAME_OVERFLOW_TOLERANCE = 4.0
 SVG_FRAME_VERTICAL_SLACK = 120.0
+SVG_TEXT_BOX_MAX_WIDTH = 420.0
+SVG_TEXT_BOX_MAX_HEIGHT = 220.0
+SVG_STRUCTURED_FRAME_MAX_WIDTH = 600.0
+SVG_STRUCTURED_FRAME_MAX_HEIGHT = 400.0
 SVG_TEXT_BOX_MIN_SIDE_PADDING = 12.0
 SVG_TEXT_BOX_MIN_TOP_PADDING = 12.0
 SVG_TEXT_BOX_MIN_BOTTOM_PADDING = 10.0
@@ -1193,6 +1197,14 @@ def inspect_svg_visual_enclosure(svg_path: Path) -> list[dict[str, Any]]:
     for frame in candidate_frames:
         overflowing_items: list[dict[str, Any]] = []
         padding_issue: dict[str, Any] | None = None
+        is_small_text_box = (
+            frame["width"] <= SVG_TEXT_BOX_MAX_WIDTH
+            and frame["height"] <= SVG_TEXT_BOX_MAX_HEIGHT
+        )
+        is_structured_content_frame = (
+            frame["width"] <= SVG_STRUCTURED_FRAME_MAX_WIDTH
+            and frame["height"] <= SVG_STRUCTURED_FRAME_MAX_HEIGHT
+        )
         vertical_limit = frame["bottom"] + min(
             SVG_FRAME_VERTICAL_SLACK,
             max(36.0, frame["height"] * 0.45),
@@ -1259,12 +1271,13 @@ def inspect_svg_visual_enclosure(svg_path: Path) -> list[dict[str, Any]]:
                 }
             )
 
-        if frame["width"] <= 420.0 and frame["height"] <= 220.0:
+        if is_small_text_box or is_structured_content_frame:
             content_text_items = []
+            content_rect_items = []
             for element in elements:
                 if element["parentKey"] != frame["parentKey"]:
                     continue
-                if element["order"] <= frame["order"] or element["tag"] != "text":
+                if element["order"] <= frame["order"] or element["tag"] not in {"rect", "text"}:
                     continue
                 center_x = (element["left"] + element["right"]) / 2
                 center_y = (element["top"] + element["bottom"]) / 2
@@ -1272,20 +1285,31 @@ def inspect_svg_visual_enclosure(svg_path: Path) -> list[dict[str, Any]]:
                     (frame["left"] + 4.0) <= center_x <= (frame["right"] - 4.0)
                     and (frame["top"] + 2.0) <= center_y <= (frame["bottom"] + 8.0)
                 ):
-                    content_text_items.append(element)
+                    if element["tag"] == "text":
+                        content_text_items.append(element)
+                    elif (
+                        0.0 < element["width"] < frame["width"]
+                        and 0.0 < element["height"] < frame["height"]
+                    ):
+                        content_rect_items.append(element)
 
-            if content_text_items:
-                content_left = min(item["left"] for item in content_text_items)
-                content_right = max(item["right"] for item in content_text_items)
-                content_top = min(item["top"] for item in content_text_items)
-                content_bottom = max(item["bottom"] for item in content_text_items)
+            content_items = content_text_items
+            if is_structured_content_frame and content_rect_items:
+                content_items = [*content_text_items, *content_rect_items]
+
+            if content_text_items and content_items:
+                content_left = min(item["left"] for item in content_items)
+                content_right = max(item["right"] for item in content_items)
+                content_top = min(item["top"] for item in content_items)
+                content_bottom = max(item["bottom"] for item in content_items)
                 padding = {
                     "left": round(frame["left"] - content_left if content_left < frame["left"] else content_left - frame["left"], 2),
                     "right": round(frame["right"] - content_right, 2),
                     "top": round(content_top - frame["top"], 2),
                     "bottom": round(frame["bottom"] - content_bottom, 2),
                 }
-                compact_multiline_box = frame["width"] <= 260.0 and len(content_text_items) >= 4
+                compact_multiline_box = is_small_text_box and frame["width"] <= 260.0 and len(content_text_items) >= 4
+                structured_content_frame = is_structured_content_frame and bool(content_rect_items)
                 horizontal_imbalance = abs(padding["left"] - padding["right"])
                 vertical_imbalance = abs(padding["top"] - padding["bottom"])
                 fails_padding = (
@@ -1298,7 +1322,7 @@ def inspect_svg_visual_enclosure(svg_path: Path) -> list[dict[str, Any]]:
                         and horizontal_imbalance > SVG_TEXT_BOX_MAX_HORIZONTAL_IMBALANCE
                     )
                     or (
-                        compact_multiline_box
+                        (compact_multiline_box or structured_content_frame)
                         and vertical_imbalance > SVG_TEXT_BOX_MAX_VERTICAL_IMBALANCE
                     )
                 )
@@ -1314,15 +1338,15 @@ def inspect_svg_visual_enclosure(svg_path: Path) -> list[dict[str, Any]]:
                         "horizontalImbalance": round(horizontal_imbalance, 2),
                         "verticalImbalance": round(vertical_imbalance, 2),
                         "compactMultilineBox": compact_multiline_box,
+                        "structuredContentFrame": structured_content_frame,
                     }
 
         rect_overflows = [item for item in overflowing_items if item["tag"] == "rect"]
         text_overflows = [item for item in overflowing_items if item["tag"] == "text"]
-        is_small_text_box = frame["width"] <= 420.0 and frame["height"] <= 220.0
         if not rect_overflows and not text_overflows:
             if padding_issue is None:
                 continue
-        if not is_small_text_box and not rect_overflows and len(text_overflows) < 2:
+        if not is_small_text_box and padding_issue is None and not rect_overflows and len(text_overflows) < 2:
             continue
 
         issues.append(
@@ -1333,6 +1357,8 @@ def inspect_svg_visual_enclosure(svg_path: Path) -> list[dict[str, Any]]:
                     if is_small_text_box and text_overflows
                     else "small_text_box_padding_failure"
                     if is_small_text_box and padding_issue is not None
+                    else "svg_inner_padding_failure"
+                    if padding_issue is not None
                     else "group_enclosure_failure"
                 ),
                 "frame": {

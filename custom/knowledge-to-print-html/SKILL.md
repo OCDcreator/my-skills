@@ -230,7 +230,7 @@ The final HTML must be:
 - free of compressed body typography used only to force content onto the page
 - protected against text overflow inside panels, callouts, table cells, code blocks, tags, and grid children with appropriate `overflow-wrap`, `word-break`, and `hyphens` rules
 - protected against SVG visual enclosure failures: every diagram outer frame / card / 外框 must actually contain the text, pills, icons, and child boxes it visually claims to group
-- protected against compact SVG text-box padding failures: inner padding must stay comfortable, the final line must not hug the bottom edge, and side spacing should keep visual balance
+- protected against compact and medium SVG frame padding failures: inner padding must stay comfortable, the final line or child box must not hug the bottom edge, and spacing should keep visual balance
 
 Full page-density and chrome rules live in `references/layout-guardrails.md`.
 

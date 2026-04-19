@@ -437,6 +437,20 @@ TIGHT_PADDING_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="900" heigh
 </svg>
 """
 
+MEDIUM_FRAME_UNEVEN_PADDING_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="640" viewBox="0 0 1200 640">
+  <rect width="1200" height="640" rx="28" fill="#f8fbff"/>
+  <rect x="670" y="340" width="450" height="276" rx="28" fill="#ffffff" stroke="#a7c5dc" stroke-width="3"/>
+  <text x="710" y="389" font-size="16" font-weight="700" fill="#2f6fa4">真核细胞</text>
+  <text x="710" y="430" font-size="32" font-weight="700" fill="#173147">三种主要方式</text>
+  <rect x="695" y="452" width="400" height="50" rx="18" fill="#eef5fb" stroke="#c2d6e6"/>
+  <text x="895" y="484" text-anchor="middle" font-size="21" font-weight="700" fill="#1e4769">无丝分裂：核直接缢裂</text>
+  <rect x="695" y="507" width="400" height="50" rx="18" fill="#eef5fb" stroke="#c2d6e6"/>
+  <text x="895" y="539" text-anchor="middle" font-size="21" font-weight="700" fill="#1e4769">有丝分裂：体细胞增殖</text>
+  <rect x="695" y="562" width="400" height="50" rx="18" fill="#eef5fb" stroke="#c2d6e6"/>
+  <text x="895" y="594" text-anchor="middle" font-size="21" font-weight="700" fill="#1e4769">减数分裂：形成配子</text>
+</svg>
+"""
+
 
 class PrintToolTests(unittest.TestCase):
     def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
@@ -544,6 +558,7 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("inner padding", combined)
         self.assertIn("bottom edge", combined)
         self.assertIn("visual balance", combined)
+        self.assertIn("medium structured", combined)
 
     def test_working_file_templates_reference_exists_and_is_linked(self) -> None:
         skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
@@ -1320,6 +1335,24 @@ class PrintToolTests(unittest.TestCase):
                 report["analysis"]["sheets"][0]["svgVisualEnclosure"]["count"],
                 0,
             )
+
+    def test_svg_visual_enclosure_reports_medium_frame_uneven_padding(self) -> None:
+        from scripts.validate_print_layout import inspect_svg_visual_enclosure
+
+        with tempfile.TemporaryDirectory() as temp_name:
+            svg_path = Path(temp_name) / "medium-frame-uneven-padding.svg"
+            svg_path.write_text(MEDIUM_FRAME_UNEVEN_PADDING_SVG, encoding="utf-8")
+
+            issues = inspect_svg_visual_enclosure(svg_path)
+
+        self.assertGreater(len(issues), 0)
+        padding_issues = [
+            issue
+            for issue in issues
+            if issue["frame"]["width"] == 450.0 and issue["paddingIssue"] is not None
+        ]
+        self.assertEqual(len(padding_issues), 1)
+        self.assertEqual(padding_issues[0]["paddingIssue"]["padding"]["bottom"], 4.0)
 
 
 if __name__ == "__main__":
