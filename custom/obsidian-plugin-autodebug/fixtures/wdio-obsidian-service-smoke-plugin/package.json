@@ -1,0 +1,18 @@
+{
+  "name": "wdio-obsidian-service-smoke-plugin",
+  "version": "0.0.1",
+  "description": "Generic fixture for optional wdio-obsidian-service detection and CI wiring",
+  "main": "dist/main.js",
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "node -e \"console.log('wdio smoke fixture already built')\"",
+    "test": "node -e \"console.log('wdio smoke fixture base test')\"",
+    "test:obsidian-wdio": "wdio run autodebug/ci/wdio.obsidian.conf.mjs"
+  },
+  "devDependencies": {
+    "@wdio/cli": "^0.0.0-fixture",
+    "wdio-obsidian-service": "^0.0.0-fixture"
+  },
+  "author": "my-skills",
+  "license": "MIT"
+}

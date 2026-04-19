@@ -25,6 +25,7 @@ import {
   buildHotReloadGuidance,
   detectHotReloadContext,
 } from './obsidian_debug_hot_reload_support.mjs';
+import { detectAdapterSupport } from './obsidian_debug_adapter_support.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
 import { discoverLogstravaganzaCapture } from './obsidian_debug_logstravaganza.mjs';
 import {
@@ -303,6 +304,15 @@ const preflightSupport = await detectPreflightSupport({
 const lintPreflightGate = getPreflightGate(preflightSupport, 'lint');
 const pluginEntryPreflightGate = getPreflightGate(preflightSupport, 'plugin-entry-validation');
 const testingFramework = await detectTestingFrameworkSupport({ repoDir });
+const adapterSupport = await detectAdapterSupport({
+  repoDir,
+  runtimeSupport,
+  ecosystemSupport,
+  testingFrameworkSupport: testingFramework,
+});
+const obsidianE2EAdapter = adapterSupport.adapters.obsidianE2E;
+const testingFrameworkAdapter = adapterSupport.adapters.testingFramework;
+const wdioAdapter = adapterSupport.adapters.wdioObsidianService;
 const buildScriptExists = Boolean(runtimeSupport.scripts?.important?.build?.exists);
 const lintScriptExists = Boolean(lintPreflightGate?.present);
 
@@ -612,27 +622,35 @@ checks.push(
 );
 checks.push(
   check(
-    ecosystemSupport.tools.obsidianE2E.scripts.length > 0 ? 'pass' : 'info',
+    obsidianE2EAdapter.status,
     'obsidian-e2e-scripts',
     'test',
-    ecosystemSupport.tools.obsidianE2E.scripts.length > 0
-      ? `Found repo-owned obsidian-e2e script(s): ${listedScriptNames(ecosystemSupport.tools.obsidianE2E.scripts)}.`
-      : 'No package.json script explicitly wires obsidian-e2e yet.',
+    obsidianE2EAdapter.detail,
     {
-      scripts: ecosystemSupport.tools.obsidianE2E.scripts,
+      scripts: obsidianE2EAdapter.scripts,
+      script: obsidianE2EAdapter.scriptName,
+      command: obsidianE2EAdapter.command.rendered || obsidianE2EAdapter.command.previewRendered || null,
+      runnable: obsidianE2EAdapter.runnable,
+      runnableInThisCheckout: obsidianE2EAdapter.runnableInThisCheckout,
+      repoOwnedPaths: obsidianE2EAdapter.repoOwnedPaths,
+      missingRepoOwnedPaths: obsidianE2EAdapter.missingRepoOwnedPaths,
     },
   ),
 );
 checks.push(
   check(
-    testingFramework.scripts.length > 0 ? 'pass' : 'info',
+    testingFrameworkAdapter.status,
     'testing-framework-scripts',
     'test',
-    testingFramework.scripts.length > 0
-      ? `Found repo-owned testing-framework script(s): ${testingFramework.scripts.map((entry) => entry.name).join(', ')}.`
-      : 'No package.json script invokes obsidian-testing-framework; keep the optional CI gate disabled until the repo owns one.',
+    testingFrameworkAdapter.detail,
     {
-      scripts: testingFramework.scripts,
+      scripts: testingFrameworkAdapter.scripts,
+      script: testingFrameworkAdapter.scriptName,
+      command: testingFrameworkAdapter.command.rendered || testingFrameworkAdapter.command.previewRendered || null,
+      runnable: testingFrameworkAdapter.runnable,
+      runnableInThisCheckout: testingFrameworkAdapter.runnableInThisCheckout,
+      repoOwnedPaths: testingFrameworkAdapter.repoOwnedPaths,
+      missingRepoOwnedPaths: testingFrameworkAdapter.missingRepoOwnedPaths,
     },
   ),
 );
@@ -651,14 +669,18 @@ checks.push(
 );
 checks.push(
   check(
-    ecosystemSupport.tools.wdioObsidianService.scripts.length > 0 ? 'pass' : 'info',
+    wdioAdapter.status,
     'wdio-obsidian-service-scripts',
     'test',
-    ecosystemSupport.tools.wdioObsidianService.scripts.length > 0
-      ? `Found repo-owned WDIO/Obsidian service script(s): ${listedScriptNames(ecosystemSupport.tools.wdioObsidianService.scripts)}.`
-      : 'No package.json script explicitly wires wdio-obsidian-service yet.',
+    wdioAdapter.detail,
     {
-      scripts: ecosystemSupport.tools.wdioObsidianService.scripts,
+      scripts: wdioAdapter.scripts,
+      script: wdioAdapter.scriptName,
+      command: wdioAdapter.command.rendered || wdioAdapter.command.previewRendered || null,
+      runnable: wdioAdapter.runnable,
+      runnableInThisCheckout: wdioAdapter.runnableInThisCheckout,
+      repoOwnedPaths: wdioAdapter.repoOwnedPaths,
+      missingRepoOwnedPaths: wdioAdapter.missingRepoOwnedPaths,
     },
   ),
 );
@@ -1078,6 +1100,7 @@ const report = {
     commands: runtimeSupport.commands,
   },
   preflight: preflightSupport,
+  adapterLanes: adapterSupport.adapters,
   ecosystem: {
     tools: ecosystemSupport.tools,
     scripts: ecosystemSupport.scripts,
@@ -1104,6 +1127,7 @@ const report = {
   ciTemplates: {
     script: path.join(toolRoot, 'scripts', 'obsidian_debug_ci_templates.mjs'),
     preflight: preflightSupport,
+    adapterLanes: adapterSupport.adapters,
     ciSuitable: [
       'repo-owned install command',
       'repo-owned lint and optional plugin-entry preflight commands before build',

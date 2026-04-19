@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring
+### [DONE] B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Make optional `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service` support actionable by shipping detector-backed fixture/script patterns and CI wiring instead of documentation-only references.
@@ -23,4 +23,5 @@
 ## Lane state
 
 - This roadmap is lane-local.
+- Lane `b2-backlog-slice` has no remaining `[NEXT]` or `[QUEUED]` items; the controller can advance to `b3-checkpoint`.
 - When it has no remaining `[NEXT]` or `[QUEUED]` items, the controller switches to `b3-checkpoint`.

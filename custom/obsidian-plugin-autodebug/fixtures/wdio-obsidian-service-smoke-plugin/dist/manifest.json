@@ -1,0 +1,9 @@
+{
+  "id": "wdio-obsidian-service-smoke-plugin",
+  "name": "WDIO Obsidian Service Smoke Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.5",
+  "description": "Generic fixture for optional wdio-obsidian-service detection.",
+  "author": "my-skills",
+  "isDesktopOnly": false
+}
