@@ -69,6 +69,29 @@
           "value": "subagent"
         }
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "把这份原始课堂笔记整理成可打印讲义，但先保留原始样本：原始课堂笔记（中英混排，顺序不要改）—— 1) Glycolysis 在 cytoplasm；2) ATP net gain=2? check；3) NADH goes to ETC；4) 老师说『不要把 fermentation 和 aerobic respiration 混了』；5) why oxygen matters?；6) 例子: sprinting / yeast。请先保留原始顺序，再做 brief/research/article。",
+      "expected_output": "Produces working files where `raw-input.md` keeps the untouched source sample in original order, `brief.md` extracts the analyzed structure afterward, and the final handout stays source-backed and print-ready.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output mentions raw-input.md",
+          "type": "contains",
+          "value": "raw-input.md"
+        },
+        {
+          "text": "Output mentions brief.md",
+          "type": "contains",
+          "value": "brief.md"
+        },
+        {
+          "text": "Output mentions research.md",
+          "type": "contains",
+          "value": "research.md"
+        }
+      ]
     }
   ]
 }

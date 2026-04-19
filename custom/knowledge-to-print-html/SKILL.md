@@ -79,6 +79,7 @@ Read these references before finalizing:
 - `references/print-checklist.md`
 - `references/runtime-requirements.md`
 - `references/visual-presets.md`
+- `references/working-file-templates.md`
 
 ## Skill Routing And Fallbacks
 
@@ -328,6 +329,8 @@ Treat these as fail conditions, not soft advice:
 
 Before claiming success, provide:
 
+- raw input path
+- final `raw-input.md` path
 - final `handout.html` path
 - working folder path
 - generated diagram paths

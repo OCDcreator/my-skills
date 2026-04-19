@@ -39,6 +39,8 @@ artifacts/knowledge-handout/<slug>/
 
 ## Research Working File Minimums
 
+For lightweight starter shapes, see `references/working-file-templates.md`.
+
 Before writing `brief.md`, save the original user material to `raw-input.md`.
 
 Keep the original order and wording in `raw-input.md`; it is a preservation file, not an analysis file.
@@ -93,6 +95,7 @@ For each core knowledge point in `research.md`, capture at least:
 
 The final response after running this skill should state:
 
+- raw-input path
 - final HTML path
 - diagram folder path
 - chosen visual preset
