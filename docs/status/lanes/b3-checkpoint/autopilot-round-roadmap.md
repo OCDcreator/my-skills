@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] Checkpoint - Review B18 and B19 outcome
+### [DONE] Checkpoint - Review B18 and B19 outcome
 
 - **Lane**: Checkpoint
 - **Goal**: Review the laneized B18/B19 batch, record what shipped, capture any unresolved platform limits, and state whether more backlog work should be human-scheduled.
@@ -19,4 +19,5 @@
 ## Lane state
 
 - This roadmap is lane-local.
+- Lane `b3-checkpoint` has no remaining `[NEXT]` or `[QUEUED]` items; the approved B18/B19 backlog batch is complete and the controller should stop until a human schedules more work.
 - When it has no remaining `[NEXT]` or `[QUEUED]` items, the overall preset is complete.
