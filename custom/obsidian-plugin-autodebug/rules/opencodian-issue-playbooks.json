@@ -1,0 +1,133 @@
+{
+  "description": "Optional OpenCodian/OpenCode-specific playbooks. Do not load these as generic Obsidian plugin defaults; copy or reference them only for projects that intentionally use the matching signatures.",
+  "playbooks": [
+    {
+      "id": "restore-or-session-drift",
+      "title": "Restore/session drift triage",
+      "summary": "The restored UI is trying to hydrate against missing runtime state. Confirm whether the persisted tab/session metadata is stale before changing network or SDK code.",
+      "match": {
+        "signatureAny": [
+          "session-sync-404"
+        ]
+      },
+      "files": [
+        "src/main.ts",
+        "src/**/*view*",
+        "src/**/*session*",
+        "src/**/*restore*",
+        "src/**/*storage*"
+      ],
+      "commands": [
+        {
+          "id": "preview-reset-plan",
+          "label": "Preview plugin reset plan",
+          "summary": "Preview the generic plugin-local reset before comparing clean and restored state behavior.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_reset_state.mjs",
+            "--mode",
+            "preview",
+            "--state-plan",
+            "{{toolRoot}}/state-plans/plugin-data-reset.json",
+            "--vault-root",
+            "{{vaultRoot}}",
+            "--plugin-id",
+            "{{pluginId}}"
+          ]
+        },
+        {
+          "id": "doctor-with-fix-plan",
+          "label": "Generate a doctor fix plan",
+          "summary": "Capture missing build/deploy/CLI/CDP prerequisites and write a reviewable fix script next to the doctor report.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_doctor.mjs",
+            "--repo-dir",
+            "{{repoDir}}",
+            "--plugin-id",
+            "{{pluginId}}",
+            "--test-vault-plugin-dir",
+            "{{testVaultPluginDir}}",
+            "--obsidian-command",
+            "{{obsidianCommand}}",
+            "--output",
+            "{{outputDir}}/doctor.json",
+            "--fix"
+          ]
+        }
+      ],
+      "actions": [
+        "Compare persisted restore metadata with the runtime catalog the plugin is querying after reload.",
+        "Decide whether missing runtime state is expected after a cold start and should degrade gracefully.",
+        "Use reset-state or a clean vault snapshot to separate stale local state from real code regressions."
+      ]
+    },
+    {
+      "id": "backend-gated-visible-ui",
+      "title": "Visible UI blocked by backend readiness",
+      "summary": "The plugin shell can render earlier than the backend becomes ready. Separate shell readiness from post-render enrichment and measure them independently.",
+      "match": {
+        "signatureAny": [
+          "slow-chat-ready",
+          "slow-server-ready",
+          "slow-view-open"
+        ]
+      },
+      "files": [
+        "src/main.ts",
+        "src/**/*server*",
+        "src/**/*view*",
+        "src/**/*hydrate*",
+        "src/**/*startup*"
+      ],
+      "commands": [
+        {
+          "id": "doctor-before-profile",
+          "label": "Run doctor before profiling",
+          "summary": "Catch missing prerequisites before trusting backend-readiness or view-open timings.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_doctor.mjs",
+            "--repo-dir",
+            "{{repoDir}}",
+            "--plugin-id",
+            "{{pluginId}}",
+            "--test-vault-plugin-dir",
+            "{{testVaultPluginDir}}",
+            "--obsidian-command",
+            "{{obsidianCommand}}",
+            "--output",
+            "{{outputDir}}/doctor.json",
+            "--fix"
+          ]
+        },
+        {
+          "id": "rerender-report",
+          "label": "Rebuild the HTML report",
+          "summary": "Produce a portable diagnosis report before comparing warm/cold timing classes.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "executable": "node",
+          "args": [
+            "{{toolRoot}}/scripts/obsidian_debug_report.mjs",
+            "--diagnosis",
+            "{{diagnosisPath}}",
+            "--output",
+            "{{outputDir}}/report.html"
+          ]
+        }
+      ],
+      "actions": [
+        "Keep visible shell state writes synchronous, but move backend snapshots and enrichments to background refresh where safe.",
+        "Record startup-complete, view-open, backend-ready, and interactive-ready milestones in the same run.",
+        "Save a warm-start baseline so cold-start backend cost does not hide frontend regressions."
+      ]
+    }
+  ]
+}

@@ -1,41 +1,26 @@
 {
   "playbooks": [
     {
-      "id": "restore-or-session-drift",
-      "title": "Restore/session drift triage",
-      "summary": "The restored UI is trying to hydrate against missing runtime state. Confirm whether the persisted tab/session metadata is stale before changing network or SDK code.",
+      "id": "plugin-load-failure-triage",
+      "title": "Plugin load failure triage",
+      "summary": "The plugin failed before it became usable. Confirm deployment, manifest identity, and the earliest stack trace before changing unrelated UI code.",
       "match": {
         "signatureAny": [
-          "session-sync-404"
+          "plugin-load-failed",
+          "plugin-runtime-exception",
+          "module-resolution-failed",
+          "manifest-or-version-invalid"
         ]
       },
       "files": [
-        "src/main.ts",
-        "src/**/*view*",
-        "src/**/*session*",
-        "src/**/*restore*",
-        "src/**/*storage*"
+        "manifest.json",
+        "package.json",
+        "src/main.*",
+        "src/**/*",
+        "dist/main.js",
+        "dist/manifest.json"
       ],
       "commands": [
-        {
-          "id": "preview-reset-plan",
-          "label": "Preview plugin reset plan",
-          "summary": "Preview the generic plugin-local reset before comparing clean and restored state behavior.",
-          "safety": "read-only",
-          "dryRunFriendly": true,
-          "executable": "node",
-          "args": [
-            "{{toolRoot}}/scripts/obsidian_debug_reset_state.mjs",
-            "--mode",
-            "preview",
-            "--state-plan",
-            "{{toolRoot}}/state-plans/plugin-data-reset.json",
-            "--vault-root",
-            "{{vaultRoot}}",
-            "--plugin-id",
-            "{{pluginId}}"
-          ]
-        },
         {
           "id": "doctor-with-fix-plan",
           "label": "Generate a doctor fix plan",
@@ -60,52 +45,66 @@
         }
       ],
       "actions": [
-        "Compare persisted restore metadata with the runtime catalog the plugin is querying after reload.",
-        "Decide whether missing runtime state is expected after a cold start and should degrade gracefully.",
-        "Use reset-state or a clean vault snapshot to separate stale local state from real code regressions."
+        "Compare the repo manifest, dist manifest, and test vault manifest before changing source code.",
+        "Use the earliest stack trace after reload as the root symptom.",
+        "Rebuild and redeploy generated artifacts before retrying plugin reload."
       ]
     },
     {
-      "id": "backend-gated-visible-ui",
-      "title": "Visible UI blocked by backend readiness",
-      "summary": "The plugin shell can render earlier than the backend becomes ready. Separate shell readiness from post-render enrichment and measure them independently.",
+      "id": "app-control-recovery",
+      "title": "Obsidian app-control recovery",
+      "summary": "CLI or CDP automation could not reach the target Obsidian desktop instance. Fix the app-control surface before trusting plugin diagnostics.",
       "match": {
         "signatureAny": [
-          "slow-chat-ready",
-          "slow-server-ready",
+          "obsidian-cli-app-unavailable",
+          "cdp-target-unreachable"
+        ]
+      },
+      "files": [
+        "job-specs/generic-debug-job.template.json",
+        "scripts/obsidian_debug_doctor.mjs",
+        "scripts/obsidian_mac_restart_cdp.sh"
+      ],
+      "commands": [
+        {
+          "id": "probe-cdp-targets",
+          "label": "Probe CDP targets",
+          "summary": "List exposed CDP targets before retrying CDP automation.",
+          "safety": "read-only",
+          "dryRunFriendly": true,
+          "platform": "auto",
+          "executable": "node",
+          "args": [
+            "--input-type=module",
+            "-e",
+            "const response = await fetch('http://127.0.0.1:9222/json/list'); console.log(await response.text());"
+          ]
+        }
+      ],
+      "actions": [
+        "Launch Obsidian desktop and open or focus the target test vault before retrying CLI commands.",
+        "If using CDP, restart Obsidian with a debug port and filter by vault title in multi-window setups.",
+        "Do not diagnose plugin code until app-control preflight succeeds."
+      ]
+    },
+    {
+      "id": "visible-ui-performance-triage",
+      "title": "Visible UI performance triage",
+      "summary": "Startup or view-open timing crossed a generic budget. Split startup, view construction, render, hydration, and background refresh before changing code.",
+      "match": {
+        "signatureAny": [
+          "slow-startup",
           "slow-view-open"
         ]
       },
       "files": [
-        "src/main.ts",
-        "src/**/*server*",
+        "src/main.*",
         "src/**/*view*",
-        "src/**/*hydrate*",
-        "src/**/*startup*"
+        "src/**/*startup*",
+        "src/**/*settings*",
+        "src/**/*state*"
       ],
       "commands": [
-        {
-          "id": "doctor-before-profile",
-          "label": "Run doctor before profiling",
-          "summary": "Catch missing prerequisites before trusting backend-readiness or view-open timings.",
-          "safety": "read-only",
-          "dryRunFriendly": true,
-          "executable": "node",
-          "args": [
-            "{{toolRoot}}/scripts/obsidian_debug_doctor.mjs",
-            "--repo-dir",
-            "{{repoDir}}",
-            "--plugin-id",
-            "{{pluginId}}",
-            "--test-vault-plugin-dir",
-            "{{testVaultPluginDir}}",
-            "--obsidian-command",
-            "{{obsidianCommand}}",
-            "--output",
-            "{{outputDir}}/doctor.json",
-            "--fix"
-          ]
-        },
         {
           "id": "rerender-report",
           "label": "Rebuild the HTML report",
@@ -123,9 +122,9 @@
         }
       ],
       "actions": [
-        "Keep visible shell state writes synchronous, but move backend snapshots and enrichments to background refresh where safe.",
-        "Record startup-complete, view-open, backend-ready, and interactive-ready milestones in the same run.",
-        "Save a warm-start baseline so cold-start backend cost does not hide frontend regressions."
+        "Record startup-complete and view-open milestones in the same run.",
+        "Render a usable shell before non-critical enrichment work where safe.",
+        "Save separate cold-start and warm-start baselines so app variance does not hide regressions."
       ]
     },
     {

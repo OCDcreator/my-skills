@@ -90,6 +90,18 @@ node scripts/obsidian_debug_report.mjs --diagnosis .obsidian-debug/diagnosis.jso
 
 Read `diagnosis.json` before raw logs. It summarizes artifact presence, assertion failures, timing metrics, known issue signatures, and next-step recommendations.
 
+Default `rules/issue-signatures.json` and `rules/issue-playbooks.json` are plugin-neutral. If a target plugin needs domain-specific signatures, keep them in that plugin repo or pass them explicitly:
+
+```bash
+node scripts/obsidian_debug_analyze.mjs \
+  --summary .obsidian-debug/summary.json \
+  --signatures path/to/project-issue-signatures.json \
+  --playbooks path/to/project-issue-playbooks.json \
+  --output .obsidian-debug/diagnosis.json
+```
+
+The bundled `rules/opencodian-issue-signatures.json` and `rules/opencodian-issue-playbooks.json` are examples for OpenCodian/OpenCode-style projects only; they are not generic Obsidian plugin defaults.
+
 ## State, Watch, Profile, And Baseline
 
 | Need | Script | Notes |
@@ -100,6 +112,15 @@ Read `diagnosis.json` before raw logs. It summarizes artifact presence, assertio
 | Watch-on-save loop | `scripts/obsidian_debug_watch.mjs` | Command template supports `{{outputDir}}` and `{{run}}`. |
 | Repeated timing profile | `scripts/obsidian_debug_profile.mjs` | Use multiple runs to separate variance from regression. |
 | Save/list/compare/prune baselines | `scripts/obsidian_debug_baseline.mjs` | Tag baselines by plugin, platform, mode, and scenario. |
+
+Start plugin-local reset plans from `state-plans/plugin-data-reset.json`, then copy the plan into the target project before adding project-specific files.
+
+## Fixtures And Evals
+
+- `fixtures/native-smoke-sample-plugin/`: plugin-neutral host smoke fixture.
+- `fixtures/package-manager-smoke-pnpm-plugin/`: package-manager/Corepack smoke fixture.
+- `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` detection fixture.
+- `evals/evals.json`: behavior prompts for checking skill coverage after edits.
 
 ## CI And Headless Quality Gates
 

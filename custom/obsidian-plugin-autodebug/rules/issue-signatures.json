@@ -1,80 +1,114 @@
 {
   "signatures": [
     {
-      "id": "server-connection-refused",
+      "id": "plugin-load-failed",
+      "type": "text",
+      "severity": "error",
+      "matchAny": [
+        "Failed to load plugin",
+        "Plugin load failed",
+        "Error loading plugin",
+        "Failed to enable plugin",
+        "Error enabling plugin"
+      ],
+      "headline": "Obsidian reported a plugin load or enable failure.",
+      "likelyCause": "The deployed bundle, manifest, dependency graph, or plugin startup path failed before the plugin became usable.",
+      "nextActions": [
+        "Confirm the deployed manifest id matches the target plugin id.",
+        "Check the first stack trace after reload and map it back to the built source.",
+        "Rebuild and redeploy only generated runtime artifacts before retrying reload."
+      ]
+    },
+    {
+      "id": "plugin-runtime-exception",
+      "type": "text",
+      "severity": "error",
+      "matchAny": [
+        "Uncaught TypeError",
+        "Uncaught ReferenceError",
+        "Unhandled promise rejection",
+        "TypeError:",
+        "ReferenceError:"
+      ],
+      "headline": "The plugin produced a JavaScript runtime exception.",
+      "likelyCause": "Plugin startup, command handling, view rendering, or settings UI touched an undefined value or rejected asynchronously.",
+      "nextActions": [
+        "Use the earliest stack trace after reload as the root symptom.",
+        "Add narrower timing or state logs around the failing startup/view path.",
+        "Fix the code path that throws before adding retries or longer waits."
+      ]
+    },
+    {
+      "id": "module-resolution-failed",
+      "type": "text",
+      "severity": "error",
+      "matchAny": [
+        "Cannot find module",
+        "ERR_MODULE_NOT_FOUND",
+        "Module not found",
+        "Cannot use import statement outside a module",
+        "Dynamic require of"
+      ],
+      "headline": "The deployed plugin bundle could not resolve a runtime module.",
+      "likelyCause": "The build output, bundler format, external dependency configuration, or copied artifact set does not match what Obsidian can load.",
+      "nextActions": [
+        "Inspect the generated main.js bundle and bundler external settings.",
+        "Verify deploy copied the current dist/main.js and manifest into the test vault.",
+        "Prefer bundling plugin runtime dependencies unless the dependency is intentionally provided by Obsidian."
+      ]
+    },
+    {
+      "id": "manifest-or-version-invalid",
       "type": "text",
       "severity": "warning",
       "matchAny": [
-        "ERR_CONNECTION_REFUSED",
-        "SDK health check failed, falling back to ServerManager health probe"
+        "manifest.json",
+        "Invalid manifest",
+        "No manifest found",
+        "minAppVersion",
+        "version mismatch"
       ],
-      "headline": "Plugin queried the OpenCode runtime before the local server became reachable.",
-      "likelyCause": "The UI or SDK health probe raced ahead of managed-server cold start.",
+      "headline": "The plugin manifest or version metadata may be invalid for the target vault.",
+      "likelyCause": "The manifest was missing, stale, malformed, or inconsistent with the deployed plugin id/version.",
       "nextActions": [
-        "Compare plugin startup time with ServerManager ready time.",
-        "Move non-critical server snapshots to deferred/background refreshes.",
-        "Check whether a stale managed local server should be restarted instead of reused."
+        "Compare repo manifest.json, dist/manifest.json, and the test vault manifest.",
+        "Confirm id, version, main, and minAppVersion fields match the intended smoke target.",
+        "Rebuild before copying manifest files into the vault."
       ]
     },
     {
-      "id": "session-sync-404",
+      "id": "obsidian-cli-app-unavailable",
       "type": "text",
       "severity": "warning",
       "matchAny": [
-        "SDK session.messages failed",
-        "SDK session.get failed",
-        "Failed to sync conversation messages from server",
-        "Request failed, status 404"
+        "The CLI is unable to find Obsidian",
+        "Please make sure Obsidian is running",
+        "Obsidian command failed"
       ],
-      "headline": "Conversation/session sync fell back because the server returned 404 for the active session.",
-      "likelyCause": "The restored tab/session no longer exists on the local server, or hydration is reading stale session identifiers.",
+      "headline": "The Obsidian CLI could not reach a running desktop instance.",
+      "likelyCause": "Obsidian is not running, the target vault is not focused, or the available obsidian executable is only the app launcher.",
       "nextActions": [
-        "Check conversation restore and hydration code paths for stale session IDs.",
-        "Compare persisted conversation/session metadata with the server's current session catalog.",
-        "Prefer graceful background fallback when missing sessions are expected during cold start."
+        "Launch Obsidian desktop and open or focus the target test vault.",
+        "Retry obsidian help and confirm Developer commands are available.",
+        "Use the CDP-first path only after starting Obsidian with a reachable debug port."
       ]
     },
     {
-      "id": "insecure-local-server",
+      "id": "cdp-target-unreachable",
       "type": "text",
-      "severity": "info",
+      "severity": "warning",
       "matchAny": [
-        "OPENCODE_SERVER_PASSWORD is not set; server is unsecured."
+        "CDP target is not reachable",
+        "Failed to query CDP targets",
+        "No Obsidian app target found",
+        "CDP WebSocket open failed"
       ],
-      "headline": "Managed local server started without a password.",
-      "likelyCause": "Development environment is intentionally unsecured or missing server auth configuration.",
+      "headline": "The CDP fallback could not attach to an Obsidian app target.",
+      "likelyCause": "Obsidian was not launched with a debug port, the port is wrong, or automation attached to the wrong window.",
       "nextActions": [
-        "If the test environment is shared, set a password or isolate the network path.",
-        "Document whether this is expected for local-only test vaults."
-      ]
-    },
-    {
-      "id": "slow-server-ready",
-      "type": "timing-threshold",
-      "severity": "warning",
-      "metric": "serverReadyMs",
-      "operator": "gte",
-      "value": 500,
-      "headline": "Local OpenCode server cold start dominates readiness.",
-      "likelyCause": "Managed server startup, health probing, or project config resolution is slower than the plugin UI startup path.",
-      "nextActions": [
-        "Measure spawn, health-check, and chat-ready milestones separately.",
-        "Delay server-dependent UI hydration until the server is healthy.",
-        "Cache or reuse safe warm state when the environment signature has not changed."
-      ]
-    },
-    {
-      "id": "slow-chat-ready",
-      "type": "timing-threshold",
-      "severity": "warning",
-      "metric": "chatReadyDelayMs",
-      "operator": "gte",
-      "value": 2000,
-      "headline": "The chat surface became interactive noticeably after reload completed.",
-      "likelyCause": "Foreground availability waits on background server readiness or post-reload hydration.",
-      "nextActions": [
-        "Keep the visible view-open path independent from background status refreshes.",
-        "Record server-ready and chat-ready milestones to separate UI cost from backend warmup."
+        "Probe http://127.0.0.1:9222/json/list before trusting CDP automation.",
+        "Restart Obsidian with the debug port helper when needed.",
+        "Use a vault title filter in multi-window setups."
       ]
     },
     {
@@ -84,11 +118,12 @@
       "metric": "startupCompletedMs",
       "operator": "gte",
       "value": 1000,
-      "headline": "Plugin startup itself is slow before the view even renders.",
+      "headline": "Plugin startup itself is slow before the view renders.",
       "likelyCause": "Heavy synchronous work still runs in the plugin onload/startup path.",
       "nextActions": [
-        "Split startup into labeled substeps and move non-essential work behind the initial render.",
-        "Inspect settings load, storage init, and conversation metadata preload costs."
+        "Split startup into labeled substeps.",
+        "Move non-essential work behind the initial render.",
+        "Compare cold-start and warm-start runs separately."
       ]
     },
     {
@@ -98,11 +133,12 @@
       "metric": "viewOpenCompletedMs",
       "operator": "gte",
       "value": 1000,
-      "headline": "View open/hydration is the visible bottleneck.",
-      "likelyCause": "Tab restore, conversation hydration, or server-backed UI refresh is blocking visible render.",
+      "headline": "View open or UI hydration is the visible bottleneck.",
+      "likelyCause": "Tab restore, view construction, DOM rendering, or post-reload hydration is blocking visible UI readiness.",
       "nextActions": [
-        "Break the view-open path into restore, hydration-tail, and background refresh stages.",
-        "Make server-backed enrichments fire-and-forget when the visible shell can render first."
+        "Break the view-open path into restore, render, hydration, and post-render stages.",
+        "Render a usable shell before non-critical enrichment work.",
+        "Use a warm-start baseline to separate normal app variance from a regression."
       ]
     }
   ]

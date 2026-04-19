@@ -52,6 +52,8 @@ The `obsidian-cli` skill provides primitive app-control commands such as:
 
 This skill is the higher-level workflow wrapper. Prefer CLI-first automation when the CLI preflight works. Use CDP only when CLI buffers miss timing-critical logs, real-time ordering matters, or the CLI surface is unavailable but a debug port is reachable.
 
+In this source repo, the mirrored skill lives at `external/kepano-obsidian-skills/obsidian-cli/SKILL.md`. In an installed agent environment, load the skill named `obsidian-cli` when it is available; do not confuse that skill with the Obsidian desktop application's `obsidian` executable.
+
 ## Preconditions
 
 Before editing or running a long loop, quickly detect:
@@ -73,7 +75,7 @@ If the repo already has a release/deploy script or skill, reuse it instead of in
 | No plugin repo yet | Run `scripts/obsidian_debug_scaffold_plugin.mjs` to create a minimal sample plugin, test vault, job spec, assertions, scenario, and CI templates. |
 | CLI developer commands work | Use CLI-first reload/log/screenshot/DOM capture. |
 | CLI cannot see Obsidian but app can expose CDP | Start Obsidian with a debug port and use CDP capture/reload scripts. |
-| One-off local pass | Use `obsidian_plugin_debug_cycle.ps1` or `.sh`. |
+| One-off local pass | Use `scripts/obsidian_plugin_debug_cycle.ps1` or `scripts/obsidian_plugin_debug_cycle.sh`. |
 | Repeatable agent/CI-like plan | Use `scripts/obsidian_debug_job.mjs` with a job spec. |
 
 For exact commands, read `references/command-reference.md`.
@@ -86,8 +88,9 @@ For exact commands, read `references/command-reference.md`.
 4. **Bootstrap**: for a brand-new plugin in a fresh vault, bootstrap discovery immediately after deploy and before the real reload/log-watch pass.
 5. **Reload**: use `obsidian plugin:reload id=<plugin-id>` first. Fall back to disable/enable or CDP only when reload is unavailable or stuck.
 6. **Capture**: clear stale buffers, watch console/errors, capture screenshot and DOM/CSS evidence, and run any configured scenario.
-7. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
-8. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
+7. **Generate diagnosis**: wrappers and `scripts/obsidian_debug_job.mjs` write `diagnosis.json` automatically; for a manual path, run `scripts/obsidian_debug_analyze.mjs --summary .obsidian-debug/summary.json --assertions assertions/plugin-view-health.template.json --output .obsidian-debug/diagnosis.json`.
+8. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
+9. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
 
 Save runtime artifacts under `.obsidian-debug/` or another repo-local debug folder. Do not commit raw runtime logs unless the user asks.
 
@@ -101,7 +104,7 @@ Use config-driven jobs for repeatability across Windows PowerShell and macOS/Lin
 - `profile` / `report`: repeated-cycle timing and optional HTML report generation;
 - `state`: optional vault snapshot, plugin-local reset preview/reset, and restore-after-run handling.
 
-For an existing plugin, keep absolute machine paths in the copied repo-local job file, not in shared templates. For a scaffolded sample plugin, use the generated `autodebug/<plugin-id>-debug-job.json`.
+For an existing plugin, keep absolute machine paths in the copied repo-local job file, not in shared templates. For a scaffolded sample plugin, use the generated `autodebug/<plugin-id>-debug-job.json`; scaffold-owned reusable config lives under `autodebug/`, while runtime captures still go under `.obsidian-debug/`.
 
 ## UI Surface And Assertions
 
@@ -114,6 +117,8 @@ Use DOM checks for deterministic assertions and screenshots for visual review. G
 - startup or view-open timings stay within budget.
 
 Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/plugin-surface.template.json` when the plugin does not have one obvious command id or root selector.
+
+Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` only when Playwright is explicitly available and the plugin needs click/locator assertions.
 
 The scenario runner resolves surface-opening strategies in this order:
 
@@ -153,6 +158,8 @@ Use state helpers when bugs depend on dirty vault/plugin data:
 - restore snapshots after experiments;
 - compare clean-state and restored-state runs with the same job spec.
 
+Start from `state-plans/plugin-data-reset.json` for conservative plugin-local resets, then copy it into the target project before adding project-specific files.
+
 Use watch mode for “save → build → deploy → reload → diagnose” loops. Use profile mode when one run is too noisy to trust. Save baselines by plugin/platform/mode/scenario so later comparisons use the nearest matching class.
 
 ## CDP Fallback
@@ -185,7 +192,18 @@ Read `diagnosis.json` before raw logs. Use it to answer:
 3. Did known issue signatures match?
 4. Which recommendation is the best next edit or instrumentation pass?
 
+Default signatures in `rules/issue-signatures.json` must stay generic to Obsidian plugin debugging. A target plugin may need its own tests, assertions, signatures, or playbooks, but those are project-local configuration: copy them into that plugin repo or pass them explicitly with `--signatures` / `--playbooks`. Do not promote one plugin's business-domain logs into the skill's default rules.
+
+`rules/opencodian-issue-signatures.json` and `rules/opencodian-issue-playbooks.json` are optional examples for an OpenCodian/OpenCode-style plugin only. Load them only for projects that intentionally emit those logs and metrics.
+
 If diagnosis is inconclusive, inspect raw console/CDP logs and consider adding a generic signature to `rules/issue-signatures.json` so the next run catches that symptom automatically.
+
+## Bundled Smoke And Eval Resources
+
+- `fixtures/native-smoke-sample-plugin/`: plugin-neutral load/reload smoke fixture.
+- `fixtures/package-manager-smoke-pnpm-plugin/`: package-manager detection fixture.
+- `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` detection fixture.
+- `evals/evals.json`: behavior prompts for evaluating whether the skill still covers common autodebug workflows.
 
 ## Final Report Format
 

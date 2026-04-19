@@ -89,14 +89,6 @@
       "pattern": "<known-empty-state-regex>",
       "flags": "i",
       "severity": "expected"
-    },
-    {
-      "id": "server-ready-flaky-budget",
-      "type": "timing-budget",
-      "metric": "serverReadyMs",
-      "maxMs": 5000,
-      "allowMissing": true,
-      "severity": "flaky"
     }
   ]
 }

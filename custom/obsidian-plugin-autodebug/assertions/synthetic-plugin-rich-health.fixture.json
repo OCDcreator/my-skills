@@ -79,13 +79,6 @@
       "pattern": "Loading data",
       "flags": "i",
       "severity": "expected"
-    },
-    {
-      "id": "server-ready-budget",
-      "type": "timing-budget",
-      "metric": "serverReadyMs",
-      "maxMs": 500,
-      "severity": "flaky"
     }
   ]
 }

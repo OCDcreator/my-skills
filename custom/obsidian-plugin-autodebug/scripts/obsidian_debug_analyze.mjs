@@ -825,22 +825,17 @@ const allLines = [
 
 const completedMetrics = parseCompletedMetrics(allLines);
 const startupCompleted = completedMetrics.find(
-  (entry) => entry.component === 'OpenCodian' && entry.phase === 'startup' && entry.label.trim() === 'completed',
-) ?? completedMetrics.find(
   (entry) => entry.phase === 'startup' && entry.label.trim() === 'completed',
 );
 const viewOpenCompleted = completedMetrics.find(
-  (entry) => entry.component === 'OpenCodianView' && entry.phase === 'view-open' && entry.label.trim() === 'completed',
-) ?? completedMetrics.find(
   (entry) => entry.phase === 'view-open' && entry.label.trim() === 'completed',
 );
 const serverReadyLine = getFirstMatchingLine(allLines, [
-  (text) => text.includes('local OpenCode server ready in '),
-  (text) => text.includes('ServerManager.start completed in '),
-  (text) => text.includes('Server status -> running'),
+  (text) => /(?:server|backend|runtime).{0,40}(?:ready|running)/i.test(text),
+  (text) => /(?:server|backend|runtime).{0,40}completed in \d+(?:\.\d+)?ms/i.test(text),
 ]);
 const chatReadyLine = getFirstMatchingLine(allLines, [
-  (text) => text.includes('Chat server availability -> running'),
+  (text) => /(?:interactive|ui|view).{0,40}(?:ready|running)/i.test(text),
 ]);
 const startupBeginLine = getFirstMatchingLine(allLines, [
   (text) => text.includes('startup begin'),
