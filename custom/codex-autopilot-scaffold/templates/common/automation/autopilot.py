@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, cast
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -204,9 +204,16 @@ def validate_lane_configs(config: dict[str, Any]) -> None:
 def normalize_lanes_config(config: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(config)
     lanes_raw = normalized.get("lanes")
-    legacy_lane_mode = not isinstance(lanes_raw, list) or not lanes_raw
-    if legacy_lane_mode:
-        lanes_raw = [synthesize_legacy_lane(normalized)]
+    lane_entries: list[dict[str, Any]] = []
+    if isinstance(lanes_raw, list) and lanes_raw:
+        for index, lane in enumerate(lanes_raw):
+            if not isinstance(lane, dict):
+                raise AutopilotError(f"lanes[{index}] must be an object.")
+            lane_entries.append(lane)
+        legacy_lane_mode = False
+    else:
+        lane_entries = [synthesize_legacy_lane(normalized)]
+        legacy_lane_mode = True
 
     shared_defaults = {
         "focus_hint": clean_string(normalized.get("focus_hint")),
@@ -215,7 +222,7 @@ def normalize_lanes_config(config: dict[str, Any]) -> dict[str, Any]:
     }
     normalized["lanes"] = [
         normalize_lane_config(lane, lane_index=index, shared_defaults=shared_defaults)
-        for index, lane in enumerate(lanes_raw)
+        for index, lane in enumerate(lane_entries)
     ]
     normalized["legacy_lane_mode"] = legacy_lane_mode
     validate_lane_configs(normalized)
@@ -1004,11 +1011,7 @@ def acquire_lock(
 
     if existing_lock:
         existing_host = clean_string(existing_lock.get("hostname"))
-        existing_pid_raw = existing_lock.get("pid")
-        try:
-            existing_pid = int(existing_pid_raw)
-        except (TypeError, ValueError):
-            existing_pid = -1
+        existing_pid = parse_int(existing_lock.get("pid"), -1)
 
         if existing_host and existing_host != hostname:
             if not force_lock:
@@ -1269,11 +1272,14 @@ def invoke_runner_round(
 
     if not process.stdin or not process.stdout or not process.stderr:
         raise AutopilotError("Failed to start codex subprocess with redirected pipes.")
+    stdin_pipe = cast(BinaryIO, process.stdin)
+    stdout_pipe = cast(BinaryIO, process.stdout)
+    stderr_pipe = cast(BinaryIO, process.stderr)
 
     def stdout_worker() -> None:
         with events_log_path.open("a", encoding="utf-8", newline="\n") as events_handle:
             while True:
-                stdout_line = process.stdout.readline()
+                stdout_line = stdout_pipe.readline()
                 if not stdout_line:
                     break
                 decoded_line = stdout_line.decode("utf-8", errors="replace").rstrip("\r\n")
@@ -1286,7 +1292,7 @@ def invoke_runner_round(
     def stderr_worker() -> None:
         with stderr_log_path.open("a", encoding="utf-8", newline="\n") as stderr_handle:
             while True:
-                stderr_line = process.stderr.readline()
+                stderr_line = stderr_pipe.readline()
                 if not stderr_line:
                     break
                 decoded_line = stderr_line.decode("utf-8", errors="replace").rstrip("\r\n")
@@ -1300,9 +1306,9 @@ def invoke_runner_round(
     stdout_thread.start()
     stderr_thread.start()
 
-    process.stdin.write(prompt_text)
-    process.stdin.flush()
-    process.stdin.close()
+    stdin_pipe.write(prompt_text)
+    stdin_pipe.flush()
+    stdin_pipe.close()
 
     return_code = process.wait()
     stdout_thread.join()
@@ -2114,11 +2120,7 @@ def remove_stale_lock(runtime_directory: Path, *, expected_pid: int | None = Non
     if not lock_data:
         return
 
-    lock_pid_raw = lock_data.get("pid")
-    try:
-        lock_pid = int(lock_pid_raw)
-    except (TypeError, ValueError):
-        lock_pid = -1
+    lock_pid = parse_int(lock_data.get("pid"), -1)
 
     if expected_pid is not None and lock_pid not in (-1, expected_pid):
         return
