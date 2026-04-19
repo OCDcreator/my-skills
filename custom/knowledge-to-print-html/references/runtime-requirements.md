@@ -1,0 +1,57 @@
+# Runtime Requirements
+
+## Default runtime model
+
+The bundled validator assumes a Python environment that can run Playwright and, when needed, install missing dependencies.
+
+Default behavior:
+
+- auto-installs missing Python packages such as `playwright` and `pymupdf`
+- auto-installs Playwright Chromium when needed
+- attempts to install or discover `qpdf` for PDF fast-view optimization
+
+## Recommended environment
+
+- Python 3.10+
+- network access when dependencies are not already installed
+- permission to install Python packages and browser/runtime dependencies
+- enough disk space for browser artifacts, screenshots, and exported PDFs
+
+## Restricted or offline environments
+
+If network/package-manager access is unavailable:
+
+1. preinstall the required Python packages
+2. preinstall a Playwright-compatible Chromium runtime
+3. preinstall `qpdf`
+4. run:
+
+```bash
+python scripts/validate_print_layout.py --html <path> --no-auto-install
+```
+
+Use `--no-auto-install` in locked-down environments so failure is immediate and explicit instead of partially attempting installs.
+
+## Review packet language
+
+`scripts/review_print_pages.py` supports:
+
+- `--review-language auto` — default; tries to match the handout language
+- `--review-language en`
+- `--review-language zh`
+
+Even when the review prompt is Chinese, the JSON schema keys remain:
+
+- `page`
+- `pass`
+- `issues`
+- `fixes`
+
+## Canonical entry points
+
+Prefer:
+
+- `python scripts/validate_print_layout.py ...`
+- `python scripts/review_print_pages.py ...`
+
+The root-level script names are compatibility wrappers for older commands and tests.

@@ -5,19 +5,70 @@
       "id": 1,
       "prompt": "把 OAuth 2.0 授权码模式 + PKCE 整理成一份图文并茂、适合 A4 打印成 PDF 的中文讲义，包含流程图、现实案例和参考来源。",
       "expected_output": "Produces a print-first handout.html with working files, readable diagrams, per-page screenshots, page-review packets, and sequential subagent review before hand-off.",
-      "files": []
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output mentions handout.html as the final artifact",
+          "type": "contains",
+          "value": "handout.html"
+        },
+        {
+          "text": "Output mentions page-review-manifest.json or equivalent review packet artifact",
+          "type": "contains",
+          "value": "page-review-manifest.json"
+        },
+        {
+          "text": "Output mentions sequential page review rather than batch approval",
+          "type": "contains",
+          "value": "page 1"
+        }
+      ]
     },
     {
       "id": 2,
       "prompt": "根据这些关键词做成可打印 HTML 教程页：IGCSE Chemistry 0620，preparation of salts，acid + metal / acid + base / precipitation，要求图文结合，不能像网页封面。",
       "expected_output": "Produces a dense but readable A4 teaching handout with no learner-facing meta text, no oversized blank lower page regions, and page-by-page review artifacts.",
-      "files": []
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output mentions A4 validation",
+          "type": "contains",
+          "value": "A4"
+        },
+        {
+          "text": "Output mentions handout.html",
+          "type": "contains",
+          "value": "handout.html"
+        },
+        {
+          "text": "Output mentions page-review packet artifacts",
+          "type": "contains",
+          "value": "page-review"
+        }
+      ]
     },
     {
       "id": 3,
       "prompt": "我有一份粗糙笔记，想变成图文讲义：Transformer attention、Q/K/V、self-attention、multi-head attention。最后我要手动打印成 PDF。",
       "expected_output": "Produces a source-backed printable handout with clear diagrams whose labels are readable at print size, then validates each page sequentially with a review subagent.",
-      "files": []
+      "files": [],
+      "assertions": [
+        {
+          "text": "Output mentions references or source-backed claims",
+          "type": "contains",
+          "value": "references"
+        },
+        {
+          "text": "Output mentions PDF export",
+          "type": "contains",
+          "value": "PDF"
+        },
+        {
+          "text": "Output mentions review subagent or sequential page review",
+          "type": "contains",
+          "value": "subagent"
+        }
+      ]
     }
   ]
 }

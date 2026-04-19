@@ -1,125 +1,107 @@
 ---
 name: knowledge-to-print-html
-description: Use when the user provides knowledge-point keywords, notes, draft text, or learning requirements and wants a polished, source-backed, diagram-rich, print-first HTML handout for A4/PDF. Trigger on "知识点", "讲义", "图文并茂", "可打印 HTML", "打印成 PDF", "根据关键词整理", "把笔记做成教程页", or printable learning-page requests.
+description: Use when the user wants notes, keywords, drafts, lesson content, or research findings turned into a print-ready HTML/PDF teaching handout, including requests like “知识点整理成讲义”, “可打印 HTML”, “打印成 PDF”, “教学页”, “knowledge handout”, “print-ready HTML handout”, “teaching handout from notes”, or “A4 learning handout with diagrams”.
 ---
 
 # Knowledge To Print HTML
 
-Turn `关键词 + 草稿` into a polished, print-first HTML handout that can be automatically exported to PDF and reviewed page-by-page for HTML/PDF print fidelity.
+Turn rough knowledge material into a polished, print-first `handout.html` that is stable on A4, exports cleanly to PDF, and passes sequential page review before hand-off.
 
-This skill is a workflow skill. It coordinates research, writing, diagrams, visual direction, HTML generation, and print verification so the final page is both readable on screen and stable when printed.
+This skill coordinates research, writing, diagram work, HTML/CSS refinement, print validation, and page-by-page review. It is for **teaching handouts**, not for generic webpages or slide decks.
 
-## When To Use
+## Use This Skill When
 
-Use this skill when the user wants things like:
+Typical requests include:
 
 - “根据这些知识点整理一份图文讲义”
-- “把这段草稿扩写成可打印的 HTML 教程页”
-- “先搜索补充案例，再做成漂亮的讲义页面”
-- “我要最后手动打印成 PDF，所以 HTML 要适配 A4”
-- “做成知识卡片 / 知识手册 / 教学页 / 学习页”
+- “把草稿做成可打印 HTML，最后导出 PDF”
+- “做一份教学页 / 学习页 / 复习手册”
+- “Turn these notes into a knowledge handout”
+- “Make a print-ready HTML handout from notes”
+- “Create an A4 teaching handout with diagrams and sources”
 
-Do not use this skill for:
+## Do Not Use This Skill When
 
-- Simple summaries with no research or design requirements
-- Slide decks and PPT-like outputs
-- PDF manipulation on existing PDF files
-- Plain Markdown to HTML conversion with no enrichment
+- the user only wants a simple summary or rewrite
+- the deliverable is a slide deck / PPT / presentation
+- the job is editing an existing PDF rather than generating a new handout
+- the request is plain Markdown-to-HTML conversion with no research, teaching design, or print validation
 
-## Required Inputs
+## Inputs And Defaults
 
-Minimum:
+Minimum inputs:
 
-- A set of knowledge-point keywords
-- Rough notes, draft text, or bullet points
+- knowledge-point keywords, notes, or draft prose
 
-Optional:
+Helpful optional inputs:
 
-- Target audience
-- Desired depth or page count
-- Preferred visual tone
-- Required sources or banned sources
-- Whether the topic needs current information
+- audience
+- target depth or page count
+- desired visual tone
+- required/banned sources
+- whether the topic needs current information
 
-## Default Assumptions
+Default assumptions when the user does not specify:
 
-If the user does not specify, assume:
+- audience: motivated beginner to intermediate reader
+- depth: one strong explainer, roughly 4–8 A4 pages
+- language: match the user's language
+- citation mode: supported claims plus a final references section
+- visual preset: `editorial-atlas`
+- output directory: `artifacts/knowledge-handout/<slug>/`
 
-- Audience: motivated beginner to intermediate reader
-- Depth: one strong explainer, roughly 4-8 A4 pages
-- Language: match the user's language
-- Citation mode: supported claims plus a final references section
-- Visual preset: `editorial-atlas`
-- Output directory: `artifacts/knowledge-handout/<slug>/`
-- Final artifact: self-contained `handout.html` plus supporting SVG diagrams
-
-## Working Files
+## Canonical Working Files
 
 Follow `references/output-contract.md`.
 
-Use these files as the standard pipeline:
+Standard pipeline files:
 
-- `brief.md` — normalized request, assumptions, and research gaps
-- `research.md` — source-backed findings, examples, and citations
-- `outline.md` — final structure before full drafting
-- `article.md` — source of truth for the written content
-- `diagrams/` — generated SVG diagrams
-- `handout.html` — final print-first HTML deliverable
+- `brief.md`
+- `research.md`
+- `outline.md`
+- `article.md`
+- `diagrams/`
+- `handout.html`
 
-Also follow:
+Canonical validation scripts in this repo:
+
+- `scripts/validate_print_layout.py`
+- `scripts/review_print_pages.py`
+
+Root-level `validate_print_layout.py` and `review_print_pages.py` are compatibility wrappers only. Prefer the `scripts/` paths in new instructions.
+
+Read these references before finalizing:
 
 - `references/layout-guardrails.md`
 - `references/diagram-guardrails.md`
 - `references/review-loop.md`
+- `references/print-checklist.md`
+- `references/runtime-requirements.md`
+- `references/visual-presets.md`
 
-## Non-Negotiable Quality Gates
+## Skill Routing And Fallbacks
 
-This skill implements **Plan C: mandatory sequential page review** by default.
+Check whether each downstream skill exists in the current environment before using it. Do not assume external skills are installed.
 
-Do not hand off `handout.html` until all of these are true:
+| Need | Priority | Preferred skill | If unavailable |
+|------|----------|-----------------|----------------|
+| current facts / source discovery | must when facts may be unstable | `searxng` | use the built-in web/search capability and keep primary sources |
+| cited research → structured prose | recommended | `content-research-writer` | draft `article.md` directly from `research.md` with explicit citations |
+| explanatory SVG diagrams | recommended | `baoyu-diagram` | build inline SVG diagrams manually |
+| dense summary infographic | optional | `baoyu-infographic` | skip the infographic unless it clearly improves teaching value |
+| real product / brand feel | optional | `design-reference-router` | stay on `editorial-atlas` or another built-in preset |
+| calm printable document discipline | recommended | `minimalist-ui` | apply `visual-presets.md` + guardrails directly in CSS |
+| final visual polish | recommended | `frontend-design` | refine typography, figures, spacing, and callouts manually |
+| Markdown → HTML conversion | recommended | `baoyu-markdown-to-html` | convert `article.md` into semantic HTML manually |
+| browser validation and screenshots | must | `webapp-testing` | run the bundled Playwright-based scripts directly |
 
-1. `validate_print_layout.py` has generated per-page screenshots where each screenshot contains exactly one `.sheet`.
-2. `validate_print_layout.py` confirms each `.sheet` itself still uses true A4 aspect in print media. A page is invalid if the DOM sheet grows taller than A4 even when the clipped screenshot still looks like A4.
-3. `validate_print_layout.py` has exported a PDF that matches the HTML page count exactly.
-4. The exported print PDF has been optimized for fast viewing with linearized structure / fast-web-view style output. A non-optimized print PDF export is not acceptable.
-5. A second PDF optimized for scrolling review has also been generated from per-page screenshots. Do not hand off only the raw print PDF when the document is expected to be read on screen.
-6. `review_print_pages.py` has generated `page-review-manifest.json` plus one `page-XX-subagent-prompt.md` per page.
-7. The validator has also rendered one PDF-page screenshot per page, plus HTML-vs-PDF parity metadata for each page.
-8. A fresh page-review subagent has reviewed page 1 using that page's HTML screenshot, PDF screenshot, and prompt.
-9. Page 1 has either passed or been fixed and revalidated.
-10. Only then may page 2 be sent to a fresh page-review subagent.
-11. The same gate repeats until every page passes.
-12. A final full-document validation runs after the last page passes.
-
-If the environment has no subagent/delegation tool, stop and report that the visual review gate is blocked. Do not self-approve pages as a substitute.
-
-Main agent and subagent roles are deliberately separate:
-
-- Main agent: researches, writes, edits HTML/CSS, reruns validation.
-- Page-review subagent: reviews exactly one page screenshot and returns structured feedback.
-- No parallel page edits. No batch approval of later pages.
-
-## Skill Routing
-
-Load these skills in this order when they apply:
-
-1. `searxng` — for current facts, examples, or source discovery
-2. `content-research-writer` — for turning research into structured, cited prose
-3. `baoyu-diagram` — for process, mechanism, architecture, or intuition diagrams
-4. `baoyu-infographic` — only when a dense summary graphic adds clear value
-5. `design-reference-router` — only when the user asks for a real brand or product feel
-6. `minimalist-ui` — default document-style visual constraints for calm, premium, printable pages
-7. `frontend-design` — for cover design, section openers, and high-quality final styling
-8. `baoyu-markdown-to-html` — for stable Markdown-to-HTML rendering
-9. `webapp-testing` — for print validation, screenshots, and broken-layout checks
-
-If one of these skills is unavailable in the current environment, use the nearest built-in equivalent and say what was substituted.
+Why the page-review gate is strict: the editing agent is too close to the layout to judge it reliably. A fresh page-review subagent catches whitespace, overflow, hierarchy drift, and HTML/PDF mismatch that the editor routinely misses.
 
 ## Workflow
 
 ### 1. Normalize the brief
 
-Convert the user's raw input into:
+Convert raw user input into:
 
 - topic slug
 - audience
@@ -129,11 +111,11 @@ Convert the user's raw input into:
 - visual target
 - print constraints
 
-Ask only the shortest necessary follow-up questions. If the user is vague, proceed with the default assumptions above rather than blocking.
+Ask only the shortest follow-up questions needed to unblock real work.
 
 ### 2. Extract what the user already knows
 
-Split the incoming material into four buckets:
+Split incoming material into:
 
 - confirmed knowledge points
 - draft prose worth preserving
@@ -144,69 +126,56 @@ Save this to `brief.md`.
 
 ### 3. Research only where it adds value
 
-Research is for filling gaps, not for replacing the user's voice.
+Research fills gaps. It does not replace the user's voice.
 
-Use `searxng` or equivalent search to gather:
+Use search only for:
 
-- definitions that are unclear or unstable
+- unstable or unclear definitions
 - concrete examples and case studies
-- evidence for claims, numbers, or comparisons
-- recent developments when the topic is time-sensitive
+- factual claims, numbers, or comparisons
+- recent developments
 
-Save notes and source links to `research.md`.
+Save findings and links to `research.md`.
 
-### 4. Build a strong explainer outline
+### 4. Build an outline for print reading
 
-Create `outline.md` that is useful for print reading, not just web scanning.
+Create `outline.md` for a printable explainer, not a scroll-first blog post.
 
-Default structure:
+Default shape:
 
-1. Title + one-sentence promise
-2. Why this matters
-3. Core mental model
-4. Key concepts or steps
-5. Worked example or case study
-6. Visual explanation blocks
-7. Pitfalls / misunderstandings
-8. Practical takeaway
-9. References
+1. title + one-sentence promise
+2. why it matters
+3. core mental model
+4. key concepts or steps
+5. worked example / case study
+6. visual explanation blocks
+7. pitfalls / misunderstandings
+8. practical takeaway
+9. references
 
-### 5. Draft the article in Markdown first
+### 5. Draft in Markdown first
 
-`article.md` is the content source of truth. Do not start from raw HTML unless the user explicitly asks for a hand-crafted page with no Markdown stage.
+`article.md` is the content source of truth unless the user explicitly asks for hand-authored HTML only.
 
 The article must:
 
 - read like a polished explainer, not a search dump
-- include at least one concrete case, example, or scenario
-- contain clear transitions between sections
-- flag uncertainty instead of overstating weak claims
-- include citations or traceable source notes for factual claims
-- avoid process chrome, provenance notes, packaging filler, or “how this handout was made” language
+- include at least one concrete example or scenario
+- keep citations traceable
+- keep process notes and packaging filler out of the learner-facing body
 
-### 6. Add visuals that teach, not decorate
+### 6. Add teaching visuals
 
-Default visual order:
+Prefer explanatory SVGs over decorative artwork.
 
-- one strong title / cover visual treatment
-- one or more SVG diagrams for processes, mechanisms, or structure
-- optional summary infographic only when density helps comprehension
+Use visuals to teach:
 
-Prefer:
+- process
+- mechanism
+- structure
+- comparison
 
-- `baoyu-diagram` for explanatory SVGs
-- diagrams with captions and one explicit takeaway
-- consistent visual language across all diagrams
-- diagrams that stay readable at print size without zooming
-
-Avoid:
-
-- random stock-like filler visuals
-- image-only pages with weak explanatory value
-- diagram styles that fight the page typography
-- shrinking a dense figure until labels are hard to read
-- allowing text to overflow boxes inside a diagram
-- keeping one crowded diagram when two smaller teaching diagrams would be clearer
+Full readability rules live in `references/diagram-guardrails.md`.
 
 ### 7. Choose the visual preset
 
@@ -216,195 +185,139 @@ Default to `editorial-atlas`.
 
 Only switch when the topic clearly calls for it:
 
-- `refined-minimal` — calmer, book-like, premium
-- `technical-briefing` — more structured, analytical, systems-oriented
+- `refined-minimal`
+- `technical-briefing`
 
-When the user does not ask for a specific brand style, apply `minimalist-ui` as the baseline visual discipline, then let `frontend-design` add only the amount of flair the document can print safely.
-
-If the user explicitly wants a real product or brand feel, run `design-reference-router` first, then let `frontend-design` interpret that brief.
+If the user explicitly wants a real product or brand feel, route through `design-reference-router` first.
 
 ### 8. Render to HTML, then refine for print
 
 Default rendering path:
 
-1. Use `baoyu-markdown-to-html` to convert `article.md` into styled HTML
-2. Refine the output HTML/CSS for print-specific layout and stronger visual quality
-3. Keep the final artifact as `handout.html`
+1. convert `article.md` into semantic HTML
+2. refine layout and CSS for A4
+3. save final artifact as `handout.html`
 
 The final HTML must be:
 
 - printable on A4 by default
 - comfortable to read on screen
-- self-contained or safely relative-pathed
-- free of fixed UI chrome, sticky nav, or app-like noise
-- free of meta text such as print instructions, topic labels, provenance notes, or workflow narration inside the teaching body
+- free of app chrome, sticky nav, and workflow narration
+- free of topic labels / provenance notes / “this handout will…” filler in the teaching body
 
-Follow `references/print-checklist.md`.
+Full page-density and chrome rules live in `references/layout-guardrails.md`.
 
-### 9. Upgrade the final look
+### 9. Validate with the canonical scripts
 
-After the HTML exists, use `frontend-design` to improve:
+Use the bundled scripts, not ad-hoc screenshots.
 
-- cover composition
-- typography hierarchy
-- section divider rhythm
-- callout boxes
-- figures and captions
-- examples and case-study blocks
-
-Do not turn the page into a landing page. This is a document artifact first, a webpage second.
-
-Do not waste half a page on cover-like spacing. If a page is too sparse, rebalance the layout, enlarge the teaching figure, or merge content with adjacent material.
-
-### 10. Validate before hand-off
-
-Use `webapp-testing` or equivalent browser validation to check:
-
-- HTML opens locally
-- images and SVGs resolve correctly
-- long sections do not break awkwardly in print
-- tables, callouts, lists, and code blocks do not overflow
-- page breaks are intentional enough for manual PDF export
-- diagrams are large enough to read and do not contain overflowing text
-- no page wastes a large empty lower region unless it is clearly justified by the composition
-- exported PDF pages preserve the HTML layout without reflow, clipping, or scaling drift
-- exported PDF must also open and scroll quickly enough for human review; the export step must not rely on the raw browser PDF alone
-- always export both:
-  - a print PDF for parity / printing
-  - a fast-view PDF for on-screen scrolling review
-
-For repo-local smoke validation, you can use:
+Smoke validation:
 
 ```bash
-python validate_print_layout.py --html evals/<slug>/handout.html
+python scripts/validate_print_layout.py --html artifacts/knowledge-handout/<slug>/handout.html
 ```
 
-By default this writes screenshots, a PDF export, PDF page screenshots, and a JSON report to `evals/<slug>/screens/py-latest/`.
-
-`validate_print_layout.py` now treats dependency provisioning as part of the workflow:
-
-- automatically installs missing Python packages such as `playwright` and `pymupdf`
-- automatically installs Playwright Chromium when needed
-- automatically installs `qpdf` when needed so the exported PDF can be optimized for fast viewing
-- may fall back to the host package manager for a browser when browser provisioning is still blocked
-- writes per-page HTML/PDF parity metadata so the next review step can stay page-local
-- builds a separate fast-view review PDF from page screenshots so vector-heavy pages do not stall during rapid mouse-wheel scrolling
-
-`validate_print_layout.py` now enforces two additional hard rules:
-
-- If a `.sheet` is stretched beyond real A4 height in print media, validation fails even if the clipped PNG still looks like A4.
-- If the exported PDF is not optimized for fast viewing after the export step, validation fails.
-- If the workflow does not also generate a separate fast-view PDF for smooth on-screen scrolling, validation fails.
-
-Default mandatory page-review loop:
+Sequential review packet:
 
 ```bash
-python review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.html
+python scripts/review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.html
 ```
 
-This writes a sequential review packet to `screens/py-latest/page-review/`, including:
+What the validator is responsible for:
 
-- `page-review-manifest.json`
-- `page-XX-review.json`
-- `page-XX-subagent-prompt.md`
+- per-page HTML screenshots clipped to exact printable page areas
+- true A4 sheet checks
+- print PDF export
+- fast-view review PDF export
+- rendered PDF-page screenshots
+- HTML-vs-PDF parity metadata
+- machine-readable validation report
 
-Each `page-XX-review.json` now contains:
+Detailed script behavior and environment requirements live in:
 
-- the HTML page screenshot path
-- the rendered PDF page screenshot path
-- parity metadata such as dimension match and visual-diff score
-- heuristic flags for both layout density and PDF-export drift
+- `references/review-loop.md`
+- `references/runtime-requirements.md`
 
-Single-page review screenshots are not generic viewport captures. They must be clipped to the exact printable page area so the exported PNG keeps true A4 page proportions for layout review. If the validator reports non-A4 page screenshots, the review packet is not acceptable for subagent review.
+### 10. Run the mandatory sequential page-review loop
 
-Review page 1 first. Give the HTML screenshot, PDF screenshot, `page-XX-review.json`, and `page-XX-subagent-prompt.md` to a fresh review subagent. If page 1 fails, fix it, rerun the packet, and re-review page 1. Only then move to page 2.
+This skill uses **Plan C: sequential page review by default**.
 
-The subagent must review at least:
+The flow is:
 
-- meta/process text leaking into the handout body
-- diagram readability, size, and text overflow
-- large lower-page blank regions
-- clipped or cramped figures, tables, callouts, code, and captions
-- print-page balance and break quality
-- whether the exported PDF page still matches the HTML page in layout, spacing, scaling, margins, clipping, and content presence
-- information hierarchy and teaching clarity
-- whether the page reads like a study handout rather than a web hero, dashboard, or marketing page
+1. run validation
+2. generate review packets
+3. review page 1 with a fresh subagent
+4. if page 1 fails, fix only what page 1 needs
+5. rerun validation + review packet generation
+6. review page 1 again
+7. only after page 1 passes, move to page 2
+8. continue until every page passes
+9. run one final full-document validation pass
 
-The subagent must return only structured JSON:
+Full operational details, JSON contract, and subagent review rules live in `references/review-loop.md`.
 
-```json
-{
-  "page": 1,
-  "pass": false,
-  "issues": [
-    {
-      "type": "large_bottom_gap",
-      "severity": "fail",
-      "evidence": "The lower third of the page is empty after the final callout.",
-      "fix": "Move the next short section onto this page or enlarge the teaching diagram."
-    }
-  ],
-  "fixes": [
-    "Rebalance page 1 before reviewing page 2."
-  ]
-}
-```
+## Non-Negotiable Quality Gates
 
-If the subagent returns `pass=false`, edit only what is needed for that page, regenerate screenshots and packets, and retry the same page. Do not review later pages while the current page is failing.
+Do not hand off `handout.html` unless all of these are true:
 
-Only then hand off `handout.html`.
+1. `scripts/validate_print_layout.py` passes the true-A4 sheet checks.
+2. The export includes both a print PDF and a fast-view PDF.
+3. HTML page count and PDF page count match exactly.
+4. The review packet includes per-page HTML screenshots, PDF screenshots, and parity metadata.
+5. Each page has been reviewed in order by a fresh page-review subagent.
+6. After the last page passes, a final full-document validation run completes.
 
-## Content Quality Rules
+If no subagent/delegation tool is available, stop and report that the review gate is blocked. Do not substitute self-approval.
 
-- Explain before optimizing for beauty
-- Use real examples instead of abstract claims whenever possible
-- Prefer one excellent case study over five shallow examples
-- Keep citations traceable, even if the final page uses a compact references section
-- Match depth to the reader; do not produce expert-only shorthand unless asked
-- Keep internal process notes out of the learner-facing artifact
+## Environment Notes
 
-## Visual Rules
+Read `references/runtime-requirements.md`.
 
-- Print first, screen second
-- Strong typography, restrained palette, generous whitespace
-- One accent color by default
-- Two typefaces maximum by default
-- SVG diagrams over decorative bitmap art
-- No dashboard-card soup
-- No generic AI gradients unless the user explicitly wants that direction
-- No dark full-page backgrounds by default for print artifacts
-- No tiny teaching diagrams used as decorative inserts
-- No dense SVG box-and-arrow charts unless the labels remain comfortably readable
-- No pages with obvious top-heavy content and an empty lower half
+Important defaults:
 
-## Hand-off Requirements
+- `scripts/validate_print_layout.py` will try to auto-install missing runtime dependencies unless `--no-auto-install` is used.
+- In offline or restricted environments, preinstall dependencies first and run with `--no-auto-install` so failure is immediate and explicit.
+- `scripts/review_print_pages.py` uses `--review-language auto` by default so the generated subagent prompt matches the handout language when possible.
+
+## Content And Visual Rules
+
+Keep these front-of-mind:
+
+- explain before optimizing for beauty
+- prefer one strong case study over many shallow examples
+- use diagrams to teach, not decorate
+- print first, screen second
+- no dashboard-card soup, sparse hero pages, or top-heavy pages with a blank lower half
+- no tiny unreadable diagrams
+- no learner-facing meta/process text inside the handout body
+
+Use the reference files for the full rule sets instead of duplicating them in the page.
+
+## Hand-Off Requirements
 
 Before claiming success, provide:
 
-- the final `handout.html` path
-- the working folder path
-- any generated diagram paths
-- the chosen visual preset
-- the browser print recommendations
+- final `handout.html` path
+- working folder path
+- generated diagram paths
+- chosen visual preset
+- print recommendations
 
-Do not copy those hand-off items into the printed page itself.
+Recommended print settings unless the page was deliberately built otherwise:
 
-Recommend these print settings unless the page was built differently:
+- paper: A4
+- scale: 100%
+- background graphics: enabled
+- headers/footers: disabled
 
-- Paper: A4
-- Scale: 100%
-- Background graphics: enabled
-- Headers/footers: disabled
+Do not place those hand-off notes inside the printed teaching body.
 
-## Common Mistakes
+## Common Failure Modes
 
-- Starting from HTML before the argument and outline are solid
-- Doing broad search instead of targeted research
-- Producing pretty pages with weak teaching value
-- Using diagrams as decoration instead of explanation
-- Letting page breaks split figures or callouts badly
-- Overriding print readability with dark hero sections or excessive effects
-- Forgetting to keep `article.md` as the content source of truth
-- Letting workflow chrome or provenance notes leak into the learner-facing page
-- Shrinking diagrams until they become unreadable
-- Accepting a page with a large blank lower half just because it technically fits
+- starting from HTML before the argument is solid
+- doing broad search instead of targeted research
+- producing stylish pages with weak teaching value
+- shrinking diagrams until they stop teaching
+- letting process chrome leak into the learner-facing page
+- accepting a page with an obvious empty lower half just because it technically fits
+- relying on heuristic checks without the sequential subagent review gate

@@ -17,7 +17,7 @@ Do not review page `N + 1` until page `N` has:
 2. Run:
 
 ```bash
-python review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.html
+python scripts/review_print_pages.py --html artifacts/knowledge-handout/<slug>/handout.html
 ```
 
 3. Read `screens/py-latest/page-review/page-review-manifest.json`
@@ -44,6 +44,8 @@ The page screenshot handed to the subagent must be a true printable-page clip:
 Treat this as a hard gate, not a preference:
 
 - if the validator reports non-A4 page screenshots, stop and fix the capture pipeline before asking a subagent to review the page
+
+The review packet generator defaults to `--review-language auto` so the subagent prompt can follow the handout language. If language detection is wrong, rerun with `--review-language zh` or `--review-language en`.
 
 ## Subagent contract
 

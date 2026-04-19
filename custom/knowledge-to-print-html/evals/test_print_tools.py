@@ -12,7 +12,9 @@ import struct
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-VALIDATOR = SKILL_DIR / "validate_print_layout.py"
+VALIDATOR = SKILL_DIR / "scripts" / "validate_print_layout.py"
+ROOT_VALIDATOR_WRAPPER = SKILL_DIR / "validate_print_layout.py"
+ROOT_REVIEW_WRAPPER = SKILL_DIR / "review_print_pages.py"
 if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
@@ -89,8 +91,20 @@ TALL_HANDOUT = """<!doctype html>
 
 
 class PrintToolTests(unittest.TestCase):
+    def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
+        self.assertTrue((SKILL_DIR / "scripts" / "validate_print_layout.py").exists())
+        self.assertTrue((SKILL_DIR / "scripts" / "review_print_pages.py").exists())
+        self.assertTrue(ROOT_VALIDATOR_WRAPPER.exists())
+        self.assertTrue(ROOT_REVIEW_WRAPPER.exists())
+
+    def test_evals_include_machine_checkable_assertions(self) -> None:
+        evals = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
+        for item in evals["evals"]:
+            self.assertIn("assertions", item)
+            self.assertGreaterEqual(len(item["assertions"]), 3)
+
     def test_ensure_python_package_installs_missing_dependency_before_retry(self) -> None:
-        import validate_print_layout as validator
+        from scripts import validate_print_layout as validator
 
         imported_module = object()
         real_import_module = importlib.import_module
@@ -292,7 +306,7 @@ class PrintToolTests(unittest.TestCase):
             self.assertGreater(report["analysis"]["sheets"][0]["rect"]["height"], report["analysis"]["sheets"][0]["expectedA4Height"])
 
     def test_optimize_pdf_for_fast_view_runs_qpdf_linearize(self) -> None:
-        import validate_print_layout as validator
+        from scripts import validate_print_layout as validator
 
         with tempfile.TemporaryDirectory() as temp_name:
             temp_dir = Path(temp_name)
@@ -327,7 +341,7 @@ class PrintToolTests(unittest.TestCase):
             self.assertEqual(info["tool"], "qpdf")
 
     def test_review_packets_create_explicit_subagent_prompt_files(self) -> None:
-        from review_print_pages import write_review_packets
+        from scripts.review_print_pages import write_review_packets
 
         with tempfile.TemporaryDirectory() as temp_name:
             temp_dir = Path(temp_name)
@@ -402,6 +416,7 @@ class PrintToolTests(unittest.TestCase):
                 report_path=report_path,
                 review_dir=temp_dir / "page-review",
                 thresholds=thresholds,
+                review_language="en",
             )
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             page = manifest["pages"][0]
@@ -420,9 +435,27 @@ class PrintToolTests(unittest.TestCase):
             self.assertIn("Compare the HTML page screenshot against the PDF page screenshot", prompt_text)
             self.assertIn("Fail if the PDF export changes layout, spacing, scaling, clipping, or missing content", prompt_text)
 
+    def test_review_packets_can_emit_chinese_subagent_prompt(self) -> None:
+        from scripts.review_print_pages import build_subagent_prompt_with_language
+
+        prompt_text = build_subagent_prompt_with_language(
+            {
+                "page": 1,
+                "htmlScreenshot": "html.png",
+                "pdfScreenshot": "pdf.png",
+                "parity": {"visualDiffScore": 0.01},
+                "heuristicFlags": [],
+            },
+            review_language="zh",
+        )
+
+        self.assertIn("你是逐页审版子代理", prompt_text)
+        self.assertIn("只返回 JSON", prompt_text)
+        self.assertIn("HTML 截图", prompt_text)
+
     def test_review_validation_keeps_failed_report_for_packet_generation(self) -> None:
         from argparse import Namespace
-        from review_print_pages import run_validation
+        from scripts.review_print_pages import run_validation
 
         with tempfile.TemporaryDirectory() as temp_name:
             temp_dir = Path(temp_name)
