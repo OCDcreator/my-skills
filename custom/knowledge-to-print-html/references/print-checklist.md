@@ -95,6 +95,14 @@ Recommend to the user:
 - Background graphics: On
 - Headers and footers: Off
 
+## Image-Only PDF Clarity
+
+- If the user requests a 图片型 PDF / raster PDF / image-only PDF, generate it from high-DPI page images.
+- Use 300 DPI as the default A4 raster target, about `2480 × 3508` pixels per page.
+- With `scripts/validate_print_layout.py`, run the final raster hand-off pass with `--device-scale-factor 3.125` and use the resulting `*-fastview.pdf` or equivalent PDF assembled from those page PNGs.
+- Do not hand off an image-only PDF built from the default 1.5 device scale screenshots, because those are only about 144 DPI and can make Chinese text and small SVG labels look blurry.
+- Use 450 DPI only for explicit print-shop/raster-prepress needs or unusually tiny labels; avoid 600 DPI by default because file size and render time grow quickly with limited visible benefit for normal handouts.
+
 ## Verification Pass
 
 Before hand-off, confirm:
@@ -111,3 +119,4 @@ Before hand-off, confirm:
 - the page is not dominated by a dashboard-like card wall
 - the reading rhythm still feels comfortable at print size
 - learner-facing body text contains no provenance/process notes
+- any requested image-only PDF is approximately 300 DPI or higher, with the actual DPI/path stated in the hand-off

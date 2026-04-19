@@ -261,6 +261,14 @@ What the validator is responsible for:
 - linked-SVG visual enclosure checks for frames/cards that fail to wrap their contents
 - machine-readable validation report
 
+If the user asks for an **image-only / raster / 图片型 PDF**, do not build it from the default 1.5-scale page screenshots; that produces roughly 144 DPI A4 images and can make text look soft. Run a final high-DPI validation pass and use the generated `*-fastview.pdf` (or an equivalent image-only PDF assembled from those high-DPI page PNGs):
+
+```bash
+python scripts/validate_print_layout.py --html artifacts/knowledge-handout/<slug>/handout.html --device-scale-factor 3.125 --out-dir artifacts/knowledge-handout/<slug>/screens/high-dpi
+```
+
+Treat **300 DPI** as the default raster-PDF target for A4 handouts: it yields about `2480 × 3508` pixels per page, which keeps body text clear without making files unnecessarily large. Use 450 DPI only when the user explicitly needs print-shop-grade raster output or the page contains unusually tiny labels; avoid 600 DPI by default because the file-size and render-time cost usually outweighs visible gains for teaching handouts.
+
 Detailed script behavior and environment requirements live in:
 
 - `references/review-loop.md`
@@ -294,6 +302,7 @@ Do not hand off `handout.html` unless all of these are true:
 4. The review packet includes per-page HTML screenshots, PDF screenshots, and parity metadata.
 5. Each page has been reviewed in order by a fresh page-review subagent.
 6. After the last page passes, a final full-document validation run completes.
+7. If the hand-off includes a 图片型 / raster / image-only PDF, it is generated from approximately 300 DPI page images, not the default lower-resolution validation screenshots.
 
 If no subagent/delegation tool is available, stop and report that the review gate is blocked. Do not substitute self-approval.
 
@@ -341,6 +350,7 @@ Before claiming success, provide:
 - generated diagram paths
 - chosen visual preset
 - print recommendations
+- image-only PDF path and raster DPI, if the user requested one
 
 Recommended print settings unless the page was deliberately built otherwise:
 

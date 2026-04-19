@@ -17,6 +17,16 @@ Default behavior:
 - permission to install Python packages and browser/runtime dependencies
 - enough disk space for browser artifacts, screenshots, and exported PDFs
 
+## High-DPI image-only PDF output
+
+The validator's default `--device-scale-factor 1.5` is suitable for layout review, but its A4 page PNGs are only about 144 DPI. When a user asks for a 图片型 PDF / raster PDF / image-only PDF, run a separate final pass at 300 DPI:
+
+```bash
+python scripts/validate_print_layout.py --html <path> --device-scale-factor 3.125 --out-dir <artifact-dir>/screens/high-dpi
+```
+
+At the default A4 CSS page size, `--device-scale-factor 3.125` produces roughly `2478 × 3506` page images, close to 300 DPI. This is the default quality target for image-only handouts. Use 450 DPI only when the user explicitly needs print-shop raster output or the document has unusually small labels; do not default to 600 DPI.
+
 ## Restricted or offline environments
 
 If network/package-manager access is unavailable:

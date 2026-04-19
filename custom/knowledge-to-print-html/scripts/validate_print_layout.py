@@ -879,7 +879,7 @@ def parse_args() -> argparse.Namespace:
         "--device-scale-factor",
         type=float,
         default=1.5,
-        help="Device scale factor for captures. Default: 1.5.",
+        help="Device scale factor for captures. Default: 1.5. Use 3.125 for roughly 300 DPI A4 image-only PDF output.",
     )
     parser.add_argument(
         "--no-auto-install",

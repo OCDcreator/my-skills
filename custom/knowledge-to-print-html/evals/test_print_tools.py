@@ -507,6 +507,22 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("overflow-wrap", checklist_text)
         self.assertIn("word-break", checklist_text)
 
+    def test_skill_docs_require_high_dpi_image_pdf_output(self) -> None:
+        skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+        checklist_text = (SKILL_DIR / "references" / "print-checklist.md").read_text(encoding="utf-8")
+        runtime_text = (SKILL_DIR / "references" / "runtime-requirements.md").read_text(encoding="utf-8")
+        validator_text = (SKILL_DIR / "scripts" / "validate_print_layout.py").read_text(encoding="utf-8")
+
+        combined = "\n".join([skill_text, checklist_text, runtime_text, validator_text])
+
+        self.assertIn("image-only", combined)
+        self.assertIn("图片型 PDF", combined)
+        self.assertIn("300 DPI", combined)
+        self.assertIn("--device-scale-factor 3.125", combined)
+        self.assertIn("144 DPI", combined)
+        self.assertIn("450 DPI", combined)
+        self.assertIn("600 DPI", combined)
+
     def test_review_loop_requires_container_level_text_overflow_check(self) -> None:
         review_text = (SKILL_DIR / "references" / "review-loop.md").read_text(encoding="utf-8")
 
