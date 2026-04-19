@@ -3,93 +3,221 @@
   "evals": [
     {
       "id": 1,
+      "name": "startup-profile-native-sample",
       "prompt": "帮我全自动排查这个 Obsidian 插件首次打开很慢的问题：构建、部署到测试库、重载插件、抓控制台日志并定位瓶颈。",
       "expected_output": "Uses a build/deploy/reload/log-watch loop, separates plugin onload from view-open and runtime warmup timing, and reports the bottleneck with artifact paths.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin"
+      ],
+      "expectations": [
+        "Uses a build, deploy, reload, and log-capture loop instead of stopping at static code inspection.",
+        "Separates plugin startup timing from view-open, warmup, or hydration phases before naming a bottleneck.",
+        "Reports artifact paths for the captured diagnosis, logs, or timing output."
+      ]
     },
     {
       "id": 2,
+      "name": "ui-reload-screenshot-dom",
       "prompt": "改完一个 Obsidian 插件 UI 后，你来自动 reload，然后截图和检查 DOM，确认设置页按钮存在且没有 console error。",
       "expected_output": "Runs plugin reload, clears and checks dev errors, captures screenshot, queries relevant DOM selectors, and summarizes pass/fail evidence for a generic plugin view/settings surface.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin",
+        "assertions/plugin-view-health.template.json",
+        "scenarios/open-plugin-view.json"
+      ],
+      "expectations": [
+        "Reloads the plugin before taking screenshots or DOM assertions.",
+        "Checks console or dev errors in addition to screenshot capture.",
+        "Uses DOM or selector-based evidence for the settings surface and reports pass or fail with artifact paths."
+      ]
     },
     {
       "id": 3,
+      "name": "deploy-build-id-console-watch",
       "prompt": "把当前插件发布到 test vault，确认 BUILD_ID 生效，然后实时看 dev console 20 秒。",
       "expected_output": "Builds, copies runtime artifacts to the test vault plugin directory, verifies hash or BUILD_ID, reloads the plugin, and saves console-watch output.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin"
+      ],
+      "expectations": [
+        "Copies generated runtime artifacts into the target vault plugin directory instead of editing source files in place.",
+        "Verifies deploy identity by BUILD_ID, hash comparison, or another explicit runtime artifact check.",
+        "Saves a bounded console-watch artifact after reload."
+      ]
     },
     {
       "id": 4,
+      "name": "cdp-early-log-fallback",
       "prompt": "CLI 的 dev:console 抓不到插件启动早期日志，改用 CDP 自动重载插件并保存一份带时间戳的实时 console trace。",
       "expected_output": "Switches to the built-in CDP scripts, enables debug flags, reloads the plugin through app context, and saves a timestamped trace with clear artifact paths.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin"
+      ],
+      "expectations": [
+        "Switches from CLI log capture to the bundled CDP path because startup logs are missed.",
+        "Keeps reload and log ordering explicit instead of mixing CLI and CDP capture vaguely.",
+        "Saves a timestamped CDP trace artifact path."
+      ]
     },
     {
       "id": 5,
+      "name": "watch-on-save-loop",
       "prompt": "把这个技能升级成保存时自动 watch：文件一改动就 build、deploy、reload、抓诊断，并把结果写到新的输出目录。",
       "expected_output": "Uses the built-in watch runner with debouncing, output-dir templating, safe excludes, and one-run smoke validation or continuous watch mode.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin"
+      ],
+      "expectations": [
+        "Uses the built-in watch runner or documented watch flow rather than inventing an unrelated watcher.",
+        "Mentions debouncing and safe watch-root or exclude handling.",
+        "Writes each watch run into a new output directory or templated run folder."
+      ]
     },
     {
       "id": 6,
+      "name": "state-reset-preview-restore",
       "prompt": "这个插件可能被脏 data.json 或缓存状态影响了。先安全预览要清理什么，再重置状态、保留快照，最后允许一键恢复。",
       "expected_output": "Uses preview/reset/restore state automation with safe target resolution, snapshot preservation, and a generic plugin-local reset plan rather than hardcoding one repository.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin",
+        "state-plans/plugin-data-reset.json"
+      ],
+      "expectations": [
+        "Starts with a preview step before any destructive reset.",
+        "Preserves snapshot data and includes an explicit restore path.",
+        "Keeps reset scope generic and plugin-local instead of hardcoding one repository layout."
+      ]
     },
     {
       "id": 7,
+      "name": "fresh-vault-bootstrap-discovery",
       "prompt": "这是个 fresh clean-vault 首次安装场景。你来零接触 bootstrap：关闭 restricted mode、让新插件被 Obsidian 发现、必要时自动 reload/restart，再继续 reload + 抓诊断。",
       "expected_output": "Uses the built-in bootstrap flow before reload/log capture, proves the plugin became discoverable/enabled in the target vault, and records a bootstrap report artifact.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin"
+      ],
+      "expectations": [
+        "Runs bootstrap before the main reload and log-capture pass.",
+        "Shows evidence that the plugin became discoverable or enabled in the fresh vault.",
+        "Records a bootstrap report or equivalent artifact path."
+      ]
     },
     {
       "id": 8,
+      "name": "doctor-cdp-websocket-bootstrap",
       "prompt": "先跑 doctor，看这个 Obsidian 调试环境在 Node20/WebSocket/CDP 上有没有坑；如果 fresh vault 还没发现插件，也给出可执行修复方案。",
       "expected_output": "Runs the doctor with vault-aware plugin discovery checks, reports Node runtime WebSocket support for CDP, and emits a bootstrap-ready fix plan when the plugin is not yet discoverable.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin"
+      ],
+      "expectations": [
+        "Runs doctor first and reports Node, WebSocket, or CDP readiness.",
+        "Includes plugin discovery status for the target vault.",
+        "Produces a concrete fix plan when the plugin is not yet discoverable."
+      ]
     },
     {
       "id": 9,
+      "name": "package-manager-pnpm-job-plan",
       "prompt": "这个仓库用 pnpm，不要再默认 npm。先用 doctor 识别 packageManager/lockfile/Corepack，再生成一个能在 Windows 和 macOS 复用的 job plan。",
       "expected_output": "Detects repo-owned package-manager signals such as packageManager, lockfiles, and build/dev/test scripts; reports Corepack/package-manager readiness; and emits a job plan that infers pnpm/yarn/bun commands instead of assuming npm-only workflows.",
-      "files": []
+      "files": [
+        "fixtures/package-manager-smoke-pnpm-plugin"
+      ],
+      "expectations": [
+        "Detects packageManager, lockfile, or Corepack signals instead of assuming npm.",
+        "Reuses repo-owned scripts for build, dev, or test commands when present.",
+        "Generates a cross-platform job plan that keeps the chosen package manager explicit."
+      ]
     },
     {
       "id": 10,
+      "name": "playwright-optional-scenario",
       "prompt": "这个插件的设置页需要更细的 UI 自动化。保留原来的 CLI/CDP 路径，但给我一个可选的 Playwright scenario：能点按钮、做 locator 断言，并把 trace/screenshot 链接进诊断报告。",
       "expected_output": "Keeps the default CLI/CDP-first workflow available, detects whether Playwright is installed before opting in, supports Playwright locator steps through scenario config, and records trace/screenshot artifacts in diagnosis and HTML report outputs.",
-      "files": []
+      "files": [
+        "fixtures/obsidian-e2e-smoke-plugin",
+        "scenarios/playwright-locator-health.template.json"
+      ],
+      "expectations": [
+        "Keeps CLI or CDP as the default path and treats Playwright as opt-in.",
+        "Checks whether Playwright-style tooling is available before enabling locator steps.",
+        "Records trace or screenshot artifacts in diagnosis or report output."
+      ]
     },
     {
       "id": 11,
+      "name": "scaffold-minimal-sample-workspace",
       "prompt": "我现在还没有真正的插件仓库。先帮我生成一个最小的 sample-plugin 工作区和 test-vault，再给出能直接跑 bootstrap/debug job 的配置，和已有插件 retrofit 流程区分清楚。",
       "expected_output": "Scaffolds a minimal plugin-neutral sample workspace with local build output, a fresh-vault target, and generated autodebug job/assertion/surface files while clearly separating the sample scaffold flow from the existing-plugin retrofit flow.",
-      "files": []
+      "files": [
+        "fixtures/native-smoke-sample-plugin",
+        "job-specs/generic-debug-job.template.json"
+      ],
+      "expectations": [
+        "Generates or points to a minimal sample-plugin workspace plus test-vault flow.",
+        "Includes autodebug job, assertion, or surface config for the scaffolded sample.",
+        "Clearly distinguishes the sample scaffold flow from retrofitting an existing plugin repo."
+      ]
     },
     {
       "id": 12,
+      "name": "testing-framework-ci-split",
       "prompt": "本地 smoke 已经通过了。现在给我一个可选的 obsidian-testing-framework 检测结果，再生成一套不依赖 secret 和本机绝对路径的 CI/headless 质量门模板，明确哪些步骤还只能本地桌面跑。",
       "expected_output": "Reports whether obsidian-testing-framework is installed, merely declared, or absent; identifies any repo-owned scripts that already invoke it; emits headless quality-gate templates for Bash/PowerShell/GitHub Actions without machine-local absolute paths; and clearly separates CI-suitable checks from local-only Obsidian desktop phases.",
-      "files": []
+      "files": [
+        "fixtures/testing-framework-smoke-plugin"
+      ],
+      "expectations": [
+        "Reports whether obsidian-testing-framework is installed or declared and surfaces matching repo-owned scripts.",
+        "Generates CI or headless templates without machine-local absolute paths or secrets.",
+        "Clearly separates CI-suitable checks from local-only desktop Obsidian phases."
+      ]
     },
     {
       "id": 13,
+      "name": "eslint-dev-utils-reuse",
       "prompt": "这个仓库已经装了 eslint-plugin-obsidianmd 和 obsidian-dev-utils。先跑 doctor，把它们识别出来；如果 repo 有自己的 lint/build/dev 脚本，就优先尊重它们，不要再手搓并行流程。",
       "expected_output": "Doctor reports official Obsidian ESLint support plus obsidian-dev-utils availability or declaration status, surfaces any matching repo-owned lint/build/dev scripts, and recommends reusing those scripts instead of inventing a parallel loop.",
-      "files": []
+      "files": [
+        "fixtures/preflight-smoke-plugin"
+      ],
+      "expectations": [
+        "Detects eslint-plugin-obsidianmd and obsidian-dev-utils from repo metadata or scripts.",
+        "Surfaces repo-owned lint, build, or dev scripts and recommends reusing them.",
+        "Treats the repo's own scripts as the preferred path instead of inventing a parallel workflow."
+      ]
     },
     {
       "id": 14,
+      "name": "optional-e2e-ci-wiring",
       "prompt": "本地桌面 smoke 过了。现在看这个仓库有没有 obsidian-e2e、obsidian-testing-framework、wdio-obsidian-service 或 plugin-entry validation 脚本；如果有，就把它们接进 CI 模板里。",
       "expected_output": "Detects optional repo-owned plugin-entry validation, obsidian-e2e, obsidian-testing-framework, and wdio-obsidian-service scripts; wires them into generated Bash/PowerShell/GitHub Actions quality-gate templates; and keeps desktop-only phases documented separately.",
-      "files": []
+      "files": [
+        "fixtures/preflight-smoke-plugin",
+        "fixtures/obsidian-e2e-smoke-plugin",
+        "fixtures/testing-framework-smoke-plugin",
+        "fixtures/wdio-obsidian-service-smoke-plugin"
+      ],
+      "expectations": [
+        "Detects plugin-entry validation, obsidian-e2e, obsidian-testing-framework, and wdio-obsidian-service lanes when present.",
+        "Wires detected lanes into generated CI templates instead of leaving them as disconnected notes.",
+        "Keeps desktop-only reload or smoke phases documented separately from CI."
+      ]
     },
     {
       "id": 15,
+      "name": "production-scaffold-routing",
       "prompt": "我还没有插件仓库，但这次不是要一个最小 debug fixture，而是想搭一个真实项目。你要把 `generator-obsidian-plugin` 和内置 sample scaffold 的定位区别说清楚。",
       "expected_output": "Routes a production-ready plugin scaffold request toward generator-obsidian-plugin, keeps the built-in scaffold positioned as a minimal debug fixture, and clearly explains which flow fits each scenario.",
-      "files": []
+      "files": [
+        "job-specs/generic-debug-job.template.json"
+      ],
+      "expectations": [
+        "Routes the production-ready scaffold request toward generator-obsidian-plugin.",
+        "Keeps the built-in scaffold positioned as a minimal debug fixture rather than the default real-project path.",
+        "Explains which user situation fits each scaffold flow."
+      ]
     }
   ]
 }

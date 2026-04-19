@@ -7,11 +7,13 @@
   "scripts": {
     "lint": "node scripts/check-manifest-residue.mjs",
     "validate:plugin-entry": "node scripts/validate-plugin-entry.mjs",
+    "dev": "node -e \"console.log('preflight smoke fixture dev via obsidian-dev-utils lane')\"",
     "build": "node -e \"console.log('preflight smoke fixture build')\"",
     "test": "node -e \"console.log('preflight smoke fixture test')\""
   },
   "devDependencies": {
-    "eslint-plugin-obsidianmd": "^0.0.0-fixture"
+    "eslint-plugin-obsidianmd": "^0.0.0-fixture",
+    "obsidian-dev-utils": "^0.0.0-fixture"
   },
   "author": "my-skills",
   "license": "MIT"
