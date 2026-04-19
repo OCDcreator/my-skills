@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field, replace
+from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,9 @@ SKILL_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
+SCAFFOLD_NAME = "codex-autopilot-scaffold"
+SCAFFOLD_VERSION = "1.0.0"
+SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 
 SCALLOWED_SOURCE_SUFFIXES = {
     ".ts",
@@ -157,6 +161,14 @@ class DetectionResult:
     test_entrypoints: list[str] = field(default_factory=list)
 
 
+@dataclass
+class ExistingScaffoldState:
+    version: str = ""
+    has_existing_scaffold: bool = False
+    needs_auto_upgrade: bool = False
+    warnings: list[str] = field(default_factory=list)
+
+
 def clean_string(value: Any) -> str:
     if value is None:
         return ""
@@ -206,6 +218,80 @@ def read_text(path: Path) -> str:
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def parse_semver(version_text: str) -> tuple[int, int, int]:
+    normalized = clean_string(version_text)
+    if not normalized:
+        return (0, 0, 0)
+    if not re.fullmatch(r"\d+(?:\.\d+){0,2}", normalized):
+        raise ScaffoldError(f"Unsupported scaffold version format: {version_text}")
+    parts = [int(part) for part in normalized.split(".")]
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def compare_semver(left: str, right: str) -> int:
+    left_parts = parse_semver(left)
+    right_parts = parse_semver(right)
+    if left_parts < right_parts:
+        return -1
+    if left_parts > right_parts:
+        return 1
+    return 0
+
+
+def detect_existing_scaffold_state(repo_root: Path, *, auto_upgrade_enabled: bool) -> ExistingScaffoldState:
+    version_marker_path = repo_root / SCAFFOLD_VERSION_MARKER
+    autopilot_path = repo_root / "automation" / "autopilot.py"
+    warnings: list[str] = []
+
+    if not version_marker_path.exists():
+        if autopilot_path.exists():
+            warnings.append(
+                "Existing autopilot scaffold has no version marker; treating it as scaffold_version=0.0.0 for auto-upgrade."
+            )
+            return ExistingScaffoldState(
+                version="0.0.0",
+                has_existing_scaffold=True,
+                needs_auto_upgrade=auto_upgrade_enabled,
+                warnings=warnings,
+            )
+        return ExistingScaffoldState()
+
+    try:
+        payload = json.loads(read_text(version_marker_path))
+    except JSONDecodeError:
+        warnings.append(
+            "Existing autopilot scaffold version marker is unreadable; treating it as scaffold_version=0.0.0 for auto-upgrade."
+        )
+        return ExistingScaffoldState(
+            version="0.0.0",
+            has_existing_scaffold=True,
+            needs_auto_upgrade=auto_upgrade_enabled,
+            warnings=warnings,
+        )
+
+    version_text = clean_string(payload.get("scaffold_version"))
+    if not version_text:
+        warnings.append(
+            "Existing autopilot scaffold version marker is missing scaffold_version; treating it as scaffold_version=0.0.0 for auto-upgrade."
+        )
+        version_text = "0.0.0"
+
+    if compare_semver(version_text, SCAFFOLD_VERSION) > 0:
+        raise ScaffoldError(
+            f"Target repo already has scaffold version {version_text}, which is newer than this skill's {SCAFFOLD_VERSION}. "
+            "Refusing automatic downgrade; use --force only if you really want to replace it."
+        )
+
+    return ExistingScaffoldState(
+        version=version_text,
+        has_existing_scaffold=True,
+        needs_auto_upgrade=auto_upgrade_enabled and compare_semver(version_text, SCAFFOLD_VERSION) < 0,
+        warnings=warnings,
+    )
 
 
 def render_tokens(template_text: str, tokens: dict[str, str]) -> str:
@@ -573,12 +659,14 @@ def apply_cli_overrides(detection: DetectionResult, args: argparse.Namespace) ->
     return updated
 
 
-def write_if_changed(path: Path, content: str, *, force: bool) -> str:
+def write_if_changed(path: Path, content: str, *, force: bool, on_conflict: str = "error") -> str:
     if path.exists():
         existing = read_text(path)
         if existing == content:
             return "unchanged"
-        if not force:
+        if not force and on_conflict == "preserve":
+            return "preserved"
+        if not force and on_conflict != "overwrite":
             raise ScaffoldError(f"Refusing to overwrite existing file without --force: {path}")
     write_text(path, content)
     return "written"
@@ -597,6 +685,7 @@ def render_template_tree(
     tokens: dict[str, str],
     *,
     force: bool,
+    on_conflict: str = "error",
 ) -> dict[str, str]:
     results: dict[str, str] = {}
     for source_path in sorted(source_root.rglob("*")):
@@ -607,8 +696,10 @@ def render_template_tree(
         relative_path = source_path.relative_to(source_root)
         destination_path = destination_root / relative_path
         rendered = render_tokens(read_text(source_path), tokens)
-        results[normalize_repo_path(destination_path, destination_root)] = write_if_changed(destination_path, rendered, force=force)
-        sync_executable_mode(source_path, destination_path)
+        status = write_if_changed(destination_path, rendered, force=force, on_conflict=on_conflict)
+        results[normalize_repo_path(destination_path, destination_root)] = status
+        if status == "written":
+            sync_executable_mode(source_path, destination_path)
     return results
 
 
@@ -689,6 +780,8 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "RUNNER_EXTRA_ARGS_JSON": "[]",
         "RUNNER_ADDITIONAL_DIRS_JSON": "[]",
         "BUILD_VERIFY_PATH_JSON": json.dumps("", ensure_ascii=False),
+        "SCAFFOLD_NAME_JSON": json.dumps(SCAFFOLD_NAME, ensure_ascii=False),
+        "SCAFFOLD_VERSION_JSON": json.dumps(SCAFFOLD_VERSION, ensure_ascii=False),
     }
     return tokens
 
@@ -750,18 +843,40 @@ def scaffold_repo(args: argparse.Namespace) -> int:
     repo_root = resolve_git_root(target_repo)
     detection = apply_cli_overrides(detect_commands(repo_root), args)
     tokens = override_tokens(default_tokens(detection, args.preset), args)
+    existing_scaffold = detect_existing_scaffold_state(repo_root, auto_upgrade_enabled=not args.no_auto_upgrade)
+    detection.warnings.extend(existing_scaffold.warnings)
 
     common_root = COMMON_TEMPLATES_ROOT
     preset_root = PRESET_TEMPLATES_ROOT / args.preset
     if not preset_root.exists():
         raise ScaffoldError(f"Preset template directory not found: {preset_root}")
 
-    common_results = render_template_tree(common_root, repo_root, tokens, force=args.force)
-    preset_results = render_template_tree(preset_root, repo_root, tokens, force=args.force)
+    common_conflict_policy = "overwrite" if existing_scaffold.needs_auto_upgrade else "error"
+    preset_conflict_policy = "preserve" if existing_scaffold.needs_auto_upgrade else "error"
+    common_results = render_template_tree(
+        common_root,
+        repo_root,
+        tokens,
+        force=args.force,
+        on_conflict=common_conflict_policy,
+    )
+    preset_results = render_template_tree(
+        preset_root,
+        repo_root,
+        tokens,
+        force=args.force,
+        on_conflict=preset_conflict_policy,
+    )
     gitignore_result = ensure_runtime_gitignore(repo_root, force=args.force)
 
     print(f"[scaffold] target repo: {repo_root}")
     print(f"[scaffold] preset: {args.preset} ({PRESET_METADATA[args.preset]['label']})")
+    print(f"[scaffold] scaffold version: {SCAFFOLD_VERSION}")
+    if existing_scaffold.needs_auto_upgrade:
+        print(
+            "[scaffold] auto-upgrade: "
+            f"detected scaffold_version={existing_scaffold.version}; refreshed common controller assets and preserved existing preset/config files."
+        )
     print("[scaffold] inferred validation commands:")
     print(build_validation_bullets(detection))
     for warning in detection.warnings:
@@ -809,6 +924,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repo-relative files or directories that require deploy when --deploy-policy targeted is used.",
     )
     parser.add_argument("--runner-model", help="Optional Codex model override to place into config.")
+    parser.add_argument(
+        "--no-auto-upgrade",
+        action="store_true",
+        help="Disable automatic refresh of common scaffold files when an older deployed scaffold version is detected.",
+    )
     parser.add_argument("--force", action="store_true", help="Overwrite existing generated files.")
     parser.add_argument("--print-next-steps", action="store_true", default=True, help="Print suggested doctor/dry-run commands.")
     parser.add_argument("--no-print-next-steps", dest="print_next_steps", action="store_false")

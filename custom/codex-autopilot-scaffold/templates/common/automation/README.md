@@ -5,6 +5,7 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 ## Files
 
 - `automation/autopilot.py`: cross-platform outer controller
+- `automation/autopilot-scaffold-version.json`: deployed scaffold name/version marker
 - `automation/Arm-AutopilotCutover.ps1`: Windows post-commit cutover wrapper
 - `automation/arm-autopilot-cutover.sh`: macOS post-commit cutover wrapper
 - `automation/start-autopilot.sh`: macOS start wrapper with optional background mode
@@ -83,6 +84,7 @@ For a repo-local macOS wrapper flow, prefer:
 ### Helpful modes
 
 ```text
+python automation/autopilot.py version
 python automation/autopilot.py status
 python automation/autopilot.py watch
 python automation/autopilot.py start --profile windows --dry-run --single-round
@@ -94,6 +96,15 @@ python automation/autopilot.py restart-after-next-commit --profile windows
 ## Deploy policy
 
 Prefer `deploy_policy=targeted` or `deploy_policy=never` for most unattended repos. Deploying after every successful round is usually unnecessary churn.
+
+## Versioned scaffold upgrades
+
+The scaffold records its deployed version in `automation/autopilot-scaffold-version.json`.
+
+- Re-running the scaffold script against an older deployed version auto-refreshes common controller assets such as `automation/autopilot.py`, wrappers, profiles, schema, and this version marker.
+- Repo-local queue docs, prompts, and `automation/autopilot-config.json` stay in place during that automatic upgrade path.
+- Use `python automation/autopilot.py version` to confirm what version a target repo is currently running.
+- Use `--force` only when you intentionally want to overwrite repo-local generated files beyond the shared controller layer.
 
 - Use `deploy_policy=targeted` when only specific files or directories should trigger deploy
 - Keep `deploy_required_paths` narrow and repo-relative

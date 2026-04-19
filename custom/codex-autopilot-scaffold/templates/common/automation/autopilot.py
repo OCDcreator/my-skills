@@ -23,6 +23,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = "automation/autopilot-config.json"
 DEFAULT_STATE_PATH = "automation/runtime/autopilot-state.json"
 DEFAULT_RUNTIME_PATH = "automation/runtime"
+AUTOPILOT_SCAFFOLD_NAME = [[SCAFFOLD_NAME_JSON]]
+AUTOPILOT_SCAFFOLD_VERSION = [[SCAFFOLD_VERSION_JSON]]
 DEFAULT_PROFILE_NAME = "windows"
 LOCK_FILENAME = "autopilot.lock.json"
 ROUND_DIRECTORY_RE = re.compile(r"^round-(\d+)$")
@@ -2459,6 +2461,11 @@ def run_doctor(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def run_version(args: argparse.Namespace) -> int:
+    print(f"{AUTOPILOT_SCAFFOLD_NAME} {AUTOPILOT_SCAFFOLD_VERSION}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Cross-platform repository autopilot.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -2500,6 +2507,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH, help="Base config JSON path.")
     doctor_parser.add_argument("--runtime-path", default=DEFAULT_RUNTIME_PATH, help="Runtime directory path.")
     doctor_parser.set_defaults(handler=run_doctor)
+
+    version_parser = subparsers.add_parser("version", help="Print the deployed scaffold version.")
+    version_parser.set_defaults(handler=run_version)
 
     restart_parser = subparsers.add_parser(
         "restart-after-next-commit",
