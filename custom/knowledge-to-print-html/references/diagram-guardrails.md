@@ -17,9 +17,18 @@ These rules apply to all teaching diagrams, flowcharts, SVG explanation graphics
 ## Text inside diagrams
 
 - Text must stay inside its boxes.
+- Compact SVG cards need healthy inner padding, not just zero overflow.
 - Labels must not overlap arrows or neighboring boxes.
 - Avoid over-dense microtext.
 - If the diagram needs many sentences, move some explanation into the body and keep only the essential labels in the SVG.
+
+## Visual enclosure integrity
+
+- The visual enclosure must match the meaning: if an outer frame, card, or 外框 introduces a group, every related text label, pill, icon, and child box must sit inside that frame.
+- Do not let an outer frame stop above the final pill or label. This fails even when the SVG image itself stays inside the page and no DOM overflow is reported.
+- In compact SVG text boxes, the last line must not hug the bottom edge, and the rightmost text must not sit visibly tighter than the left edge.
+- Visual balance matters: a box can still fail even when the text remains technically inside, if the inner padding looks obviously uneven.
+- Prefer enlarging the frame, rebalancing the grouped items, or splitting the group over hiding overflow or shrinking labels.
 
 The same readability rule applies to CSS callouts or card-like explanation blocks:
 

@@ -148,6 +148,7 @@ def build_flags(
     typography = page.get("typography") or {}
     meta = page.get("meta") or {}
     container_text_overflow = page.get("containerTextOverflow") or {}
+    svg_visual_enclosure = page.get("svgVisualEnclosure") or {}
     largest_figure = figures.get("largest")
 
     if page.get("issueCount", 0) > 0:
@@ -286,6 +287,16 @@ def build_flags(
             }
         )
 
+    if svg_visual_enclosure.get("count", 0) > 0:
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "svg_visual_enclosure_failure",
+                "message": "An SVG diagram uses a visual frame/card that does not enclose its own pills, labels, or content.",
+                "actual": svg_visual_enclosure.get("items"),
+            }
+        )
+
     if screenshot.get("visibleSheetCount") != 1:
         flags.append(
             {
@@ -392,6 +403,7 @@ def build_subagent_prompt_with_language(
             "- 如果为了塞进页面而明显压缩字号、行距或段距，导致排版节奏失衡，判失败。\n"
             "- 如果层级更像网页 hero 或 dashboard，而不是学习讲义，判失败。\n"
             "- 如果图、callout、表格、代码块被裁切、拆坏或明显拥挤，判失败。\n"
+            "- 如果 SVG 图中的外框、卡片或分组边框没有把它声称包含的文字、pill、图标或子框完整包住，判失败。\n"
             "- 如果任何 panel、callout、表格单元格、代码块、标签或网格子项内部的文字在容器内左右/上下溢出、被裁切、或只能靠隐藏 overflow 通过页面边界检查，判失败。\n"
             "- 如果 PDF 相比 HTML 出现布局、间距、缩放、裁切或内容缺失变化，判失败。\n"
             "- 如果标题、示例、caption、正文之间缺少清晰教学层级，判失败。\n"
@@ -422,6 +434,7 @@ def build_subagent_prompt_with_language(
         "- Fail if spacing, line height, or body text size appears compressed just to force the page to fit.\n"
         "- Fail if visual hierarchy feels like a web hero or dashboard rather than a study handout.\n"
         "- Fail if figures, callouts, tables, or code blocks are clipped, awkwardly split, or visually cramped.\n"
+        "- Fail if an SVG diagram's outer frame, card, or grouped border does not visually enclose the text, pills, icons, or child boxes it claims to contain.\n"
         "- Fail if text inside any panel, callout, table cell, code block, tag, or grid item overflows horizontally or vertically, is clipped inside its own container, or only passes page-boundary checks because overflow is hidden.\n"
         "- Fail if the PDF export changes layout, spacing, scaling, clipping, or missing content compared with the HTML page.\n"
         "- Fail if headings, examples, captions, and body text do not form a clear teaching hierarchy.\n"
@@ -498,6 +511,7 @@ def write_review_packets(
                 "typography": page.get("typography"),
                 "meta": page.get("meta"),
                 "containerTextOverflow": page.get("containerTextOverflow"),
+                "svgVisualEnclosure": page.get("svgVisualEnclosure"),
             },
             "pdfMetrics": pdf_screenshot,
             "parity": parity,

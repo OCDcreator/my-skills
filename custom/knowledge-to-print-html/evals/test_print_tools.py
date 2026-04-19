@@ -278,6 +278,165 @@ INNER_TEXT_OVERFLOW_HANDOUT = """<!doctype html>
 </html>
 """
 
+SVG_FRAME_OVERFLOW_HANDOUT = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SVG frame overflow handout</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @media print { body { margin: 0; } }
+    * { box-sizing: border-box; print-color-adjust: exact; }
+    body { margin: 0; background: #eee; font-family: Arial, sans-serif; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 16mm;
+      background: white;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    h1 { margin: 0 0 5mm; }
+    p { margin: 0 0 4mm; font-size: 13px; line-height: 1.5; }
+    figure {
+      margin: 6mm auto 0;
+      width: 85%;
+      border: 1px solid #ccc;
+      padding: 4mm;
+    }
+    img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <article class="sheet" data-page="1">
+    <h1>Diagram enclosure failure</h1>
+    <p>The diagram stays inside the page, but one outer frame does not visually contain all of the pills it introduces.</p>
+    <figure>
+      <img src="broken-diagram.svg" alt="Broken enclosure diagram" />
+    </figure>
+  </article>
+</body>
+</html>
+"""
+
+BROKEN_ENCLOSURE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="600" height="320" viewBox="0 0 600 320">
+  <rect width="600" height="320" rx="24" fill="#f8fbff"/>
+  <rect x="60" y="70" width="250" height="130" rx="24" fill="#ffffff" stroke="#a7c5dc" stroke-width="3"/>
+  <text x="90" y="115" font-size="16" font-weight="700" fill="#2f6fa4">Container</text>
+  <text x="90" y="152" font-size="28" font-weight="700" fill="#173147">Three methods</text>
+  <rect x="88" y="170" width="190" height="24" rx="12" fill="#eef5fb" stroke="#c2d6e6"/>
+  <text x="183" y="186" text-anchor="middle" font-size="14" font-weight="700" fill="#1e4769">First pill</text>
+  <rect x="84" y="202" width="198" height="24" rx="12" fill="#eef5fb" stroke="#c2d6e6"/>
+  <text x="183" y="218" text-anchor="middle" font-size="14" font-weight="700" fill="#1e4769">Second pill</text>
+  <rect x="90" y="234" width="186" height="24" rx="12" fill="#eef5fb" stroke="#c2d6e6"/>
+  <text x="183" y="250" text-anchor="middle" font-size="14" font-weight="700" fill="#1e4769">Third pill</text>
+</svg>
+"""
+
+SVG_TEXT_BOX_OVERFLOW_HANDOUT = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SVG text box overflow handout</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @media print { body { margin: 0; } }
+    * { box-sizing: border-box; print-color-adjust: exact; }
+    body { margin: 0; background: #eee; font-family: Arial, sans-serif; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 16mm;
+      background: white;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    figure {
+      margin: 6mm auto 0;
+      width: 90%;
+      border: 1px solid #ccc;
+      padding: 4mm;
+    }
+    img { display: block; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <article class="sheet" data-page="1">
+    <figure>
+      <img src="broken-text-box.svg" alt="Broken text box svg" />
+    </figure>
+  </article>
+</body>
+</html>
+"""
+
+BROKEN_TEXT_BOX_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260">
+  <rect width="900" height="260" rx="24" fill="#f8fbff"/>
+  <g transform="translate(70,70)">
+    <rect x="0" y="0" width="180" height="96" rx="18" fill="#fff" stroke="#bfd2e2" stroke-width="3"/>
+    <text x="18" y="28" font-size="16" font-weight="700" fill="#2f6fa4">后期 → 末期</text>
+    <text x="18" y="58" font-size="18" font-weight="700" fill="#173147">姐妹单体分离</text>
+    <text x="18" y="86" font-size="18" font-weight="500" fill="#284256">末期每子细胞回到 2n / 2c</text>
+  </g>
+</svg>
+"""
+
+SVG_TIGHT_PADDING_HANDOUT = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SVG tight padding handout</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @media print { body { margin: 0; } }
+    * { box-sizing: border-box; print-color-adjust: exact; }
+    body { margin: 0; background: #eee; font-family: Arial, sans-serif; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 16mm;
+      background: white;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    figure {
+      margin: 6mm auto 0;
+      width: 90%;
+      border: 1px solid #ccc;
+      padding: 4mm;
+    }
+    img { display: block; width: 100%; height: auto; }
+  </style>
+</head>
+<body>
+  <article class="sheet" data-page="1">
+    <figure>
+      <img src="tight-padding.svg" alt="Tight padding svg" />
+    </figure>
+  </article>
+</body>
+</html>
+"""
+
+TIGHT_PADDING_SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260">
+  <rect width="900" height="260" rx="24" fill="#f8fbff"/>
+  <g transform="translate(70,70)">
+    <rect x="0" y="0" width="224" height="110" rx="18" fill="#fff" stroke="#bfd2e2" stroke-width="3"/>
+    <text x="18" y="26" font-size="16" font-weight="700" fill="#2f6fa4">G1</text>
+    <text x="18" y="56" font-size="20" font-weight="700" fill="#173147">未复制</text>
+    <text x="18" y="82" font-size="18" font-weight="500" fill="#284256">染色体：2n</text>
+    <text x="18" y="104" font-size="18" font-weight="500" fill="#284256">DNA：2c  单体：0</text>
+  </g>
+</svg>
+"""
+
 
 class PrintToolTests(unittest.TestCase):
     def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
@@ -354,6 +513,21 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("文字", review_text)
         self.assertRegex(review_text, r"container|容器")
         self.assertRegex(review_text, r"overflow|溢出")
+
+    def test_skill_docs_require_svg_visual_enclosure_check(self) -> None:
+        skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+        diagram_text = (SKILL_DIR / "references" / "diagram-guardrails.md").read_text(encoding="utf-8")
+        checklist_text = (SKILL_DIR / "references" / "print-checklist.md").read_text(encoding="utf-8")
+        review_text = (SKILL_DIR / "references" / "review-loop.md").read_text(encoding="utf-8")
+
+        combined = "\n".join([skill_text, diagram_text, checklist_text, review_text])
+
+        self.assertIn("visual enclosure", combined)
+        self.assertIn("outer frame", combined)
+        self.assertIn("外框", combined)
+        self.assertIn("inner padding", combined)
+        self.assertIn("bottom edge", combined)
+        self.assertIn("visual balance", combined)
 
     def test_working_file_templates_reference_exists_and_is_linked(self) -> None:
         skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
@@ -1011,6 +1185,123 @@ class PrintToolTests(unittest.TestCase):
             self.assertFalse(report["checks"]["avoidsInnerContainerTextOverflow"])
             self.assertGreater(
                 report["analysis"]["sheets"][0]["containerTextOverflow"]["count"],
+                0,
+            )
+
+    def test_validate_print_layout_reports_svg_frame_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            svg_path = temp_dir / "broken-diagram.svg"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(SVG_FRAME_OVERFLOW_HANDOUT, encoding="utf-8")
+            svg_path.write_text(BROKEN_ENCLOSURE_SVG, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "svg-frame-overflow",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            report = json.loads(
+                (out_dir / "svg-frame-overflow-validation-report.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(report["checks"]["avoidsSvgVisualEnclosureFailures"])
+            self.assertGreater(
+                report["analysis"]["sheets"][0]["svgVisualEnclosure"]["count"],
+                0,
+            )
+
+    def test_validate_print_layout_reports_svg_text_box_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            svg_path = temp_dir / "broken-text-box.svg"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(SVG_TEXT_BOX_OVERFLOW_HANDOUT, encoding="utf-8")
+            svg_path.write_text(BROKEN_TEXT_BOX_SVG, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "svg-text-box-overflow",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            report = json.loads(
+                (out_dir / "svg-text-box-overflow-validation-report.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(report["checks"]["avoidsSvgVisualEnclosureFailures"])
+            self.assertGreater(
+                report["analysis"]["sheets"][0]["svgVisualEnclosure"]["count"],
+                0,
+            )
+
+    def test_validate_print_layout_reports_svg_tight_padding(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            svg_path = temp_dir / "tight-padding.svg"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(SVG_TIGHT_PADDING_HANDOUT, encoding="utf-8")
+            svg_path.write_text(TIGHT_PADDING_SVG, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "svg-tight-padding",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            report = json.loads(
+                (out_dir / "svg-tight-padding-validation-report.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(report["checks"]["avoidsSvgVisualEnclosureFailures"])
+            self.assertGreater(
+                report["analysis"]["sheets"][0]["svgVisualEnclosure"]["count"],
                 0,
             )
 

@@ -95,6 +95,8 @@ For each page, review all of these:
 - **Component density** — the page is not built from a dense dashboard-like grid of small cards or micro-boxes
 - **Overflow and clipping** — figures, callouts, tables, code blocks, captions, and reference items stay inside the page, and text stays inside its own container
 - **Container-level text overflow / 容器内文字溢出** — panels, callouts, table cells, code blocks, tags, and grid children must not have horizontal or vertical text overflow, hidden clipping, or long unbreakable strings escaping their box
+- **SVG visual enclosure / SVG 外框包裹关系** — any outer frame, card, or grouped border must visually contain the labels, pills, icons, and child boxes it claims to group
+- **SVG inner padding / SVG 内边距** — compact SVG text boxes must keep healthy inner padding, avoid hugging the bottom edge, and keep left/right spacing in visual balance
 - **Teaching hierarchy** — title, section headings, examples, captions, and takeaways have clear relative importance
 - **Typographic rhythm** — body text remains comfortable at print size and spacing is not obviously crushed to make the page fit
 - **Repair quality** — suggested fixes improve structure/content/layout instead of just shrinking type or squeezing spacing
@@ -115,6 +117,8 @@ Do not recommend shrinking font size, line-height, or paragraph spacing as the p
 - meta/process chrome appears in the handout body
 - diagrams are too small to read
 - diagram text overflows or becomes cramped
+- a diagram outer frame/card/外框 does not wrap the labels, pills, icons, or child boxes it visually groups
+- a compact SVG text box technically fits but still looks broken because its inner padding is too tight or visually unbalanced
 - diagrams act as decoration instead of explanation
 - text overflows or is clipped inside a panel, callout, table cell, code block, tag, or grid child even when the outer page boundary still passes
 - the page wastes a large lower section with obvious blank space

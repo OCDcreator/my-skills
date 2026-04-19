@@ -229,6 +229,8 @@ The final HTML must be:
 - free of dense multi-card dashboard grids used as the main page structure
 - free of compressed body typography used only to force content onto the page
 - protected against text overflow inside panels, callouts, table cells, code blocks, tags, and grid children with appropriate `overflow-wrap`, `word-break`, and `hyphens` rules
+- protected against SVG visual enclosure failures: every diagram outer frame / card / 外框 must actually contain the text, pills, icons, and child boxes it visually claims to group
+- protected against compact SVG text-box padding failures: inner padding must stay comfortable, the final line must not hug the bottom edge, and side spacing should keep visual balance
 
 Full page-density and chrome rules live in `references/layout-guardrails.md`.
 
@@ -256,6 +258,7 @@ What the validator is responsible for:
 - fast-view review PDF export
 - rendered PDF-page screenshots
 - HTML-vs-PDF parity metadata
+- linked-SVG visual enclosure checks for frames/cards that fail to wrap their contents
 - machine-readable validation report
 
 Detailed script behavior and environment requirements live in:
@@ -314,6 +317,7 @@ Keep these front-of-mind:
 - print first, screen second
 - no dense card-grid/dashboard-card soup, sparse hero pages, or top-heavy pages with a blank lower half
 - no tiny unreadable diagrams
+- no diagram outer frame / 外框 that fails to contain its own labels, pills, icons, or child boxes
 - no learner-facing meta/process text inside the handout body
 
 Use the reference files for the full rule sets instead of duplicating them in the page.
