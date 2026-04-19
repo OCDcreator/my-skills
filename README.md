@@ -21,6 +21,7 @@ my-skills/
 │   ├── skill-catalog-maintainer/              # 技能目录/README/AGENTS 维护
 │   ├── skill-router/                          # 任务先路由到 my-skills 中合适技能
 │   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
+│   ├── windows-mac-ssh/                       # Windows PowerShell 通过 SSH/SCP 操作 Mac
 │   ├── design-reference-router/                # 品牌/产品风格参考路由技能
 │   └── x-reader/                              # 视频/播客转录内容分析
 ├── external/                                  # 外部来源（技能 + 设计参考）
@@ -57,6 +58,7 @@ my-skills/
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
 | [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |
 | [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
+| [windows-mac-ssh](custom/windows-mac-ssh/) | Windows PowerShell / Codex CLI 通过 SSH/SCP 流畅操作 Mac，重点规避引号、换行、路径、变量展开与远程 zsh 命令坑 |
 | [x-reader](custom/x-reader/) | 视频/播客转录内容多维分析与结构化总结 |
 | [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |
 
