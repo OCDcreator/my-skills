@@ -1,0 +1,30 @@
+{
+  "skill_name": "windows-mac-ssh",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "我在 Windows 上，SSH 连接 Mac Mini，到 /Volumes/SDD2T/obsidian-vault-write/custom-project/my-skills 运行 git status 和 git rev-parse，注意别让 && 在本地执行。",
+      "expected_output": "Uses the windows-mac-ssh skill, sets a Mac target, quotes the whole remote command or uses Invoke-MacZsh.ps1, and checks the SSH exit code."
+    },
+    {
+      "id": 2,
+      "prompt": "从 Windows 通过 SSH 在 Mac 上跑一个多行 zsh 脚本，里面有 $HOME、中文、管道、单引号和双引号。",
+      "expected_output": "Uses the base64 LF-normalized pattern or scripts/Invoke-MacZsh.ps1 instead of nested inline quotes."
+    },
+    {
+      "id": 3,
+      "prompt": "把 Windows 上的 artifacts 文件夹复制到 Mac 仓库对应目录，不能踩 $Mac:/path 的 PowerShell 坑，复制后校验两端一致。",
+      "expected_output": "Uses scripts/Copy-ToMac.ps1 or tar-over-ssh with ${Mac}: only where appropriate, then verifies file count/hash with Compare-WindowsMacHash.ps1."
+    },
+    {
+      "id": 4,
+      "prompt": "在 Mac 上启动一个无人值守长任务，Windows 这边可以断开，给我一个实时日志监看命令。",
+      "expected_output": "Uses Start-MacBackgroundJob.ps1 or nohup with a stable log path, prints PID/log path, and provides Watch-MacLog.ps1 or tail -f monitoring."
+    },
+    {
+      "id": 5,
+      "prompt": "Windows 上 SSH 到 Mac 删除一个旧的 artifacts 目录再复制新的，必须保证不会误删其他路径。",
+      "expected_output": "Uses a remote destructive guard that verifies the target prefix before rm -rf, and performs a status/path check before deletion."
+    }
+  ]
+}

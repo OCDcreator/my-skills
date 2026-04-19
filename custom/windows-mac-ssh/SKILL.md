@@ -1,6 +1,6 @@
 ---
 name: windows-mac-ssh
-description: Use when working from Windows PowerShell or Codex CLI and needing to SSH/SCP into a Mac/macOS host, run remote zsh commands, sync Git repos or artifacts, or avoid Windows/macOS quoting, newline, path, variable-expansion, `$Mac:` and `scp` mistakes.
+description: Use when Windows PowerShell or Codex CLI needs to SSH/SCP into a Mac/Mac Mini/macOS host, 在 Mac 上执行命令, copy files/artifacts, sync Git repos, run background jobs, monitor logs, or avoid quoting, CRLF/LF, `$Mac:`, `scp`, zsh, remote `$HOME`, and PowerShell escape mistakes.
 ---
 
 # Windows → Mac SSH
@@ -21,6 +21,45 @@ Do not “correct” `SDD2T` to `SSD2T` unless you verify the mounted volume nam
 ```powershell
 ssh $Mac 'ls -la /Volumes'
 ```
+
+## First decision
+
+Pick the least fragile route before writing a command:
+
+| Situation | Use |
+|-----------|-----|
+| One simple command, no tricky quotes | `ssh $Mac 'remote command'` |
+| Multi-line command, pipes, JSON, regex, Chinese, nested quotes, or remote `$VARS` | `scripts/Invoke-MacZsh.ps1` or the base64 pattern |
+| Copy a file/directory from Windows to Mac | `scripts/Copy-ToMac.ps1` or tar-over-ssh |
+| Verify copied artifacts | `scripts/Compare-WindowsMacHash.ps1` |
+| Start unattended work that must continue after the session | `scripts/Start-MacBackgroundJob.ps1` |
+| Watch a long-running job log | `scripts/Watch-MacLog.ps1` |
+| Reset, delete, or overwrite remote data | Base64 pattern + destructive guard + status check |
+
+If a command is longer than one line, prefer the bundled script instead of hand-rolled nested quotes.
+
+## Bundled scripts
+
+When this skill is available from the `my-skills` repo, prefer these scripts over retyping wrappers:
+
+```powershell
+$SkillDir = 'C:\Users\lt\Desktop\Write\custom-project\my-skills\custom\windows-mac-ssh'
+
+& "$SkillDir\scripts\Invoke-MacZsh.ps1" -Script @'
+cd "/Volumes/SDD2T/obsidian-vault-write/custom-project/my-skills"
+git status -sb
+'@
+```
+
+Scripts included:
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/Invoke-MacZsh.ps1` | Runs LF-normalized zsh over SSH through base64, checks exit code |
+| `scripts/Copy-ToMac.ps1` | Copies Windows files/directories to Mac through tar-over-ssh |
+| `scripts/Compare-WindowsMacHash.ps1` | Compares Windows and Mac files/directories by SHA-256 |
+| `scripts/Start-MacBackgroundJob.ps1` | Starts a detached Mac zsh job and prints PID/log path |
+| `scripts/Watch-MacLog.ps1` | Tails a Mac log file safely from PowerShell |
 
 ## Golden rules
 
@@ -45,6 +84,40 @@ if ($LASTEXITCODE -ne 0) { throw "SSH failed: $LASTEXITCODE" }
 ```
 
 `BatchMode=yes` fails fast instead of hanging on password/passphrase prompts. Remove it only when the user expects an interactive login.
+
+## SSH config
+
+For repeated work, add a host alias in `C:\Users\<user>\.ssh\config`:
+
+```sshconfig
+Host macmini
+  HostName 192.168.31.215
+  User dht
+  Port 22
+  ServerAliveInterval 30
+  ServerAliveCountMax 4
+```
+
+Then commands can use:
+
+```powershell
+$Mac = 'macmini'
+ssh -o BatchMode=yes $Mac 'hostname && whoami'
+```
+
+Keep the alias boring and stable. Do not mix aliases and raw `user@host` in the same verification report unless you print what each one resolves to.
+
+## First connection and key errors
+
+If SSH fails before running the remote command, diagnose connection/auth before debugging quotes:
+
+| Symptom | Fix |
+|---------|-----|
+| Prompt asks to trust a host key | Run one interactive `ssh dht@192.168.31.215` and accept only if the host is expected |
+| `Permission denied (publickey)` | Verify the right user, key loaded, and `~/.ssh/authorized_keys` on Mac |
+| `REMOTE HOST IDENTIFICATION HAS CHANGED` | Verify the Mac really changed, then run `ssh-keygen -R 192.168.31.215` |
+| Hangs before output | Retry with `ssh -vvv -o ConnectTimeout=10 ...` |
+| Works interactively but not in automation | Remove `BatchMode=yes` only for setup; restore it for unattended commands |
 
 ## Simple remote commands
 
@@ -102,6 +175,20 @@ Use this pattern when a command contains:
 - more than one or two shell operators.
 
 For very large scripts, write a temporary LF-only `.zsh` file, `scp` it to `/tmp`, then run `/bin/zsh /tmp/file.zsh`.
+
+## Clean remote environment
+
+When commands behave differently from an interactive Mac Terminal, suspect `~/.zshenv`, aliases, functions, or a different `PATH`. Use clean mode:
+
+```powershell
+& "$SkillDir\scripts\Invoke-MacZsh.ps1" -CleanEnv -Script @'
+set -e
+command -v git
+git --version
+'@
+```
+
+The clean runner uses `/bin/zsh -f` with a known `PATH`. It avoids user startup files while preserving essential variables such as `HOME` and `USER`.
 
 ## PowerShell here-string rules
 
@@ -206,6 +293,21 @@ New-Item -ItemType Directory -Force -Path $destLocal | Out-Null
 scp -r "${Mac}:/Volumes/SDD2T/obsidian-vault-write/custom-project/my-skills/path/on/mac" $destLocal
 ```
 
+Copy semantics:
+
+- `Copy-ToMac.ps1 -LocalPath C:\dir -RemoteDirectory /tmp` copies the directory itself to `/tmp/dir`.
+- `Copy-ToMac.ps1 -Replace` first removes `/tmp/dir`, guarded by destination-prefix checks.
+- For “copy directory contents only”, make that explicit and test with a temporary directory first; most mistakes happen when the caller means contents but writes the parent directory.
+- After copying important artifacts, verify file count and key hashes with `Compare-WindowsMacHash.ps1`.
+
+Artifact verification example:
+
+```powershell
+& "$SkillDir\scripts\Compare-WindowsMacHash.ps1" `
+  -LocalPath 'C:\Users\lt\Desktop\Write\custom-project\my-skills\custom\knowledge-to-print-html\artifacts' `
+  -RemotePath '/Volumes/SDD2T/obsidian-vault-write/custom-project/my-skills/custom/knowledge-to-print-html/artifacts'
+```
+
 ## Git repo sync on Mac
 
 Use a status-first flow. Do not discard remote work unless the user explicitly asks for reset/overwrite.
@@ -247,6 +349,36 @@ git rev-parse HEAD
 
 Encode and run it with the same base64 pattern.
 
+## Background jobs and logs
+
+For unattended Mac work, never rely on an interactive SSH session staying open. Start a detached job and print its PID/log path:
+
+```powershell
+& "$SkillDir\scripts\Start-MacBackgroundJob.ps1" -Label 'my-skills-maintenance' -Script @'
+set -e
+set -u
+set -o pipefail
+cd "/Volumes/SDD2T/obsidian-vault-write/custom-project/my-skills"
+git status -sb
+sleep 5
+git rev-parse HEAD
+'@
+```
+
+Watch the log:
+
+```powershell
+& "$SkillDir\scripts\Watch-MacLog.ps1" -LogPath '/Users/dht/.cache/windows-mac-ssh/jobs/my-skills-maintenance.log' -Follow
+```
+
+Check whether a PID is still running:
+
+```powershell
+ssh $Mac 'ps -p 12345 -o pid=,stat=,command='
+```
+
+If a long job modifies a Git repo, require it to write a status file or final `git status -sb` to its log before claiming success.
+
 ## Destructive command guard
 
 Before `rm -rf`, `git reset --hard`, or replacing a directory, verify the path is exactly under the expected repo:
@@ -279,6 +411,20 @@ Run this through the base64 pattern rather than trying to inline it inside neste
 | SSH hangs | Waiting for password/passphrase/host key | Use `BatchMode=yes`, pre-authorize key, or run interactive once |
 | `No such file or directory` under `/Volumes` | Disk not mounted or volume name differs | Run `ssh $Mac 'ls -la /Volumes'` |
 
+## No-go patterns
+
+Do not use these in future commands:
+
+```powershell
+ssh $Mac cd /repo && git status       # && runs locally
+ssh $Mac "echo $HOME"                 # $HOME may expand locally or become empty
+scp file "$Mac:/tmp/"                 # $Mac: can be parsed as a scoped variable
+$cmd = "echo \"quoted\""              # \" is not PowerShell escaping
+ssh $Mac "for f in ...; do ...; done" # fragile nested zsh; use base64
+```
+
+Use the scripts/base64 pattern instead.
+
 ## Final verification pattern
 
 When claiming Windows, GitHub, and Mac are consistent, verify with fresh command output:
@@ -297,3 +443,12 @@ if ($win -ne $origin -or $win -ne $github -or $win -ne $macHead.Trim()) {
   throw "Git SHA mismatch"
 }
 ```
+
+## Skill evals
+
+Keep `evals/evals.json` aligned with real failure modes:
+
+- simple SSH command should quote remote operators correctly,
+- multi-line remote work should use base64 or `Invoke-MacZsh.ps1`,
+- file copy should avoid `"$Mac:/path"` and verify hashes,
+- background jobs should detach and expose monitorable logs.
