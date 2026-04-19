@@ -9,6 +9,14 @@ from pathlib import Path
 from typing import Any
 
 
+DEFAULT_MAX_CARD_GRID_COUNT = 2
+DEFAULT_MAX_CARD_AREA_RATIO = 0.35
+DEFAULT_MIN_CARD_TEXT_SIZE_PX = 11.0
+DEFAULT_MIN_BODY_FONT_SIZE_PX = 11.5
+DEFAULT_MIN_BODY_LINE_HEIGHT_RATIO = 1.35
+DEFAULT_MIN_PARAGRAPH_SPACING_RATIO = 0.45
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Generate a sequential page-review packet for print handouts."
@@ -60,6 +68,42 @@ def parse_args() -> argparse.Namespace:
         default=0.10,
         help="Heuristic warning threshold for the largest figure area ratio. Default: 0.10.",
     )
+    parser.add_argument(
+        "--max-card-grid-count",
+        type=int,
+        default=DEFAULT_MAX_CARD_GRID_COUNT,
+        help="Fail when too many small card-like blocks create a dashboard grid. Default: 2.",
+    )
+    parser.add_argument(
+        "--max-card-area-ratio",
+        type=float,
+        default=DEFAULT_MAX_CARD_AREA_RATIO,
+        help="Fail when card-like blocks occupy too much of the page. Default: 0.35.",
+    )
+    parser.add_argument(
+        "--min-card-text-size-px",
+        type=float,
+        default=DEFAULT_MIN_CARD_TEXT_SIZE_PX,
+        help="Fail when dense card-like blocks use text smaller than this threshold. Default: 11.0.",
+    )
+    parser.add_argument(
+        "--min-body-font-size-px",
+        type=float,
+        default=DEFAULT_MIN_BODY_FONT_SIZE_PX,
+        help="Fail when body text gets too small for print reading. Default: 11.5.",
+    )
+    parser.add_argument(
+        "--min-body-line-height-ratio",
+        type=float,
+        default=DEFAULT_MIN_BODY_LINE_HEIGHT_RATIO,
+        help="Fail when line height is compressed below this ratio. Default: 1.35.",
+    )
+    parser.add_argument(
+        "--min-paragraph-spacing-ratio",
+        type=float,
+        default=DEFAULT_MIN_PARAGRAPH_SPACING_RATIO,
+        help="Fail when paragraph spacing is compressed below this ratio. Default: 0.45.",
+    )
     return parser.parse_args()
 
 
@@ -100,6 +144,9 @@ def build_flags(
     flags: list[dict[str, Any]] = []
     density = page.get("density") or {}
     figures = page.get("figures") or {}
+    cards = page.get("cards") or {}
+    typography = page.get("typography") or {}
+    meta = page.get("meta") or {}
     largest_figure = figures.get("largest")
 
     if page.get("issueCount", 0) > 0:
@@ -154,6 +201,79 @@ def build_flags(
                     "threshold": thresholds["min_figure_area_ratio"],
                 }
             )
+
+    card_grid_count = cards.get("gridLikeCount", 0)
+    if card_grid_count > thresholds["max_card_grid_count"] or (
+        cards.get("count", 0) > thresholds["max_card_grid_count"]
+        and cards.get("totalAreaRatio", 0) > thresholds["max_card_area_ratio"]
+        and (
+            cards.get("minSmallestFontSizePx") is not None
+            and cards.get("minSmallestFontSizePx") < thresholds["min_card_text_size_px"]
+        )
+    ):
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "card_grid_antipattern",
+                "message": "Dense card-like grid makes the page read like a dashboard instead of a handout.",
+                "actual": {
+                    "count": cards.get("count"),
+                    "gridLikeCount": card_grid_count,
+                    "totalAreaRatio": cards.get("totalAreaRatio"),
+                    "smallTextCount": cards.get("smallTextCount"),
+                    "minSmallestFontSizePx": cards.get("minSmallestFontSizePx"),
+                },
+                "threshold": {
+                    "maxCardGridCount": thresholds["max_card_grid_count"],
+                    "maxCardAreaRatio": thresholds["max_card_area_ratio"],
+                    "minCardTextSizePx": thresholds["min_card_text_size_px"],
+                },
+            }
+        )
+
+    min_body_font_size = typography.get("minBodyFontSizePx")
+    min_line_height_ratio = typography.get("minLineHeightRatio")
+    min_paragraph_spacing_ratio = typography.get("minParagraphSpacingRatio")
+    small_body_text = (
+        min_body_font_size is not None
+        and min_body_font_size < thresholds["min_body_font_size_px"]
+    )
+    tight_line_height = (
+        min_line_height_ratio is not None
+        and min_line_height_ratio < thresholds["min_body_line_height_ratio"]
+    )
+    tight_paragraph_spacing = (
+        min_paragraph_spacing_ratio is not None
+        and min_paragraph_spacing_ratio < thresholds["min_paragraph_spacing_ratio"]
+    )
+    if small_body_text or (tight_line_height and tight_paragraph_spacing):
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "compressed_typographic_rhythm",
+                "message": "Typography has been compressed too aggressively; reflow content instead of tightening type.",
+                "actual": {
+                    "minBodyFontSizePx": min_body_font_size,
+                    "minLineHeightRatio": min_line_height_ratio,
+                    "minParagraphSpacingRatio": min_paragraph_spacing_ratio,
+                },
+                "threshold": {
+                    "minBodyFontSizePx": thresholds["min_body_font_size_px"],
+                    "minBodyLineHeightRatio": thresholds["min_body_line_height_ratio"],
+                    "minParagraphSpacingRatio": thresholds["min_paragraph_spacing_ratio"],
+                },
+            }
+        )
+
+    if meta.get("candidateCount", 0) > 0:
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "meta_leakage_candidate",
+                "message": "Learner-facing body appears to contain provenance or process narration.",
+                "actual": meta.get("candidates"),
+            }
+        )
 
     if screenshot.get("visibleSheetCount") != 1:
         flags.append(
@@ -254,14 +374,18 @@ def build_subagent_prompt_with_language(
             "只返回 JSON，键名必须是: page, pass, issues, fixes。\n"
             "每个 issue 必须包含: type, severity, evidence, fix。\n"
             "审查范围:\n"
-            "- 如果正文混入打印说明、topic 标签、来源说明、流程叙述等元信息，判失败。\n"
+            "- 如果正文混入任何来源说明、过程说明、topic 标签、打印说明等元信息，判失败；不要只盯具体示例。\n"
             "- 如果图太小、图中文字溢出、或图只起装饰作用，判失败。\n"
             "- 如果页面下半部分出现明显大面积空白且没有明确的整页构图理由，判失败。\n"
+            "- 如果页面依赖密集小卡片网格、dashboard 式盒子墙或微缩文字盒子，判失败。\n"
+            "- 如果为了塞进页面而明显压缩字号、行距或段距，导致排版节奏失衡，判失败。\n"
             "- 如果层级更像网页 hero 或 dashboard，而不是学习讲义，判失败。\n"
             "- 如果图、callout、表格、代码块被裁切、拆坏或明显拥挤，判失败。\n"
             "- 如果 PDF 相比 HTML 出现布局、间距、缩放、裁切或内容缺失变化，判失败。\n"
             "- 如果标题、示例、caption、正文之间缺少清晰教学层级，判失败。\n"
             "- issue 必须具体、只针对当前页。\n"
+            "- 优先建议重排内容、合并或拆分区块、放大教学图、改成表格/worked example、或在相邻页之间重新分配内容。\n"
+            "- 不要把缩小字号、压缩行距或段距当作首选修复。\n"
             "- fixes 必须说明当前页要怎么改，且必须在审查第 "
             f"{page_number + 1} 页之前完成。"
         )
@@ -279,14 +403,18 @@ def build_subagent_prompt_with_language(
         "Return only JSON with keys: page, pass, issues, fixes.\n"
         "Each issue must include: type, severity, evidence, fix.\n"
         "Review scope:\n"
-        "- Fail if body text contains meta/process chrome such as print instructions, topic labels, provenance notes, or workflow narration.\n"
+        "- Fail if body text contains any provenance or process chrome such as print instructions, topic labels, source notes, or workflow narration.\n"
         "- Fail if a diagram is too small to read, text in a diagram overflows, or the diagram works only as decoration.\n"
         "- Fail if the page leaves a large empty lower region without a deliberate full-page composition reason.\n"
+        "- Fail if the page depends on dense small-card grids, dashboard-like box walls, or microtext boxes.\n"
+        "- Fail if spacing, line height, or body text size appears compressed just to force the page to fit.\n"
         "- Fail if visual hierarchy feels like a web hero or dashboard rather than a study handout.\n"
         "- Fail if figures, callouts, tables, or code blocks are clipped, awkwardly split, or visually cramped.\n"
         "- Fail if the PDF export changes layout, spacing, scaling, clipping, or missing content compared with the HTML page.\n"
         "- Fail if headings, examples, captions, and body text do not form a clear teaching hierarchy.\n"
         "- Issues must be concrete and page-local.\n"
+        "- Prefer fixes that rebalance content, merge or split blocks, or enlarge teaching visuals.\n"
+        "- Do not suggest shrinking font size, line height, or paragraph spacing as the primary fix.\n"
         "- Fixes must describe how to change layout/content for this page before page "
         f"{page_number + 1} is reviewed."
     )
@@ -353,6 +481,9 @@ def write_review_packets(
                 "issueCount": page.get("issueCount"),
                 "density": page.get("density"),
                 "figures": page.get("figures"),
+                "cards": page.get("cards"),
+                "typography": page.get("typography"),
+                "meta": page.get("meta"),
             },
             "pdfMetrics": pdf_screenshot,
             "parity": parity,
@@ -418,6 +549,12 @@ def main() -> int:
         "min_content_height_ratio": args.min_content_height_ratio,
         "min_figure_width_ratio": args.min_figure_width_ratio,
         "min_figure_area_ratio": args.min_figure_area_ratio,
+        "max_card_grid_count": args.max_card_grid_count,
+        "max_card_area_ratio": args.max_card_area_ratio,
+        "min_card_text_size_px": args.min_card_text_size_px,
+        "min_body_font_size_px": args.min_body_font_size_px,
+        "min_body_line_height_ratio": args.min_body_line_height_ratio,
+        "min_paragraph_spacing_ratio": args.min_paragraph_spacing_ratio,
     }
 
     review_language = detect_review_language(html_path, args.review_language)

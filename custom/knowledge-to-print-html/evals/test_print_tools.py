@@ -89,6 +89,108 @@ TALL_HANDOUT = """<!doctype html>
 </html>
 """
 
+CARD_GRID_HANDOUT = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Card grid handout</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @media print { body { margin: 0; } }
+    * { box-sizing: border-box; print-color-adjust: exact; }
+    body { margin: 0; background: #eee; font-family: Arial, sans-serif; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 16mm;
+      background: white;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6mm;
+      margin-top: 8mm;
+    }
+    .card {
+      border: 1px solid #cbd5e1;
+      padding: 4mm;
+      background: #f8fafc;
+      font-size: 9px;
+      line-height: 1.12;
+      min-height: 40mm;
+    }
+    .card h2 { margin: 0 0 2mm; font-size: 10px; }
+    p { margin: 0; }
+  </style>
+</head>
+<body>
+  <article class="sheet" data-page="1">
+    <h1>OAuth 2.0 + PKCE</h1>
+    <p>Based on user-provided notes, this handout summarizes the workflow.</p>
+    <div class="card-grid">
+      <section class="card"><h2>Client</h2><p>Stores verifier, redirects, exchanges code, retries, and explains every branch in tiny text.</p></section>
+      <section class="card"><h2>Browser</h2><p>Handles redirect hops, state checks, callback parsing, and error handling in tiny text.</p></section>
+      <section class="card"><h2>Auth Server</h2><p>Validates challenge, issues code, checks verifier, creates tokens, and emits edge-case notes.</p></section>
+      <section class="card"><h2>API</h2><p>Consumes bearer tokens, renews sessions, and lists additional implementation caveats in tiny text.</p></section>
+    </div>
+  </article>
+</body>
+</html>
+"""
+
+SINGLE_CALLOUT_HANDOUT = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Single callout handout</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @media print { body { margin: 0; } }
+    * { box-sizing: border-box; print-color-adjust: exact; }
+    body { margin: 0; background: #eee; font-family: Arial, sans-serif; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 16mm;
+      background: white;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    h1 { margin: 0 0 5mm; }
+    p { margin: 0 0 4mm; font-size: 13px; line-height: 1.5; }
+    .callout {
+      margin: 6mm 0;
+      padding: 5mm;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    figure {
+      margin: 6mm 0;
+      border: 1px solid #ccc;
+      padding: 4mm;
+      min-height: 52mm;
+    }
+  </style>
+</head>
+<body>
+  <article class="sheet" data-page="1">
+    <h1>PKCE core mental model</h1>
+    <p>PKCE prevents stolen authorization codes from being redeemed without the original verifier.</p>
+    <div class="callout">A single teaching callout is acceptable when it enlarges one key warning instead of turning the page into a dashboard of micro-cards.</div>
+    <p>The browser only carries the code challenge. The verifier stays with the client until the token request.</p>
+    <figure>Large readable figure placeholder for the code-challenge to verifier flow.</figure>
+    <p>Use the final section to reinforce the attack model and the protection mechanism with normal reading rhythm.</p>
+  </article>
+</body>
+</html>
+"""
+
 
 class PrintToolTests(unittest.TestCase):
     def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
@@ -97,11 +199,55 @@ class PrintToolTests(unittest.TestCase):
         self.assertTrue(ROOT_VALIDATOR_WRAPPER.exists())
         self.assertTrue(ROOT_REVIEW_WRAPPER.exists())
 
+    def test_root_wrappers_only_import_main(self) -> None:
+        validator_wrapper = ROOT_VALIDATOR_WRAPPER.read_text(encoding="utf-8")
+        review_wrapper = ROOT_REVIEW_WRAPPER.read_text(encoding="utf-8")
+
+        self.assertIn("from scripts.validate_print_layout import main", validator_wrapper)
+        self.assertIn("from scripts.review_print_pages import main", review_wrapper)
+        self.assertNotIn("import *", validator_wrapper)
+        self.assertNotIn("import *", review_wrapper)
+
     def test_evals_include_machine_checkable_assertions(self) -> None:
         evals = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
         for item in evals["evals"]:
             self.assertIn("assertions", item)
             self.assertGreaterEqual(len(item["assertions"]), 3)
+
+    def test_skill_text_defaults_to_comprehensive_research(self) -> None:
+        skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("Research every core knowledge point by default", skill_text)
+        self.assertIn("Each core knowledge point should usually be researched", skill_text)
+        self.assertIn("When comprehensive external research is not possible", skill_text)
+        self.assertIn("source support for each core knowledge point", skill_text)
+        self.assertNotIn("Use search only for:", skill_text)
+        self.assertNotIn("Research fills gaps. It does not replace the user's voice.", skill_text)
+
+    def test_output_contract_requires_research_mode_and_per_point_research_notes(self) -> None:
+        contract_text = (SKILL_DIR / "references" / "output-contract.md").read_text(encoding="utf-8")
+
+        self.assertIn("Record the research mode in `brief.md`", contract_text)
+        self.assertIn("`comprehensive`", contract_text)
+        self.assertIn("`constrained`", contract_text)
+        self.assertIn("For each core knowledge point", contract_text)
+        self.assertIn("authoritative explanation", contract_text)
+        self.assertIn("example, application, or counterexample", contract_text)
+
+    def test_evals_pressure_comprehensive_and_constrained_research_paths(self) -> None:
+        evals = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
+        prompts = [item["prompt"] for item in evals["evals"]]
+        expected_outputs = [item["expected_output"] for item in evals["evals"]]
+
+        self.assertTrue(
+            any("每条知识点" in prompt or "每个核心知识点" in prompt for prompt in prompts)
+        )
+        self.assertTrue(
+            any("不要联网" in prompt or "只用我给的资料" in prompt for prompt in prompts)
+        )
+        self.assertTrue(
+            any("research.md" in output and "core knowledge point" in output for output in expected_outputs)
+        )
 
     def test_ensure_python_package_installs_missing_dependency_before_retry(self) -> None:
         from scripts import validate_print_layout as validator
@@ -340,6 +486,127 @@ class PrintToolTests(unittest.TestCase):
             self.assertTrue(info["objectStreams"])
             self.assertEqual(info["tool"], "qpdf")
 
+    def test_build_flags_detect_card_grid_rhythm_and_meta_leakage(self) -> None:
+        from scripts.review_print_pages import build_flags
+
+        page = {
+            "page": "1",
+            "issueCount": 0,
+            "density": {
+                "bottomGapRatio": 0.08,
+                "contentHeightRatio": 0.82,
+            },
+            "figures": {
+                "largest": {
+                    "widthRatio": 0.68,
+                    "areaRatio": 0.19,
+                }
+            },
+            "cards": {
+                "count": 4,
+                "gridLikeCount": 4,
+                "totalAreaRatio": 0.43,
+                "smallTextCount": 4,
+                "overflowCount": 0,
+            },
+            "typography": {
+                "minBodyFontSizePx": 10.2,
+                "minLineHeightRatio": 1.14,
+                "minParagraphSpacingRatio": 0.18,
+            },
+            "meta": {
+                "candidateCount": 1,
+                "candidates": [
+                    {
+                        "kind": "provenance",
+                        "text": "Based on user-provided notes",
+                    }
+                ],
+            },
+        }
+        thresholds = {
+            "max_bottom_gap_ratio": 0.22,
+            "min_content_height_ratio": 0.58,
+            "min_figure_width_ratio": 0.50,
+            "min_figure_area_ratio": 0.10,
+            "max_card_grid_count": 2,
+            "max_card_area_ratio": 0.35,
+            "min_card_text_size_px": 11.0,
+            "min_body_font_size_px": 11.5,
+            "min_body_line_height_ratio": 1.35,
+            "min_paragraph_spacing_ratio": 0.45,
+        }
+        flags = build_flags(
+            page=page,
+            thresholds=thresholds,
+            screenshot={"visibleSheetCount": 1},
+            pdf_screenshot={"usesA4Aspect": True},
+            parity={"visualDiffScore": 0.01, "sameDimensions": True},
+        )
+
+        codes = {flag["code"] for flag in flags}
+        self.assertIn("card_grid_antipattern", codes)
+        self.assertIn("compressed_typographic_rhythm", codes)
+        self.assertIn("meta_leakage_candidate", codes)
+
+    def test_build_flags_do_not_fail_single_large_callout(self) -> None:
+        from scripts.review_print_pages import build_flags
+
+        page = {
+            "page": "1",
+            "issueCount": 0,
+            "density": {
+                "bottomGapRatio": 0.09,
+                "contentHeightRatio": 0.76,
+            },
+            "figures": {
+                "largest": {
+                    "widthRatio": 0.73,
+                    "areaRatio": 0.20,
+                }
+            },
+            "cards": {
+                "count": 1,
+                "gridLikeCount": 0,
+                "totalAreaRatio": 0.12,
+                "smallTextCount": 0,
+                "overflowCount": 0,
+            },
+            "typography": {
+                "minBodyFontSizePx": 12.8,
+                "minLineHeightRatio": 1.48,
+                "minParagraphSpacingRatio": 0.72,
+            },
+            "meta": {
+                "candidateCount": 0,
+                "candidates": [],
+            },
+        }
+        thresholds = {
+            "max_bottom_gap_ratio": 0.22,
+            "min_content_height_ratio": 0.58,
+            "min_figure_width_ratio": 0.50,
+            "min_figure_area_ratio": 0.10,
+            "max_card_grid_count": 2,
+            "max_card_area_ratio": 0.35,
+            "min_card_text_size_px": 11.0,
+            "min_body_font_size_px": 11.5,
+            "min_body_line_height_ratio": 1.35,
+            "min_paragraph_spacing_ratio": 0.45,
+        }
+        flags = build_flags(
+            page=page,
+            thresholds=thresholds,
+            screenshot={"visibleSheetCount": 1},
+            pdf_screenshot={"usesA4Aspect": True},
+            parity={"visualDiffScore": 0.01, "sameDimensions": True},
+        )
+
+        codes = {flag["code"] for flag in flags}
+        self.assertNotIn("card_grid_antipattern", codes)
+        self.assertNotIn("compressed_typographic_rhythm", codes)
+        self.assertNotIn("meta_leakage_candidate", codes)
+
     def test_review_packets_create_explicit_subagent_prompt_files(self) -> None:
         from scripts.review_print_pages import write_review_packets
 
@@ -409,6 +676,12 @@ class PrintToolTests(unittest.TestCase):
                 "min_content_height_ratio": 0.58,
                 "min_figure_width_ratio": 0.50,
                 "min_figure_area_ratio": 0.10,
+                "max_card_grid_count": 2,
+                "max_card_area_ratio": 0.35,
+                "min_card_text_size_px": 11.0,
+                "min_body_font_size_px": 11.5,
+                "min_body_line_height_ratio": 1.35,
+                "min_paragraph_spacing_ratio": 0.45,
             }
 
             manifest_path = write_review_packets(
@@ -434,6 +707,8 @@ class PrintToolTests(unittest.TestCase):
             self.assertEqual(page["parity"]["visualDiffScore"], 0.013)
             self.assertIn("Compare the HTML page screenshot against the PDF page screenshot", prompt_text)
             self.assertIn("Fail if the PDF export changes layout, spacing, scaling, clipping, or missing content", prompt_text)
+            self.assertIn("Prefer fixes that rebalance content, merge or split blocks, or enlarge teaching visuals", prompt_text)
+            self.assertIn("Do not suggest shrinking font size, line height, or paragraph spacing as the primary fix", prompt_text)
 
     def test_review_packets_can_emit_chinese_subagent_prompt(self) -> None:
         from scripts.review_print_pages import build_subagent_prompt_with_language
@@ -452,6 +727,8 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("你是逐页审版子代理", prompt_text)
         self.assertIn("只返回 JSON", prompt_text)
         self.assertIn("HTML 截图", prompt_text)
+        self.assertIn("优先建议重排内容、合并或拆分区块、放大教学图", prompt_text)
+        self.assertIn("不要把缩小字号、压缩行距或段距当作首选修复", prompt_text)
 
     def test_review_validation_keeps_failed_report_for_packet_generation(self) -> None:
         from argparse import Namespace
@@ -475,6 +752,78 @@ class PrintToolTests(unittest.TestCase):
                 result = run_validation(args, html_path, "handout")
 
             self.assertEqual(result, report_path)
+
+    def test_validate_print_layout_reports_card_grid_antipattern(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(CARD_GRID_HANDOUT, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "card-grid",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            report = json.loads(
+                (out_dir / "card-grid-validation-report.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(report["checks"]["avoidsCardGridAntipattern"])
+            self.assertFalse(report["checks"]["avoidsMetaLeakageCandidates"])
+            self.assertFalse(report["checks"]["maintainsComfortableTypographicRhythm"])
+            self.assertGreaterEqual(report["analysis"]["sheets"][0]["cards"]["gridLikeCount"], 4)
+            self.assertGreaterEqual(report["analysis"]["sheets"][0]["meta"]["candidateCount"], 1)
+
+    def test_validate_print_layout_allows_single_callout_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(SINGLE_CALLOUT_HANDOUT, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "single-callout",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report = json.loads(
+                (out_dir / "single-callout-validation-report.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(report["checks"]["avoidsCardGridAntipattern"])
+            self.assertTrue(report["checks"]["avoidsMetaLeakageCandidates"])
+            self.assertTrue(report["checks"]["maintainsComfortableTypographicRhythm"])
 
 
 if __name__ == "__main__":

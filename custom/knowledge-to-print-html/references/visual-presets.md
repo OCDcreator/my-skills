@@ -4,6 +4,12 @@ These are the default visual directions for `knowledge-to-print-html`.
 
 The goal is not "fancy for its own sake". The page must teach clearly, print cleanly, and still feel intentionally designed.
 
+Across all presets:
+
+- do not simulate “editorial rhythm” with a dashboard of small cards
+- do not use microtext boxes to squeeze more content onto the page
+- keep readable paragraph rhythm even when the page is dense
+
 ## `editorial-atlas` (Default)
 
 Best for:
@@ -32,6 +38,7 @@ Implementation hint:
 
 - Start from `minimalist-ui` constraints
 - Then let `frontend-design` strengthen only the cover, section headers, and special callouts
+- Use large sections, diagrams, and a few strong callouts — not a wall of repeated mini-cards
 
 ## `refined-minimal`
 
@@ -55,6 +62,7 @@ Implementation hint:
 
 - Stay very close to `minimalist-ui`
 - Use `frontend-design` sparingly
+- Let whitespace come from disciplined sections, not empty hero gaps or decorative card arrays
 
 ## `technical-briefing`
 
@@ -88,3 +96,4 @@ Use this when the user wants the page to feel like a polished internal whitepape
 - Default diagrams: SVG first
 - Default layout: document rhythm first, dramatic cover second
 - Avoid dark full-page backgrounds unless the user explicitly asks for them
+- If the composition starts looking like product UI, dashboard cards, or a landing page, simplify it back into document structure

@@ -20,6 +20,12 @@ A4_WIDTH_MM = 210
 A4_HEIGHT_MM = 297
 A4_ASPECT_RATIO = A4_WIDTH_MM / A4_HEIGHT_MM
 DEFAULT_PARITY_DIFF_THRESHOLD = 0.035
+DEFAULT_MAX_CARD_GRID_COUNT = 2
+DEFAULT_MAX_CARD_AREA_RATIO = 0.35
+DEFAULT_MIN_CARD_TEXT_SIZE_PX = 11.0
+DEFAULT_MIN_BODY_FONT_SIZE_PX = 11.5
+DEFAULT_MIN_BODY_LINE_HEIGHT_RATIO = 1.35
+DEFAULT_MIN_PARAGRAPH_SPACING_RATIO = 0.45
 
 
 IMAGE_EVAL_JS = r"""
@@ -50,13 +56,80 @@ elements => {
     ".tags",
     ".table-like",
   ].join(",");
+  const cardSelectors = [
+    ".card",
+    ".mini",
+    ".callout",
+    ".case-study",
+    ".note-box",
+    ".mistakes",
+    ".summary-points > div",
+    ".hero-panel",
+    ".table-like",
+  ].join(",");
+  const textSelectors = [
+    "p",
+    "li",
+    "blockquote p",
+    "figcaption",
+    "td",
+    "th",
+    ".callout",
+    ".case-study",
+    ".note-box",
+    ".card",
+    ".mini",
+  ].join(",");
+  const paragraphSelectors = [
+    "p",
+    "li",
+    "blockquote p",
+  ].join(",");
+  const metaPatterns = [
+    { kind: "provenance", pattern: /\bbased on user[- ]provided\b/i },
+    { kind: "provenance", pattern: /\bfrom user[- ]provided\b/i },
+    { kind: "provenance", pattern: /\busing user[- ]provided\b/i },
+    { kind: "provenance", pattern: /\bcompiled from (?:the )?user(?:'s)? (?:notes|draft|outline|materials?)\b/i },
+    { kind: "provenance", pattern: /\breorganized from (?:the )?user(?:'s)? (?:notes|draft|outline|materials?)\b/i },
+    { kind: "process", pattern: /\bthis handout (?:was )?generated from\b/i },
+    { kind: "process", pattern: /\bthis page (?:was )?generated from\b/i },
+    { kind: "process", pattern: /\bthis handout will answer\b/i },
+    { kind: "provenance", pattern: /基于用户提供(?:的)?(?:笔记|资料|草稿|提纲)/ },
+    { kind: "provenance", pattern: /参考了用户提供(?:的)?(?:笔记|资料|草稿|提纲)/ },
+    { kind: "provenance", pattern: /由用户提供(?:的)?(?:笔记|资料|草稿|提纲)整理/ },
+  ];
+  const round = value => Math.round(value * 100) / 100;
+  const roundRatio = value => Math.round(value * 1000) / 1000;
+  const isVisible = node => {
+    const style = window.getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+  };
+  const parsePx = (value, fallbackFontSize) => {
+    if (!value || value === "normal") {
+      return fallbackFontSize * 1.2;
+    }
+    const numeric = Number.parseFloat(value);
+    return Number.isFinite(numeric) ? numeric : fallbackFontSize * 1.2;
+  };
+  const smallestFontSize = node => {
+    const descendants = [node, ...Array.from(node.querySelectorAll("*"))];
+    let smallest = null;
+    for (const element of descendants) {
+      const fontSize = Number.parseFloat(window.getComputedStyle(element).fontSize || "");
+      if (Number.isFinite(fontSize)) {
+        smallest = smallest === null ? fontSize : Math.min(smallest, fontSize);
+      }
+    }
+    return smallest;
+  };
 
-    return elements.map((sheet) => {
-      const rect = sheet.getBoundingClientRect();
-      const expectedA4Height = rect.width / (210 / 297);
-      const issues = [];
+  return elements.map((sheet) => {
+    const rect = sheet.getBoundingClientRect();
+    const expectedA4Height = rect.width / (210 / 297);
+    const issues = [];
     const directChildren = Array.from(sheet.children).filter((node) => {
-      return !node.classList.contains("page-no") && !node.hidden;
+      return !node.classList.contains("page-no") && !node.hidden && isVisible(node);
     });
 
     let contentTop = rect.bottom;
@@ -65,9 +138,12 @@ elements => {
     let contentRight = rect.left;
 
     for (const node of sheet.querySelectorAll(watchedSelectors)) {
+      if (!isVisible(node)) {
+        continue;
+      }
       const box = node.getBoundingClientRect();
-      const rightOverflow = Math.round((box.right - rect.right) * 100) / 100;
-      const bottomOverflow = Math.round((box.bottom - rect.bottom) * 100) / 100;
+      const rightOverflow = round(box.right - rect.right);
+      const bottomOverflow = round(box.bottom - rect.bottom);
 
       if (rightOverflow > 1) {
         issues.push({
@@ -96,23 +172,23 @@ elements => {
 
     const hasVisibleContent = directChildren.length > 0;
     const contentBounds = hasVisibleContent ? {
-      top: Math.round((contentTop - rect.top) * 100) / 100,
-      bottom: Math.round((contentBottom - rect.top) * 100) / 100,
-      left: Math.round((contentLeft - rect.left) * 100) / 100,
-      right: Math.round((contentRight - rect.left) * 100) / 100,
-      width: Math.round((contentRight - contentLeft) * 100) / 100,
-      height: Math.round((contentBottom - contentTop) * 100) / 100,
+      top: round(contentTop - rect.top),
+      bottom: round(contentBottom - rect.top),
+      left: round(contentLeft - rect.left),
+      right: round(contentRight - rect.left),
+      width: round(contentRight - contentLeft),
+      height: round(contentBottom - contentTop),
     } : null;
 
-    const figures = Array.from(sheet.querySelectorAll("figure, .figure, img")).map((node) => {
+    const figures = Array.from(sheet.querySelectorAll("figure, .figure, img")).filter(isVisible).map((node) => {
       const box = node.getBoundingClientRect();
       return {
         selector: node.className || node.tagName.toLowerCase(),
-        width: Math.round(box.width * 100) / 100,
-        height: Math.round(box.height * 100) / 100,
-        widthRatio: Math.round((box.width / rect.width) * 1000) / 1000,
-        heightRatio: Math.round((box.height / rect.height) * 1000) / 1000,
-        areaRatio: Math.round(((box.width * box.height) / (rect.width * rect.height)) * 1000) / 1000,
+        width: round(box.width),
+        height: round(box.height),
+        widthRatio: roundRatio(box.width / rect.width),
+        heightRatio: roundRatio(box.height / rect.height),
+        areaRatio: roundRatio((box.width * box.height) / (rect.width * rect.height)),
       };
     });
 
@@ -121,7 +197,69 @@ elements => {
       return largest;
     }, null);
 
+    const cards = Array.from(sheet.querySelectorAll(cardSelectors)).filter(isVisible).map((node) => {
+      const box = node.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      const fontSizePx = Number.parseFloat(style.fontSize || "");
+      const smallestTextPx = smallestFontSize(node);
       return {
+        selector: node.className || node.tagName.toLowerCase(),
+        widthRatio: roundRatio(box.width / rect.width),
+        areaRatio: roundRatio((box.width * box.height) / (rect.width * rect.height)),
+        fontSizePx: Number.isFinite(fontSizePx) ? round(fontSizePx) : null,
+        smallestFontSizePx: smallestTextPx === null ? null : round(smallestTextPx),
+        overflowX: Math.max(0, node.scrollWidth - node.clientWidth),
+        overflowY: Math.max(0, node.scrollHeight - node.clientHeight),
+      };
+    });
+    const paragraphItems = Array.from(sheet.querySelectorAll(paragraphSelectors)).filter(isVisible).filter((node) => {
+      return (node.textContent || "").trim().length >= 20;
+    }).map((node) => {
+      const style = window.getComputedStyle(node);
+      const fontSizePx = Number.parseFloat(style.fontSize || "");
+      if (!Number.isFinite(fontSizePx)) {
+        return null;
+      }
+      const lineHeightPx = parsePx(style.lineHeight, fontSizePx);
+      const marginBottomPx = parsePx(style.marginBottom, fontSizePx);
+      return {
+        fontSizePx,
+        lineHeightRatio: lineHeightPx / fontSizePx,
+        paragraphSpacingRatio: marginBottomPx / fontSizePx,
+      };
+    }).filter(Boolean);
+    const textItems = Array.from(sheet.querySelectorAll(textSelectors)).filter(isVisible).filter((node) => {
+      return (node.textContent || "").trim().length >= 20;
+    }).map((node) => {
+      const style = window.getComputedStyle(node);
+      const fontSizePx = Number.parseFloat(style.fontSize || "");
+      if (!Number.isFinite(fontSizePx)) {
+        return null;
+      }
+      const lineHeightPx = parsePx(style.lineHeight, fontSizePx);
+      return {
+        fontSizePx,
+        lineHeightRatio: lineHeightPx / fontSizePx,
+      };
+    }).filter(Boolean);
+    const cardSmallTextCount = cards.filter((card) => {
+      const size = card.smallestFontSizePx ?? card.fontSizePx;
+      return size !== null && size < 11;
+    }).length;
+    const cardOverflowCount = cards.filter((card) => card.overflowX > 1 || card.overflowY > 1).length;
+    const metaText = (sheet.innerText || sheet.textContent || "").replace(/\s+/g, " ").trim();
+    const metaCandidates = [];
+    for (const entry of metaPatterns) {
+      const match = metaText.match(entry.pattern);
+      if (match && !metaCandidates.some((candidate) => candidate.text === match[0])) {
+        metaCandidates.push({
+          kind: entry.kind,
+          text: match[0],
+        });
+      }
+    }
+
+    return {
       page: sheet.dataset.page || null,
       client: {
         width: sheet.clientWidth,
@@ -136,24 +274,51 @@ elements => {
         y: Math.max(0, sheet.scrollHeight - sheet.clientHeight),
       },
       rect: {
-        width: Math.round(rect.width * 100) / 100,
-        height: Math.round(rect.height * 100) / 100,
+        width: round(rect.width),
+        height: round(rect.height),
       },
-      expectedA4Height: Math.round(expectedA4Height * 100) / 100,
+      expectedA4Height: round(expectedA4Height),
       usesA4Aspect: Math.abs(rect.height - expectedA4Height) <= 2,
       contentBounds,
       density: hasVisibleContent ? {
-        contentHeightRatio: Math.round(((contentBottom - contentTop) / rect.height) * 1000) / 1000,
-        contentWidthRatio: Math.round(((contentRight - contentLeft) / rect.width) * 1000) / 1000,
-        bottomGap: Math.round((rect.bottom - contentBottom) * 100) / 100,
-        bottomGapRatio: Math.round(((rect.bottom - contentBottom) / rect.height) * 1000) / 1000,
-        topGap: Math.round((contentTop - rect.top) * 100) / 100,
-        topGapRatio: Math.round(((contentTop - rect.top) / rect.height) * 1000) / 1000,
+        contentHeightRatio: roundRatio((contentBottom - contentTop) / rect.height),
+        contentWidthRatio: roundRatio((contentRight - contentLeft) / rect.width),
+        bottomGap: round(rect.bottom - contentBottom),
+        bottomGapRatio: roundRatio((rect.bottom - contentBottom) / rect.height),
+        topGap: round(contentTop - rect.top),
+        topGapRatio: roundRatio((contentTop - rect.top) / rect.height),
       } : null,
       figures: {
         count: figures.length,
         largest: largestFigure,
         items: figures,
+      },
+      cards: {
+        count: cards.length,
+        gridLikeCount: cards.filter((card) => card.widthRatio <= 0.52 && card.areaRatio <= 0.22).length,
+        totalAreaRatio: roundRatio(cards.reduce((total, card) => total + card.areaRatio, 0)),
+        smallTextCount: cardSmallTextCount,
+        minSmallestFontSizePx: cards.length
+          ? round(Math.min(...cards.map((card) => card.smallestFontSizePx ?? card.fontSizePx ?? 999)))
+          : null,
+        overflowCount: cardOverflowCount,
+        items: cards,
+      },
+      typography: {
+        sampleCount: textItems.length,
+        minBodyFontSizePx: textItems.length
+          ? round(Math.min(...textItems.map((item) => item.fontSizePx)))
+          : null,
+        minLineHeightRatio: textItems.length
+          ? roundRatio(Math.min(...textItems.map((item) => item.lineHeightRatio)))
+          : null,
+        minParagraphSpacingRatio: paragraphItems.length
+          ? roundRatio(Math.min(...paragraphItems.map((item) => item.paragraphSpacingRatio)))
+          : null,
+      },
+      meta: {
+        candidateCount: metaCandidates.length,
+        candidates: metaCandidates,
       },
       issueCount: issues.length,
       issues,
@@ -161,6 +326,44 @@ elements => {
   });
 }
 """
+
+
+def sheet_has_card_grid_antipattern(sheet: dict[str, Any]) -> bool:
+    cards = sheet.get("cards") or {}
+    count = cards.get("count", 0)
+    return (
+        cards.get("gridLikeCount", 0) > DEFAULT_MAX_CARD_GRID_COUNT
+        or (
+            count > DEFAULT_MAX_CARD_GRID_COUNT
+            and cards.get("totalAreaRatio", 0) > DEFAULT_MAX_CARD_AREA_RATIO
+            and cards.get("smallTextCount", 0) > 0
+        )
+    )
+
+
+def sheet_has_compressed_typography(sheet: dict[str, Any]) -> bool:
+    typography = sheet.get("typography") or {}
+    min_body_font_size = typography.get("minBodyFontSizePx")
+    min_line_height_ratio = typography.get("minLineHeightRatio")
+    min_paragraph_spacing_ratio = typography.get("minParagraphSpacingRatio")
+    small_body_text = (
+        min_body_font_size is not None
+        and min_body_font_size < DEFAULT_MIN_BODY_FONT_SIZE_PX
+    )
+    tight_line_height = (
+        min_line_height_ratio is not None
+        and min_line_height_ratio < DEFAULT_MIN_BODY_LINE_HEIGHT_RATIO
+    )
+    tight_paragraph_spacing = (
+        min_paragraph_spacing_ratio is not None
+        and min_paragraph_spacing_ratio < DEFAULT_MIN_PARAGRAPH_SPACING_RATIO
+    )
+    return small_body_text or (tight_line_height and tight_paragraph_spacing)
+
+
+def sheet_has_meta_leakage_candidates(sheet: dict[str, Any]) -> bool:
+    meta = sheet.get("meta") or {}
+    return meta.get("candidateCount", 0) > 0
 
 STYLE_RULES_EVAL_JS = r"""
 () => {
@@ -880,6 +1083,7 @@ def build_pdf_html_parity(
 
 def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[str, bool]]:
     analysis = summary["analysis"]
+    sheets = analysis["sheets"]
     pdf_screenshots = summary["pdf"]["screenshots"]["pages"]
     parity_pages = summary["parity"]["pages"]
     required_checks = {
@@ -892,17 +1096,17 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
         ),
         "noSheetOverflow": all(
             sheet["overflow"]["x"] <= 1 and sheet["overflow"]["y"] <= 1
-            for sheet in analysis["sheets"]
+            for sheet in sheets
         ),
         "noDetectedClipping": all(
-            sheet["issueCount"] == 0 for sheet in analysis["sheets"]
+            sheet["issueCount"] == 0 for sheet in sheets
         ),
         "hasA4PageRule": analysis["rules"]["a4Page"],
         "hasPrintMediaRule": analysis["rules"]["printMedia"],
         "hasBreakAvoidRule": analysis["rules"]["breakAvoid"],
         "hasPrintColorAdjust": analysis["rules"]["printColorAdjust"],
         "sheetsUseA4Aspect": all(
-            sheet.get("usesA4Aspect") for sheet in analysis["sheets"]
+            sheet.get("usesA4Aspect") for sheet in sheets
         ),
         "pdfOptimizedForFastView": summary["pdf"].get("optimization", {}).get("linearized") is True,
         "pdfPageCountMatches": summary["pdf"]["pageCount"] == analysis["sheetCount"],
@@ -915,6 +1119,15 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
         ),
         "fastViewPdfPageCountMatchesHtml": summary["fastViewPdf"]["pageCount"] == analysis["sheetCount"],
         "fastViewPdfOptimizedForFastView": summary["fastViewPdf"].get("optimization", {}).get("linearized") is True,
+        "avoidsCardGridAntipattern": all(
+            not sheet_has_card_grid_antipattern(sheet) for sheet in sheets
+        ),
+        "maintainsComfortableTypographicRhythm": all(
+            not sheet_has_compressed_typography(sheet) for sheet in sheets
+        ),
+        "avoidsMetaLeakageCandidates": all(
+            not sheet_has_meta_leakage_candidates(sheet) for sheet in sheets
+        ),
     }
     optional_checks = {
         "pageQueryIsolatesSheets": all(
@@ -922,7 +1135,7 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
         ),
         "pagesAvoidLargeBottomGaps": all(
             (sheet.get("density") or {}).get("bottomGapRatio", 0) <= 0.22
-            for sheet in analysis["sheets"]
+            for sheet in sheets
         ),
         "pdfVisualParityLooksClose": all(
             page.get("matchSuggested") is True for page in parity_pages

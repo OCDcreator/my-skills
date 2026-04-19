@@ -89,13 +89,25 @@ Avoid vague feedback like “looks a bit crowded” or “maybe larger”.
 
 For each page, review all of these:
 
-- **Meta leakage** — print instructions, topic labels, provenance notes, “user-provided notes”, workflow narration, or other process chrome in the learner-facing body
+- **Meta leakage** — print instructions, topic labels, provenance notes, “user-provided notes”, workflow narration, or any equivalent source/process chrome in the learner-facing body
 - **Diagram readability** — figures are large enough, teach a real concept, have readable labels, and do not contain text overflow or cramped arrows
 - **Page density** — the lower page region is not obviously empty unless the composition has a clear teaching reason
+- **Component density** — the page is not built from a dense dashboard-like grid of small cards or micro-boxes
 - **Overflow and clipping** — figures, callouts, tables, code blocks, captions, and reference items stay inside the page
 - **Teaching hierarchy** — title, section headings, examples, captions, and takeaways have clear relative importance
+- **Typographic rhythm** — body text remains comfortable at print size and spacing is not obviously crushed to make the page fit
+- **Repair quality** — suggested fixes improve structure/content/layout instead of just shrinking type or squeezing spacing
 - **Print identity** — the page feels like a study handout, not a website hero, dashboard, mood board, or marketing page
 - **Page-local continuity** — blocks are not awkwardly split and the page can be understood in sequence
+
+When the page fails, prefer fixes in this order:
+
+1. rebalance content across neighboring pages
+2. merge or split related blocks
+3. enlarge or simplify the teaching visual
+4. replace a small-card grid with sections, a table, or a worked example
+
+Do not recommend shrinking font size, line-height, or paragraph spacing as the primary repair.
 
 ## What counts as a page-review failure
 
@@ -104,6 +116,8 @@ For each page, review all of these:
 - diagram text overflows or becomes cramped
 - diagrams act as decoration instead of explanation
 - the page wastes a large lower section with obvious blank space
+- the page relies on dense small-card grids or microtext boxes
+- the page fits only because typography rhythm has been visibly compressed
 - the page reads like web chrome rather than a teaching handout
 - blocks split awkwardly or feel visually unbalanced
 - the page passes heuristics but the screenshot still looks visually broken

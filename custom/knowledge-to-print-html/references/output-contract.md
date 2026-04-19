@@ -28,12 +28,29 @@ artifacts/knowledge-handout/<slug>/
 
 | File | Role |
 |------|------|
-| `brief.md` | Normalize user intent, defaults, questions resolved, and research gaps |
-| `research.md` | Source-backed notes, links, dates, facts, case studies, and claim support |
+| `brief.md` | Normalize user intent, defaults, questions resolved, research mode, and research constraints |
+| `research.md` | Source-backed notes organized by core knowledge point, including links, dates, facts, case studies, and claim support |
 | `outline.md` | Final section plan before full drafting |
 | `article.md` | Source of truth for the written content |
 | `handout.html` | Final printable HTML artifact |
 | `diagrams/*.svg` | Teaching diagrams generated for the article |
+
+## Research Working File Minimums
+
+Record the research mode in `brief.md`:
+
+- `comprehensive` when default external research is available
+- `constrained` when the user forbids search, the environment is offline, the material is private, or the user explicitly limits sources
+
+If the run is `constrained`, state the reason clearly in `brief.md`.
+
+For each core knowledge point in `research.md`, capture at least:
+
+- an authoritative explanation or mechanism description
+- key boundaries, misconceptions, or distinctions
+- an example, application, or counterexample
+- source URLs or source identifiers
+- retrieval date when the information is recent or unstable
 
 ## Article Minimum Structure
 
@@ -56,6 +73,8 @@ artifacts/knowledge-handout/<slug>/
 - Every strong factual claim should be traceable back to `research.md`
 - If a fact is recent or unstable, note the retrieval date in `research.md`
 - Prefer source URLs over vague source labels
+- Traceability belongs in `research.md` and the final `## References` section, not in the learner-facing prose
+- Do not write provenance/process notes such as “based on user-provided notes”, “compiled from the draft”, or “generated from the outline” inside `article.md` or `handout.html`
 
 ## Image And Diagram Placement
 

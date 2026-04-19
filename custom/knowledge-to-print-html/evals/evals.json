@@ -3,8 +3,8 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "把 OAuth 2.0 授权码模式 + PKCE 整理成一份图文并茂、适合 A4 打印成 PDF 的中文讲义，包含流程图、现实案例和参考来源。",
-      "expected_output": "Produces a print-first handout.html with working files, readable diagrams, per-page screenshots, page-review packets, and sequential subagent review before hand-off.",
+      "prompt": "把 OAuth 2.0 授权码模式 + PKCE 整理成一份图文并茂、适合 A4 打印成 PDF 的中文讲义。我的知识点只是骨架，请对每条知识点都先做外部检索，补齐权威解释、关键边界和现实案例。不要用小卡片网格，也不要在正文里写“根据用户提供资料整理”。",
+      "expected_output": "Produces a print-first handout.html plus working files where `research.md` is organized by core knowledge point, each core knowledge point has source-backed enrichment, learner-facing provenance notes stay out of the body, and sequential page review happens before hand-off.",
       "files": [],
       "assertions": [
         {
@@ -26,8 +26,8 @@
     },
     {
       "id": 2,
-      "prompt": "根据这些关键词做成可打印 HTML 教程页：IGCSE Chemistry 0620，preparation of salts，acid + metal / acid + base / precipitation，要求图文结合，不能像网页封面。",
-      "expected_output": "Produces a dense but readable A4 teaching handout with no learner-facing meta text, no oversized blank lower page regions, and page-by-page review artifacts.",
+      "prompt": "根据这些关键词做成可打印 HTML 教程页：IGCSE Chemistry 0620，preparation of salts，acid + metal / acid + base / precipitation。请把每个核心知识点都先补权威解释、反应规律和至少一个课堂场景，再整理成讲义；不能像网页封面，也不要做成 dashboard 卡片墙。",
+      "expected_output": "Produces a dense but readable A4 teaching handout where `research.md` covers each core knowledge point with source-backed notes, examples, and references, while the final pages avoid learner-facing meta text, dashboard-like card walls, and oversized blank lower regions.",
       "files": [],
       "assertions": [
         {
@@ -49,8 +49,8 @@
     },
     {
       "id": 3,
-      "prompt": "我有一份粗糙笔记，想变成图文讲义：Transformer attention、Q/K/V、self-attention、multi-head attention。最后我要手动打印成 PDF。",
-      "expected_output": "Produces a source-backed printable handout with clear diagrams whose labels are readable at print size, then validates each page sequentially with a review subagent.",
+      "prompt": "我有一份粗糙笔记，想变成图文讲义：Transformer attention、Q/K/V、self-attention、multi-head attention。不要联网，只用我给的资料和草稿，但仍要按每个核心知识点整理 working files，最后我要手动打印成 PDF；不要通过缩小字号、压缩段距来硬塞版面。",
+      "expected_output": "Produces a printable handout with clear diagrams, comfortable typography, and sequential page validation; `brief.md` records constrained research mode and reason, and `research.md` still stays organized by core knowledge point using only the allowed material.",
       "files": [],
       "assertions": [
         {

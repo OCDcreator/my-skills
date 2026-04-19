@@ -12,6 +12,7 @@ The final `handout.html` must not contain workflow chrome or provenance text suc
 - notes about how the artifact was generated
 - source/provenance notes such as `User-provided revision notes`
 - process narration like “this handout will answer” or “this page was generated from”
+- generalized variants such as “based on user-provided notes”, “compiled from the draft”, or “organized from the outline”
 
 These belong either in:
 
@@ -30,11 +31,31 @@ The page should look like a study handout, not a sparse landing page.
   - introduce a comparison table or worked example
   - rebalance content across neighboring pages
 
+## Card-grid anti-pattern
+
+- Do not use dense multi-card grids as the primary teaching layout.
+- A single large callout or case-study panel is fine when it teaches one important point.
+- Multiple narrow boxes filled with tiny text fail even if they technically fit.
+- If the page starts to feel like a dashboard of cards, rebuild it as sections, a table, a worked example, or a larger diagram-led composition.
+
 ## Section rhythm
 
 - Do not create a new page only for a tiny heading + one short paragraph.
 - Keep section openers visually strong, but do not waste half a page on them.
 - Prefer fewer, fuller pages over many airy pages.
+- Do not compress line-height or paragraph spacing just to make a page pass.
+
+## Repair ladder
+
+When a page is too sparse, too crowded, or visually broken, use this order:
+
+1. rebalance content across neighboring pages
+2. merge or split related blocks
+3. enlarge or simplify the teaching visual
+4. replace a card wall with a comparison table or worked example
+5. only then make minor spacing adjustments that preserve readable rhythm
+
+Do not treat smaller type, tighter leading, or collapsed paragraph spacing as the primary repair.
 
 ## Handout first
 

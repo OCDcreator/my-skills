@@ -85,7 +85,7 @@ Check whether each downstream skill exists in the current environment before usi
 
 | Need | Priority | Preferred skill | If unavailable |
 |------|----------|-----------------|----------------|
-| current facts / source discovery | must when facts may be unstable | `searxng` | use the built-in web/search capability and keep primary sources |
+| source support for each core knowledge point | default, must when facts may be unstable | `searxng` | use the built-in web/search capability and keep primary sources |
 | cited research → structured prose | recommended | `content-research-writer` | draft `article.md` directly from `research.md` with explicit citations |
 | explanatory SVG diagrams | recommended | `baoyu-diagram` | build inline SVG diagrams manually |
 | dense summary infographic | optional | `baoyu-infographic` | skip the infographic unless it clearly improves teaching value |
@@ -117,6 +117,7 @@ Ask only the shortest follow-up questions needed to unblock real work.
 
 Split incoming material into:
 
+- a core knowledge point list
 - confirmed knowledge points
 - draft prose worth preserving
 - unsupported claims that need checking
@@ -124,16 +125,29 @@ Split incoming material into:
 
 Save this to `brief.md`.
 
-### 3. Research only where it adds value
+### 3. Research every core knowledge point by default
 
-Research fills gaps. It does not replace the user's voice.
+The user's knowledge points are the skeleton. Research adds the missing muscle, examples, and precision.
 
-Use search only for:
+Keep the user's voice in the final writing, but do not let “voice” become an excuse to skip research.
 
-- unstable or unclear definitions
-- concrete examples and case studies
-- factual claims, numbers, or comparisons
-- recent developments
+Each core knowledge point should usually be researched until you have:
+
+- an authoritative explanation or mechanism description
+- key boundaries, easy confusions, or misconceptions
+- at least one example, application, case study, or counterexample
+- source support that can be traced in `research.md`
+
+Adjacent sub-points can be researched together, but do not skip a whole core point just because it looks familiar or because the user already mentioned it.
+
+When comprehensive external research is not possible, switch to constrained mode only if:
+
+- the user explicitly says not to search
+- the environment is offline or search access is blocked
+- the material is private and cannot be checked externally
+- the user provides a closed source pack and explicitly says to use only that pack
+
+In constrained mode, record the reason in `brief.md`, keep the limitation visible in the final hand-off, and still organize `research.md` by core knowledge point using the available material.
 
 Save findings and links to `research.md`.
 
@@ -161,7 +175,7 @@ The article must:
 
 - read like a polished explainer, not a search dump
 - include at least one concrete example or scenario
-- keep citations traceable
+- keep citations traceable in `research.md` and the final references section, not as learner-facing provenance notes inside the body
 - keep process notes and packaging filler out of the learner-facing body
 
 ### 6. Add teaching visuals
@@ -204,6 +218,8 @@ The final HTML must be:
 - comfortable to read on screen
 - free of app chrome, sticky nav, and workflow narration
 - free of topic labels / provenance notes / “this handout will…” filler in the teaching body
+- free of dense multi-card dashboard grids used as the main page structure
+- free of compressed body typography used only to force content onto the page
 
 Full page-density and chrome rules live in `references/layout-guardrails.md`.
 
@@ -287,11 +303,19 @@ Keep these front-of-mind:
 - prefer one strong case study over many shallow examples
 - use diagrams to teach, not decorate
 - print first, screen second
-- no dashboard-card soup, sparse hero pages, or top-heavy pages with a blank lower half
+- no dense card-grid/dashboard-card soup, sparse hero pages, or top-heavy pages with a blank lower half
 - no tiny unreadable diagrams
 - no learner-facing meta/process text inside the handout body
 
 Use the reference files for the full rule sets instead of duplicating them in the page.
+
+## Hard Anti-Patterns
+
+Treat these as fail conditions, not soft advice:
+
+- Do not build the page around multi-column micro-card grids. A single large teaching callout is acceptable; a wall of small cards is not.
+- Do not “fix” page density by shrinking font size or crushing line-height / paragraph spacing. Rebalance content or layout instead.
+- Do not write learner-facing provenance or process notes such as “based on user-provided notes”, “compiled from the draft”, or “this handout was generated from”.
 
 ## Hand-Off Requirements
 
@@ -314,10 +338,11 @@ Do not place those hand-off notes inside the printed teaching body.
 
 ## Common Failure Modes
 
-- starting from HTML before the argument is solid
-- doing broad search instead of targeted research
-- producing stylish pages with weak teaching value
-- shrinking diagrams until they stop teaching
-- letting process chrome leak into the learner-facing page
-- accepting a page with an obvious empty lower half just because it technically fits
-- relying on heuristic checks without the sequential subagent review gate
+- starting from HTML before the argument is solid → Fix: finish `brief.md`, `research.md`, and `outline.md` first.
+- doing unstructured broad browsing instead of per-point research → Fix: return to the core knowledge point list and research each point with focused queries.
+- searching only the points that feel uncertain → Fix: research every core knowledge point before drafting, even when the user already supplied a rough explanation.
+- producing stylish pages with weak teaching value → Fix: strengthen the mental model, worked example, and diagram purpose before polishing visuals.
+- shrinking diagrams until they stop teaching → Fix: enlarge the figure, simplify labels, or split it into two figures.
+- letting process chrome leak into the learner-facing page → Fix: move provenance/process notes back into `brief.md`, `research.md`, or the final hand-off message.
+- accepting a page with an obvious empty lower half just because it technically fits → Fix: merge blocks, enlarge teaching visuals, add a comparison/worked example, or rebalance neighboring pages.
+- relying on heuristic checks without the sequential subagent review gate → Fix: rerun the validator, regenerate the packet, and re-review the current page before advancing.

@@ -24,6 +24,7 @@ Suggested baseline:
 - Avoid multi-column sections unless they print reliably
 - Prevent bad splits on figures, callouts, tables, lists, and code blocks
 - Keep section openers from leaving only one orphan line on a new page
+- Avoid dense micro-card grids as the main content structure
 
 Useful rules:
 
@@ -45,6 +46,7 @@ table,
 - Contrast should remain strong without relying on backlit screens
 - Avoid very thin type, very light gray text, or huge line lengths
 - Headings should create rhythm without wasting half-pages
+- Do not “solve” layout pressure by shrinking body type or crushing line-height / paragraph spacing
 
 ## Visuals
 
@@ -72,3 +74,6 @@ Before hand-off, confirm:
 - code blocks wrap or scroll safely
 - important sections do not break in obviously bad places
 - references section appears in the final artifact
+- the page is not dominated by a dashboard-like card wall
+- the reading rhythm still feels comfortable at print size
+- learner-facing body text contains no provenance/process notes

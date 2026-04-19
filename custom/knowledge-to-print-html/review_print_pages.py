@@ -1,4 +1,4 @@
-from scripts.review_print_pages import *  # noqa: F401,F403
+from scripts.review_print_pages import main
 
 
 if __name__ == "__main__":

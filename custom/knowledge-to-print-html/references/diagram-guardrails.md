@@ -1,6 +1,6 @@
 # Diagram Guardrails
 
-These rules apply to all teaching diagrams, flowcharts, and SVG explanation graphics.
+These rules apply to all teaching diagrams, flowcharts, SVG explanation graphics, and card-like teaching blocks that carry explanatory text.
 
 ## Readability comes before decoration
 
@@ -20,6 +20,12 @@ These rules apply to all teaching diagrams, flowcharts, and SVG explanation grap
 - Labels must not overlap arrows or neighboring boxes.
 - Avoid over-dense microtext.
 - If the diagram needs many sentences, move some explanation into the body and keep only the essential labels in the SVG.
+
+The same readability rule applies to CSS callouts or card-like explanation blocks:
+
+- text must not overflow the box
+- text must not become tiny just to preserve a side-by-side layout
+- if the block needs too much prose, turn it into a normal section, table, or worked example instead
 
 ## When to split a diagram
 

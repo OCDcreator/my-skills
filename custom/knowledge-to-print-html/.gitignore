@@ -1,0 +1,9 @@
+# Local runtime artifacts for this skill.
+# The repo root already ignores these paths; keep this file so the skill stays self-contained.
+__pycache__/
+*.pyc
+.venv-print/
+.local-libs/
+.local-qpdf/
+artifacts/
+evals/*/screens/
