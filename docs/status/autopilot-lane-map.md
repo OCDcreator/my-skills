@@ -1,13 +1,13 @@
 # Autopilot Lane Map
 
 > **Preset**: `Bugfix / Backlog`
-> **Current `[NEXT]`**: `B17 - Persistent vault log ingestion via Logstravaganza`
+> **Current `[NEXT]`**: `B18 - Preflight lint and plugin-entry validation gates`
 
 ## Current priority
 
-- B16 is complete; ecosystem detection, docs, and CI surfacing are now covered
-- Execute B17 next to turn `Logstravaganza` from a detected optional tool into a real capture/report input
-- Keep B18 and B19 queued behind B17 so lint/plugin-entry and repo-owned Obsidian E2E follow in order
+- B17 is complete; `Logstravaganza` vault-log ingestion now feeds doctor, capture, diagnosis, and reports
+- Execute B18 next to turn optional lint/plugin-entry detection into reusable preflight gates before build/deploy
+- Keep B19 queued behind B18 so repo-owned Obsidian E2E fixtures and CI wiring follow in order
 - Keep each round bounded to one Obsidian plugin autodebug framework slice
 - Validate with script-level smoke tests where available because this repo has no global build/test/lint
 

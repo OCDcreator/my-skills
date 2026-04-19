@@ -91,6 +91,7 @@ node scripts/obsidian_debug_report.mjs --diagnosis .obsidian-debug/diagnosis.jso
 ```
 
 Read `diagnosis.json` before raw logs. It summarizes artifact presence, assertion failures, timing metrics, known issue signatures, and next-step recommendations.
+When `Logstravaganza` is available, the cycle wrappers also emit `vault-log-capture.json`; the diagnosis/report layer merges those NDJSON events with CLI/CDP evidence while keeping source paths and line numbers visible.
 
 Default `rules/issue-signatures.json` and `rules/issue-playbooks.json` are plugin-neutral. If a target plugin needs domain-specific signatures, keep them in that plugin repo or pass them explicitly:
 
@@ -128,7 +129,7 @@ Start plugin-local reset plans from `state-plans/plugin-data-reset.json`, then c
 
 - `obsidian-dev-utils`: when the repo already uses it, prefer its repo-owned `dev` / `build` / `lint` / `test` scripts over rebuilding a parallel local loop.
 - `eslint-plugin-obsidianmd`: wire it through a repo-owned lint script before build when the repo wants official manifest/template validation.
-- `Logstravaganza`: if the target vault enables it, collect its NDJSON log files as persistent secondary evidence in addition to CLI/CDP output.
+- `Logstravaganza`: if the target vault enables it, collect its NDJSON log files as persistent secondary evidence in addition to CLI/CDP output; doctor can surface discovered files up front and reports show merged provenance explicitly.
 - `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service`: optional CI/headless adapters that should stay repo-owned rather than hard-coded by the skill.
 - `generator-obsidian-plugin`: prefer this when the user needs a production-ready plugin project scaffold instead of a minimal debug fixture.
 - `semantic-release-obsidian-plugin`: release automation belongs in release-management flows, not the default local debug loop.

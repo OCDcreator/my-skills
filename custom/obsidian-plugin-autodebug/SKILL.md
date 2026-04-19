@@ -87,7 +87,7 @@ For exact commands, read `references/command-reference.md`.
 3. **Deploy**: copy only generated runtime artifacts into the test vault plugin directory: `main.js`, `manifest.json`, `styles.css`, and changed bundled assets.
 4. **Bootstrap**: for a brand-new plugin in a fresh vault, bootstrap discovery immediately after deploy and before the real reload/log-watch pass.
 5. **Reload**: use `obsidian plugin:reload id=<plugin-id>` first. Fall back to disable/enable or CDP only when reload is unavailable or stuck.
-6. **Capture**: clear stale buffers, watch console/errors, capture screenshot and DOM/CSS evidence, and run any configured scenario. If the target vault intentionally enables `Logstravaganza`, treat its NDJSON files as a persistent secondary log source alongside CLI/CDP capture.
+6. **Capture**: clear stale buffers, watch console/errors, capture screenshot and DOM/CSS evidence, and run any configured scenario. If the target vault intentionally enables `Logstravaganza`, treat its NDJSON files as a persistent secondary log source alongside CLI/CDP capture and preserve the discovered source metadata in the generated `vault-log-capture.json`.
 7. **Generate diagnosis**: wrappers and `scripts/obsidian_debug_job.mjs` write `diagnosis.json` automatically; for a manual path, run `scripts/obsidian_debug_analyze.mjs --summary .obsidian-debug/summary.json --assertions assertions/plugin-view-health.template.json --output .obsidian-debug/diagnosis.json`.
 8. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
 9. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
@@ -170,7 +170,7 @@ When the surrounding repo or target vault already uses these tools, integrate wi
 
 - `obsidian-dev-utils`: prefer repo-owned `dev` / `build` / `lint` / `test` scripts that already route through it.
 - `eslint-plugin-obsidianmd`: run it through a repo-owned lint script before build when the repo wants official Obsidian manifest/template checks.
-- `Logstravaganza`: use it as persistent secondary console/error evidence, especially for mobile or user-supplied repro logs.
+- `Logstravaganza`: use it as persistent secondary console/error evidence, especially for mobile or user-supplied repro logs; doctor/capture/report now preserve NDJSON source metadata so merged evidence stays attributable.
 - `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service`: keep them optional; doctor and CI templates should surface them only when the repo already owns matching scripts or dependencies.
 - `mobile-hot-reload`: treat it as intentional cross-device watch context because it can influence reload timing and log ordering.
 - `generator-obsidian-plugin`: recommend it when the user wants a real plugin project scaffold rather than a minimal debug fixture.

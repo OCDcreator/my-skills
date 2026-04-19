@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-04-19T08:00:01.000Z",
+  "repoDir": "../..",
+  "pluginId": "sample-log-plugin",
+  "vaultName": "Logstravaganza Smoke",
+  "obsidianCommand": "missing-obsidian",
+  "testVaultPluginDir": "../../test-vault/.obsidian/plugins/sample-log-plugin",
+  "outputDir": ".",
+  "buildLog": null,
+  "deployReport": null,
+  "bootstrapReport": null,
+  "scenarioReport": null,
+  "assertionsPath": null,
+  "comparisonReport": null,
+  "consoleLog": "./console-watch.log",
+  "errorsLog": "./errors.log",
+  "useCdp": false,
+  "cdpTrace": null,
+  "cdpSummary": null,
+  "screenshot": null,
+  "dom": null,
+  "watchSeconds": 5,
+  "consoleLimit": 50,
+  "capturePlan": {
+    "trace": {
+      "mode": "console-watch",
+      "requested": true,
+      "intentionallySkipped": false,
+      "skipReason": null
+    },
+    "screenshot": {
+      "requested": false,
+      "intentionallySkipped": true,
+      "skipReason": "fixture-no-screenshot"
+    },
+    "dom": {
+      "requested": false,
+      "intentionallySkipped": true,
+      "skipReason": "fixture-no-dom"
+    }
+  }
+}

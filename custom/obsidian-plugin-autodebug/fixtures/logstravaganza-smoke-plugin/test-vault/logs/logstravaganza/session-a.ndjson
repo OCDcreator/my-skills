@@ -1,0 +1,2 @@
+{"timestamp":"2026-04-19T08:00:00.250Z","level":"info","pluginId":"sample-log-plugin","message":"[sample-log-plugin] [startup] completed in 150ms"}
+{"timestamp":"2026-04-19T08:00:00.800Z","level":"error","pluginId":"sample-log-plugin","message":"Sample vault logger warning"}

@@ -26,6 +26,7 @@ import {
   detectHotReloadContext,
 } from './obsidian_debug_hot_reload_support.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
+import { discoverLogstravaganzaCapture } from './obsidian_debug_logstravaganza.mjs';
 import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
@@ -808,20 +809,31 @@ const logstravaganzaInstalled = installedPlugins.find((entry) => entry.id === 'l
 const logstravaganzaEnabled = enabledPlugins.find((entry) => entry.id === 'logstravaganza') ?? null;
 const mobileHotReloadInstalled = installedPlugins.find((entry) => entry.id === 'mobile-hot-reload') ?? null;
 const mobileHotReloadEnabled = enabledPlugins.find((entry) => entry.id === 'mobile-hot-reload') ?? null;
+const logstravaganzaCapture = await discoverLogstravaganzaCapture({ testVaultPluginDir });
+const logstravaganzaFilesystemInstalled = Boolean(logstravaganzaCapture.pluginDirExists);
+const logstravaganzaDetected = Boolean(logstravaganzaInstalled) || logstravaganzaFilesystemInstalled;
+const logstravaganzaUsable = Boolean(logstravaganzaCapture.usable);
 
 checks.push(
   check(
-    logstravaganzaEnabled ? 'pass' : logstravaganzaInstalled ? 'info' : 'info',
+    logstravaganzaUsable ? 'pass' : 'info',
     'logstravaganza-vault',
     'capture',
-    logstravaganzaEnabled
-      ? 'Vault enables Logstravaganza; its NDJSON files can serve as a persistent secondary console/error log source alongside CLI/CDP capture.'
-      : logstravaganzaInstalled
-        ? 'Vault contains Logstravaganza but it is not enabled; persistent NDJSON log capture remains available if you turn it on.'
-        : 'Logstravaganza was not detected in the target vault; persistent secondary file logging remains optional.',
+    logstravaganzaUsable
+      ? `${logstravaganzaCapture.detail} The cycle capture writes vault-log-capture.json, and analysis/reporting merge those events with console/CDP evidence while preserving source paths and line numbers.`
+      : logstravaganzaEnabled
+        ? `Vault enables Logstravaganza, but no usable NDJSON files were discovered yet. ${logstravaganzaCapture.detail}`
+        : logstravaganzaDetected
+          ? `Vault contains Logstravaganza context, but persistent NDJSON capture is not usable yet. ${logstravaganzaCapture.detail}`
+          : 'Logstravaganza was not detected in the target vault; persistent secondary file logging remains optional.',
     {
       installedVersion: logstravaganzaInstalled?.version ?? null,
       enabledVersion: logstravaganzaEnabled?.version ?? null,
+      filesystemInstalled: logstravaganzaFilesystemInstalled,
+      usable: logstravaganzaUsable,
+      sourceCount: logstravaganzaCapture.sourceCount,
+      lineCount: logstravaganzaCapture.lineCount,
+      capture: logstravaganzaCapture,
     },
   ),
 );
@@ -1048,10 +1060,15 @@ const report = {
     scripts: ecosystemSupport.scripts,
     vaultPlugins: {
       logstravaganza: {
-        installed: Boolean(logstravaganzaInstalled),
+        installed: logstravaganzaDetected,
         enabled: Boolean(logstravaganzaEnabled),
         installedVersion: logstravaganzaInstalled?.version ?? null,
         enabledVersion: logstravaganzaEnabled?.version ?? null,
+        filesystemInstalled: logstravaganzaFilesystemInstalled,
+        usable: logstravaganzaUsable,
+        sourceCount: logstravaganzaCapture.sourceCount,
+        lineCount: logstravaganzaCapture.lineCount,
+        capture: logstravaganzaCapture,
       },
       mobileHotReload: {
         installed: Boolean(mobileHotReloadInstalled),

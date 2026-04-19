@@ -14,6 +14,10 @@ import {
   normalizePlatform,
   resolveTemplateCommand,
 } from './obsidian_debug_command_templates.mjs';
+import {
+  discoverLogstravaganzaCapture,
+  ingestLogstravaganzaCapture,
+} from './obsidian_debug_logstravaganza.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 if (hasHelpOption(options)) {
@@ -129,6 +133,41 @@ async function pathExists(filePath) {
   }
 }
 
+function resolveDocumentPath(documentPath, value) {
+  const normalized = stringValue(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (path.isAbsolute(normalized)) {
+    return path.resolve(normalized);
+  }
+
+  return path.resolve(path.dirname(path.resolve(documentPath)), normalized);
+}
+
+function normalizeSummaryPaths(summary, documentPath) {
+  const base = summary && typeof summary === 'object' && !Array.isArray(summary) ? summary : {};
+  return {
+    ...base,
+    repoDir: resolveDocumentPath(documentPath, base.repoDir),
+    outputDir: resolveDocumentPath(documentPath, base.outputDir),
+    testVaultPluginDir: resolveDocumentPath(documentPath, base.testVaultPluginDir),
+    buildLog: resolveDocumentPath(documentPath, base.buildLog),
+    deployReport: resolveDocumentPath(documentPath, base.deployReport),
+    bootstrapReport: resolveDocumentPath(documentPath, base.bootstrapReport),
+    scenarioReport: resolveDocumentPath(documentPath, base.scenarioReport),
+    comparisonReport: resolveDocumentPath(documentPath, base.comparisonReport),
+    consoleLog: resolveDocumentPath(documentPath, base.consoleLog),
+    errorsLog: resolveDocumentPath(documentPath, base.errorsLog),
+    cdpTrace: resolveDocumentPath(documentPath, base.cdpTrace),
+    cdpSummary: resolveDocumentPath(documentPath, base.cdpSummary),
+    screenshot: resolveDocumentPath(documentPath, base.screenshot),
+    dom: resolveDocumentPath(documentPath, base.dom),
+    vaultLogCapture: resolveDocumentPath(documentPath, base.vaultLogCapture),
+  };
+}
+
 function splitLines(text, filePath) {
   if (!text) {
     return [];
@@ -173,6 +212,28 @@ function parseCompletedMetrics(lines) {
   }
 
   return metrics;
+}
+
+function sortMergedLines(lines) {
+  return lines
+    .map((entry, index) => ({
+      entry,
+      index,
+      timestamp: getLineTimestamp(entry.text),
+    }))
+    .sort((left, right) => {
+      if (left.timestamp !== null && right.timestamp !== null && left.timestamp !== right.timestamp) {
+        return left.timestamp - right.timestamp;
+      }
+      if (left.timestamp !== null && right.timestamp === null) {
+        return -1;
+      }
+      if (left.timestamp === null && right.timestamp !== null) {
+        return 1;
+      }
+      return left.index - right.index;
+    })
+    .map((entry) => entry.entry);
 }
 
 function getFirstMatchingLine(lines, predicates) {
@@ -310,6 +371,12 @@ function deriveCapturePlan(summary) {
       intentionallySkipped: false,
       skipReason: null,
       mode: 'dom',
+    }),
+    vaultLogs: normalizeCapturePlanEntry(hasCapturePlan ? raw.vaultLogs : null, {
+      requested: Boolean(stringValue(summary?.testVaultPluginDir) || stringValue(summary?.vaultLogCapture)),
+      intentionallySkipped: false,
+      skipReason: null,
+      mode: 'logstravaganza-ndjson',
     }),
   };
 }
@@ -736,18 +803,21 @@ function evaluateStringExpectation(actualValue, assertion) {
   };
 }
 
-const summary = JSON.parse((await fs.readFile(summaryPath, 'utf8')).replace(/^\uFEFF/, ''));
+const summary = normalizeSummaryPaths(
+  JSON.parse((await fs.readFile(summaryPath, 'utf8')).replace(/^\uFEFF/, '')),
+  summaryPath,
+);
 const signaturesDocument = (await readJsonIfExists(signaturesPath)) ?? { signatures: [] };
 const playbooksDocument = (await readJsonIfExists(playbooksPath)) ?? { playbooks: [] };
 const toolRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = stringValue(summary.outputDir)
-  ? path.resolve(summary.outputDir)
+  ? summary.outputDir
   : path.dirname(path.resolve(outputPath));
 const repoDir = stringValue(summary.repoDir)
-  ? path.resolve(summary.repoDir)
+  ? summary.repoDir
   : '';
 const testVaultPluginDir = stringValue(summary.testVaultPluginDir)
-  ? path.resolve(summary.testVaultPluginDir)
+  ? summary.testVaultPluginDir
   : '';
 const platform = normalizePlatform('auto');
 const runtimeContext = {
@@ -816,12 +886,24 @@ const scenarioReport = await readJsonIfExists(summary.scenarioReport);
 const assertionsDocument = assertionsPath ? ((await readJsonIfExists(assertionsPath)) ?? { assertions: [] }) : null;
 const screenshotExists = await pathExists(summary.screenshot);
 const domExists = await pathExists(summary.dom);
+let vaultLogCapture = await readJsonIfExists(summary.vaultLogCapture);
+if (!vaultLogCapture && (testVaultPluginDir || runtimeContext.vaultRoot)) {
+  vaultLogCapture = await discoverLogstravaganzaCapture({
+    testVaultPluginDir,
+    vaultRoot: runtimeContext.vaultRoot,
+  });
+}
+const vaultLogIngestion = await ingestLogstravaganzaCapture(vaultLogCapture);
 
-const allLines = [
+const primaryLines = [
   ...splitLines(consoleText, summary.consoleLog),
   ...splitLines(errorsText, summary.errorsLog),
   ...splitLines(cdpTraceText, summary.cdpTrace),
 ];
+const allLines = sortMergedLines([
+  ...primaryLines,
+  ...vaultLogIngestion.lines,
+]);
 
 const completedMetrics = parseCompletedMetrics(allLines);
 const startupCompleted = completedMetrics.find(
@@ -870,8 +952,8 @@ const traceState = buildArtifactState({
   plan: capturePlan.trace,
   artifactPath: traceArtifactPath,
   exists: Boolean(traceArtifactPath),
-  captured: allLines.length > 0,
-  captureDetail: `Captured ${allLines.length} log lines.`,
+  captured: primaryLines.length > 0,
+  captureDetail: `Captured ${primaryLines.length} primary console/CDP log lines.`,
   failureDetail: 'No console/CDP trace lines were captured.',
   failureStatus: traceArtifactPath ? 'empty' : 'missing',
 });
@@ -881,8 +963,39 @@ if (traceArtifactPath || capturePlan.trace.intentionallySkipped || capturePlan.t
     assertionStatusFromArtifactState(traceState),
     traceState.detail,
     traceState.status === 'captured'
-      ? [{ filePath: allLines[0].filePath, lineNumber: allLines[0].lineNumber }]
+      ? [{ filePath: primaryLines[0].filePath, lineNumber: primaryLines[0].lineNumber }]
       : [],
+  );
+}
+
+const vaultLogState = {
+  key: 'vaultLogs',
+  label: 'Logstravaganza vault log capture',
+  status: vaultLogIngestion.status,
+  requested: capturePlan.vaultLogs.requested,
+  intentionallySkipped: capturePlan.vaultLogs.intentionallySkipped,
+  skipReason: capturePlan.vaultLogs.skipReason,
+  mode: capturePlan.vaultLogs.mode,
+  path: summary.vaultLogCapture ?? null,
+  sourceCount: vaultLogIngestion.sourceCount,
+  lineCount: vaultLogIngestion.lineCount,
+  detail: vaultLogIngestion.detail,
+};
+if (capturePlan.vaultLogs.requested || vaultLogIngestion.available || vaultLogIngestion.sourceCount > 0) {
+  const vaultLogStatus = vaultLogIngestion.usable
+    ? 'pass'
+    : vaultLogIngestion.status === 'invalid'
+      ? 'warn'
+      : 'skipped';
+  pushAssertion(
+    'vault-log-captured',
+    vaultLogStatus,
+    vaultLogIngestion.usable
+      ? `Merged ${vaultLogIngestion.lineCount} Logstravaganza event line(s) from ${vaultLogIngestion.sourceCount} source file(s).`
+      : vaultLogIngestion.detail,
+    vaultLogIngestion.lines.length > 0
+      ? [{ filePath: vaultLogIngestion.lines[0].filePath, lineNumber: vaultLogIngestion.lines[0].lineNumber }]
+      : artifactEvidence(summary.vaultLogCapture),
   );
 }
 
@@ -1061,6 +1174,14 @@ function getTextSource(source) {
       return { text: consoleText ?? '', label: 'console', filePath: summary.consoleLog };
     case 'cdp':
       return { text: cdpTraceText ?? '', label: 'cdp', filePath: summary.cdpTrace };
+    case 'vault':
+    case 'vaultLogs':
+    case 'logstravaganza':
+      return {
+        text: vaultLogIngestion.lines.map((entry) => entry.text).join('\n'),
+        label: 'Logstravaganza vault logs',
+        filePath: summary.vaultLogCapture,
+      };
     case 'combined':
     default:
       return { text: combinedLogText, label: 'combined logs', filePath: null };
@@ -1077,6 +1198,9 @@ function findFirstLine(source, predicate) {
       return false;
     }
     if (sourceName === 'cdp' && entry.filePath !== summary.cdpTrace) {
+      return false;
+    }
+    if (['vault', 'vaultLogs', 'logstravaganza'].includes(sourceName) && entry.sourceKind !== 'logstravaganza') {
       return false;
     }
     return predicate(entry.text);
@@ -1642,14 +1766,29 @@ const diagnosis = {
     errorsLog: summary.errorsLog,
     cdpTrace: summary.cdpTrace,
     cdpSummary: summary.cdpSummary,
+    vaultLogCapture: summary.vaultLogCapture ?? null,
     scenarioReport: summary.scenarioReport ?? null,
     screenshot: summary.screenshot,
     dom: summary.dom,
   },
   artifactStates: {
     trace: traceState,
+    vaultLogs: vaultLogState,
     screenshot: screenshotState,
     dom: domState,
+  },
+  vaultLogs: {
+    available: vaultLogIngestion.available,
+    usable: vaultLogIngestion.usable,
+    status: vaultLogIngestion.status,
+    detail: vaultLogIngestion.detail,
+    sourceCount: vaultLogIngestion.sourceCount,
+    lineCount: vaultLogIngestion.lineCount,
+    invalidLineCount: vaultLogIngestion.invalidLineCount,
+    capturePath: summary.vaultLogCapture ?? null,
+    sources: vaultLogIngestion.sources,
+    preview: vaultLogIngestion.preview,
+    mergedWithPrimaryTrace: vaultLogIngestion.lineCount > 0,
   },
   assertions,
   customAssertions,
@@ -1670,6 +1809,8 @@ const diagnosis = {
     : null,
   traces: {
     lineCount: allLines.length,
+    primaryLineCount: primaryLines.length,
+    vaultLogLineCount: vaultLogIngestion.lineCount,
     firstLineTimestamp: startupAnchorTimestamp ? new Date(startupAnchorTimestamp).toISOString() : null,
     lastLineTimestamp: (() => {
       const last = [...allLines].reverse().find((entry) => getLineTimestamp(entry.text));

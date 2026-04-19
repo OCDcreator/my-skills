@@ -161,6 +161,8 @@ COMPARISON_PATH="$OUTPUT_DIR/comparison.json"
 BOOTSTRAP_REPORT_PATH="$OUTPUT_DIR/bootstrap-report.json"
 CDP_TRACE_PATH="$OUTPUT_DIR/cdp-reload-trace.log"
 CDP_SUMMARY_PATH="$CDP_TRACE_PATH.summary.json"
+VAULT_LOG_CAPTURE_PATH="$OUTPUT_DIR/vault-log-capture.json"
+RESOLVED_VAULT_LOG_CAPTURE_PATH=""
 VERSION_PATH="$OUTPUT_DIR/obsidian-version.txt"
 
 obsidian_cli() {
@@ -358,6 +360,27 @@ write_diagnosis() {
     diagnosis_args+=(--dom-selector "$DOM_SELECTOR")
   fi
   node "${diagnosis_args[@]}"
+}
+
+write_logstravaganza_capture() {
+  if [[ -z "$TEST_VAULT_PLUGIN_DIR" ]]; then
+    return
+  fi
+
+  log_capture_args=(
+    "$SCRIPT_DIR/obsidian_debug_logstravaganza_capture.mjs"
+    --test-vault-plugin-dir "$TEST_VAULT_PLUGIN_DIR"
+    --output "$VAULT_LOG_CAPTURE_PATH"
+  )
+
+  write_section "Vault Log Capture"
+  if node "${log_capture_args[@]}"; then
+    if [[ -f "$VAULT_LOG_CAPTURE_PATH" ]]; then
+      RESOLVED_VAULT_LOG_CAPTURE_PATH="$VAULT_LOG_CAPTURE_PATH"
+    fi
+  else
+    echo "Logstravaganza capture failed; continuing with CLI/CDP logs only." >&2
+  fi
 }
 
 write_comparison() {
@@ -613,6 +636,8 @@ if [[ "$SKIP_DOM" -eq 0 ]]; then
   fi
 fi
 
+write_logstravaganza_capture
+
 TRACE_CAPTURE_MODE="console-watch"
 TRACE_CAPTURE_REQUESTED=1
 TRACE_CAPTURE_SKIPPED=0
@@ -664,6 +689,7 @@ cat > "$SUMMARY_PATH" <<EOF
   "useCdp": $( [[ "$USE_CDP" -eq 1 ]] && printf 'true' || printf 'false' ),
   "cdpTrace": $( [[ "$USE_CDP" -eq 1 && "$SKIP_RELOAD" -eq 0 ]] && json_path_or_null "$CDP_TRACE_PATH" || printf 'null' ),
   "cdpSummary": $( [[ "$USE_CDP" -eq 1 && "$SKIP_RELOAD" -eq 0 ]] && json_path_or_null "$CDP_SUMMARY_PATH" || printf 'null' ),
+  "vaultLogCapture": $( json_path_or_null "$RESOLVED_VAULT_LOG_CAPTURE_PATH" ),
   "screenshot": $( [[ "$SKIP_SCREENSHOT" -eq 1 ]] && printf 'null' || json_path_or_null "$SCREENSHOT_PATH" ),
   "dom": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'null' || json_path_or_null "$DOM_PATH" ),
   "watchSeconds": $WATCH_SECONDS,
@@ -696,6 +722,12 @@ cat > "$SUMMARY_PATH" <<EOF
       "requested": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'false' || printf 'true' ),
       "intentionallySkipped": $( [[ "$SKIP_DOM" -eq 1 ]] && printf 'true' || printf 'false' ),
       "skipReason": $( [[ "$SKIP_DOM" -eq 1 ]] && json_string_or_null "skip-dom-flag" || printf 'null' )
+    },
+    "vaultLogs": {
+      "mode": "logstravaganza-ndjson",
+      "requested": $( [[ -n "$TEST_VAULT_PLUGIN_DIR" ]] && printf 'true' || printf 'false' ),
+      "intentionallySkipped": false,
+      "skipReason": null
     }
   }
 }

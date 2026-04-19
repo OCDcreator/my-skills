@@ -398,6 +398,41 @@ function Invoke-Diagnosis {
   }
 }
 
+function Invoke-LogstravaganzaCapture {
+  param(
+    [string]$OutputPath
+  )
+
+  if ($TestVaultPluginDir.Trim().Length -eq 0) {
+    return $null
+  }
+
+  $scriptPath = Join-Path $PSScriptRoot "obsidian_debug_logstravaganza_capture.mjs"
+  if (-not (Test-Path -LiteralPath $scriptPath)) {
+    Write-Warning "Logstravaganza capture script not found: $scriptPath"
+    return $null
+  }
+
+  $args = @(
+    $scriptPath,
+    "--test-vault-plugin-dir", $TestVaultPluginDir,
+    "--output", $OutputPath
+  )
+
+  Write-Section "Vault Log Capture"
+  Write-Host "node $($args -join ' ')"
+  & node @args 2>&1 | ForEach-Object { Write-Host $_ }
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Logstravaganza capture failed with exit code $LASTEXITCODE; continuing with CLI/CDP logs only."
+    return $null
+  }
+
+  if (Test-Path -LiteralPath $OutputPath) {
+    return $OutputPath
+  }
+  return $null
+}
+
 function Invoke-Comparison {
   param(
     [string]$BaselinePath,
@@ -526,7 +561,9 @@ $scenarioReportPath = Join-Path $resolvedOutputDir "scenario-report.json"
 $comparisonPath = Join-Path $resolvedOutputDir "comparison.json"
 $bootstrapReportPath = Join-Path $resolvedOutputDir "bootstrap-report.json"
 $cdpTracePath = Join-Path $resolvedOutputDir "cdp-reload-trace.log"
+$vaultLogCapturePath = Join-Path $resolvedOutputDir "vault-log-capture.json"
 $cdpSummaryPath = $null
+$resolvedVaultLogCapturePath = $null
 $resolvedBootstrapReportPath = $null
 $resolvedScenarioReportPath = $null
 $hotReloadPreClearSettleApplied = $false
@@ -613,6 +650,8 @@ if (-not $SkipDom) {
     Set-Content -LiteralPath $domPath -Encoding UTF8
 }
 
+$resolvedVaultLogCapturePath = Invoke-LogstravaganzaCapture -OutputPath $vaultLogCapturePath
+
 $hotReloadMayInfluenceTimings = $false
 $hotReloadTimingsTrust = "deterministic"
 $hotReloadDetail = "Controlled mode issued an explicit reload without a Hot Reload settle delay."
@@ -646,6 +685,7 @@ $summary = [ordered]@{
   useCdp = $UseCdp.IsPresent
   cdpTrace = if ($UseCdp -and -not $SkipReload -and (Test-Path -LiteralPath $cdpTracePath)) { $cdpTracePath } else { $null }
   cdpSummary = if ($cdpSummaryPath -and (Test-Path -LiteralPath $cdpSummaryPath)) { $cdpSummaryPath } else { $null }
+  vaultLogCapture = if ($resolvedVaultLogCapturePath -and (Test-Path -LiteralPath $resolvedVaultLogCapturePath)) { $resolvedVaultLogCapturePath } else { $null }
   screenshot = if ($SkipScreenshot -or -not (Test-Path -LiteralPath $screenshotPath)) { $null } else { $screenshotPath }
   dom = if ($SkipDom -or -not (Test-Path -LiteralPath $domPath)) { $null } else { $domPath }
   watchSeconds = $WatchSeconds
@@ -684,6 +724,12 @@ $summary = [ordered]@{
       requested = -not $SkipDom
       intentionallySkipped = $SkipDom.IsPresent
       skipReason = if ($SkipDom) { "skip-dom-flag" } else { $null }
+    }
+    vaultLogs = [ordered]@{
+      mode = "logstravaganza-ndjson"
+      requested = $TestVaultPluginDir.Trim().Length -gt 0
+      intentionallySkipped = $false
+      skipReason = $null
     }
   }
 }

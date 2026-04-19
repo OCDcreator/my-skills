@@ -199,7 +199,7 @@
   - CI templates can wire optional lint, plugin-entry validation, and repo-owned Obsidian E2E scripts without machine-local paths
   - Docs explain how `Logstravaganza`, MCP, `generator-obsidian-plugin`, `mobile-hot-reload`, `obsidian-typings`, and release-adjacent checks fit the debug workflow
 
-### [NEXT] B17 - Persistent vault log ingestion via Logstravaganza
+### [DONE] B17 - Persistent vault log ingestion via Logstravaganza
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Extend generic capture, diagnosis, and report flows so they can ingest `Logstravaganza` NDJSON logs from a vault when available, correlate them with existing console/CDP evidence, and preserve structured source metadata for downstream analysis.
@@ -212,7 +212,7 @@
   - Capture/analysis/report flows can import structured vault logs when present and degrade cleanly when absent
   - Fixture or sample artifacts validate NDJSON parsing, source attribution, and no-logger fallback behavior
 
-### [QUEUED] B18 - Preflight lint and plugin-entry validation gates
+### [NEXT] B18 - Preflight lint and plugin-entry validation gates
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Turn optional `eslint-plugin-obsidianmd` and ReviewBot-style plugin-entry validation into reusable preflight checks that run before build/deploy flows and can be emitted into generated CI templates.
@@ -245,5 +245,6 @@
 - B14 is complete.
 - B15 is complete.
 - B16 is complete.
-- B17 is next.
-- B18-B19 are queued.
+- B17 is complete.
+- B18 is next.
+- B19 is queued.

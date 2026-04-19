@@ -99,6 +99,10 @@ function normalizeStatusClass(status) {
     case 'empty':
     case 'missing':
       return 'fail';
+    case 'invalid':
+      return 'warn';
+    case 'unavailable':
+      return 'info';
     case 'skipped':
       return 'skipped';
     default:
@@ -277,6 +281,29 @@ function renderArtifactRows(entries) {
   `, 4);
 }
 
+function renderVaultLogRows(sources) {
+  return renderTableRows(sources, (entry) => `
+    <tr>
+      <td>${entry.path ? renderArtifactLink(entry.path) : escapeHtml(entry.relativePath ?? 'unknown')}</td>
+      <td>${escapeHtml(entry.parsedLineCount ?? 0)}</td>
+      <td>${escapeHtml(entry.invalidLineCount ?? 0)}</td>
+      <td>${(entry.levels ?? []).length ? (entry.levels ?? []).map((item) => `<code>${escapeHtml(item)}</code>`).join(' ') : 'None'}</td>
+      <td>${(entry.pluginIds ?? []).length ? (entry.pluginIds ?? []).map((item) => `<code>${escapeHtml(item)}</code>`).join(' ') : 'None'}</td>
+    </tr>
+  `, 5);
+}
+
+function renderVaultLogPreview(preview) {
+  if (!preview || preview.length === 0) {
+    return '<p class="muted">No Logstravaganza events were imported.</p>';
+  }
+
+  const text = preview
+    .map((entry) => `[${entry.sourceLabel ?? path.basename(entry.filePath ?? 'vault-log')}:${entry.lineNumber ?? 1}] ${entry.text ?? ''}`)
+    .join('\n');
+  return `<pre>${escapeHtml(text)}</pre>`;
+}
+
 function renderStatusSummary(label, value, cssClass = '') {
   return `<span class="badge ${escapeHtml(cssClass || normalizeStatusClass(value))}">${escapeHtml(label)}: ${escapeHtml(value ?? 'n/a')}</span>`;
 }
@@ -297,6 +324,9 @@ const screenshotDiffPath = comparison?.screenshotDiff?.diffPath ?? null;
 const hotReload = diagnosis.hotReload && typeof diagnosis.hotReload === 'object' && !Array.isArray(diagnosis.hotReload)
   ? diagnosis.hotReload
   : null;
+const vaultLogs = diagnosis.vaultLogs && typeof diagnosis.vaultLogs === 'object' && !Array.isArray(diagnosis.vaultLogs)
+  ? diagnosis.vaultLogs
+  : null;
 
 const domPreview = trimPreview(await readTextOrNull(diagnosisArtifacts.dom));
 const consolePreview = trimPreview(await readTextOrNull(diagnosisArtifacts.consoleLog));
@@ -315,6 +345,7 @@ const artifactEntries = [
   { scope: 'candidate', label: 'console log', path: diagnosisArtifacts.consoleLog, state: diagnosis.useCdp ? null : (diagnosisArtifactStates.trace ?? null) },
   { scope: 'candidate', label: 'errors log', path: diagnosisArtifacts.errorsLog },
   { scope: 'candidate', label: 'CDP trace', path: diagnosisArtifacts.cdpTrace, state: diagnosis.useCdp ? (diagnosisArtifactStates.trace ?? null) : null },
+  { scope: 'candidate', label: 'vault log capture', path: diagnosisArtifacts.vaultLogCapture, state: diagnosisArtifactStates.vaultLogs ?? null },
   { scope: 'candidate', label: 'deploy report', path: diagnosisArtifacts.deployReport },
   { scope: 'candidate', label: 'scenario report', path: diagnosisArtifacts.scenarioReport },
   { scope: 'comparison', label: 'comparison JSON', path: comparisonPath ? path.resolve(comparisonPath) : null },
@@ -376,6 +407,7 @@ const html = `<!doctype html>
       ${comparison ? renderStatusSummary('Compare', comparison.status) : ''}
       ${comparison ? renderStatusSummary('Visual', comparison.visualStatus ?? comparison.screenshotDiff?.status ?? 'n/a', comparison.screenshotDiff?.status === 'different' ? 'warn' : 'info') : ''}
       ${hotReload ? renderStatusSummary('Hot Reload', hotReload.timingsTrust ?? 'n/a', hotReload.mayInfluenceTimings ? 'warning' : (hotReload.timingsTrust === 'deterministic' ? 'pass' : 'info')) : ''}
+      ${vaultLogs ? renderStatusSummary('Vault Logs', vaultLogs.status ?? 'n/a', vaultLogs.usable ? 'pass' : 'info') : ''}
     </div>
     <strong>${escapeHtml(diagnosis.headline)}</strong>
     <p>Plugin: <code>${escapeHtml(diagnosis.pluginId)}</code> | Vault: <code>${escapeHtml(diagnosis.vaultName)}</code></p>
@@ -463,6 +495,24 @@ const html = `<!doctype html>
         state: comparisonBaselineArtifactStates.dom ?? null,
       })}
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Vault Log Sources</h2>
+    ${vaultLogs ? `
+      <p>
+        ${renderStatusSummary('Status', vaultLogs.status ?? 'n/a', vaultLogs.usable ? 'pass' : 'info')}
+        ${renderStatusSummary('Events', vaultLogs.lineCount ?? 0, vaultLogs.usable ? 'pass' : 'info')}
+        ${renderStatusSummary('Sources', vaultLogs.sourceCount ?? 0, vaultLogs.sourceCount > 0 ? 'info' : 'skipped')}
+      </p>
+      <p>${escapeHtml(vaultLogs.detail ?? 'No Logstravaganza detail recorded.')}</p>
+      <table>
+        <tr><th>Source</th><th>Parsed Events</th><th>Invalid Lines</th><th>Levels</th><th>Plugin IDs</th></tr>
+        ${renderVaultLogRows(vaultLogs.sources ?? [])}
+      </table>
+      <h3>Merged Preview</h3>
+      ${renderVaultLogPreview(vaultLogs.preview ?? [])}
+    ` : '<p>No Logstravaganza vault-log metadata recorded.</p>'}
   </div>
 
   <div class="card">

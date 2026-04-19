@@ -1,0 +1,5 @@
+{
+  "enabled": true,
+  "path": "logs/logstravaganza",
+  "activeFile": "logs/logstravaganza/session-a.ndjson"
+}

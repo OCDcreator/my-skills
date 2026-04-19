@@ -87,6 +87,7 @@ export function resolveArtifactPaths(diagnosis, diagnosisPath) {
     errorsLog: resolveDocumentPath(diagnosisPath, artifacts.errorsLog),
     cdpTrace: resolveDocumentPath(diagnosisPath, artifacts.cdpTrace),
     cdpSummary: resolveDocumentPath(diagnosisPath, artifacts.cdpSummary),
+    vaultLogCapture: resolveDocumentPath(diagnosisPath, artifacts.vaultLogCapture),
     scenarioReport: resolveDocumentPath(diagnosisPath, artifacts.scenarioReport),
     playwrightTrace: resolveDocumentPath(diagnosisPath, artifacts.playwrightTrace),
     playwrightScreenshot: resolveDocumentPath(diagnosisPath, artifacts.playwrightScreenshot),
