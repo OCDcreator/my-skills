@@ -1,0 +1,17 @@
+{
+  "name": "testing-framework-smoke-plugin",
+  "version": "0.0.1",
+  "description": "Generic fixture for optional obsidian-testing-framework detection",
+  "main": "dist/main.js",
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "node -e \"console.log('testing-framework smoke fixture already built')\"",
+    "test": "node -e \"console.log('testing-framework smoke fixture test')\"",
+    "test:obsidian": "obsidian-testing-framework run --config autodebug/ci/obsidian-testing-framework.config.mjs"
+  },
+  "devDependencies": {
+    "obsidian-testing-framework": "^0.0.0-fixture"
+  },
+  "author": "my-skills",
+  "license": "MIT"
+}

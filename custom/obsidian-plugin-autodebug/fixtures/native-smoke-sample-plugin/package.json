@@ -3,8 +3,11 @@
   "version": "0.0.1",
   "description": "Generic native smoke fixture for Obsidian plugin autodebug validation",
   "main": "main.js",
+  "packageManager": "npm@10.9.0",
   "scripts": {
-    "build": "node -e \"console.log('native smoke fixture already built')\""
+    "build": "node -e \"console.log('native smoke fixture already built')\"",
+    "dev": "node -e \"console.log('native smoke fixture dev')\"",
+    "test": "node -e \"console.log('native smoke fixture test')\""
   },
   "author": "my-skills",
   "license": "MIT"

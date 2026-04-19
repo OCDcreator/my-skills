@@ -121,7 +121,7 @@
   - Doctor reports fresh-vault discovery status and Node/WebSocket CDP readiness with runnable remediation commands
   - Windows and native macOS smoke validation record evidence for both additions
 
-### [NEXT] B11 - Package-manager and runtime doctor coverage
+### [DONE] B11 - Package-manager and runtime doctor coverage
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Teach the generic doctor/job runner how to identify Node version, Corepack readiness, npm/pnpm/yarn/bun usage, lockfiles, package-manager fields, and repo build/dev/test scripts so future rounds stop assuming npm-only workflows.
@@ -134,7 +134,7 @@
   - Job/cycle runners can choose inferred package-manager commands or explain why inference is weak
   - Windows and macOS smoke evidence covers at least one npm-style and one non-npm-style path or fixture
 
-### [QUEUED] B12 - Optional Playwright and UI trace adapter
+### [DONE] B12 - Optional Playwright and UI trace adapter
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add an optional Playwright-backed scenario adapter for richer UI interactions, locator assertions, and trace artifacts while preserving the existing CLI/CDP-first path.
@@ -147,7 +147,7 @@
   - Diagnosis/report artifacts can link Playwright traces/screenshots when available
   - Plugin-neutral fixtures or templates demonstrate the adapter without hard-coding one plugin
 
-### [QUEUED] B13 - Hot Reload coordination doctor
+### [DONE] B13 - Hot Reload coordination doctor
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Detect repository/vault Hot Reload conditions and guide automation toward controlled reload or Hot Reload-friendly modes so startup logs stay trustworthy.
@@ -160,7 +160,7 @@
   - Job/cycle flows can opt into controlled reload or friendly coexistence modes
   - Reports make it clear when Hot Reload may have influenced captured timings/logs
 
-### [QUEUED] B14 - Sample-plugin scaffold and bootstrap mode
+### [DONE] B14 - Sample-plugin scaffold and bootstrap mode
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Extend the framework from “debug an existing plugin” to “scaffold a minimal debug-ready plugin workspace” using generic sample-plugin patterns, manifest/bootstrap defaults, job specs, and assertions.
@@ -173,7 +173,7 @@
   - Fresh-vault bootstrap works against the scaffolded sample on Windows and macOS
   - Docs clearly separate scaffolding flows from existing-plugin retrofit flows
 
-### [QUEUED] B15 - Optional testing-framework and CI templates
+### [DONE] B15 - Optional testing-framework and CI templates
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Add optional `obsidian-testing-framework` and CI-ready templates so agents can plug the framework into repeatable E2E/quality-gate pipelines after local smoke success.
@@ -189,5 +189,7 @@
 ## Current state
 
 - B1-B10 are complete.
-- B11 is the approved next slice.
-- B12-B15 are approved queued follow-ups; do not expand beyond them without another human approval.
+- B11-B13 are complete.
+- B14 is complete.
+- B15 is complete.
+- No additional queued slice is approved; await human approval before expanding beyond B15.

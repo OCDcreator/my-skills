@@ -1,0 +1,9 @@
+{
+  "id": "testing-framework-smoke-plugin",
+  "name": "Testing Framework Smoke Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.5",
+  "description": "Generic fixture for optional obsidian-testing-framework detection.",
+  "author": "my-skills",
+  "isDesktopOnly": false
+}

@@ -1,0 +1,28 @@
+{
+  "name": "playwright-locator-health",
+  "description": "Open the plugin surface through the generic strategy chain, then use Playwright locators for richer assertions and trace-friendly artifacts.",
+  "adapter": "playwright",
+  "playwright": {
+    "trace": true,
+    "tracePath": ".obsidian-debug/playwright-trace.zip",
+    "screenshotPath": ".obsidian-debug/playwright-scenario.png",
+    "selectorTimeoutMs": 5000
+  },
+  "steps": [
+    {
+      "type": "surface-open"
+    },
+    {
+      "type": "sleep",
+      "ms": "${sleepAfterMs}"
+    },
+    {
+      "type": "locator-assert",
+      "selector": ".workspace-leaf.mod-active",
+      "state": "visible"
+    },
+    {
+      "type": "page-screenshot"
+    }
+  ]
+}

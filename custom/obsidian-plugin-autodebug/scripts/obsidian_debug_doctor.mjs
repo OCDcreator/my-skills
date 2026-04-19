@@ -23,6 +23,7 @@ import {
   buildHotReloadGuidance,
   detectHotReloadContext,
 } from './obsidian_debug_hot_reload_support.mjs';
+import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
@@ -244,6 +245,7 @@ const repoRuntime = packageJson
       },
     }
   : null;
+const testingFramework = await detectTestingFrameworkSupport({ repoDir });
 const buildScriptExists = Boolean(packageJson?.scripts?.build);
 
 const buildFixes = buildScriptExists
@@ -406,6 +408,59 @@ checks.push(
   buildScriptExists
     ? check('pass', 'build-script', 'build', 'package.json defines a build script', { path: packagePath })
     : check('warn', 'build-script', 'build', 'package.json is missing scripts.build; build fixes stay informational only', { path: packagePath }),
+);
+checks.push(
+  check(
+    testingFramework.available ? 'pass' : testingFramework.declared ? 'warn' : 'info',
+    'testing-framework-module',
+    'test',
+    testingFramework.detail,
+    {
+      testingFramework: {
+        available: testingFramework.available,
+        declared: testingFramework.declared,
+        moduleName: testingFramework.moduleName,
+        version: testingFramework.version,
+        resolvedPath: testingFramework.resolvedPath,
+        declaredDependencies: testingFramework.declaredDependencies,
+      },
+    },
+  ),
+);
+checks.push(
+  check(
+    testingFramework.scripts.length > 0 ? 'pass' : 'info',
+    'testing-framework-scripts',
+    'test',
+    testingFramework.scripts.length > 0
+      ? `Found repo-owned testing-framework script(s): ${testingFramework.scripts.map((entry) => entry.name).join(', ')}.`
+      : 'No package.json script invokes obsidian-testing-framework; keep the optional CI gate disabled until the repo owns one.',
+    {
+      scripts: testingFramework.scripts,
+    },
+  ),
+);
+checks.push(
+  check(
+    'info',
+    'ci-quality-gate-templates',
+    'ci',
+    'Headless quality-gate templates can be emitted for install/build/test/script dry-runs while desktop Obsidian reload/capture stays local-only.',
+    {
+      templateScript: path.join(toolRoot, 'scripts', 'obsidian_debug_ci_templates.mjs'),
+      ciSuitable: [
+        'repo-owned install/build/test commands',
+        'optional obsidian-testing-framework package script',
+        'obsidian_debug_job.mjs dry-run plans',
+      ],
+      localOnly: [
+        'fresh-vault bootstrap',
+        'desktop Obsidian reload',
+        'CLI/CDP log capture',
+        'screenshots, DOM snapshots, and Playwright traces',
+      ],
+    },
+  ),
 );
 
 if (manifest && expectedPluginId) {
@@ -713,6 +768,28 @@ const report = {
     targetTitleContains: cdpTargetTitleContains || null,
   },
   categoryCounts,
+  testingFramework: {
+    available: testingFramework.available,
+    declared: testingFramework.declared,
+    moduleName: testingFramework.moduleName,
+    version: testingFramework.version,
+    scripts: testingFramework.scripts,
+    detail: testingFramework.detail,
+  },
+  ciTemplates: {
+    script: path.join(toolRoot, 'scripts', 'obsidian_debug_ci_templates.mjs'),
+    ciSuitable: [
+      'repo-owned install/build/test commands',
+      'optional obsidian-testing-framework package script',
+      'obsidian_debug_job.mjs dry-run plans',
+    ],
+    localOnly: [
+      'fresh-vault bootstrap',
+      'desktop Obsidian reload',
+      'CLI/CDP log capture',
+      'screenshots, DOM snapshots, and Playwright traces',
+    ],
+  },
   hotReload: {
     ...hotReloadContext,
     guidance: hotReloadGuidance,

@@ -17,6 +17,13 @@ import {
   discoverSurface,
   selectSurfaceOpenStrategy,
 } from './obsidian_debug_surface_discovery.mjs';
+import {
+  detectPlaywrightSupport,
+  loadPlaywrightSupport,
+  normalizeScenarioAdapter,
+  resolvePlaywrightArtifactPaths,
+  selectPlaywrightPage,
+} from './obsidian_debug_playwright_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -32,14 +39,55 @@ const cdpHost = getStringOption(options, 'cdp-host', '127.0.0.1').trim();
 const cdpPort = getNumberOption(options, 'cdp-port', 0);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '').trim();
 const dryRun = getBooleanOption(options, 'dry-run', false);
+const cliAvailable = getBooleanOption(options, 'cli-available', obsidianCommand.length > 0);
+const scenarioAdapterOption = getStringOption(
+  options,
+  'scenario-adapter',
+  getStringOption(options, 'adapter', ''),
+).trim();
+const playwrightModuleNameOption = getStringOption(options, 'playwright-module', '').trim();
+const playwrightTraceOption = getBooleanOption(options, 'playwright-trace', false);
+const playwrightTracePathOption = getStringOption(options, 'playwright-trace-path', '').trim();
+const playwrightScreenshotPathOption = getStringOption(options, 'playwright-screenshot-path', '').trim();
+const playwrightSelectorTimeoutOption = getNumberOption(options, 'playwright-selector-timeout-ms', 5000);
 const outputPath = getStringOption(
   options,
   'output',
   path.resolve('.obsidian-debug/scenario-report.json'),
 );
 
-if (!obsidianCommand && !dryRun) {
-  throw new Error('--obsidian-command is required');
+if (!obsidianCommand && cliAvailable && !dryRun) {
+  throw new Error('--obsidian-command is required when CLI-backed scenario steps are enabled');
+}
+
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function stringValue(value, fallback = '') {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
+}
+
+function numberValue(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function booleanValue(value, fallback = false) {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+async function pathExists(filePath) {
+  if (!filePath) {
+    return false;
+  }
+
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function resolveScenarioPath() {
@@ -73,6 +121,10 @@ function normalizeArgs(args, context) {
 }
 
 function runObsidianCli(command, args) {
+  if (!obsidianCommand) {
+    throw new Error('Obsidian CLI is unavailable for obsidian-cli scenario steps.');
+  }
+
   const cliArgs = [];
   if (vaultName) {
     cliArgs.push(`vault=${vaultName}`);
@@ -101,6 +153,33 @@ function runObsidianCli(command, args) {
 
 const scenarioPath = resolveScenarioPath();
 const scenario = JSON.parse(await fs.readFile(scenarioPath, 'utf8'));
+const scenarioPlaywright = asObject(scenario.playwright);
+const scenarioAdapter = normalizeScenarioAdapter(
+  scenarioAdapterOption
+    || stringValue(scenario.adapter)
+    || (Object.keys(scenarioPlaywright).length > 0 ? 'playwright' : 'cli'),
+);
+const playwrightArtifacts = resolvePlaywrightArtifactPaths({
+  outputPath,
+  tracePath: playwrightTracePathOption || stringValue(scenarioPlaywright.tracePath),
+  screenshotPath: playwrightScreenshotPathOption || stringValue(scenarioPlaywright.screenshotPath),
+});
+const resolvedPlaywrightModuleName = playwrightModuleNameOption || stringValue(scenarioPlaywright.module);
+const resolvedPlaywrightTraceRequested = scenarioAdapter === 'playwright'
+  && (playwrightTraceOption || booleanValue(scenarioPlaywright.trace, false));
+const resolvedPlaywrightTracePath = resolvedPlaywrightTraceRequested
+  ? playwrightArtifacts.tracePath
+  : null;
+const explicitPlaywrightScreenshotPath = playwrightScreenshotPathOption || stringValue(scenarioPlaywright.screenshotPath);
+const resolvedPlaywrightScreenshotPath = explicitPlaywrightScreenshotPath
+  ? path.resolve(explicitPlaywrightScreenshotPath)
+  : null;
+const resolvedPlaywrightSelectorTimeoutMs = numberValue(
+  options.has('playwright-selector-timeout-ms')
+    ? playwrightSelectorTimeoutOption
+    : scenarioPlaywright.selectorTimeoutMs,
+  playwrightSelectorTimeoutOption,
+);
 const fallbackCommandId = scenarioCommandId || (pluginId ? `${pluginId}:open-view` : '');
 const surfaceDiscovery = await discoverSurface({
   surfaceProfilePath,
@@ -111,7 +190,7 @@ const surfaceDiscovery = await discoverSurface({
   cdpTargetTitleContains,
 });
 const selectedSurfaceStrategy = selectSurfaceOpenStrategy(surfaceDiscovery.strategies, {
-  cliAvailable: obsidianCommand.length > 0,
+  cliAvailable,
   cdpAvailable: !dryRun && cdpPort > 0,
   preferFirst: dryRun,
 });
@@ -124,11 +203,21 @@ const variableContext = {
       : fallbackCommandId,
   sleepAfterMs: scenarioSleepMs,
   surfaceProfilePath,
+  scenarioAdapter,
 };
 
 const executedSteps = [];
 let success = true;
 let cdpSession = null;
+let playwrightSetup = null;
+let playwrightSupport = null;
+let playwrightRuntime = null;
+let playwrightTraceStarted = false;
+let playwrightTraceCaptured = false;
+let playwrightTraceDetail = resolvedPlaywrightTraceRequested ? 'Trace capture is pending.' : 'Trace was not requested.';
+let playwrightScreenshotCaptured = false;
+let playwrightScreenshotPath = null;
+const warnings = [];
 
 async function getCdpSession() {
   if (cdpSession) {
@@ -144,6 +233,101 @@ async function getCdpSession() {
     targetTitleContains: cdpTargetTitleContains,
   });
   return cdpSession;
+}
+
+async function preparePlaywrightSetup() {
+  const startedAt = nowIso();
+  const support = await detectPlaywrightSupport({
+    repoDir: process.cwd(),
+    moduleName: resolvedPlaywrightModuleName,
+  });
+  playwrightSupport = support;
+
+  if (!support.available) {
+    return {
+      type: 'playwright-setup',
+      startedAt,
+      finishedAt: nowIso(),
+      ok: false,
+      adapter: scenarioAdapter,
+      error: [support.detail, ...support.errors].filter(Boolean).join(' '),
+      module: support,
+    };
+  }
+
+  if (cdpPort <= 0) {
+    return {
+      type: 'playwright-setup',
+      startedAt,
+      finishedAt: nowIso(),
+      ok: false,
+      adapter: scenarioAdapter,
+      error: 'Playwright adapter requires --cdp-port so it can attach to the running Obsidian window.',
+      module: support,
+    };
+  }
+
+  return {
+    type: 'playwright-setup',
+    startedAt,
+    finishedAt: nowIso(),
+    ok: true,
+    adapter: scenarioAdapter,
+    dryRun,
+    module: support,
+    cdp: {
+      host: cdpHost,
+      port: cdpPort,
+      targetTitleContains: cdpTargetTitleContains || null,
+    },
+  };
+}
+
+async function getPlaywrightRuntime() {
+  if (playwrightRuntime) {
+    return playwrightRuntime;
+  }
+
+  const support = await loadPlaywrightSupport({
+    repoDir: process.cwd(),
+    moduleName: resolvedPlaywrightModuleName,
+  });
+  playwrightSupport = support;
+  const browser = await support.chromium.connectOverCDP(`http://${cdpHost}:${cdpPort}`);
+  const selectedPage = await selectPlaywrightPage({
+    browser,
+    targetTitleContains: cdpTargetTitleContains,
+  });
+  selectedPage.page.setDefaultTimeout(Math.max(1, resolvedPlaywrightSelectorTimeoutMs));
+
+  if (resolvedPlaywrightTraceRequested) {
+    if (selectedPage.context?.tracing && typeof selectedPage.context.tracing.start === 'function') {
+      try {
+        await selectedPage.context.tracing.start({
+          screenshots: true,
+          snapshots: true,
+        });
+        playwrightTraceStarted = true;
+        playwrightTraceDetail = `Trace capture is enabled at ${resolvedPlaywrightTracePath}.`;
+      } catch (error) {
+        playwrightTraceDetail = `Playwright trace could not start: ${error instanceof Error ? error.message : String(error)}`;
+        warnings.push(playwrightTraceDetail);
+      }
+    } else {
+      playwrightTraceDetail = 'Playwright tracing is unavailable on the connected browser context.';
+      warnings.push(playwrightTraceDetail);
+    }
+  }
+
+  playwrightRuntime = {
+    support,
+    browser,
+    context: selectedPage.context,
+    page: selectedPage.page,
+    title: selectedPage.title,
+    url: selectedPage.url,
+  };
+  return playwrightRuntime;
 }
 
 async function runSurfaceOpenStep() {
@@ -273,8 +457,194 @@ async function runSurfaceOpenStep() {
   };
 }
 
+function resolvePlaywrightSelector(step) {
+  const selector = substituteTemplate(step.selector ?? step.locator ?? '', variableContext).trim();
+  if (!selector) {
+    throw new Error(`Scenario step ${step.type ?? 'unknown'} requires a selector.`);
+  }
+  return selector;
+}
+
+function resolveStepTimeoutMs(step, fallback = resolvedPlaywrightSelectorTimeoutMs) {
+  return numberValue(substituteTemplate(String(step.timeoutMs ?? ''), variableContext), fallback);
+}
+
+async function capturePlaywrightScreenshot({ page, stepPath = '', fullPage = false }) {
+  const targetPath = path.resolve(
+    stepPath
+      ? substituteTemplate(stepPath, variableContext)
+      : resolvedPlaywrightScreenshotPath || playwrightArtifacts.screenshotPath,
+  );
+  await ensureParentDirectory(targetPath);
+  await page.screenshot({
+    path: targetPath,
+    fullPage,
+  });
+  playwrightScreenshotCaptured = true;
+  playwrightScreenshotPath = targetPath;
+  return targetPath;
+}
+
+async function runPlaywrightStep(step) {
+  const runtime = await getPlaywrightRuntime();
+  const { page } = runtime;
+  const startedAt = nowIso();
+
+  if (step.type === 'locator-wait') {
+    const selector = resolvePlaywrightSelector(step);
+    const state = stringValue(step.state, 'visible');
+    const timeout = resolveStepTimeoutMs(step);
+    await page.locator(selector).first().waitFor({ state, timeout });
+    return {
+      type: 'locator-wait',
+      selector,
+      state,
+      timeout,
+      startedAt,
+      finishedAt: nowIso(),
+      ok: true,
+    };
+  }
+
+  if (step.type === 'locator-click') {
+    const selector = resolvePlaywrightSelector(step);
+    const timeout = resolveStepTimeoutMs(step);
+    await page.locator(selector).first().click({
+      timeout,
+      button: stringValue(step.button, 'left'),
+    });
+    return {
+      type: 'locator-click',
+      selector,
+      timeout,
+      startedAt,
+      finishedAt: nowIso(),
+      ok: true,
+    };
+  }
+
+  if (step.type === 'locator-fill') {
+    const selector = resolvePlaywrightSelector(step);
+    const value = substituteTemplate(step.value ?? '', variableContext);
+    const timeout = resolveStepTimeoutMs(step);
+    await page.locator(selector).first().fill(value, { timeout });
+    return {
+      type: 'locator-fill',
+      selector,
+      timeout,
+      value,
+      startedAt,
+      finishedAt: nowIso(),
+      ok: true,
+    };
+  }
+
+  if (step.type === 'locator-press') {
+    const selector = resolvePlaywrightSelector(step);
+    const key = substituteTemplate(step.key ?? '', variableContext).trim();
+    if (!key) {
+      throw new Error('locator-press steps require a key.');
+    }
+    const timeout = resolveStepTimeoutMs(step);
+    await page.locator(selector).first().press(key, { timeout });
+    return {
+      type: 'locator-press',
+      selector,
+      timeout,
+      key,
+      startedAt,
+      finishedAt: nowIso(),
+      ok: true,
+    };
+  }
+
+  if (step.type === 'locator-assert') {
+    const selector = resolvePlaywrightSelector(step);
+    const state = stringValue(step.state, 'visible');
+    const timeout = resolveStepTimeoutMs(step);
+    const locator = page.locator(selector);
+    await locator.first().waitFor({ state, timeout });
+    const count = await locator.count();
+    const expectedCount = step.count === undefined
+      ? null
+      : numberValue(substituteTemplate(String(step.count), variableContext), NaN);
+    if (Number.isFinite(expectedCount) && count !== expectedCount) {
+      throw new Error(`Expected ${selector} count=${expectedCount}, received ${count}.`);
+    }
+    const textIncludes = substituteTemplate(step.textIncludes ?? '', variableContext).trim();
+    const textMatches = substituteTemplate(step.textMatches ?? '', variableContext).trim();
+    const flags = substituteTemplate(step.regexFlags ?? '', variableContext).trim();
+    const actualText = count > 0
+      ? String(await locator.first().innerText()).replace(/\s+/g, ' ').trim()
+      : '';
+    if (textIncludes && !actualText.includes(textIncludes)) {
+      throw new Error(`Expected ${selector} text to include ${textIncludes}, received ${actualText || '(empty)'}.`);
+    }
+    if (textMatches) {
+      const matcher = new RegExp(textMatches, flags);
+      if (!matcher.test(actualText)) {
+        throw new Error(`Expected ${selector} text to match /${textMatches}/${flags}, received ${actualText || '(empty)'}.`);
+      }
+    }
+    return {
+      type: 'locator-assert',
+      selector,
+      state,
+      timeout,
+      count,
+      text: actualText,
+      startedAt,
+      finishedAt: nowIso(),
+      ok: true,
+    };
+  }
+
+  if (step.type === 'page-screenshot') {
+    const targetPath = await capturePlaywrightScreenshot({
+      page,
+      stepPath: stringValue(step.path),
+      fullPage: booleanValue(step.fullPage, false),
+    });
+    return {
+      type: 'page-screenshot',
+      path: targetPath,
+      fullPage: booleanValue(step.fullPage, false),
+      startedAt,
+      finishedAt: nowIso(),
+      ok: true,
+    };
+  }
+
+  throw new Error(`Unsupported Playwright scenario step type: ${step.type ?? 'unknown'}`);
+}
+
 try {
+  if (scenarioAdapter === 'playwright') {
+    playwrightSetup = await preparePlaywrightSetup();
+    executedSteps.push(playwrightSetup);
+    if (!playwrightSetup.ok) {
+      success = false;
+    } else if (!dryRun) {
+      try {
+        await getPlaywrightRuntime();
+      } catch (error) {
+        executedSteps.push({
+          type: 'playwright-runtime',
+          startedAt: nowIso(),
+          finishedAt: nowIso(),
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        success = false;
+      }
+    }
+  }
+
   for (const step of scenario.steps ?? []) {
+    if (!success) {
+      break;
+    }
+
     if (step.type === 'sleep') {
       const ms = Number(substituteTemplate(String(step.ms ?? 0), variableContext)) || 0;
       const startedAt = nowIso();
@@ -297,6 +667,47 @@ try {
         finishedAt: nowIso(),
         ok: true,
       });
+      continue;
+    }
+
+    if (
+      scenarioAdapter === 'playwright'
+      && ['locator-wait', 'locator-click', 'locator-fill', 'locator-press', 'locator-assert', 'page-screenshot'].includes(step.type)
+    ) {
+      if (dryRun) {
+        const selector = ['page-screenshot'].includes(step.type) ? null : resolvePlaywrightSelector(step);
+        executedSteps.push({
+          type: step.type,
+          selector,
+          path: step.type === 'page-screenshot'
+            ? path.resolve(
+              stringValue(step.path)
+                ? substituteTemplate(step.path, variableContext)
+                : resolvedPlaywrightScreenshotPath || playwrightArtifacts.screenshotPath,
+            )
+            : null,
+          startedAt: nowIso(),
+          finishedAt: nowIso(),
+          ok: true,
+          dryRun: true,
+        });
+        continue;
+      }
+
+      try {
+        const result = await runPlaywrightStep(step);
+        executedSteps.push(result);
+      } catch (error) {
+        executedSteps.push({
+          type: step.type,
+          startedAt: nowIso(),
+          finishedAt: nowIso(),
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        success = false;
+        break;
+      }
       continue;
     }
 
@@ -337,7 +748,9 @@ try {
     executedSteps.push({
       type: step.type ?? 'unknown',
       ok: false,
-      error: `Unsupported scenario step type: ${step.type ?? 'unknown'}`,
+      error: scenarioAdapter === 'playwright'
+        ? `Unsupported scenario step type for adapter ${scenarioAdapter}: ${step.type ?? 'unknown'}`
+        : `Unsupported scenario step type: ${step.type ?? 'unknown'}`,
       startedAt: nowIso(),
       finishedAt: nowIso(),
     });
@@ -345,14 +758,62 @@ try {
     break;
   }
 } finally {
+  if (
+    success
+    && scenarioAdapter === 'playwright'
+    && !dryRun
+    && resolvedPlaywrightScreenshotPath
+    && !playwrightScreenshotCaptured
+  ) {
+    try {
+      const runtime = await getPlaywrightRuntime();
+      await capturePlaywrightScreenshot({
+        page: runtime.page,
+        stepPath: resolvedPlaywrightScreenshotPath,
+      });
+    } catch (error) {
+      warnings.push(`Playwright screenshot capture failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (playwrightRuntime?.context && playwrightTraceStarted && resolvedPlaywrightTracePath) {
+    try {
+      await ensureParentDirectory(resolvedPlaywrightTracePath);
+      await playwrightRuntime.context.tracing.stop({
+        path: resolvedPlaywrightTracePath,
+      });
+      playwrightTraceCaptured = await pathExists(resolvedPlaywrightTracePath);
+      playwrightTraceDetail = playwrightTraceCaptured
+        ? `Captured Playwright trace at ${resolvedPlaywrightTracePath}.`
+        : `Playwright trace stop completed, but ${resolvedPlaywrightTracePath} was not written.`;
+    } catch (error) {
+      playwrightTraceCaptured = false;
+      playwrightTraceDetail = `Playwright trace capture failed: ${error instanceof Error ? error.message : String(error)}`;
+      warnings.push(playwrightTraceDetail);
+    }
+  }
+
+  if (playwrightRuntime?.browser) {
+    try {
+      await playwrightRuntime.browser.close();
+    } catch (error) {
+      warnings.push(`Playwright browser close reported: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   if (cdpSession) {
     await cdpSession.close();
   }
 }
 
+if (playwrightScreenshotPath && !playwrightScreenshotCaptured) {
+  playwrightScreenshotCaptured = await pathExists(playwrightScreenshotPath);
+}
+
 const report = {
   generatedAt: nowIso(),
   success,
+  adapter: scenarioAdapter,
   scenarioName: scenario.name ?? scenarioName ?? path.basename(scenarioPath, '.json'),
   description: scenario.description ?? '',
   scenarioPath,
@@ -360,8 +821,56 @@ const report = {
   vaultName: vaultName || null,
   pluginId: pluginId || null,
   dryRun,
+  warnings,
   variables: variableContext,
   steps: executedSteps,
+  artifacts: {
+    playwrightTrace: resolvedPlaywrightTracePath,
+    playwrightScreenshot: playwrightScreenshotPath,
+  },
+  playwright: scenarioAdapter === 'playwright'
+    ? {
+        module: playwrightSupport
+          ? {
+              available: playwrightSupport.available,
+              moduleName: playwrightSupport.moduleName,
+              version: playwrightSupport.version,
+              resolvedPath: playwrightSupport.resolvedPath,
+              detail: playwrightSupport.detail,
+              via: playwrightSupport.via,
+              errors: playwrightSupport.errors ?? [],
+            }
+          : null,
+        cdp: {
+          host: cdpHost,
+          port: cdpPort,
+          targetTitleContains: cdpTargetTitleContains || null,
+        },
+        page: playwrightRuntime
+          ? {
+              title: playwrightRuntime.title,
+              url: playwrightRuntime.url,
+            }
+          : null,
+        selectorTimeoutMs: resolvedPlaywrightSelectorTimeoutMs,
+        trace: {
+          requested: resolvedPlaywrightTraceRequested,
+          path: resolvedPlaywrightTracePath,
+          captured: playwrightTraceCaptured,
+          detail: playwrightTraceDetail,
+        },
+        screenshot: {
+          requested: Boolean(resolvedPlaywrightScreenshotPath || playwrightScreenshotCaptured),
+          path: playwrightScreenshotPath,
+          captured: playwrightScreenshotCaptured,
+          detail: playwrightScreenshotCaptured
+            ? `Captured Playwright screenshot at ${playwrightScreenshotPath}.`
+            : resolvedPlaywrightScreenshotPath
+              ? `Playwright screenshot was requested at ${resolvedPlaywrightScreenshotPath}.`
+              : 'Playwright screenshot was not requested.',
+        },
+      }
+    : null,
   surfaceDiscovery: {
     surfaceProfilePath: surfaceDiscovery.surfaceProfilePath,
     selectionReason: selectedSurfaceStrategy.reason,

@@ -48,6 +48,30 @@
       "prompt": "先跑 doctor，看这个 Obsidian 调试环境在 Node20/WebSocket/CDP 上有没有坑；如果 fresh vault 还没发现插件，也给出可执行修复方案。",
       "expected_output": "Runs the doctor with vault-aware plugin discovery checks, reports Node runtime WebSocket support for CDP, and emits a bootstrap-ready fix plan when the plugin is not yet discoverable.",
       "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "这个仓库用 pnpm，不要再默认 npm。先用 doctor 识别 packageManager/lockfile/Corepack，再生成一个能在 Windows 和 macOS 复用的 job plan。",
+      "expected_output": "Detects repo-owned package-manager signals such as packageManager, lockfiles, and build/dev/test scripts; reports Corepack/package-manager readiness; and emits a job plan that infers pnpm/yarn/bun commands instead of assuming npm-only workflows.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "这个插件的设置页需要更细的 UI 自动化。保留原来的 CLI/CDP 路径，但给我一个可选的 Playwright scenario：能点按钮、做 locator 断言，并把 trace/screenshot 链接进诊断报告。",
+      "expected_output": "Keeps the default CLI/CDP-first workflow available, detects whether Playwright is installed before opting in, supports Playwright locator steps through scenario config, and records trace/screenshot artifacts in diagnosis and HTML report outputs.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "我现在还没有真正的插件仓库。先帮我生成一个最小的 sample-plugin 工作区和 test-vault，再给出能直接跑 bootstrap/debug job 的配置，和已有插件 retrofit 流程区分清楚。",
+      "expected_output": "Scaffolds a minimal plugin-neutral sample workspace with local build output, a fresh-vault target, and generated autodebug job/assertion/surface files while clearly separating the sample scaffold flow from the existing-plugin retrofit flow.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "本地 smoke 已经通过了。现在给我一个可选的 obsidian-testing-framework 检测结果，再生成一套不依赖 secret 和本机绝对路径的 CI/headless 质量门模板，明确哪些步骤还只能本地桌面跑。",
+      "expected_output": "Reports whether obsidian-testing-framework is installed, merely declared, or absent; identifies any repo-owned scripts that already invoke it; emits headless quality-gate templates for Bash/PowerShell/GitHub Actions without machine-local absolute paths; and clearly separates CI-suitable checks from local-only Obsidian desktop phases.",
+      "files": []
     }
   ]
 }
