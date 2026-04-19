@@ -35,6 +35,18 @@ SCHEMA_REQUIRED_TYPES: dict[str, tuple[type, ...]] = {
     "object": (dict,),
     "null": (type(None),),
 }
+LANE_OVERRIDE_KEYS = {
+    "focus_hint",
+    "phase_doc_prefix",
+    "starting_phase_doc",
+    "roadmap_path",
+    "prompt_template",
+    "commit_prefix",
+}
+LEGACY_LANE_ID = "legacy-lane"
+LANE_ACTIVE_STATUS = "active"
+LANE_PENDING_STATUS = "pending"
+LANE_COMPLETE_STATUS = "complete"
 
 
 def ensure_console_streams() -> None:
@@ -82,6 +94,314 @@ def resolve_repo_path(path_value: str) -> Path:
     if path.is_absolute():
         return path.resolve()
     return (REPO_ROOT / path).resolve()
+
+
+def normalize_path_text(path_value: Any) -> str:
+    return clean_string(path_value).replace("\\", "/")
+
+
+def ensure_path_within_repo(path_value: str, *, label: str, must_exist: bool = False) -> Path:
+    normalized = normalize_path_text(path_value)
+    if not normalized:
+        raise AutopilotError(f"{label} is required.")
+    resolved = resolve_repo_path(normalized)
+    try:
+        resolved.relative_to(REPO_ROOT)
+    except ValueError as exc:
+        raise AutopilotError(f"{label} must stay within the repository: {normalized}") from exc
+    if must_exist and not resolved.exists():
+        raise AutopilotError(f"{label} was not found: {normalized}")
+    return resolved
+
+
+def infer_roadmap_path_text_from_phase_doc(phase_doc_path: str) -> str:
+    normalized_phase_doc = normalize_path_text(phase_doc_path)
+    if not normalized_phase_doc:
+        return ""
+    match = re.match(r"^(?P<prefix>.+?)phase-\d+\.md$", normalized_phase_doc)
+    if not match:
+        return ""
+    return f"{match.group('prefix')}round-roadmap.md"
+
+
+def synthesize_legacy_lane(base_config: dict[str, Any]) -> dict[str, Any]:
+    phase_doc_prefix = normalize_path_text(base_config.get("phase_doc_prefix"))
+    starting_phase_doc = normalize_path_text(base_config.get("starting_phase_doc"))
+    if not starting_phase_doc and phase_doc_prefix:
+        starting_phase_doc = f"{phase_doc_prefix}0.md"
+    roadmap_path = normalize_path_text(base_config.get("roadmap_path"))
+    if not roadmap_path and starting_phase_doc:
+        roadmap_path = infer_roadmap_path_text_from_phase_doc(starting_phase_doc)
+    return {
+        "id": LEGACY_LANE_ID,
+        "label": clean_string(base_config.get("focus_hint")) or "Legacy lane",
+        "focus_hint": clean_string(base_config.get("focus_hint")) or "Legacy lane",
+        "phase_doc_prefix": phase_doc_prefix,
+        "starting_phase_doc": starting_phase_doc,
+        "roadmap_path": roadmap_path,
+        "prompt_template": normalize_path_text(base_config.get("prompt_template")) or "automation/round-prompt.md",
+        "commit_prefix": clean_string(base_config.get("commit_prefix")),
+    }
+
+
+def normalize_lane_config(raw_lane: dict[str, Any], *, lane_index: int, shared_defaults: dict[str, Any]) -> dict[str, Any]:
+    lane_id = clean_string(raw_lane.get("id"))
+    if not lane_id:
+        raise AutopilotError(f"lanes[{lane_index}] is missing id.")
+
+    phase_doc_prefix = normalize_path_text(raw_lane.get("phase_doc_prefix"))
+    starting_phase_doc = normalize_path_text(raw_lane.get("starting_phase_doc"))
+    if not starting_phase_doc and phase_doc_prefix:
+        starting_phase_doc = f"{phase_doc_prefix}0.md"
+
+    roadmap_path = normalize_path_text(raw_lane.get("roadmap_path"))
+    if not roadmap_path and starting_phase_doc:
+        roadmap_path = infer_roadmap_path_text_from_phase_doc(starting_phase_doc)
+
+    normalized_lane = {
+        "id": lane_id,
+        "label": clean_string(raw_lane.get("label")) or lane_id,
+        "focus_hint": clean_string(raw_lane.get("focus_hint")) or clean_string(shared_defaults.get("focus_hint")) or lane_id,
+        "phase_doc_prefix": phase_doc_prefix,
+        "starting_phase_doc": starting_phase_doc,
+        "roadmap_path": roadmap_path,
+        "prompt_template": normalize_path_text(raw_lane.get("prompt_template") or shared_defaults.get("prompt_template"))
+        or "automation/round-prompt.md",
+        "commit_prefix": clean_string(
+            raw_lane["commit_prefix"] if "commit_prefix" in raw_lane else shared_defaults.get("commit_prefix")
+        ),
+    }
+    return normalized_lane
+
+
+def validate_lane_configs(config: dict[str, Any]) -> None:
+    seen_lane_ids: set[str] = set()
+    for lane in config["lanes"]:
+        lane_id = lane["id"]
+        if lane_id in seen_lane_ids:
+            raise AutopilotError(f"Duplicate lane id '{lane_id}' in autopilot-config.json.")
+        seen_lane_ids.add(lane_id)
+
+        prefix_text = normalize_path_text(lane.get("phase_doc_prefix"))
+        if not prefix_text:
+            raise AutopilotError(f"Lane '{lane_id}' is missing phase_doc_prefix.")
+        starting_phase_doc = normalize_path_text(lane.get("starting_phase_doc"))
+        roadmap_path = normalize_path_text(lane.get("roadmap_path"))
+        prompt_template = normalize_path_text(lane.get("prompt_template"))
+
+        ensure_path_within_repo(f"{prefix_text}0.md", label=f"Lane '{lane_id}' phase_doc_prefix probe")
+        ensure_path_within_repo(starting_phase_doc, label=f"Lane '{lane_id}' starting_phase_doc", must_exist=True)
+        ensure_path_within_repo(roadmap_path, label=f"Lane '{lane_id}' roadmap_path", must_exist=True)
+        ensure_path_within_repo(prompt_template, label=f"Lane '{lane_id}' prompt_template", must_exist=True)
+
+        if not starting_phase_doc.startswith(prefix_text):
+            raise AutopilotError(
+                f"Lane '{lane_id}' starting_phase_doc must stay under phase_doc_prefix: "
+                f"{starting_phase_doc} vs {prefix_text}"
+            )
+
+
+def normalize_lanes_config(config: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(config)
+    lanes_raw = normalized.get("lanes")
+    legacy_lane_mode = not isinstance(lanes_raw, list) or not lanes_raw
+    if legacy_lane_mode:
+        lanes_raw = [synthesize_legacy_lane(normalized)]
+
+    shared_defaults = {
+        "focus_hint": clean_string(normalized.get("focus_hint")),
+        "prompt_template": normalize_path_text(normalized.get("prompt_template")) or "automation/round-prompt.md",
+        "commit_prefix": clean_string(normalized.get("commit_prefix")),
+    }
+    normalized["lanes"] = [
+        normalize_lane_config(lane, lane_index=index, shared_defaults=shared_defaults)
+        for index, lane in enumerate(lanes_raw)
+    ]
+    normalized["legacy_lane_mode"] = legacy_lane_mode
+    validate_lane_configs(normalized)
+    return normalized
+
+
+def config_lane_map(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {lane["id"]: lane for lane in config.get("lanes", [])}
+
+
+def parse_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def build_initial_lane_progress(config: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    lane_progress: dict[str, dict[str, Any]] = {}
+    initial_phase_number = parse_int(config.get("next_phase_number"), 1)
+    for index, lane in enumerate(config["lanes"]):
+        lane_progress[lane["id"]] = {
+            "status": LANE_ACTIVE_STATUS if index == 0 else LANE_PENDING_STATUS,
+            "next_phase_number": initial_phase_number if index == 0 else 1,
+            "last_phase_doc": lane["starting_phase_doc"],
+        }
+    return lane_progress
+
+
+def active_lane_id_for_state(state: dict[str, Any], config: dict[str, Any]) -> str:
+    lane_map = config_lane_map(config)
+    active_lane_id = clean_string(state.get("active_lane_id"))
+    if active_lane_id in lane_map:
+        return active_lane_id
+    if not config.get("lanes"):
+        raise AutopilotError("No lane configuration is available.")
+    return config["lanes"][0]["id"]
+
+
+def normalize_state_for_lanes(state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    normalized_state = dict(state)
+    lane_map = config_lane_map(config)
+    fallback_active_lane_id = clean_string(normalized_state.get("active_lane_id"))
+    if fallback_active_lane_id not in lane_map:
+        fallback_active_lane_id = config["lanes"][0]["id"]
+
+    raw_lane_progress = normalized_state.get("lane_progress")
+    if not isinstance(raw_lane_progress, dict):
+        raw_lane_progress = {}
+
+    lane_progress: dict[str, dict[str, Any]] = {}
+    fallback_phase_number = parse_int(normalized_state.get("next_phase_number"), parse_int(config.get("next_phase_number"), 1))
+    fallback_phase_doc = normalize_path_text(normalized_state.get("last_phase_doc"))
+    for lane in config["lanes"]:
+        lane_id = lane["id"]
+        raw_progress = raw_lane_progress.get(lane_id)
+        if not isinstance(raw_progress, dict):
+            raw_progress = {}
+        if config.get("legacy_lane_mode") and lane_id == fallback_active_lane_id and not raw_progress:
+            lane_progress[lane_id] = {
+                "status": clean_string(normalized_state.get("status")) or LANE_ACTIVE_STATUS,
+                "next_phase_number": fallback_phase_number,
+                "last_phase_doc": fallback_phase_doc or lane["starting_phase_doc"],
+            }
+            continue
+        lane_progress[lane_id] = {
+            "status": clean_string(raw_progress.get("status")) or (LANE_ACTIVE_STATUS if lane_id == fallback_active_lane_id else LANE_PENDING_STATUS),
+            "next_phase_number": parse_int(raw_progress.get("next_phase_number"), 1),
+            "last_phase_doc": normalize_path_text(raw_progress.get("last_phase_doc")) or lane["starting_phase_doc"],
+        }
+
+    normalized_state["active_lane_id"] = fallback_active_lane_id
+    normalized_state["lane_progress"] = lane_progress
+    sync_active_lane_mirror_fields(normalized_state, config)
+    return normalized_state
+
+
+def sync_active_lane_mirror_fields(state: dict[str, Any], config: dict[str, Any]) -> None:
+    lane_id = active_lane_id_for_state(state, config)
+    lane_progress = state["lane_progress"][lane_id]
+    state["active_lane_id"] = lane_id
+    state["next_phase_number"] = parse_int(lane_progress.get("next_phase_number"), 1)
+    state["last_phase_doc"] = normalize_path_text(lane_progress.get("last_phase_doc"))
+
+
+def active_lane_config(state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    return config_lane_map(config)[active_lane_id_for_state(state, config)]
+
+
+def active_lane_progress(state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
+    return state["lane_progress"][active_lane_id_for_state(state, config)]
+
+
+def set_active_lane(state: dict[str, Any], config: dict[str, Any], lane_id: str) -> None:
+    for lane in config["lanes"]:
+        lane_progress = state["lane_progress"][lane["id"]]
+        if lane["id"] == lane_id:
+            lane_progress["status"] = LANE_ACTIVE_STATUS
+        elif clean_string(lane_progress.get("status")) != LANE_COMPLETE_STATUS:
+            lane_progress["status"] = LANE_PENDING_STATUS
+    state["active_lane_id"] = lane_id
+    sync_active_lane_mirror_fields(state, config)
+
+
+def mark_lane_complete(state: dict[str, Any], lane_id: str) -> None:
+    if lane_id in state.get("lane_progress", {}):
+        state["lane_progress"][lane_id]["status"] = LANE_COMPLETE_STATUS
+
+
+def increment_active_lane_phase(state: dict[str, Any], config: dict[str, Any]) -> None:
+    lane_progress = active_lane_progress(state, config)
+    lane_progress["next_phase_number"] = parse_int(lane_progress.get("next_phase_number"), 1) + 1
+    sync_active_lane_mirror_fields(state, config)
+
+
+def lane_runtime_config(config: dict[str, Any], lane: dict[str, Any]) -> dict[str, Any]:
+    runtime_config = dict(config)
+    for override_key in LANE_OVERRIDE_KEYS:
+        runtime_config[override_key] = lane.get(override_key, runtime_config.get(override_key))
+    return runtime_config
+
+
+def read_lane_queue_progress(
+    config: dict[str, Any] | None,
+    *,
+    state: dict[str, Any] | None = None,
+    lane_id: str | None = None,
+) -> dict[str, Any] | None:
+    roadmap_path: Path | None = None
+    if config and lane_id:
+        lane = config_lane_map(config).get(lane_id)
+        if lane:
+            roadmap_path = resolve_repo_path(lane["roadmap_path"])
+    if roadmap_path is None and state is not None:
+        roadmap_path = infer_round_roadmap_path_from_phase_doc(clean_string(state.get("last_phase_doc")))
+    if roadmap_path is None or not roadmap_path.exists():
+        return None
+
+    counts = {"DONE": 0, "NEXT": 0, "QUEUED": 0}
+    try:
+        roadmap_text = read_text(roadmap_path)
+    except OSError:
+        return None
+
+    for raw_line in roadmap_text.splitlines():
+        line = raw_line.strip()
+        match = QUEUE_ITEM_STATUS_RE.match(line)
+        if not match:
+            continue
+        counts[match.group(1)] += 1
+
+    total_count = counts["DONE"] + counts["NEXT"] + counts["QUEUED"]
+    remaining_count = counts["NEXT"] + counts["QUEUED"]
+    return {
+        "roadmap_path": roadmap_path,
+        "counts": counts,
+        "done_count": counts["DONE"],
+        "total_count": total_count,
+        "remaining_count": remaining_count,
+    }
+
+
+def has_remaining_lane_work(config: dict[str, Any], state: dict[str, Any], lane_id: str) -> bool:
+    queue_progress = read_lane_queue_progress(config, state=state, lane_id=lane_id)
+    if queue_progress is None:
+        return False
+    return int(queue_progress["remaining_count"]) > 0
+
+
+def next_unfinished_lane_id(config: dict[str, Any], state: dict[str, Any], *, after_lane_id: str | None = None) -> str | None:
+    started = after_lane_id is None
+    for lane in config["lanes"]:
+        lane_id = lane["id"]
+        if not started:
+            if lane_id == after_lane_id:
+                started = True
+            continue
+        if lane_id == after_lane_id:
+            continue
+        if has_remaining_lane_work(config, state, lane_id):
+            return lane_id
+    return None
+
+
+def has_any_unfinished_lane_work(config: dict[str, Any], state: dict[str, Any]) -> bool:
+    return any(has_remaining_lane_work(config, state, lane["id"]) for lane in config["lanes"])
 
 
 def read_text(path: Path) -> str:
@@ -134,7 +454,7 @@ def append_controller_requirements(prompt_text: str, config: dict[str, Any]) -> 
         "- The final JSON `commit_message` must exactly equal `git log -1 --pretty=%s`.",
         "- If `build_ran` is `true`, set a non-empty `build_id` taken from the actual build artifact, hash, or generated build marker.",
         "- If no reliable build identifier was produced, set `build_ran` to `false` instead of inventing a `build_id`.",
-        "- If `deploy_ran` is `true`, only report it when the lane actually performed a deploy step required by config.",
+        "- If `deploy_ran` is `true`, only report it when this round actually performed a deploy step required by config.",
         "- If `deploy_ran` is `true`, also set `deploy_verified` to `true` only after the configured deploy verification step really passed.",
     ]
     if commit_prefix:
@@ -261,15 +581,19 @@ def run_shell_command(
 
 def new_state(config: dict[str, Any]) -> dict[str, Any]:
     timestamp = now_timestamp()
+    lane_progress = build_initial_lane_progress(config)
+    initial_lane_id = config["lanes"][0]["id"]
     return {
         "status": "active",
         "current_round": 0,
         "consecutive_failures": 0,
-        "next_phase_number": int(config["next_phase_number"]),
-        "last_phase_doc": str(config["starting_phase_doc"]),
+        "active_lane_id": initial_lane_id,
+        "lane_progress": lane_progress,
+        "next_phase_number": lane_progress[initial_lane_id]["next_phase_number"],
+        "last_phase_doc": lane_progress[initial_lane_id]["last_phase_doc"],
         "last_commit_sha": None,
         "last_summary": None,
-        "last_next_focus": str(config["focus_hint"]),
+        "last_next_focus": active_lane_config({"active_lane_id": initial_lane_id, "lane_progress": lane_progress}, config)["focus_hint"],
         "last_result": None,
         "last_blocking_reason": None,
         "vulture_command": clean_string(config.get("vulture_command")),
@@ -289,66 +613,35 @@ def save_state(state: dict[str, Any], state_path: Path) -> None:
 
 
 def infer_round_roadmap_path_from_phase_doc(phase_doc_path: str) -> Path | None:
-    normalized_phase_doc = clean_string(phase_doc_path).replace("\\", "/")
-    if not normalized_phase_doc:
+    roadmap_path_text = infer_roadmap_path_text_from_phase_doc(phase_doc_path)
+    if not roadmap_path_text:
         return None
 
-    match = re.match(r"^(?P<prefix>.+?)phase-\d+\.md$", normalized_phase_doc)
-    if not match:
-        return None
-
-    roadmap_path = resolve_repo_path(f"{match.group('prefix')}round-roadmap.md")
+    roadmap_path = resolve_repo_path(roadmap_path_text)
     if roadmap_path.exists():
         return roadmap_path
     return None
 
 
-def read_queue_status_counts_from_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
+def read_queue_status_counts_from_state(state: dict[str, Any] | None, config: dict[str, Any] | None = None) -> dict[str, Any] | None:
     if state is None:
         return None
-
-    roadmap_path = infer_round_roadmap_path_from_phase_doc(clean_string(state.get("last_phase_doc")))
-    if roadmap_path is None:
-        return None
-
-    counts = {"DONE": 0, "NEXT": 0, "QUEUED": 0}
-    try:
-        roadmap_text = read_text(roadmap_path)
-    except OSError:
-        return None
-
-    for raw_line in roadmap_text.splitlines():
-        line = raw_line.strip()
-        match = QUEUE_ITEM_STATUS_RE.match(line)
-        if not match:
-            continue
-        counts[match.group(1)] += 1
-
-    return {
-        "roadmap_path": roadmap_path,
-        "counts": counts,
-    }
+    lane_id = clean_string(state.get("active_lane_id"))
+    return read_lane_queue_progress(config, state=state, lane_id=lane_id or None)
 
 
-def has_unfinished_queue_work(state: dict[str, Any] | None) -> bool:
-    queue_status = read_queue_status_counts_from_state(state)
+def has_unfinished_queue_work(state: dict[str, Any] | None, config: dict[str, Any] | None = None) -> bool:
+    queue_status = read_queue_status_counts_from_state(state, config)
     if queue_status is None:
         return False
-
-    counts = queue_status["counts"]
-    return int(counts.get("NEXT", 0)) + int(counts.get("QUEUED", 0)) > 0
+    return int(queue_status.get("remaining_count", 0)) > 0
 
 
-def ensure_next_phase_after_completed_round(state: dict[str, Any]) -> None:
-    try:
-        current_round = int(state.get("current_round", 0))
-        next_phase_number = int(state.get("next_phase_number", 1))
-    except (TypeError, ValueError):
-        return
-
-    minimum_next_phase = current_round + 1
-    if next_phase_number < minimum_next_phase:
-        state["next_phase_number"] = minimum_next_phase
+def ensure_next_phase_after_completed_round(state: dict[str, Any], config: dict[str, Any]) -> None:
+    lane_progress = active_lane_progress(state, config)
+    if parse_int(lane_progress.get("next_phase_number"), 0) < 1:
+        lane_progress["next_phase_number"] = 1
+    sync_active_lane_mirror_fields(state, config)
 
 
 def resume_state_if_threshold_allows(
@@ -356,14 +649,19 @@ def resume_state_if_threshold_allows(
     config: dict[str, Any],
     state_path: Path,
 ) -> dict[str, Any]:
+    state = normalize_state_for_lanes(state, config)
     previous_status = clean_string(state.get("status"))
     should_resume = False
     if previous_status == "stopped_max_rounds":
         should_resume = int(state["current_round"]) < int(config["max_rounds"])
     elif previous_status == "stopped_failures":
         should_resume = int(state["consecutive_failures"]) < int(config["max_consecutive_failures"])
-    elif previous_status == "complete" and has_unfinished_queue_work(state):
-        ensure_next_phase_after_completed_round(state)
+    elif previous_status == "complete" and has_any_unfinished_lane_work(config, state):
+        if not has_remaining_lane_work(config, state, active_lane_id_for_state(state, config)):
+            next_lane_id = next_unfinished_lane_id(config, state)
+            if next_lane_id:
+                set_active_lane(state, config, next_lane_id)
+        ensure_next_phase_after_completed_round(state, config)
         should_resume = True
 
     if not should_resume:
@@ -387,7 +685,26 @@ def is_working_tree_dirty() -> bool:
     return bool(run_git(["status", "--porcelain"]).stdout.strip())
 
 
+def preserve_worktree_before_reset(target_head_sha: str) -> None:
+    current_head = get_head_sha()
+    snapshot_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if current_head and current_head != target_head_sha:
+        safety_ref = f"refs/autopilot/safety/{snapshot_id}-{current_head[:12]}"
+        run_git(["update-ref", safety_ref, current_head])
+        info(f"Preserved pre-reset HEAD at {safety_ref}.")
+
+    if is_working_tree_dirty():
+        stash_message = f"autopilot safety before reset to {target_head_sha[:12]} at {snapshot_id}"
+        stash_result = run_git(["stash", "push", "--include-untracked", "-m", stash_message], check=False)
+        combined = "\n".join(part for part in (stash_result.stdout, stash_result.stderr) if clean_string(part))
+        if stash_result.returncode != 0:
+            raise AutopilotError(f"Failed to preserve dirty worktree before reset: {combined}")
+        if "No local changes to save" not in combined:
+            info(f"Preserved dirty worktree in git stash: {stash_message}")
+
+
 def reset_worktree_to_head(head_sha: str) -> None:
+    preserve_worktree_before_reset(head_sha)
     run_git(["reset", "--hard", head_sha])
     run_git(["clean", "-fd"])
 
@@ -655,6 +972,11 @@ def load_config(config_path_value: str, profile_name: str, profile_path_override
     merged_config.setdefault("deploy_required_paths", [])
     merged_config.setdefault("deploy_verify_path", "")
     merged_config.setdefault("vulture_command", "")
+    merged_config.setdefault("prompt_template", "automation/round-prompt.md")
+    merged_config.setdefault("commit_prefix", "")
+    merged_config.setdefault("focus_hint", "")
+    merged_config.setdefault("next_phase_number", 1)
+    merged_config = normalize_lanes_config(merged_config)
     return merged_config, config_path, profile_path
 
 
@@ -879,14 +1201,7 @@ def resolve_runner_executable(config: dict[str, Any]) -> str:
             return str(runner_path)
         raise AutopilotError(f"Configured runner_command was not found: {configured_runner}")
 
-    if os.name == "nt":
-        for candidate in ("codex.exe", "codex", "codex.cmd"):
-            resolved = shutil.which(candidate)
-            if resolved:
-                return resolved
-        return "codex.exe"
-
-    return shutil.which("codex") or shutil.which("codex.cmd") or "codex"
+    return shutil.which("codex.cmd") or shutil.which("codex") or "codex"
 
 
 def invoke_runner_round(
@@ -999,6 +1314,7 @@ def build_history_entry(
     *,
     attempt_number: int,
     phase_number: int,
+    lane_id: str,
     result: dict[str, Any] | None,
     failure_reason: str | None,
 ) -> dict[str, Any]:
@@ -1006,6 +1322,7 @@ def build_history_entry(
         "timestamp": now_timestamp(),
         "round": attempt_number,
         "phase_number": phase_number,
+        "lane_id": clean_string(result.get("lane_id") if result else lane_id) or lane_id,
         "status": "failure" if failure_reason else clean_string(result.get("status") if result else ""),
         "phase_doc": result.get("phase_doc_path") if result else None,
         "commit_sha": result.get("commit_sha") if result else None,
@@ -1015,12 +1332,31 @@ def build_history_entry(
     }
 
 
+def advance_lane_after_nonfailure(state: dict[str, Any], config: dict[str, Any], *, completed_lane_id: str) -> None:
+    increment_active_lane_phase(state, config)
+    if has_remaining_lane_work(config, state, completed_lane_id):
+        set_active_lane(state, config, completed_lane_id)
+        state["status"] = "active"
+        return
+
+    mark_lane_complete(state, completed_lane_id)
+    next_lane_id = next_unfinished_lane_id(config, state, after_lane_id=completed_lane_id)
+    if next_lane_id:
+        set_active_lane(state, config, next_lane_id)
+        state["status"] = "active"
+        state["last_next_focus"] = config_lane_map(config)[next_lane_id]["focus_hint"]
+        return
+
+    state["status"] = "complete"
+
+
 def validate_round_result(
     *,
     attempt_number: int,
     result: dict[str, Any],
     schema: dict[str, Any],
     phase_doc_relative_path: str,
+    expected_lane_id: str,
     config: dict[str, Any],
     ending_head: str,
     working_tree_dirty: bool,
@@ -1031,6 +1367,12 @@ def validate_round_result(
         return " ".join(validation_errors)
 
     status = clean_string(result.get("status"))
+    reported_lane_id = clean_string(result.get("lane_id"))
+    if reported_lane_id != expected_lane_id:
+        validation_errors.append(
+            f"Result lane_id '{reported_lane_id}' does not match active lane '{expected_lane_id}'."
+        )
+
     if status == "success":
         phase_doc_path_from_result = clean_string(result.get("phase_doc_path"))
         if not phase_doc_path_from_result:
@@ -1126,7 +1468,7 @@ def validate_round_result(
         if not blocking_reason:
             validation_errors.append("Agent reported failure without blocking_reason.")
         else:
-            return blocking_reason
+            return " ".join(validation_errors + [blocking_reason]) if validation_errors else blocking_reason
     elif status == "goal_complete":
         if working_tree_dirty:
             validation_errors.append("goal_complete returned with a dirty working tree.")
@@ -1164,7 +1506,6 @@ def run_start(args: argparse.Namespace) -> int:
     runtime_directory = state_path.parent
     runtime_directory.mkdir(parents=True, exist_ok=True)
 
-    template_path = resolve_repo_path(str(config["prompt_template"]))
     schema_path = resolve_repo_path(str(config["result_schema"]))
     schema = read_json(schema_path)
 
@@ -1176,8 +1517,8 @@ def run_start(args: argparse.Namespace) -> int:
         raise AutopilotError(f"Required command(s) not found in PATH: {', '.join(missing_commands)}")
 
     state = read_json(state_path) if state_path.exists() else new_state(config)
-    if not state_path.exists():
-        save_state(state, state_path)
+    state = normalize_state_for_lanes(state, config)
+    save_state(state, state_path)
     state = resume_state_if_threshold_allows(state, config, state_path)
 
     current_branch = get_current_branch()
@@ -1192,7 +1533,6 @@ def run_start(args: argparse.Namespace) -> int:
         raise AutopilotError("Working tree must be clean before unattended execution.")
 
     rounds_executed = 0
-    template_text = read_text(template_path)
     head_sha = get_head_sha()
 
     with autopilot_lock(
@@ -1232,8 +1572,14 @@ def run_start(args: argparse.Namespace) -> int:
                 break
 
             attempt_number = int(state["current_round"]) + 1
-            phase_number = int(state["next_phase_number"])
-            phase_doc_relative_path = f"{config['phase_doc_prefix']}{phase_number}.md"
+            current_lane = active_lane_config(state, config)
+            current_lane_id = current_lane["id"]
+            current_lane_progress = active_lane_progress(state, config)
+            round_config = lane_runtime_config(config, current_lane)
+            template_path = resolve_repo_path(str(round_config["prompt_template"]))
+            template_text = read_text(template_path)
+            phase_number = parse_int(current_lane_progress.get("next_phase_number"), 1)
+            phase_doc_relative_path = f"{current_lane['phase_doc_prefix']}{phase_number}.md"
             round_directory = runtime_directory / f"round-{attempt_number:03d}"
             round_directory.mkdir(parents=True, exist_ok=True)
 
@@ -1261,11 +1607,14 @@ def run_start(args: argparse.Namespace) -> int:
                     "vulture_command": clean_string(config.get("vulture_command")),
                     "runner_kind": clean_string(config.get("runner_kind")),
                     "runner_model": clean_string(config.get("runner_model")),
-                    "commit_prefix": config["commit_prefix"],
+                    "commit_prefix": round_config["commit_prefix"],
                     "platform_note": config.get("platform_note", ""),
+                    "current_lane_id": current_lane_id,
+                    "current_lane_label": current_lane["label"],
+                    "current_lane_roadmap": current_lane["roadmap_path"],
                 },
             )
-            rendered_prompt = append_controller_requirements(rendered_prompt, config)
+            rendered_prompt = append_controller_requirements(rendered_prompt, round_config)
             prompt_path.write_bytes(rendered_prompt.encode("utf-8"))
 
             if args.dry_run:
@@ -1320,7 +1669,8 @@ def run_start(args: argparse.Namespace) -> int:
                     result=result,
                     schema=schema,
                     phase_doc_relative_path=phase_doc_relative_path,
-                    config=config,
+                    expected_lane_id=current_lane_id,
+                    config=round_config,
                     ending_head=ending_head,
                     working_tree_dirty=working_tree_dirty,
                 )
@@ -1329,6 +1679,7 @@ def run_start(args: argparse.Namespace) -> int:
             history_entry = build_history_entry(
                 attempt_number=attempt_number,
                 phase_number=phase_number,
+                lane_id=current_lane_id,
                 result=result,
                 failure_reason=failure_reason,
             )
@@ -1364,20 +1715,25 @@ def run_start(args: argparse.Namespace) -> int:
             if clean_string(result.get("next_focus")):
                 state["last_next_focus"] = result["next_focus"]
             if clean_string(result.get("phase_doc_path")):
-                state["last_phase_doc"] = result["phase_doc_path"]
+                state["lane_progress"][current_lane_id]["last_phase_doc"] = result["phase_doc_path"]
             if clean_string(result.get("commit_sha")):
                 state["last_commit_sha"] = result["commit_sha"]
 
+            sync_active_lane_mirror_fields(state, config)
+
             if result["status"] == "success":
-                state["next_phase_number"] = int(state["next_phase_number"]) + 1
+                advance_lane_after_nonfailure(state, config, completed_lane_id=current_lane_id)
                 info(f"Round {attempt_number} succeeded with commit {result['commit_sha']}.")
             elif result["status"] == "goal_complete":
-                if has_unfinished_queue_work(state):
-                    ensure_next_phase_after_completed_round(state)
-                    info("Round reported goal_complete for the queued slice; roadmap still has pending work.")
-                else:
-                    state["status"] = "complete"
+                advance_lane_after_nonfailure(state, config, completed_lane_id=current_lane_id)
+                if clean_string(state.get("status")) == "complete":
                     info("Autopilot objective reported complete.")
+                else:
+                    info("Round reported goal_complete; controller advanced without wasting an empty discovery round.")
+
+            if clean_string(state.get("status")) != "complete" and active_lane_id_for_state(state, config) != current_lane_id:
+                next_lane = active_lane_config(state, config)
+                info(f"Switching active lane to {next_lane['id']}.")
 
             if clean_string(config.get("vulture_command")):
                 refresh_vulture_metrics(state, config)
@@ -1388,11 +1744,15 @@ def run_start(args: argparse.Namespace) -> int:
 
 
 def print_state_summary(state: dict[str, Any], *, runtime_directory: Path | None = None) -> None:
+    queue_progress = read_watch_queue_progress(state)
+    lane_id = clean_string(state.get("active_lane_id")) or "legacy"
     print(
         "[status] "
         f"status={state.get('status')} round={state.get('current_round')} "
-        f"failures={state.get('consecutive_failures')} next_phase={state.get('next_phase_number')}"
+        f"lane={lane_id} phase={state.get('next_phase_number')} failures={state.get('consecutive_failures')}"
     )
+    if queue_progress and queue_progress.get("total_count") is not None:
+        print(f"[status] queue: {queue_progress['done_count']}/{queue_progress['total_count']} done")
     if state.get("last_phase_doc"):
         print(f"[status] last phase doc: {state.get('last_phase_doc')}")
     if state.get("last_next_focus"):
@@ -1511,19 +1871,10 @@ def read_watch_queue_progress(state: dict[str, Any] | None) -> dict[str, Any] | 
         counts[match.group(1)] += 1
 
     total = counts["DONE"] + counts["NEXT"] + counts["QUEUED"]
-    if total <= 0:
-        return {
-            "completion_percent": None,
-            "done_count": counts["DONE"],
-            "total_count": total,
-            "roadmap_path": roadmap_path,
-        }
-
-    completion_percent = round((counts["DONE"] / total) * 100)
     return {
-        "completion_percent": completion_percent,
         "done_count": counts["DONE"],
         "total_count": total,
+        "remaining_count": counts["NEXT"] + counts["QUEUED"],
         "roadmap_path": roadmap_path,
     }
 
@@ -1533,6 +1884,7 @@ def build_watch_state_signature(state: dict[str, Any] | None, *, state_path_exis
         return ("missing",)
     return (
         clean_string(state.get("status")),
+        clean_string(state.get("active_lane_id")),
         clean_string(state.get("current_round")),
         clean_string(state.get("consecutive_failures")),
         clean_string(state.get("next_phase_number")),
@@ -1551,6 +1903,7 @@ def print_watch_snapshot(
     state_round = clean_string(state.get("current_round")) if state else ""
     watched_round_number = parse_round_directory_number(progress_path.parent) if progress_path else None
     phase_number = clean_string(state.get("next_phase_number")) if state else ""
+    lane_id = clean_string(state.get("active_lane_id")) if state else ""
     status_value = clean_string(state.get("status")) if state else ""
     failures_value = clean_string(state.get("consecutive_failures")) if state else ""
     queue_progress = read_watch_queue_progress(state)
@@ -1565,8 +1918,10 @@ def print_watch_snapshot(
             heading_parts.append(f"state_round={state_round}")
     if phase_number:
         heading_parts.append(f"phase={phase_number}")
-    if queue_progress and queue_progress.get("completion_percent") is not None:
-        heading_parts.append(f"completion={queue_progress['completion_percent']}%")
+    if lane_id:
+        heading_parts.append(f"lane={lane_id}")
+    if queue_progress and queue_progress.get("total_count") is not None:
+        heading_parts.append(f"queue={queue_progress['done_count']}/{queue_progress['total_count']}")
     if state and state.get("vulture_current_count") is not None:
         heading_parts.append(f"vulture={state.get('vulture_current_count')}")
     if state and state.get("vulture_delta") is not None:
@@ -1596,11 +1951,11 @@ def print_watch_snapshot(
                     f"count={state.get('vulture_current_count')} "
                     f"delta={format_metric_delta(state.get('vulture_delta'))}"
                 )
-        if queue_progress and queue_progress.get("completion_percent") is not None:
+        if queue_progress and queue_progress.get("total_count") is not None:
             print(
                 "[watch] queue progress: "
-                f"{queue_progress['completion_percent']}% "
-                f"({queue_progress['done_count']}/{queue_progress['total_count']} done)"
+                f"{queue_progress['done_count']}/{queue_progress['total_count']} done "
+                f"({queue_progress['remaining_count']} remaining)"
             )
     if progress_path is not None:
         print(f"[watch] progress log: {progress_path}")
@@ -1664,15 +2019,17 @@ def build_watch_detail_prefix(
         state.get("consecutive_failures") if state else None,
         width=1,
     )
+    lane_token = clean_string(state.get("active_lane_id")) if state else ""
     queue_progress = read_watch_queue_progress(state)
-    completion_value = format_watch_completion_percent(
-        queue_progress.get("completion_percent") if queue_progress else None
-    )
+    queue_value = "q?/?"
+    if queue_progress and queue_progress.get("total_count") is not None:
+        queue_value = f"q{queue_progress['done_count']}/{queue_progress['total_count']}"
     status_token = clean_string(state.get("status")) if state else ""
     if clean_string(prefix_format).lower() == "short":
-        return f"[{completion_value} r{round_value} p{phase_value} {status_token or 'unknown'} f{failure_value}]"
+        lane_short = lane_token or "lane?"
+        return f"[{lane_short} {queue_value} r{round_value} p{phase_value} {status_token or 'unknown'} f{failure_value}]"
     return (
-        f"[completion={completion_value} round={round_value} phase={phase_value} "
+        f"[lane={lane_token or 'unknown'} queue={queue_value[1:]} round={round_value} phase={phase_value} "
         f"status={status_token or 'unknown'} failures={failure_value}]"
     )
 
@@ -2048,6 +2405,28 @@ def run_doctor(args: argparse.Namespace) -> int:
             failures += 1
     else:
         print("[doctor] info vulture command: <not configured>")
+
+    print(f"[doctor] info lanes: {len(config.get('lanes', []))}")
+    for lane in config.get("lanes", []):
+        lane_id = lane["id"]
+        try:
+            ensure_path_within_repo(f"{lane['phase_doc_prefix']}0.md", label=f"Lane '{lane_id}' phase_doc_prefix probe")
+            print(f"[doctor] ok   lane {lane_id} phase prefix: {lane['phase_doc_prefix']}")
+        except AutopilotError as exc:
+            print(f"[doctor] fail lane {lane_id} phase prefix: {exc}")
+            failures += 1
+
+        for label, path_value in [
+            ("starting phase", lane["starting_phase_doc"]),
+            ("roadmap", lane["roadmap_path"]),
+            ("prompt", lane["prompt_template"]),
+        ]:
+            try:
+                ensure_path_within_repo(path_value, label=f"Lane '{lane_id}' {label}", must_exist=True)
+                print(f"[doctor] ok   lane {lane_id} {label}: {path_value}")
+            except AutopilotError as exc:
+                print(f"[doctor] fail lane {lane_id} {label}: {exc}")
+                failures += 1
 
     branch_name = get_current_branch()
     allowed_prefixes = list(config.get("allowed_branch_prefixes", []))
