@@ -12,10 +12,7 @@ param(
     [int]$Port = 0
 )
 
-function ConvertTo-ZshSingleQuoted {
-    param([Parameter(Mandatory = $true)][string]$Value)
-    return "'" + ($Value -replace "'", "'\''") + "'"
-}
+. "$PSScriptRoot/ConvertTo-ZshSingleQuoted.ps1"
 
 $safeLabel = ($Label -replace '[^A-Za-z0-9._-]', '-').Trim('-')
 if (-not $safeLabel) {
@@ -47,6 +44,7 @@ printf '%s' '$payload' | /usr/bin/base64 -D > "`$script_path"
 chmod 700 "`$script_path"
 nohup /bin/zsh "`$script_path" > "`$log_path" 2>&1 < /dev/null &
 pid=`$!
+(disown %+ 2>/dev/null || disown %1 2>/dev/null || true)
 printf 'pid=%s\nlog=%s\nscript=%s\n' "`$pid" "`$log_path" "`$script_path"
 "@
 

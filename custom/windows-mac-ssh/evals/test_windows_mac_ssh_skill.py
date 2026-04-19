@@ -16,9 +16,12 @@ class WindowsMacSshSkillTests(unittest.TestCase):
             "Mac Mini",
             "SSH 连接 Mac",
             "连 mac mini",
+            "连不上 Mac",
+            "Mac Mini 挂了",
             "把文件复制到 Mac",
             "scp 到 Mac",
             "Windows 到 macOS 同步仓库/artifacts",
+            "Mac 上的 git 报错",
             "远程跑无人值守任务",
             "在 Mac 上执行命令",
             "background jobs",
@@ -57,11 +60,12 @@ class WindowsMacSshSkillTests(unittest.TestCase):
 
     def test_required_scripts_exist_and_use_hardening_patterns(self):
         scripts = {
-            "Invoke-MacZsh.ps1": ["base64", "BatchMode=yes", "ConnectTimeout", "CleanEnv"],
-            "Copy-ToMac.ps1": ["tar -C", "Refusing unsafe destination", "BatchMode=yes"],
-            "Compare-WindowsMacHash.ps1": ["Get-FileHash", "shasum -a 256", "Compare-Object"],
-            "Start-MacBackgroundJob.ps1": ["nohup", ".cache/windows-mac-ssh/jobs", "pid=%s"],
-            "Watch-MacLog.ps1": ["tail -n", "BatchMode=yes"],
+            "ConvertTo-ZshSingleQuoted.ps1": ["function ConvertTo-ZshSingleQuoted", "-replace"],
+            "Invoke-MacZsh.ps1": ['ConvertTo-ZshSingleQuoted.ps1', "base64", "BatchMode=yes", "ConnectTimeout", "CleanEnv"],
+            "Copy-ToMac.ps1": ['ConvertTo-ZshSingleQuoted.ps1', "tar -C", "Refusing unsafe destination", "BatchMode=yes"],
+            "Compare-WindowsMacHash.ps1": ['ConvertTo-ZshSingleQuoted.ps1', "Get-FileHash", "shasum -a 256", "Compare-Object"],
+            "Start-MacBackgroundJob.ps1": ['ConvertTo-ZshSingleQuoted.ps1', "nohup", "disown", ".cache/windows-mac-ssh/jobs", "pid=%s"],
+            "Watch-MacLog.ps1": ['ConvertTo-ZshSingleQuoted.ps1', "tail -n", "BatchMode=yes"],
         }
 
         for script_name, required_phrases in scripts.items():
@@ -80,7 +84,7 @@ class WindowsMacSshSkillTests(unittest.TestCase):
 
     def test_power_shell_scripts_parse(self):
         script_paths = sorted((ROOT / "scripts").glob("*.ps1"))
-        self.assertGreaterEqual(len(script_paths), 5)
+        self.assertGreaterEqual(len(script_paths), 6)
 
         for path in script_paths:
             command = (

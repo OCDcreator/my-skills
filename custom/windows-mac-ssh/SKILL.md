@@ -1,6 +1,6 @@
 ---
 name: windows-mac-ssh
-description: Use when Windows PowerShell or Codex CLI needs to SSH/SCP into a Mac/Mac Mini/macOS host, including “SSH 连接 Mac”, “连 mac mini”, “把文件复制到 Mac”, “scp 到 Mac”, “在 Mac 上执行命令”, “Windows 到 macOS 同步仓库/artifacts”, or “远程跑无人值守任务”, and when avoiding quoting, CRLF/LF, `$Mac:`, zsh, remote `$HOME`, and PowerShell escape mistakes.
+description: Use when Windows PowerShell or Codex CLI needs to SSH/SCP into a Mac/Mac Mini/macOS host, including “SSH 连接 Mac”, “连 mac mini”, “连不上 Mac”, “Mac Mini 挂了”, “把文件复制到 Mac”, “scp 到 Mac”, “在 Mac 上执行命令”, “Windows 到 macOS 同步仓库/artifacts”, “Mac 上的 git 报错”, or “远程跑无人值守任务”, and when avoiding quoting, CRLF/LF, `$Mac:`, zsh, remote `$HOME`, and PowerShell escape mistakes.
 ---
 
 # Windows → Mac SSH
@@ -60,6 +60,7 @@ Scripts included:
 | `scripts/Compare-WindowsMacHash.ps1` | Compares Windows and Mac files/directories by SHA-256 |
 | `scripts/Start-MacBackgroundJob.ps1` | Starts a detached Mac zsh job and prints PID/log path |
 | `scripts/Watch-MacLog.ps1` | Tails a Mac log file safely from PowerShell |
+| `scripts/ConvertTo-ZshSingleQuoted.ps1` | Shared remote-safe single-quote escaping helper used by the other scripts |
 
 ## Golden rules
 
@@ -397,6 +398,8 @@ ssh $Mac "pgrep -af 'my-skills-maintenance'"
 ```
 
 If a long job modifies a Git repo, require it to write a status file or final `git status -sb` to its log before claiming success.
+
+If a command may outlive the current SSH session, do not keep it inline. Convert it into a background job first.
 
 ## Destructive command guard
 

@@ -11,10 +11,7 @@ param(
     [int]$Port = 0
 )
 
-function ConvertTo-ZshSingleQuoted {
-    param([Parameter(Mandatory = $true)][string]$Value)
-    return "'" + ($Value -replace "'", "'\''") + "'"
-}
+. "$PSScriptRoot/ConvertTo-ZshSingleQuoted.ps1"
 
 $quotedLog = ConvertTo-ZshSingleQuoted $LogPath
 $mode = if ($Follow) { '-f' } else { '' }

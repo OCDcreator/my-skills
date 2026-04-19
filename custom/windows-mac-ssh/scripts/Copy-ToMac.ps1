@@ -13,10 +13,7 @@ param(
     [switch]$Replace
 )
 
-function ConvertTo-ZshSingleQuoted {
-    param([Parameter(Mandatory = $true)][string]$Value)
-    return "'" + ($Value -replace "'", "'\''") + "'"
-}
+. "$PSScriptRoot/ConvertTo-ZshSingleQuoted.ps1"
 
 $item = Get-Item -LiteralPath $LocalPath -ErrorAction Stop
 $leaf = $item.Name
