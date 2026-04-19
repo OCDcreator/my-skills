@@ -191,6 +191,93 @@ SINGLE_CALLOUT_HANDOUT = """<!doctype html>
 </html>
 """
 
+INNER_TEXT_OVERFLOW_HANDOUT = """<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Inner text overflow handout</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    @media print { body { margin: 0; } }
+    * { box-sizing: border-box; print-color-adjust: exact; }
+    body { margin: 0; background: #eee; font-family: Arial, sans-serif; }
+    .sheet {
+      width: 210mm;
+      height: 297mm;
+      margin: 0;
+      padding: 16mm;
+      background: white;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    h1 { margin: 0 0 6mm; }
+    p { margin: 0 0 4mm; font-size: 12.5px; line-height: 1.45; }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5mm;
+      margin-top: 4mm;
+    }
+    .panel {
+      border: 1px solid #cbd5e1;
+      padding: 4mm;
+      min-height: 28mm;
+      overflow: hidden;
+    }
+    .nowrap {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin-top: 5mm;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 3mm;
+      vertical-align: top;
+    }
+    .cell-clip {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+  </style>
+</head>
+<body>
+  <article class="sheet" data-page="1">
+    <h1>Overflow blind spot</h1>
+    <p>This page keeps every block inside the sheet, but two inner containers clip long unbreakable strings.</p>
+    <div class="two-col">
+      <section class="panel">
+        <h2>Panel</h2>
+        <p class="nowrap">supercalifragilisticexpialidocioussupercalifragilisticexpialidocioussupercalifragilisticexpialidocious</p>
+      </section>
+      <section class="panel">
+        <h2>Reference</h2>
+        <p>Normal body text stays readable so the failure comes from inner-container clipping, not overall page overflow.</p>
+      </section>
+    </div>
+    <table>
+      <tr>
+        <th>Risk</th>
+        <th>Example</th>
+      </tr>
+      <tr>
+        <td>Cell clipping</td>
+        <td><span class="cell-clip">precipitationreactionsneedwordbreakingprecipitationreactionsneedwordbreakingprecipitationreactionsneedwordbreaking</span></td>
+      </tr>
+    </table>
+  </article>
+</body>
+</html>
+"""
+
 
 class PrintToolTests(unittest.TestCase):
     def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
@@ -254,6 +341,19 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("├── raw-input.md", contract_text)
         self.assertIn("| `raw-input.md` | Preserve the original user input", contract_text)
         self.assertIn("Keep the original order and wording", contract_text)
+
+    def test_print_checklist_requires_text_overflow_protection(self) -> None:
+        checklist_text = (SKILL_DIR / "references" / "print-checklist.md").read_text(encoding="utf-8")
+
+        self.assertIn("overflow-wrap", checklist_text)
+        self.assertIn("word-break", checklist_text)
+
+    def test_review_loop_requires_container_level_text_overflow_check(self) -> None:
+        review_text = (SKILL_DIR / "references" / "review-loop.md").read_text(encoding="utf-8")
+
+        self.assertIn("文字", review_text)
+        self.assertRegex(review_text, r"container|容器")
+        self.assertRegex(review_text, r"overflow|溢出")
 
     def test_working_file_templates_reference_exists_and_is_linked(self) -> None:
         skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
@@ -876,6 +976,43 @@ class PrintToolTests(unittest.TestCase):
             self.assertTrue(report["checks"]["avoidsCardGridAntipattern"])
             self.assertTrue(report["checks"]["avoidsMetaLeakageCandidates"])
             self.assertTrue(report["checks"]["maintainsComfortableTypographicRhythm"])
+
+    def test_validate_print_layout_reports_inner_container_text_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(INNER_TEXT_OVERFLOW_HANDOUT, encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATOR),
+                    "--html",
+                    str(html_path),
+                    "--out-dir",
+                    str(out_dir),
+                    "--prefix",
+                    "inner-text-overflow",
+                    "--settle-ms",
+                    "0",
+                ],
+                cwd=SKILL_DIR,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            report = json.loads(
+                (out_dir / "inner-text-overflow-validation-report.json").read_text(encoding="utf-8")
+            )
+            self.assertFalse(report["checks"]["avoidsInnerContainerTextOverflow"])
+            self.assertGreater(
+                report["analysis"]["sheets"][0]["containerTextOverflow"]["count"],
+                0,
+            )
 
 
 if __name__ == "__main__":

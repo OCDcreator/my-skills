@@ -93,7 +93,8 @@ For each page, review all of these:
 - **Diagram readability** — figures are large enough, teach a real concept, have readable labels, and do not contain text overflow or cramped arrows
 - **Page density** — the lower page region is not obviously empty unless the composition has a clear teaching reason
 - **Component density** — the page is not built from a dense dashboard-like grid of small cards or micro-boxes
-- **Overflow and clipping** — figures, callouts, tables, code blocks, captions, and reference items stay inside the page
+- **Overflow and clipping** — figures, callouts, tables, code blocks, captions, and reference items stay inside the page, and text stays inside its own container
+- **Container-level text overflow / 容器内文字溢出** — panels, callouts, table cells, code blocks, tags, and grid children must not have horizontal or vertical text overflow, hidden clipping, or long unbreakable strings escaping their box
 - **Teaching hierarchy** — title, section headings, examples, captions, and takeaways have clear relative importance
 - **Typographic rhythm** — body text remains comfortable at print size and spacing is not obviously crushed to make the page fit
 - **Repair quality** — suggested fixes improve structure/content/layout instead of just shrinking type or squeezing spacing
@@ -115,6 +116,7 @@ Do not recommend shrinking font size, line-height, or paragraph spacing as the p
 - diagrams are too small to read
 - diagram text overflows or becomes cramped
 - diagrams act as decoration instead of explanation
+- text overflows or is clipped inside a panel, callout, table cell, code block, tag, or grid child even when the outer page boundary still passes
 - the page wastes a large lower section with obvious blank space
 - the page relies on dense small-card grids or microtext boxes
 - the page fits only because typography rhythm has been visibly compressed

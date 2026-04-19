@@ -25,10 +25,17 @@ Suggested baseline:
 - Prevent bad splits on figures, callouts, tables, lists, and code blocks
 - Keep section openers from leaving only one orphan line on a new page
 - Avoid dense micro-card grids as the main content structure
+- Protect every text container from inner overflow: long words, URLs, formulas, table entries, labels, and bilingual terms must wrap or break inside their own box
 
 Useful rules:
 
 ```css
+html {
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
 section,
 figure,
 blockquote,
@@ -37,6 +44,28 @@ table,
 .callout,
 .case-study {
   break-inside: avoid;
+  max-width: 100%;
+}
+
+td,
+th,
+pre,
+code,
+.callout,
+.case-study,
+.panel,
+.insight,
+.memory-strip,
+.definition-list > *,
+.two-col > *,
+.three-col > * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+pre,
+code {
+  white-space: pre-wrap;
 }
 ```
 
@@ -71,6 +100,7 @@ Before hand-off, confirm:
 - `handout.html` opens locally
 - no broken image or SVG paths
 - long tables do not overflow the printable area
+- text inside panels, callouts, table cells, code blocks, tags, and grid items does not overflow or clip inside its own container
 - code blocks wrap or scroll safely
 - important sections do not break in obviously bad places
 - references section appears in the final artifact

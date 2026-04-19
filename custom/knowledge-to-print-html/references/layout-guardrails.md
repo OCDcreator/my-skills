@@ -38,6 +38,15 @@ The page should look like a study handout, not a sparse landing page.
 - Multiple narrow boxes filled with tiny text fail even if they technically fit.
 - If the page starts to feel like a dashboard of cards, rebuild it as sections, a table, a worked example, or a larger diagram-led composition.
 
+## Text overflow protection
+
+Page-level fit is not enough. Text must also stay inside the container that owns it.
+
+- Add wrap protection to the base stylesheet before layout polishing: `overflow-wrap`, `word-break`, and `hyphens` should cover body text, tables, code, labels, callouts, panels, and grid children.
+- Treat unbreakable strings as normal content, not an edge case: chemical equations, URLs, filenames, variable names, bilingual glossary terms, and long examiner phrases must not spill horizontally.
+- Do not rely on `overflow: hidden` to make a panel pass page-boundary checks. Hidden or clipped text is a layout failure even if the `.sheet` itself remains clean.
+- Check table cells, narrow columns, definition lists, tags/chips, and two/three-column grids at print scale; these are the common places where inner text overflow hides.
+
 ## Section rhythm
 
 - Do not create a new page only for a tiny heading + one short paragraph.

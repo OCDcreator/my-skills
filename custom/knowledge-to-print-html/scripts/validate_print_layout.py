@@ -112,6 +112,48 @@ elements => {
     const numeric = Number.parseFloat(value);
     return Number.isFinite(numeric) ? numeric : fallbackFontSize * 1.2;
   };
+  const parseLength = value => {
+    const numeric = Number.parseFloat(value || "");
+    return Number.isFinite(numeric) ? numeric : 0;
+  };
+  const selectorLabel = node => {
+    const className = typeof node.className === "string"
+      ? node.className
+      : (node.className && typeof node.className.baseVal === "string" ? node.className.baseVal : "");
+    return className || node.tagName.toLowerCase();
+  };
+  const textSnippet = node => (node.innerText || node.textContent || "").replace(/\s+/g, " ").trim();
+  const hasContainerChrome = style => {
+    const padding = (
+      parseLength(style.paddingTop) +
+      parseLength(style.paddingRight) +
+      parseLength(style.paddingBottom) +
+      parseLength(style.paddingLeft)
+    );
+    const hasBorder = (
+      parseLength(style.borderTopWidth) +
+      parseLength(style.borderRightWidth) +
+      parseLength(style.borderBottomWidth) +
+      parseLength(style.borderLeftWidth)
+    ) > 0;
+    const background = style.backgroundColor || "";
+    const hasBackground = background && background !== "rgba(0, 0, 0, 0)" && background !== "transparent";
+    return padding > 0 || hasBorder || hasBackground;
+  };
+  const hasClipOrScrollStyle = style => {
+    return ["hidden", "clip", "scroll", "auto"].includes(style.overflowX)
+      || ["hidden", "clip", "scroll", "auto"].includes(style.overflowY)
+      || style.whiteSpace === "nowrap";
+  };
+  const isLikelyTextContainer = (node, style) => {
+    const tag = node.tagName.toLowerCase();
+    const label = selectorLabel(node);
+    return ["td", "th", "pre", "code", "figcaption"].includes(tag)
+      || style.display === "table-cell"
+      || hasClipOrScrollStyle(style)
+      || hasContainerChrome(style)
+      || /(callout|case-study|note-box|mistakes|print-note|card|mini|ref-item|hero-panel|table-like|panel|insight|memory-strip|chip|pill|tag|badge|definition)/i.test(label);
+  };
   const smallestFontSize = node => {
     const descendants = [node, ...Array.from(node.querySelectorAll("*"))];
     let smallest = null;
@@ -212,6 +254,43 @@ elements => {
         overflowY: Math.max(0, node.scrollHeight - node.clientHeight),
       };
     });
+    const containerTextOverflowItems = Array.from(sheet.querySelectorAll("*")).filter((node) => {
+      if (!isVisible(node) || node === sheet) {
+        return false;
+      }
+      const text = textSnippet(node);
+      if (text.length < 18) {
+        return false;
+      }
+      const style = window.getComputedStyle(node);
+      if (!isLikelyTextContainer(node, style)) {
+        return false;
+      }
+      return Math.max(0, node.scrollWidth - node.clientWidth) > 1
+        || Math.max(0, node.scrollHeight - node.clientHeight) > 1;
+    }).map((node) => {
+      const box = node.getBoundingClientRect();
+      const style = window.getComputedStyle(node);
+      const overflowX = Math.max(0, node.scrollWidth - node.clientWidth);
+      const overflowY = Math.max(0, node.scrollHeight - node.clientHeight);
+      return {
+        selector: selectorLabel(node),
+        tag: node.tagName.toLowerCase(),
+        overflowX: round(overflowX),
+        overflowY: round(overflowY),
+        clientWidth: round(node.clientWidth),
+        clientHeight: round(node.clientHeight),
+        scrollWidth: round(node.scrollWidth),
+        scrollHeight: round(node.scrollHeight),
+        rectWidth: round(box.width),
+        rectHeight: round(box.height),
+        whiteSpace: style.whiteSpace,
+        overflowWrap: style.overflowWrap,
+        wordBreak: style.wordBreak,
+        hyphens: style.hyphens,
+        text: textSnippet(node).slice(0, 120),
+      };
+    });
     const paragraphItems = Array.from(sheet.querySelectorAll(paragraphSelectors)).filter(isVisible).filter((node) => {
       return (node.textContent || "").trim().length >= 20;
     }).map((node) => {
@@ -304,6 +383,10 @@ elements => {
         overflowCount: cardOverflowCount,
         items: cards,
       },
+      containerTextOverflow: {
+        count: containerTextOverflowItems.length,
+        items: containerTextOverflowItems,
+      },
       typography: {
         sampleCount: textItems.length,
         minBodyFontSizePx: textItems.length
@@ -364,6 +447,11 @@ def sheet_has_compressed_typography(sheet: dict[str, Any]) -> bool:
 def sheet_has_meta_leakage_candidates(sheet: dict[str, Any]) -> bool:
     meta = sheet.get("meta") or {}
     return meta.get("candidateCount", 0) > 0
+
+
+def sheet_has_inner_container_text_overflow(sheet: dict[str, Any]) -> bool:
+    container_text_overflow = sheet.get("containerTextOverflow") or {}
+    return container_text_overflow.get("count", 0) > 0
 
 STYLE_RULES_EVAL_JS = r"""
 () => {
@@ -1127,6 +1215,9 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
         ),
         "avoidsMetaLeakageCandidates": all(
             not sheet_has_meta_leakage_candidates(sheet) for sheet in sheets
+        ),
+        "avoidsInnerContainerTextOverflow": all(
+            not sheet_has_inner_container_text_overflow(sheet) for sheet in sheets
         ),
     }
     optional_checks = {

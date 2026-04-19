@@ -228,6 +228,7 @@ The final HTML must be:
 - free of topic labels / provenance notes / “this handout will…” filler in the teaching body
 - free of dense multi-card dashboard grids used as the main page structure
 - free of compressed body typography used only to force content onto the page
+- protected against text overflow inside panels, callouts, table cells, code blocks, tags, and grid children with appropriate `overflow-wrap`, `word-break`, and `hyphens` rules
 
 Full page-density and chrome rules live in `references/layout-guardrails.md`.
 
