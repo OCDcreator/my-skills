@@ -218,6 +218,7 @@ If diagnosis is inconclusive, inspect raw console/CDP logs and consider adding a
 
 - `fixtures/native-smoke-sample-plugin/`: plugin-neutral load/reload smoke fixture.
 - `fixtures/package-manager-smoke-pnpm-plugin/`: package-manager detection fixture.
+- `fixtures/preflight-smoke-plugin/`: lint and plugin-entry preflight fixture with intentional manifest/template residue failures.
 - `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` detection fixture.
 - `evals/evals.json`: behavior prompts for evaluating whether the skill still covers common autodebug workflows.
 

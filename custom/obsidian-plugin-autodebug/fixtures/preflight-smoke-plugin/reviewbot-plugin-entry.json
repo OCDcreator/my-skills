@@ -1,0 +1,6 @@
+{
+  "id": "preflight-smoke-plugin",
+  "name": "Preflight Smoke Plugin",
+  "repo": "{{github-owner}}/{{github-repo}}",
+  "branch": "main"
+}

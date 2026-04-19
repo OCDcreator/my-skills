@@ -2,7 +2,7 @@
 
 ## Queue
 
-### [NEXT] B18 - Preflight lint and plugin-entry validation gates
+### [DONE] B18 - Preflight lint and plugin-entry validation gates
 
 - **Lane**: Bugfix / backlog
 - **Goal**: Turn optional `eslint-plugin-obsidianmd` and ReviewBot-style plugin-entry validation into reusable preflight checks that run before build/deploy flows and can be emitted into generated CI templates.
@@ -25,4 +25,5 @@
 ## Lane state
 
 - This roadmap is lane-local.
+- Lane `b1-backlog-slice` has no remaining `[NEXT]` or `[QUEUED]` items; the controller can advance to `b2-backlog-slice`.
 - When it has no remaining `[NEXT]` or `[QUEUED]` items, the controller switches to `b2-backlog-slice`.

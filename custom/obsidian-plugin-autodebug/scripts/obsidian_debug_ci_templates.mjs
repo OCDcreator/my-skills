@@ -10,6 +10,10 @@ import {
   printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
+import {
+  detectPreflightSupport,
+  getPreflightScriptName,
+} from './obsidian_debug_preflight_support.mjs';
 import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
@@ -124,9 +128,9 @@ mkdir -p "\${AUTODEBUG_OUTPUT_DIR}"
 
 run_optional_command "install" "\${AUTODEBUG_INSTALL_COMMAND}"
 run_optional_script "lint" "\${AUTODEBUG_LINT_SCRIPT}"
+run_optional_script "plugin entry validation" "\${AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT}"
 run_optional_script "build" "\${AUTODEBUG_BUILD_SCRIPT}"
 run_optional_script "repo test" "\${AUTODEBUG_TEST_SCRIPT}"
-run_optional_script "plugin entry validation" "\${AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT}"
 run_optional_script "obsidian-e2e" "\${AUTODEBUG_OBSIDIAN_E2E_SCRIPT}"
 run_optional_script "obsidian-testing-framework" "\${AUTODEBUG_TESTING_FRAMEWORK_SCRIPT}"
 run_optional_script "wdio-obsidian-service" "\${AUTODEBUG_WDIO_SCRIPT}"
@@ -192,9 +196,9 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 Invoke-OptionalCommand -Label 'install' -Command $InstallCommand
 Invoke-OptionalScript -Label 'lint' -ScriptName $LintScript
+Invoke-OptionalScript -Label 'plugin entry validation' -ScriptName $PluginEntryValidationScript
 Invoke-OptionalScript -Label 'build' -ScriptName $BuildScript
 Invoke-OptionalScript -Label 'repo test' -ScriptName $TestScript
-Invoke-OptionalScript -Label 'plugin entry validation' -ScriptName $PluginEntryValidationScript
 Invoke-OptionalScript -Label 'obsidian-e2e' -ScriptName $ObsidianE2EScript
 Invoke-OptionalScript -Label 'obsidian-testing-framework' -ScriptName $TestingFrameworkScript
 Invoke-OptionalScript -Label 'wdio-obsidian-service' -ScriptName $WdioScript
@@ -291,10 +295,10 @@ These generated templates keep CI/headless checks separate from local desktop sm
 ## CI-Suitable Steps
 
 - Optional install command from \`AUTODEBUG_INSTALL_COMMAND\` (blank by default so repo-owned install policy stays explicit).
-- Repo-owned lint script: \`${defaults.lintScript || '(none detected)'}\`.
+- Repo-owned lint preflight script: \`${defaults.lintScript || '(none detected)'}\`.
+- Optional plugin-entry validation preflight script: ${pluginEntryScript}.
 - Repo-owned build script: \`${defaults.buildScript || '(none detected)'}\`.
 - Repo-owned test script: \`${defaults.testScript || '(none detected)'}\`.
-- Optional plugin-entry validation script: ${pluginEntryScript}.
 - Optional \`obsidian-e2e\` script: ${obsidianE2EScript}.
 - Optional \`obsidian-testing-framework\` script: ${testingScript}.
 - Optional \`wdio-obsidian-service\` script: ${wdioScript}.
@@ -342,15 +346,22 @@ export async function generateQualityGateTemplates({
   const resolvedOutputDir = path.resolve(resolvedRepoDir, outputDir);
   const repoRuntime = await detectRepoRuntime({ repoDir: resolvedRepoDir, probeTools: false });
   const ecosystem = await detectEcosystemSupport({ repoDir: resolvedRepoDir });
+  const preflight = await detectPreflightSupport({
+    repoDir: resolvedRepoDir,
+    runtimeSupport: repoRuntime,
+    ecosystemSupport: ecosystem,
+  });
   const testingFramework = await detectTestingFrameworkSupport({
     repoDir: resolvedRepoDir,
     moduleName: testingFrameworkModule,
   });
   const inferredManager = repoRuntime.inference?.manager ?? 'npm';
-  const lintScript = repoRuntime.scripts?.important?.lint?.exists ? 'lint' : '';
+  const lintScript = getPreflightScriptName(preflight, 'lint');
   const testScript = repoRuntime.scripts?.important?.test?.exists ? 'test' : '';
   const detectedTestingFrameworkScript = firstTestingFrameworkScript(testingFramework);
-  const detectedPluginEntryValidationScript = firstToolScript(ecosystem.scripts.pluginEntryValidation);
+  const detectedPluginEntryValidationScript = getPreflightScriptName(preflight, 'plugin-entry-validation', {
+    exclude: [lintScript],
+  });
   const detectedObsidianE2EScript = firstToolScript(ecosystem.tools.obsidianE2E);
   const detectedWdioScript = firstToolScript(ecosystem.tools.wdioObsidianService);
   const defaults = {
@@ -362,7 +373,7 @@ export async function generateQualityGateTemplates({
     buildScript: repoRuntime.scripts?.important?.build?.exists ? 'build' : '',
     testScript,
     pluginEntryValidationScript: detectedPluginEntryValidationScript
-      && ![lintScript, testScript].includes(detectedPluginEntryValidationScript)
+      && ![testScript].includes(detectedPluginEntryValidationScript)
       ? detectedPluginEntryValidationScript
       : '',
     obsidianE2EScript: detectedObsidianE2EScript
@@ -413,6 +424,7 @@ export async function generateQualityGateTemplates({
     packageManager: inferredManager,
     defaults,
     templateDir: defaults.templateDir,
+    preflight,
     testingFramework: {
       available: testingFramework.available,
       declared: testingFramework.declared,
@@ -426,8 +438,9 @@ export async function generateQualityGateTemplates({
       scripts: ecosystem.scripts,
     },
     ciSuitable: [
-      'repo-owned install/lint/build/test commands',
-      'optional plugin-entry validation script',
+      'repo-owned install command',
+      'repo-owned lint and optional plugin-entry preflight commands before build',
+      'repo-owned build/test commands',
       'optional obsidian-e2e package script',
       'optional obsidian-testing-framework package script',
       'optional wdio-obsidian-service package script',

@@ -254,7 +254,7 @@ function resolveCommandPrefix(manager, tools) {
   };
 }
 
-function buildRunCommand(manager, scriptName, tools) {
+export function buildRunCommand(manager, scriptName, tools) {
   const prefix = resolveCommandPrefix(manager, tools);
   if (!prefix.available) {
     return {
