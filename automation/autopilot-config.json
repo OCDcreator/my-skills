@@ -1,8 +1,7 @@
 {
-  "objective": "Queue and execute the remaining approved Windows + macOS generic custom/obsidian-plugin-autodebug ecosystem slices beyond B16: Logstravaganza-backed persistent vault log ingestion, official lint and plugin-entry preflight validation, and repo-owned Obsidian E2E adapter fixtures plus CI wiring without hard-coding one plugin or machine-local path.",
-  "starting_phase_doc": "docs/status/autopilot-phase-16.md",
-  "next_phase_number": 17,
-  "focus_hint": "B17 - Persistent vault log ingestion via Logstravaganza",
+  "objective": "Continue the approved generic `custom/obsidian-plugin-autodebug` ecosystem backlog from completed B17 into the remaining B18 preflight validation slice, B19 repo-owned Obsidian E2E adapter slice, and a final checkpoint without hard-coding one plugin or machine-local path.",
+  "focus_hint": "B18 - Preflight lint and plugin-entry validation gates",
+  "next_phase_number": 1,
   "max_rounds": 120,
   "max_consecutive_failures": 3,
   "lint_command": "",
@@ -10,31 +9,67 @@
   "full_test_command": "",
   "targeted_test_required": false,
   "targeted_test_prefixes": [],
-  "targeted_test_required_paths": [],
+  "targeted_test_required_paths": [
+  "docs/"
+],
   "full_test_cadence_rounds": 0,
-  "full_test_required_paths": [],
+  "full_test_required_paths": [
+  "docs/"
+],
   "build_command": "",
-  "build_required_paths": [],
+  "build_required_paths": [
+  "docs/"
+],
   "vulture_command": "",
   "deploy_after_build": false,
   "deploy_policy": "never",
   "deploy_required_paths": [],
   "deploy_verify_path": "",
-  "max_git_status_per_round": 6,
+  "max_git_status_per_round": 10,
   "max_git_diff_stat_per_round": 3,
   "allowed_branch_prefixes": [
-  "main",
   "autopilot/",
   "automation/",
   "quality/",
   "bugfix/"
 ],
   "commit_prefix": "autopilot",
-  "phase_doc_prefix": "docs/status/autopilot-phase-",
   "prompt_template": "automation/round-prompt.md",
   "result_schema": "automation/round-result.schema.json",
   "runner_kind": "codex",
   "runner_command": "",
   "runner_model": "",
-  "runner_extra_args": []
+  "runner_extra_args": [],
+  "lanes": [
+    {
+      "id": "b1-backlog-slice",
+      "label": "B18 - Preflight lint and plugin-entry validation gates",
+      "focus_hint": "B18 - Preflight lint and plugin-entry validation gates",
+      "phase_doc_prefix": "docs/status/lanes/b1-backlog-slice/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/b1-backlog-slice/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/b1-backlog-slice/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "b2-backlog-slice",
+      "label": "B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring",
+      "focus_hint": "B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring",
+      "phase_doc_prefix": "docs/status/lanes/b2-backlog-slice/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/b2-backlog-slice/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/b2-backlog-slice/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    },
+    {
+      "id": "b3-checkpoint",
+      "label": "Checkpoint - Review B18 and B19 outcome",
+      "focus_hint": "Checkpoint - Review B18 and B19 outcome",
+      "phase_doc_prefix": "docs/status/lanes/b3-checkpoint/autopilot-phase-",
+      "starting_phase_doc": "docs/status/lanes/b3-checkpoint/autopilot-phase-0.md",
+      "roadmap_path": "docs/status/lanes/b3-checkpoint/autopilot-round-roadmap.md",
+      "prompt_template": "automation/round-prompt.md",
+      "commit_prefix": "autopilot"
+    }
+  ]
 }

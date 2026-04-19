@@ -122,7 +122,10 @@ Start plugin-local reset plans from `state-plans/plugin-data-reset.json`, then c
 
 - `fixtures/native-smoke-sample-plugin/`: plugin-neutral host smoke fixture.
 - `fixtures/package-manager-smoke-pnpm-plugin/`: package-manager/Corepack smoke fixture.
-- `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` detection fixture.
+- `fixtures/preflight-smoke-plugin/`: optional lint and plugin-entry preflight fixture that intentionally fails on manifest/template residue before build.
+- `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` fixture with a repo-owned adapter config and CI dry-run job sample.
+- `fixtures/obsidian-e2e-smoke-plugin/`: optional Vitest-style `obsidian-e2e` fixture with a repo-owned adapter config and CI dry-run job sample.
+- `fixtures/wdio-obsidian-service-smoke-plugin/`: optional WebdriverIO-style `wdio-obsidian-service` fixture with a repo-owned adapter config and CI dry-run job sample.
 - `evals/evals.json`: behavior prompts for checking skill coverage after edits.
 
 ## Optional Ecosystem Tools
@@ -144,7 +147,7 @@ node scripts/obsidian_debug_ci_templates.mjs --repo-dir <repo> --job <repo>/.obs
 
 Keep the split explicit:
 
-- CI-suitable: install/lint/build/test commands, optional plugin-entry validation scripts, optional `obsidian-e2e`, `obsidian-testing-framework`, or `wdio-obsidian-service` repo scripts, and job dry-runs.
+- CI-suitable: install, repo-owned lint and optional plugin-entry validation preflight commands before build, build/test commands, optional `obsidian-e2e`, `obsidian-testing-framework`, or `wdio-obsidian-service` repo scripts, and job dry-runs.
 - Local-only: fresh-vault bootstrap, desktop Obsidian reload, CLI/CDP console capture, screenshots, DOM snapshots, Playwright traces.
 
 ## Troubleshooting

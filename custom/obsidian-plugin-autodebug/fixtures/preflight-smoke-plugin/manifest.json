@@ -1,0 +1,8 @@
+{
+  "id": "preflight-smoke-plugin",
+  "name": "Preflight Smoke Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.6.0",
+  "description": "{{plugin-description}}",
+  "author": "my-skills"
+}

@@ -1,25 +1,44 @@
 # Autopilot Master Plan
 
-> **Status**: [ACTIVE]
 > **Preset**: `Bugfix / Backlog`
 > **Repository**: `my-skills`
+> **Controller mode**: Explicit sequential lanes from `automation/autopilot-config.json`
+> **Note**: This file is a human-facing cross-lane overview, not the live `[NEXT]` truth source.
 
 ## Overall objective
 
-- Queue and execute the remaining approved Windows + macOS generic `custom/obsidian-plugin-autodebug` ecosystem slices beyond B16: persistent vault log ingestion, official lint/plugin-entry preflight validation, and repo-owned Obsidian E2E adapter fixtures plus CI wiring without hard-coding one plugin.
+- Continue the approved generic `custom/obsidian-plugin-autodebug` ecosystem backlog from completed B17 into the remaining B18 preflight validation slice, B19 repo-owned Obsidian E2E adapter slice, and a final checkpoint without hard-coding one plugin or machine-local path.
 - Keep each queued slice small, reproducible, and easy to validate
 - Prefer the highest-confidence bugfix or backlog item first
 
-## Priority lanes
+## Lane order
 
-- **P1. Persistent log capture and diagnosis**: vault-level structured logging discovery, NDJSON ingestion, and merged console/CDP plus file-log evidence with plugin-neutral defaults
-- **P2. Preflight validation gates**: official lint/plugin-entry checks that surface manifest and template issues before build/deploy while respecting repository-owned scripts
-- **P3. Repo-owned Obsidian E2E adapters**: optional `obsidian-e2e`, `obsidian-testing-framework`, and `wdio-obsidian-service` fixture plus CI wiring that preserves the existing CLI/CDP-first path
+- `b1-backlog-slice` — B18 preflight lint and plugin-entry validation gates
+- `b2-backlog-slice` — B19 repo-owned Obsidian E2E adapter fixtures and CI wiring
+- `b3-checkpoint` — summarize the B18/B19 batch and decide whether more backlog work should be human-scheduled
+
+## Shared entrypoints
+
+- `AGENTS.md`
+- `custom/obsidian-plugin-autodebug/SKILL.md`
+- `custom/obsidian-plugin-autodebug/scripts/`
+- `custom/obsidian-plugin-autodebug/assertions/`
+- `custom/obsidian-plugin-autodebug/rules/`
+- `custom/obsidian-plugin-autodebug/state-plans/`
+- `custom/obsidian-plugin-autodebug/job-specs/`
+- `custom/obsidian-plugin-autodebug/fixtures/`
+
+## Shared validation baseline
+
+- Lint: not inferred
+- Typecheck: not inferred
+- Full test: not inferred
+- Build: not inferred
+- Vulture: not inferred
 
 ## Guardrails
 
-- Follow the first `[NEXT]` queue item in `docs/status/autopilot-round-roadmap.md`
-- Keep each round inside the generic `custom/obsidian-plugin-autodebug` framework backlog
-- Preserve plugin-agnostic behavior; real plugin names may appear only as validation fixtures or examples
-- Do not modify existing skill files unless the active queue item explicitly requires it
-- Do not expand beyond the approved B17-B19 queue without another human approval
+- Only one lane is active at a time
+- The controller advances to the next lane only after the current lane roadmap has no remaining `[NEXT]` or `[QUEUED]` items
+- Root-level legacy phase docs (`docs/status/autopilot-phase-*.md`) remain as archive for B1-B17 and are not the live lane queue source
+- Do not extend the queue automatically beyond B19 without another human approval

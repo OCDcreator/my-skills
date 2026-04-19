@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "job": {
+    "id": "testing-framework-smoke",
+    "label": "Testing framework smoke dry-run"
+  },
+  "runtime": {
+    "cwd": ".",
+    "pluginId": "testing-framework-smoke-plugin",
+    "testVaultPluginDir": "test-vault/.obsidian/plugins/testing-framework-smoke-plugin",
+    "obsidianCommand": "obsidian",
+    "outputDir": ".obsidian-debug/{{jobId}}-{{platform}}"
+  },
+  "build": {
+    "enabled": true,
+    "command": [
+      "npm",
+      "run",
+      "build"
+    ]
+  },
+  "deploy": {
+    "enabled": true,
+    "from": "dist"
+  },
+  "bootstrap": {
+    "enabled": false
+  },
+  "reload": {
+    "enabled": false
+  },
+  "logWatch": {
+    "enabled": false
+  },
+  "scenario": {
+    "enabled": false
+  },
+  "assertions": {
+    "path": "",
+    "domSelector": "",
+    "domText": false
+  },
+  "comparison": {
+    "baselineDiagnosisPath": ""
+  },
+  "profile": {
+    "enabled": false
+  },
+  "report": {
+    "enabled": false
+  },
+  "capture": {
+    "screenshot": false,
+    "dom": false
+  },
+  "state": {
+    "restoreAfterRun": false
+  }
+}

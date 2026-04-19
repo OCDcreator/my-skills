@@ -10,6 +10,14 @@ import {
   printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
+import {
+  detectPreflightSupport,
+  getPreflightScriptName,
+} from './obsidian_debug_preflight_support.mjs';
+import {
+  detectAdapterSupport,
+  getAdapterScriptName,
+} from './obsidian_debug_adapter_support.mjs';
 import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
@@ -58,20 +66,24 @@ function yamlQuote(value) {
   return JSON.stringify(String(value ?? ''));
 }
 
-function firstTestingFrameworkScript(testingFramework) {
-  return testingFramework.scripts?.[0]?.name ?? '';
-}
-
-function firstToolScript(tool) {
-  return tool?.scripts?.[0]?.name ?? '';
-}
-
 function statusText(tool, missingText) {
   return tool.available
     ? `installed as \`${tool.moduleName}\`${tool.version ? ` (${tool.version})` : ''}`
     : tool.declared
       ? `declared as \`${tool.moduleName}\` but not installed in this checkout`
       : missingText;
+}
+
+function renderAdapterLane(adapter) {
+  if (!adapter) {
+    return '- adapter data unavailable';
+  }
+
+  const readiness = adapter.runnable ? 'ready' : adapter.scriptName ? 'incomplete' : 'disabled';
+  const files = adapter.repoOwnedPaths.length > 0
+    ? ` repo-owned files: ${adapter.repoOwnedPaths.map((entry) => `\`${entry.relativePath}\``).join(', ')}.`
+    : '';
+  return `- \`${adapter.label}\`: ${readiness}. ${adapter.detail}${files}`;
 }
 
 function renderBashQualityGate(defaults) {
@@ -124,9 +136,9 @@ mkdir -p "\${AUTODEBUG_OUTPUT_DIR}"
 
 run_optional_command "install" "\${AUTODEBUG_INSTALL_COMMAND}"
 run_optional_script "lint" "\${AUTODEBUG_LINT_SCRIPT}"
+run_optional_script "plugin entry validation" "\${AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT}"
 run_optional_script "build" "\${AUTODEBUG_BUILD_SCRIPT}"
 run_optional_script "repo test" "\${AUTODEBUG_TEST_SCRIPT}"
-run_optional_script "plugin entry validation" "\${AUTODEBUG_PLUGIN_ENTRY_VALIDATE_SCRIPT}"
 run_optional_script "obsidian-e2e" "\${AUTODEBUG_OBSIDIAN_E2E_SCRIPT}"
 run_optional_script "obsidian-testing-framework" "\${AUTODEBUG_TESTING_FRAMEWORK_SCRIPT}"
 run_optional_script "wdio-obsidian-service" "\${AUTODEBUG_WDIO_SCRIPT}"
@@ -192,9 +204,9 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 Invoke-OptionalCommand -Label 'install' -Command $InstallCommand
 Invoke-OptionalScript -Label 'lint' -ScriptName $LintScript
+Invoke-OptionalScript -Label 'plugin entry validation' -ScriptName $PluginEntryValidationScript
 Invoke-OptionalScript -Label 'build' -ScriptName $BuildScript
 Invoke-OptionalScript -Label 'repo test' -ScriptName $TestScript
-Invoke-OptionalScript -Label 'plugin entry validation' -ScriptName $PluginEntryValidationScript
 Invoke-OptionalScript -Label 'obsidian-e2e' -ScriptName $ObsidianE2EScript
 Invoke-OptionalScript -Label 'obsidian-testing-framework' -ScriptName $TestingFrameworkScript
 Invoke-OptionalScript -Label 'wdio-obsidian-service' -ScriptName $WdioScript
@@ -253,14 +265,17 @@ jobs:
 `;
 }
 
-function renderReadme(defaults, testingFramework, ecosystem) {
+function renderReadme(defaults, adapterSupport) {
+  const obsidianE2E = adapterSupport.adapters.obsidianE2E;
+  const testingFramework = adapterSupport.adapters.testingFramework;
+  const wdio = adapterSupport.adapters.wdioObsidianService;
   const testingScript = defaults.testingFrameworkScript
     ? `\`${defaults.packageRunner} ${defaults.testingFrameworkScript}\``
     : 'not configured by package.json scripts';
-  const testingStatus = testingFramework.available
-    ? `installed as \`${testingFramework.moduleName}\`${testingFramework.version ? ` (${testingFramework.version})` : ''}`
-    : testingFramework.declared
-      ? `declared as \`${testingFramework.moduleName}\` but not installed in this checkout`
+  const testingStatus = testingFramework.tool.available
+    ? `installed as \`${testingFramework.tool.moduleName}\`${testingFramework.tool.version ? ` (${testingFramework.tool.version})` : ''}`
+    : testingFramework.tool.declared
+      ? `declared as \`${testingFramework.tool.moduleName}\` but not installed in this checkout`
       : 'not declared in this checkout';
   const wdioScript = defaults.wdioScript
     ? `\`${defaults.packageRunner} ${defaults.wdioScript}\``
@@ -271,18 +286,9 @@ function renderReadme(defaults, testingFramework, ecosystem) {
   const pluginEntryScript = defaults.pluginEntryValidationScript
     ? `\`${defaults.packageRunner} ${defaults.pluginEntryValidationScript}\``
     : 'not configured by package.json scripts';
-  const eslintStatus = statusText(
-    ecosystem.tools.eslintObsidianmd,
-    'not declared in this checkout',
-  );
-  const obsidianE2EStatus = statusText(
-    ecosystem.tools.obsidianE2E,
-    'not declared in this checkout',
-  );
-  const wdioStatus = statusText(
-    ecosystem.tools.wdioObsidianService,
-    'not declared in this checkout',
-  );
+  const eslintStatus = statusText(adapterSupport.ecosystem.tools.eslintObsidianmd, 'not declared in this checkout');
+  const obsidianE2EStatus = statusText(obsidianE2E.tool, 'not declared in this checkout');
+  const wdioStatus = statusText(wdio.tool, 'not declared in this checkout');
 
   return `# Obsidian Autodebug Quality Gates
 
@@ -291,14 +297,20 @@ These generated templates keep CI/headless checks separate from local desktop sm
 ## CI-Suitable Steps
 
 - Optional install command from \`AUTODEBUG_INSTALL_COMMAND\` (blank by default so repo-owned install policy stays explicit).
-- Repo-owned lint script: \`${defaults.lintScript || '(none detected)'}\`.
+- Repo-owned lint preflight script: \`${defaults.lintScript || '(none detected)'}\`.
+- Optional plugin-entry validation preflight script: ${pluginEntryScript}.
 - Repo-owned build script: \`${defaults.buildScript || '(none detected)'}\`.
 - Repo-owned test script: \`${defaults.testScript || '(none detected)'}\`.
-- Optional plugin-entry validation script: ${pluginEntryScript}.
 - Optional \`obsidian-e2e\` script: ${obsidianE2EScript}.
 - Optional \`obsidian-testing-framework\` script: ${testingScript}.
 - Optional \`wdio-obsidian-service\` script: ${wdioScript}.
 - Cross-platform dry-run plan generation through \`${defaults.toolRootRef}/scripts/obsidian_debug_job.mjs\`.
+
+## Detected Adapter Lanes
+
+${renderAdapterLane(obsidianE2E)}
+${renderAdapterLane(testingFramework)}
+${renderAdapterLane(wdio)}
 
 ## Local-Only Steps
 
@@ -342,17 +354,36 @@ export async function generateQualityGateTemplates({
   const resolvedOutputDir = path.resolve(resolvedRepoDir, outputDir);
   const repoRuntime = await detectRepoRuntime({ repoDir: resolvedRepoDir, probeTools: false });
   const ecosystem = await detectEcosystemSupport({ repoDir: resolvedRepoDir });
-  const testingFramework = await detectTestingFrameworkSupport({
+  const preflight = await detectPreflightSupport({
+    repoDir: resolvedRepoDir,
+    runtimeSupport: repoRuntime,
+    ecosystemSupport: ecosystem,
+  });
+  const testingFrameworkSupport = await detectTestingFrameworkSupport({
     repoDir: resolvedRepoDir,
     moduleName: testingFrameworkModule,
   });
+  const adapterSupport = await detectAdapterSupport({
+    repoDir: resolvedRepoDir,
+    runtimeSupport: repoRuntime,
+    ecosystemSupport: ecosystem,
+    testingFrameworkSupport,
+  });
   const inferredManager = repoRuntime.inference?.manager ?? 'npm';
-  const lintScript = repoRuntime.scripts?.important?.lint?.exists ? 'lint' : '';
+  const lintScript = getPreflightScriptName(preflight, 'lint');
   const testScript = repoRuntime.scripts?.important?.test?.exists ? 'test' : '';
-  const detectedTestingFrameworkScript = firstTestingFrameworkScript(testingFramework);
-  const detectedPluginEntryValidationScript = firstToolScript(ecosystem.scripts.pluginEntryValidation);
-  const detectedObsidianE2EScript = firstToolScript(ecosystem.tools.obsidianE2E);
-  const detectedWdioScript = firstToolScript(ecosystem.tools.wdioObsidianService);
+  const detectedPluginEntryValidationScript = getPreflightScriptName(preflight, 'plugin-entry-validation', {
+    exclude: [lintScript],
+  });
+  const detectedObsidianE2EScript = getAdapterScriptName(adapterSupport, 'obsidianE2E', {
+    exclude: [lintScript, testScript],
+  });
+  const detectedTestingFrameworkScript = getAdapterScriptName(adapterSupport, 'testingFramework', {
+    exclude: [testScript],
+  });
+  const detectedWdioScript = getAdapterScriptName(adapterSupport, 'wdioObsidianService', {
+    exclude: [lintScript, testScript],
+  });
   const defaults = {
     toolRootRef: normalizeToolRootRef(toolRootRef),
     jobPath: relativeFromRepo(resolvedRepoDir, jobPath),
@@ -362,20 +393,12 @@ export async function generateQualityGateTemplates({
     buildScript: repoRuntime.scripts?.important?.build?.exists ? 'build' : '',
     testScript,
     pluginEntryValidationScript: detectedPluginEntryValidationScript
-      && ![lintScript, testScript].includes(detectedPluginEntryValidationScript)
+      && ![testScript].includes(detectedPluginEntryValidationScript)
       ? detectedPluginEntryValidationScript
       : '',
-    obsidianE2EScript: detectedObsidianE2EScript
-      && ![lintScript, testScript].includes(detectedObsidianE2EScript)
-      ? detectedObsidianE2EScript
-      : '',
-    testingFrameworkScript: detectedTestingFrameworkScript && detectedTestingFrameworkScript !== testScript
-      ? detectedTestingFrameworkScript
-      : '',
-    wdioScript: detectedWdioScript
-      && ![lintScript, testScript].includes(detectedWdioScript)
-      ? detectedWdioScript
-      : '',
+    obsidianE2EScript: detectedObsidianE2EScript,
+    testingFrameworkScript: detectedTestingFrameworkScript,
+    wdioScript: detectedWdioScript,
     outputDir: ciOutputDir,
     templateDir: toPosixPath(path.relative(resolvedRepoDir, resolvedOutputDir) || '.'),
     githubActionsPath: path.join(resolvedOutputDir, 'github-actions-quality-gate.yml'),
@@ -383,7 +406,10 @@ export async function generateQualityGateTemplates({
   const files = [
     {
       path: path.join(resolvedOutputDir, 'README.md'),
-      content: renderReadme(defaults, testingFramework, ecosystem),
+      content: renderReadme(defaults, {
+        ...adapterSupport,
+        ecosystem,
+      }),
     },
     {
       path: path.join(resolvedOutputDir, 'quality-gate.sh'),
@@ -413,21 +439,17 @@ export async function generateQualityGateTemplates({
     packageManager: inferredManager,
     defaults,
     templateDir: defaults.templateDir,
-    testingFramework: {
-      available: testingFramework.available,
-      declared: testingFramework.declared,
-      moduleName: testingFramework.moduleName,
-      version: testingFramework.version,
-      scripts: testingFramework.scripts,
-      detail: testingFramework.detail,
-    },
+    preflight,
+    testingFramework: adapterSupport.adapters.testingFramework.tool,
+    adapterLanes: adapterSupport.adapters,
     ecosystem: {
       tools: ecosystem.tools,
       scripts: ecosystem.scripts,
     },
     ciSuitable: [
-      'repo-owned install/lint/build/test commands',
-      'optional plugin-entry validation script',
+      'repo-owned install command',
+      'repo-owned lint and optional plugin-entry preflight commands before build',
+      'repo-owned build/test commands',
       'optional obsidian-e2e package script',
       'optional obsidian-testing-framework package script',
       'optional wdio-obsidian-service package script',

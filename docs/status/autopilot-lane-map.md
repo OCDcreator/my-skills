@@ -1,18 +1,27 @@
 # Autopilot Lane Map
 
 > **Preset**: `Bugfix / Backlog`
-> **Current `[NEXT]`**: `B18 - Preflight lint and plugin-entry validation gates`
+> **Scheduling**: Sequential lane controller
+> **Note**: The active lane comes from `automation/autopilot-config.json`; this file is a static index.
 
-## Current priority
+## Lane directories
 
-- B17 is complete; `Logstravaganza` vault-log ingestion now feeds doctor, capture, diagnosis, and reports
-- Execute B18 next to turn optional lint/plugin-entry detection into reusable preflight gates before build/deploy
-- Keep B19 queued behind B18 so repo-owned Obsidian E2E fixtures and CI wiring follow in order
-- Keep each round bounded to one Obsidian plugin autodebug framework slice
-- Validate with script-level smoke tests where available because this repo has no global build/test/lint
+- `b1-backlog-slice`
+  - roadmap: `docs/status/lanes/b1-backlog-slice/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/b1-backlog-slice/autopilot-phase-0.md`
+  - live slice: `B18 - Preflight lint and plugin-entry validation gates`
+- `b2-backlog-slice`
+  - roadmap: `docs/status/lanes/b2-backlog-slice/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/b2-backlog-slice/autopilot-phase-0.md`
+  - live slice: `B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring`
+- `b3-checkpoint`
+  - roadmap: `docs/status/lanes/b3-checkpoint/autopilot-round-roadmap.md`
+  - baseline: `docs/status/lanes/b3-checkpoint/autopilot-phase-0.md`
+  - live slice: `Checkpoint - Review B18 and B19 outcome`
 
 ## Suggested entrypoints
 
+- `AGENTS.md`
 - `custom/obsidian-plugin-autodebug/SKILL.md`
 - `custom/obsidian-plugin-autodebug/scripts/`
 - `custom/obsidian-plugin-autodebug/assertions/`
@@ -32,6 +41,6 @@
 ## Boundaries
 
 - No broad polish or unrelated cleanup
-- Preserve plugin-agnostic behavior; project-specific names belong only in examples or validation artifacts
-- No queue expansion beyond approved B17-B19 unless a human approves it
+- Legacy root `docs/status/autopilot-round-roadmap.md` and `docs/status/autopilot-phase-*.md` are archived carry-over from B1-B17; live queue truth now lives in `docs/status/lanes/*`
+- No queue expansion beyond B19 unless a human edits the lane roadmap
 - Keep `automation/runtime/` ignored and local-only

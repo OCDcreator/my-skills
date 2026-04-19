@@ -1,0 +1,9 @@
+{
+  "id": "obsidian-e2e-smoke-plugin",
+  "name": "Obsidian E2E Smoke Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.5",
+  "description": "Generic fixture for optional obsidian-e2e detection.",
+  "author": "my-skills",
+  "isDesktopOnly": false
+}

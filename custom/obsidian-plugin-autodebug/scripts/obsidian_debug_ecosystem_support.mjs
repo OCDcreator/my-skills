@@ -290,6 +290,7 @@ function detectScriptProbe({
   const scripts = collectRelevantScripts(packageJson, {
     namePatterns,
     bodyPatterns,
+    allowLooseMatch: true,
   });
 
   return {
@@ -322,8 +323,8 @@ export async function detectEcosystemSupport({
   const pluginEntryValidation = detectScriptProbe({
     packageJson,
     label: 'plugin-entry-validation',
-    namePatterns: [/\bvalidate\b/i, /\bplugin-entry\b/i, /\breviewbot\b/i],
-    bodyPatterns: [/validate-plugin-entry/i, /community-plugins\.json/i, /obsidian-releases/i, /plugin-entry/i],
+    namePatterns: [/\bplugin[-:_ ]entry\b/i, /\breviewbot\b/i, /\bvalidate[-:_ ]manifest\b/i, /\bmanifest[-:_ ]validate\b/i],
+    bodyPatterns: [/validate-plugin-entry/i, /community-plugins\.json/i, /obsidian-releases/i, /plugin[-:_ ]entry/i, /\breviewbot\b/i],
     detailIfPresent: (scripts) => `Found repo-owned plugin entry validation script(s): ${scripts.map((entry) => entry.name).join(', ')}.`,
     detailIfMissing: 'No repo-owned plugin entry validation script was detected; ReviewBot-style manifest/release checks remain optional.',
   });

@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": [
     "status",
+    "lane_id",
     "summary",
     "phase_doc_path",
     "tests_run",
@@ -27,6 +28,10 @@
         "failure",
         "goal_complete"
       ]
+    },
+    "lane_id": {
+      "type": "string",
+      "minLength": 1
     },
     "summary": {
       "type": "string",

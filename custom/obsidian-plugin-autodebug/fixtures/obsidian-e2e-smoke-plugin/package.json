@@ -1,0 +1,18 @@
+{
+  "name": "obsidian-e2e-smoke-plugin",
+  "version": "0.0.1",
+  "description": "Generic fixture for optional obsidian-e2e detection and CI wiring",
+  "main": "dist/main.js",
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "node -e \"console.log('obsidian-e2e smoke fixture already built')\"",
+    "test": "node -e \"console.log('obsidian-e2e smoke fixture base test')\"",
+    "test:obsidian-e2e": "vitest run --config autodebug/ci/obsidian-e2e.vitest.config.mjs"
+  },
+  "devDependencies": {
+    "obsidian-e2e": "^0.0.0-fixture",
+    "vitest": "^0.0.0-fixture"
+  },
+  "author": "my-skills",
+  "license": "MIT"
+}
