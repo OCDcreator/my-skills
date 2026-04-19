@@ -14,6 +14,12 @@ class WindowsMacSshSkillTests(unittest.TestCase):
         for phrase in [
             "SSH/SCP",
             "Mac Mini",
+            "SSH 连接 Mac",
+            "连 mac mini",
+            "把文件复制到 Mac",
+            "scp 到 Mac",
+            "Windows 到 macOS 同步仓库/artifacts",
+            "远程跑无人值守任务",
             "在 Mac 上执行命令",
             "background jobs",
             "CRLF/LF",
@@ -32,6 +38,20 @@ class WindowsMacSshSkillTests(unittest.TestCase):
             "zsh: parse error near done",
             "Command seems to run locally",
             "No-go patterns",
+            "Bash-style \\ line continuation is not PowerShell",
+            "cmd.exe caret continuation is not PowerShell",
+        ]:
+            self.assertIn(phrase, skill)
+
+    def test_skill_covers_background_monitor_and_restart_patterns(self):
+        skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+        for phrase in [
+            "Start-MacBackgroundJob.ps1",
+            "Watch-MacLog.ps1",
+            "pgrep -af",
+            "tail -f",
+            "inspect the previous log before restarting",
         ]:
             self.assertIn(phrase, skill)
 

@@ -1,6 +1,6 @@
 ---
 name: windows-mac-ssh
-description: Use when Windows PowerShell or Codex CLI needs to SSH/SCP into a Mac/Mac Mini/macOS host, 在 Mac 上执行命令, copy files/artifacts, sync Git repos, run background jobs, monitor logs, or avoid quoting, CRLF/LF, `$Mac:`, `scp`, zsh, remote `$HOME`, and PowerShell escape mistakes.
+description: Use when Windows PowerShell or Codex CLI needs to SSH/SCP into a Mac/Mac Mini/macOS host, including “SSH 连接 Mac”, “连 mac mini”, “把文件复制到 Mac”, “scp 到 Mac”, “在 Mac 上执行命令”, “Windows 到 macOS 同步仓库/artifacts”, or “远程跑无人值守任务”, and when avoiding quoting, CRLF/LF, `$Mac:`, zsh, remote `$HOME`, and PowerShell escape mistakes.
 ---
 
 # Windows → Mac SSH
@@ -377,6 +377,25 @@ Check whether a PID is still running:
 ssh $Mac 'ps -p 12345 -o pid=,stat=,command='
 ```
 
+Search by label when only part of the command is known:
+
+```powershell
+ssh $Mac "pgrep -af 'my-skills-maintenance|windows-mac-ssh'"
+```
+
+Raw tail also works when a helper script is unavailable:
+
+```powershell
+ssh $Mac 'tail -f /Users/dht/.cache/windows-mac-ssh/jobs/my-skills-maintenance.log'
+```
+
+If a background job fails, restart with a new label or after removing the old PID/script/log trio. Always inspect the previous log before restarting:
+
+```powershell
+ssh $Mac 'tail -n 120 /Users/dht/.cache/windows-mac-ssh/jobs/my-skills-maintenance.log'
+ssh $Mac "pgrep -af 'my-skills-maintenance'"
+```
+
 If a long job modifies a Git repo, require it to write a status file or final `git status -sb` to its log before claiming success.
 
 ## Destructive command guard
@@ -421,6 +440,8 @@ ssh $Mac "echo $HOME"                 # $HOME may expand locally or become empty
 scp file "$Mac:/tmp/"                 # $Mac: can be parsed as a scoped variable
 $cmd = "echo \"quoted\""              # \" is not PowerShell escaping
 ssh $Mac "for f in ...; do ...; done" # fragile nested zsh; use base64
+ssh $Mac "echo one" \                 # Bash-style \ line continuation is not PowerShell
+ssh $Mac "echo one" ^                 # cmd.exe caret continuation is not PowerShell
 ```
 
 Use the scripts/base64 pattern instead.
