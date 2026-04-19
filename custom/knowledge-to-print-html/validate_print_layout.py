@@ -1,26 +1,25 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import glob
+import importlib
 import json
 import os
 import re
+import shutil
 import struct
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
-
-try:
-    from playwright.sync_api import sync_playwright
-except ImportError as exc:  # pragma: no cover
-    raise SystemExit(
-        "Playwright is required. Install it first, for example: "
-        "`python -m pip install playwright`."
-    ) from exc
 
 
 A4_WIDTH_MM = 210
 A4_HEIGHT_MM = 297
 A4_ASPECT_RATIO = A4_WIDTH_MM / A4_HEIGHT_MM
+DEFAULT_PARITY_DIFF_THRESHOLD = 0.035
 
 
 IMAGE_EVAL_JS = r"""
@@ -52,9 +51,10 @@ elements => {
     ".table-like",
   ].join(",");
 
-  return elements.map((sheet) => {
-    const rect = sheet.getBoundingClientRect();
-    const issues = [];
+    return elements.map((sheet) => {
+      const rect = sheet.getBoundingClientRect();
+      const expectedA4Height = rect.width / (210 / 297);
+      const issues = [];
     const directChildren = Array.from(sheet.children).filter((node) => {
       return !node.classList.contains("page-no") && !node.hidden;
     });
@@ -121,7 +121,7 @@ elements => {
       return largest;
     }, null);
 
-    return {
+      return {
       page: sheet.dataset.page || null,
       client: {
         width: sheet.clientWidth,
@@ -139,6 +139,8 @@ elements => {
         width: Math.round(rect.width * 100) / 100,
         height: Math.round(rect.height * 100) / 100,
       },
+      expectedA4Height: Math.round(expectedA4Height * 100) / 100,
+      usesA4Aspect: Math.abs(rect.height - expectedA4Height) <= 2,
       contentBounds,
       density: hasVisibleContent ? {
         contentHeightRatio: Math.round(((contentBottom - contentTop) / rect.height) * 1000) / 1000,
@@ -189,6 +191,320 @@ sheet => {
 VISIBLE_SHEET_COUNT_EVAL_JS = r"""
 elements => elements.filter((sheet) => !sheet.hidden).length
 """
+
+IMAGE_DIFF_EVAL_JS = r"""
+async payload => {
+  const { leftDataUrl, rightDataUrl, sampleSize } = payload;
+  const loadImage = src => new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Failed to decode comparison image."));
+    image.src = src;
+  });
+
+  const [leftImage, rightImage] = await Promise.all([
+    loadImage(leftDataUrl),
+    loadImage(rightDataUrl),
+  ]);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = sampleSize;
+  canvas.height = sampleSize;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+
+  const sampleImage = image => {
+    context.clearRect(0, 0, sampleSize, sampleSize);
+    context.drawImage(image, 0, 0, sampleSize, sampleSize);
+    return context.getImageData(0, 0, sampleSize, sampleSize).data;
+  };
+
+  const leftPixels = sampleImage(leftImage);
+  const rightPixels = sampleImage(rightImage);
+  let totalDifference = 0;
+
+  for (let index = 0; index < leftPixels.length; index += 4) {
+    const leftGray = (
+      leftPixels[index] * 0.299 +
+      leftPixels[index + 1] * 0.587 +
+      leftPixels[index + 2] * 0.114
+    ) / 255;
+    const rightGray = (
+      rightPixels[index] * 0.299 +
+      rightPixels[index + 1] * 0.587 +
+      rightPixels[index + 2] * 0.114
+    ) / 255;
+    totalDifference += Math.abs(leftGray - rightGray);
+  }
+
+  return Math.round((totalDifference / (sampleSize * sampleSize)) * 10000) / 10000;
+}
+"""
+
+
+def run_bootstrap_command(command: list[str]) -> None:
+    subprocess.run(command, check=True)
+
+
+def ensure_python_package(
+    import_name: str,
+    *,
+    pip_name: str,
+    auto_install: bool,
+) -> Any:
+    try:
+        return importlib.import_module(import_name)
+    except ImportError as exc:
+        if not auto_install:
+            raise RuntimeError(
+                f"Missing Python dependency `{pip_name}`. "
+                f"Install it with: {' '.join([sys.executable, '-m', 'pip', 'install', pip_name])}"
+            ) from exc
+
+    run_bootstrap_command([sys.executable, "-m", "pip", "install", pip_name])
+
+    try:
+        return importlib.import_module(import_name)
+    except ImportError as exc:
+        raise RuntimeError(
+            f"Automatic installation finished, but `{pip_name}` still could not be imported."
+        ) from exc
+
+
+def try_install_system_browser() -> str | None:
+    commands: list[list[str]] = []
+    if os.name == "nt" and shutil.which("winget"):
+        commands.extend(
+            [
+                [
+                    "winget",
+                    "install",
+                    "-e",
+                    "--id",
+                    "Microsoft.Edge",
+                    "--accept-package-agreements",
+                    "--accept-source-agreements",
+                ],
+                [
+                    "winget",
+                    "install",
+                    "-e",
+                    "--id",
+                    "Google.Chrome",
+                    "--accept-package-agreements",
+                    "--accept-source-agreements",
+                ],
+            ]
+        )
+    elif sys.platform == "darwin" and shutil.which("brew"):
+        commands.extend(
+            [
+                ["brew", "install", "--cask", "microsoft-edge"],
+                ["brew", "install", "--cask", "google-chrome"],
+            ]
+        )
+    elif shutil.which("apt-get"):
+        commands.extend(
+            [
+                ["apt-get", "install", "-y", "chromium-browser"],
+                ["apt-get", "install", "-y", "chromium"],
+            ]
+        )
+
+    for command in commands:
+        try:
+            run_bootstrap_command(command)
+        except Exception:
+            continue
+
+        browser_path = resolve_browser_path(None)
+        if browser_path:
+            return browser_path
+
+    return None
+
+
+def resolve_qpdf_path() -> str | None:
+    candidates = [
+        shutil.which("qpdf"),
+        r"C:\Program Files\qpdf\bin\qpdf.exe",
+        r"C:\Program Files (x86)\qpdf\bin\qpdf.exe",
+        "/opt/homebrew/bin/qpdf",
+        "/usr/local/bin/qpdf",
+        "/usr/bin/qpdf",
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return str(Path(candidate))
+
+    glob_patterns = [
+        r"C:\Program Files\qpdf*\bin\qpdf.exe",
+        r"C:\Program Files (x86)\qpdf*\bin\qpdf.exe",
+        str(Path.home() / "AppData/Local/Microsoft/WinGet/Packages/QPDF.QPDF_*" / "*" / "qpdf.exe"),
+    ]
+    for pattern in glob_patterns:
+        matches = sorted(glob.glob(pattern))
+        for match in matches:
+            if Path(match).exists():
+                return str(Path(match))
+    return None
+
+
+def try_install_qpdf() -> str | None:
+    commands: list[list[str]] = []
+    if os.name == "nt" and shutil.which("winget"):
+        commands.append(
+            [
+                "winget",
+                "install",
+                "-e",
+                "--id",
+                "QPDF.QPDF",
+                "--accept-package-agreements",
+                "--accept-source-agreements",
+            ]
+        )
+    elif sys.platform == "darwin" and shutil.which("brew"):
+        commands.append(["brew", "install", "qpdf"])
+    elif shutil.which("apt-get"):
+        commands.append(["apt-get", "install", "-y", "qpdf"])
+
+    for command in commands:
+        try:
+            run_bootstrap_command(command)
+        except Exception:
+            continue
+
+        qpdf_path = resolve_qpdf_path()
+        if qpdf_path:
+            return qpdf_path
+
+    return None
+
+
+def inspect_pdf_fast_view_features(path: Path) -> dict[str, bool]:
+    data = path.read_bytes()
+    head = data[:2048]
+    return {
+        "linearized": b"/Linearized" in head,
+        "objectStreams": b"/ObjStm" in data,
+        "xrefStream": b"/XRef" in data,
+    }
+
+
+def optimize_pdf_for_fast_view(
+    raw_pdf_path: Path,
+    final_pdf_path: Path,
+    *,
+    auto_install: bool,
+) -> dict[str, Any]:
+    qpdf_path = resolve_qpdf_path()
+    if not qpdf_path and auto_install:
+        qpdf_path = try_install_qpdf()
+
+    raw_bytes = raw_pdf_path.stat().st_size
+    if not qpdf_path:
+        if raw_pdf_path != final_pdf_path:
+            shutil.copyfile(raw_pdf_path, final_pdf_path)
+        features = inspect_pdf_fast_view_features(final_pdf_path)
+        return {
+            "tool": None,
+            "linearized": features["linearized"],
+            "objectStreams": features["objectStreams"],
+            "xrefStream": features["xrefStream"],
+            "rawBytes": raw_bytes,
+            "optimizedBytes": final_pdf_path.stat().st_size,
+            "optimized": False,
+            "reason": "qpdf was not available and could not be installed automatically.",
+        }
+
+    command = [
+        qpdf_path,
+        "--linearize",
+        "--object-streams=generate",
+        str(raw_pdf_path),
+        str(final_pdf_path),
+    ]
+    run_bootstrap_command(command)
+    features = inspect_pdf_fast_view_features(final_pdf_path)
+    return {
+        "tool": "qpdf",
+        "toolPath": qpdf_path,
+        "linearized": features["linearized"],
+        "objectStreams": features["objectStreams"],
+        "xrefStream": features["xrefStream"],
+        "rawBytes": raw_bytes,
+        "optimizedBytes": final_pdf_path.stat().st_size,
+        "optimized": features["linearized"],
+        "reason": None if features["linearized"] else "qpdf ran but the output is not linearized.",
+    }
+
+
+def build_fast_view_pdf(
+    html_page_artifacts: list[dict[str, Any]],
+    output_dir: Path,
+    prefix: str,
+    *,
+    auto_install: bool,
+) -> dict[str, Any]:
+    fitz = load_pymupdf(auto_install)
+    raw_pdf_path = output_dir / f"{prefix}-fastview-raw.pdf"
+    final_pdf_path = output_dir / f"{prefix}-fastview.pdf"
+    document = fitz.open()
+
+    try:
+        for artifact in html_page_artifacts:
+            image_path = Path(artifact["path"])
+            page = document.new_page(width=594.96, height=841.92)
+            page.insert_image(page.rect, filename=str(image_path), keep_proportion=False)
+        document.save(raw_pdf_path, garbage=4, deflate=True, clean=True)
+    finally:
+        document.close()
+
+    optimization = optimize_pdf_for_fast_view(
+        raw_pdf_path,
+        final_pdf_path,
+        auto_install=auto_install,
+    )
+    try:
+        raw_pdf_path.unlink()
+    except OSError:
+        pass
+
+    page_count, media_boxes = inspect_pdf_document(
+        final_pdf_path,
+        auto_install=auto_install,
+    )
+    return {
+        "path": str(final_pdf_path),
+        "bytes": final_pdf_path.stat().st_size,
+        "pageCount": page_count,
+        "mediaBoxes": media_boxes,
+        "source": "html-page-screenshots",
+        "optimization": optimization,
+    }
+
+
+def ensure_playwright_runtime(auto_install: bool) -> None:
+    if not auto_install:
+        return
+    run_bootstrap_command([sys.executable, "-m", "playwright", "install", "chromium"])
+
+
+def load_playwright(auto_install: bool) -> Any:
+    module = ensure_python_package(
+        "playwright.sync_api",
+        pip_name="playwright",
+        auto_install=auto_install,
+    )
+    return module.sync_playwright
+
+
+def load_pymupdf(auto_install: bool) -> Any:
+    return ensure_python_package(
+        "fitz",
+        pip_name="pymupdf",
+        auto_install=auto_install,
+    )
 
 ISOLATE_PAGE_EVAL_JS = r"""
 pageNumber => {
@@ -255,6 +571,17 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=1.5,
         help="Device scale factor for captures. Default: 1.5.",
+    )
+    parser.add_argument(
+        "--no-auto-install",
+        action="store_true",
+        help="Disable automatic dependency installation and browser provisioning.",
+    )
+    parser.add_argument(
+        "--parity-sample-size",
+        type=int,
+        default=64,
+        help="Downsample size for lightweight HTML-vs-PDF visual diff scoring. Default: 64.",
     )
     return parser.parse_args()
 
@@ -338,6 +665,11 @@ def read_png_dimensions(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", png_bytes[16:24])
 
 
+def path_to_data_url(path: Path) -> str:
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def build_a4_clip(box: dict[str, float]) -> dict[str, float]:
     width = float(box["width"])
     return {
@@ -412,8 +744,144 @@ def capture_page_artifacts(
     return page_artifacts
 
 
+def render_pdf_page_artifacts(
+    pdf_path: Path,
+    output_dir: Path,
+    prefix: str,
+    html_page_artifacts: list[dict[str, Any]],
+    *,
+    auto_install: bool,
+) -> list[dict[str, Any]]:
+    fitz = load_pymupdf(auto_install)
+    document = fitz.open(str(pdf_path))
+    artifacts: list[dict[str, Any]] = []
+
+    try:
+        for page_number, pdf_page in enumerate(document, start=1):
+            html_artifact = next(
+                (artifact for artifact in html_page_artifacts if artifact["page"] == page_number),
+                None,
+            )
+            target_width = (
+                int(html_artifact["screenshotWidthPx"])
+                if html_artifact
+                else int(round(pdf_page.rect.width * 2))
+            )
+            zoom = target_width / float(pdf_page.rect.width)
+            pixmap = pdf_page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+            screenshot_path = output_dir / f"{prefix}-pdf-page-{page_number}.png"
+            pixmap.save(str(screenshot_path))
+            screenshot_width_px, screenshot_height_px = read_png_dimensions(screenshot_path)
+            screenshot_aspect_ratio = screenshot_width_px / screenshot_height_px
+
+            artifacts.append(
+                {
+                    "page": page_number,
+                    "path": str(screenshot_path),
+                    "widthPt": round(float(pdf_page.rect.width), 2),
+                    "heightPt": round(float(pdf_page.rect.height), 2),
+                    "screenshotWidthPx": screenshot_width_px,
+                    "screenshotHeightPx": screenshot_height_px,
+                    "screenshotAspectRatio": round(screenshot_aspect_ratio, 4),
+                    "usesA4Aspect": abs(screenshot_aspect_ratio - A4_ASPECT_RATIO) <= 0.02,
+                }
+            )
+    finally:
+        document.close()
+
+    return artifacts
+
+
+def inspect_pdf_document(
+    pdf_path: Path,
+    *,
+    auto_install: bool,
+) -> tuple[int, list[dict[str, float]]]:
+    fitz = load_pymupdf(auto_install)
+    document = fitz.open(str(pdf_path))
+    try:
+        media_boxes = [
+            {
+                "widthPt": round(float(page.rect.width), 2),
+                "heightPt": round(float(page.rect.height), 2),
+            }
+            for page in document
+        ]
+        return document.page_count, media_boxes
+    finally:
+        document.close()
+
+
+def build_pdf_html_parity(
+    context: Any,
+    html_page_artifacts: list[dict[str, Any]],
+    pdf_page_artifacts: list[dict[str, Any]],
+    *,
+    sample_size: int,
+) -> list[dict[str, Any]]:
+    comparison_page = context.new_page()
+    comparison_page.set_content("<!doctype html><html><body></body></html>")
+    parity_pages: list[dict[str, Any]] = []
+
+    try:
+        pdf_index = {artifact["page"]: artifact for artifact in pdf_page_artifacts}
+        for html_artifact in html_page_artifacts:
+            page_number = html_artifact["page"]
+            pdf_artifact = pdf_index.get(page_number)
+            if not pdf_artifact:
+                parity_pages.append(
+                    {
+                        "page": page_number,
+                        "htmlScreenshot": html_artifact["path"],
+                        "pdfScreenshot": None,
+                        "visualDiffScore": None,
+                        "matchSuggested": False,
+                    }
+                )
+                continue
+
+            visual_diff_score = comparison_page.evaluate(
+                IMAGE_DIFF_EVAL_JS,
+                {
+                    "leftDataUrl": path_to_data_url(Path(html_artifact["path"])),
+                    "rightDataUrl": path_to_data_url(Path(pdf_artifact["path"])),
+                    "sampleSize": sample_size,
+                },
+            )
+            same_dimensions = (
+                abs(html_artifact["screenshotWidthPx"] - pdf_artifact["screenshotWidthPx"]) <= 4
+                and abs(html_artifact["screenshotHeightPx"] - pdf_artifact["screenshotHeightPx"]) <= 4
+            )
+            match_suggested = (
+                visual_diff_score <= DEFAULT_PARITY_DIFF_THRESHOLD
+                and same_dimensions
+                and pdf_artifact["usesA4Aspect"]
+            )
+
+            parity_pages.append(
+                {
+                    "page": page_number,
+                    "htmlScreenshot": html_artifact["path"],
+                    "pdfScreenshot": pdf_artifact["path"],
+                    "htmlScreenshotWidthPx": html_artifact["screenshotWidthPx"],
+                    "htmlScreenshotHeightPx": html_artifact["screenshotHeightPx"],
+                    "pdfScreenshotWidthPx": pdf_artifact["screenshotWidthPx"],
+                    "pdfScreenshotHeightPx": pdf_artifact["screenshotHeightPx"],
+                    "sameDimensions": same_dimensions,
+                    "visualDiffScore": visual_diff_score,
+                    "matchSuggested": match_suggested,
+                }
+            )
+    finally:
+        comparison_page.close()
+
+    return parity_pages
+
+
 def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[str, bool]]:
     analysis = summary["analysis"]
+    pdf_screenshots = summary["pdf"]["screenshots"]["pages"]
+    parity_pages = summary["parity"]["pages"]
     required_checks = {
         "noConsoleProblems": len(summary["consoleMessages"]) == 0,
         "allImagesLoaded": all(
@@ -433,10 +901,20 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
         "hasPrintMediaRule": analysis["rules"]["printMedia"],
         "hasBreakAvoidRule": analysis["rules"]["breakAvoid"],
         "hasPrintColorAdjust": analysis["rules"]["printColorAdjust"],
+        "sheetsUseA4Aspect": all(
+            sheet.get("usesA4Aspect") for sheet in analysis["sheets"]
+        ),
+        "pdfOptimizedForFastView": summary["pdf"].get("optimization", {}).get("linearized") is True,
         "pdfPageCountMatches": summary["pdf"]["pageCount"] == analysis["sheetCount"],
+        "pdfScreenshotCountMatchesHtml": len(pdf_screenshots) == len(summary["screenshots"]["pages"]),
         "pageScreenshotsUseA4Aspect": all(
             artifact["usesA4Aspect"] for artifact in summary["screenshots"]["pages"]
         ),
+        "pdfScreenshotsUseA4Aspect": all(
+            artifact["usesA4Aspect"] for artifact in pdf_screenshots
+        ),
+        "fastViewPdfPageCountMatchesHtml": summary["fastViewPdf"]["pageCount"] == analysis["sheetCount"],
+        "fastViewPdfOptimizedForFastView": summary["fastViewPdf"].get("optimization", {}).get("linearized") is True,
     }
     optional_checks = {
         "pageQueryIsolatesSheets": all(
@@ -446,8 +924,40 @@ def build_checks(summary: dict[str, Any]) -> tuple[dict[str, bool | None], dict[
             (sheet.get("density") or {}).get("bottomGapRatio", 0) <= 0.22
             for sheet in analysis["sheets"]
         ),
+        "pdfVisualParityLooksClose": all(
+            page.get("matchSuggested") is True for page in parity_pages
+        ) if parity_pages else True,
     }
     return required_checks, optional_checks
+
+
+def launch_browser(playwright: Any, *, browser_path: str | None, auto_install: bool) -> tuple[Any, str | None]:
+    launch_kwargs: dict[str, Any] = {"headless": True}
+    if browser_path:
+        launch_kwargs["executable_path"] = browser_path
+
+    try:
+        return playwright.chromium.launch(**launch_kwargs), browser_path
+    except Exception as first_error:
+        if not auto_install:
+            raise
+
+    ensure_playwright_runtime(auto_install=True)
+    try:
+        return playwright.chromium.launch(**launch_kwargs), browser_path
+    except Exception as second_error:
+        fallback_browser_path = resolve_browser_path(None) or try_install_system_browser()
+        if fallback_browser_path:
+            return (
+                playwright.chromium.launch(
+                    headless=True,
+                    executable_path=fallback_browser_path,
+                ),
+                fallback_browser_path,
+            )
+        raise RuntimeError(
+            "Unable to launch Chromium even after automatic Playwright/browser provisioning."
+        ) from second_error
 
 
 def main() -> int:
@@ -466,14 +976,16 @@ def main() -> int:
     prefix = args.prefix or html_path.stem
     base_url = html_path.as_uri()
     browser_path = resolve_browser_path(args.browser_path)
+    auto_install = not args.no_auto_install
     console_messages: list[dict[str, str]] = []
+    sync_playwright = load_playwright(auto_install)
 
     with sync_playwright() as playwright:
-        launch_kwargs: dict[str, Any] = {"headless": True}
-        if browser_path:
-            launch_kwargs["executable_path"] = browser_path
-
-        browser = playwright.chromium.launch(**launch_kwargs)
+        browser, browser_path = launch_browser(
+            playwright,
+            browser_path=browser_path,
+            auto_install=auto_install,
+        )
         context = browser.new_context(
             viewport={
                 "width": args.viewport_width,
@@ -514,29 +1026,47 @@ def main() -> int:
             prefix=prefix,
             settle_ms=args.settle_ms,
         )
+        fast_view_pdf = build_fast_view_pdf(
+            page_artifacts,
+            output_dir,
+            prefix,
+            auto_install=auto_install,
+        )
 
         page.emulate_media(media="print")
         pdf_path = output_dir / f"{prefix}.pdf"
+        raw_pdf_path = output_dir / f"{prefix}-raw.pdf"
         page.pdf(
-            path=str(pdf_path),
+            path=str(raw_pdf_path),
             print_background=True,
             prefer_css_page_size=True,
         )
-        pdf_text = pdf_path.read_bytes().decode("latin1", errors="ignore")
-        page_counts = [
-            int(match.group(1)) for match in re.finditer(r"/Count\s+(\d+)", pdf_text)
-        ]
-        media_boxes = [
-            {
-                "widthPt": float(match.group(1)),
-                "heightPt": float(match.group(2)),
-            }
-            for match in re.finditer(
-                r"/MediaBox\s*\[\s*0\s+0\s+([0-9.]+)\s+([0-9.]+)\s*\]",
-                pdf_text,
-            )
-        ]
-        pdf_page_count = max(page_counts) if page_counts else None
+        pdf_optimization = optimize_pdf_for_fast_view(
+            raw_pdf_path,
+            pdf_path,
+            auto_install=auto_install,
+        )
+        try:
+            raw_pdf_path.unlink()
+        except OSError:
+            pass
+        pdf_page_artifacts = render_pdf_page_artifacts(
+            pdf_path,
+            output_dir,
+            prefix,
+            page_artifacts,
+            auto_install=auto_install,
+        )
+        parity_pages = build_pdf_html_parity(
+            context,
+            page_artifacts,
+            pdf_page_artifacts,
+            sample_size=args.parity_sample_size,
+        )
+        pdf_page_count, media_boxes = inspect_pdf_document(
+            pdf_path,
+            auto_install=auto_install,
+        )
 
         browser.close()
 
@@ -546,6 +1076,7 @@ def main() -> int:
         "browser": {
             "resolvedPath": browser_path,
             "usesBundledBrowser": browser_path is None,
+            "autoInstallEnabled": auto_install,
         },
         "analysis": analysis,
         "consoleMessages": console_messages,
@@ -558,6 +1089,16 @@ def main() -> int:
             "bytes": pdf_path.stat().st_size,
             "pageCount": pdf_page_count,
             "mediaBoxes": media_boxes,
+            "optimization": pdf_optimization,
+            "screenshots": {
+                "pages": pdf_page_artifacts,
+            },
+        },
+        "fastViewPdf": fast_view_pdf,
+        "parity": {
+            "sampleSize": args.parity_sample_size,
+            "diffThreshold": DEFAULT_PARITY_DIFF_THRESHOLD,
+            "pages": parity_pages,
         },
     }
 
@@ -577,6 +1118,7 @@ def main() -> int:
     print(f"Pass: {summary['pass']}")
     print(f"Pages: {analysis['sheetCount']}")
     print(f"PDF: {pdf_path}")
+    print(f"Fast-view PDF: {fast_view_pdf['path']}")
     if optional_checks:
         print(f"Optional checks: {json.dumps(optional_checks, ensure_ascii=False)}")
     if failed_checks:

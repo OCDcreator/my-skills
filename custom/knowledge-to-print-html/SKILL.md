@@ -5,7 +5,7 @@ description: Use when the user provides knowledge-point keywords, notes, draft t
 
 # Knowledge To Print HTML
 
-Turn `关键词 + 草稿` into a polished, print-first HTML handout that the user can manually export to PDF.
+Turn `关键词 + 草稿` into a polished, print-first HTML handout that can be automatically exported to PDF and reviewed page-by-page for HTML/PDF print fidelity.
 
 This skill is a workflow skill. It coordinates research, writing, diagrams, visual direction, HTML generation, and print verification so the final page is both readable on screen and stable when printed.
 
@@ -79,12 +79,17 @@ This skill implements **Plan C: mandatory sequential page review** by default.
 Do not hand off `handout.html` until all of these are true:
 
 1. `validate_print_layout.py` has generated per-page screenshots where each screenshot contains exactly one `.sheet`.
-2. `review_print_pages.py` has generated `page-review-manifest.json` plus one `page-XX-subagent-prompt.md` per page.
-3. A fresh page-review subagent has reviewed page 1 using that page's prompt and screenshot.
-4. Page 1 has either passed or been fixed and revalidated.
-5. Only then may page 2 be sent to a fresh page-review subagent.
-6. The same gate repeats until every page passes.
-7. A final full-document validation runs after the last page passes.
+2. `validate_print_layout.py` confirms each `.sheet` itself still uses true A4 aspect in print media. A page is invalid if the DOM sheet grows taller than A4 even when the clipped screenshot still looks like A4.
+3. `validate_print_layout.py` has exported a PDF that matches the HTML page count exactly.
+4. The exported print PDF has been optimized for fast viewing with linearized structure / fast-web-view style output. A non-optimized print PDF export is not acceptable.
+5. A second PDF optimized for scrolling review has also been generated from per-page screenshots. Do not hand off only the raw print PDF when the document is expected to be read on screen.
+6. `review_print_pages.py` has generated `page-review-manifest.json` plus one `page-XX-subagent-prompt.md` per page.
+7. The validator has also rendered one PDF-page screenshot per page, plus HTML-vs-PDF parity metadata for each page.
+8. A fresh page-review subagent has reviewed page 1 using that page's HTML screenshot, PDF screenshot, and prompt.
+9. Page 1 has either passed or been fixed and revalidated.
+10. Only then may page 2 be sent to a fresh page-review subagent.
+11. The same gate repeats until every page passes.
+12. A final full-document validation runs after the last page passes.
 
 If the environment has no subagent/delegation tool, stop and report that the visual review gate is blocked. Do not self-approve pages as a substitute.
 
@@ -262,6 +267,11 @@ Use `webapp-testing` or equivalent browser validation to check:
 - page breaks are intentional enough for manual PDF export
 - diagrams are large enough to read and do not contain overflowing text
 - no page wastes a large empty lower region unless it is clearly justified by the composition
+- exported PDF pages preserve the HTML layout without reflow, clipping, or scaling drift
+- exported PDF must also open and scroll quickly enough for human review; the export step must not rely on the raw browser PDF alone
+- always export both:
+  - a print PDF for parity / printing
+  - a fast-view PDF for on-screen scrolling review
 
 For repo-local smoke validation, you can use:
 
@@ -269,7 +279,22 @@ For repo-local smoke validation, you can use:
 python validate_print_layout.py --html evals/<slug>/handout.html
 ```
 
-By default this writes screenshots, a PDF export, and a JSON report to `evals/<slug>/screens/py-latest/`.
+By default this writes screenshots, a PDF export, PDF page screenshots, and a JSON report to `evals/<slug>/screens/py-latest/`.
+
+`validate_print_layout.py` now treats dependency provisioning as part of the workflow:
+
+- automatically installs missing Python packages such as `playwright` and `pymupdf`
+- automatically installs Playwright Chromium when needed
+- automatically installs `qpdf` when needed so the exported PDF can be optimized for fast viewing
+- may fall back to the host package manager for a browser when browser provisioning is still blocked
+- writes per-page HTML/PDF parity metadata so the next review step can stay page-local
+- builds a separate fast-view review PDF from page screenshots so vector-heavy pages do not stall during rapid mouse-wheel scrolling
+
+`validate_print_layout.py` now enforces two additional hard rules:
+
+- If a `.sheet` is stretched beyond real A4 height in print media, validation fails even if the clipped PNG still looks like A4.
+- If the exported PDF is not optimized for fast viewing after the export step, validation fails.
+- If the workflow does not also generate a separate fast-view PDF for smooth on-screen scrolling, validation fails.
 
 Default mandatory page-review loop:
 
@@ -283,9 +308,16 @@ This writes a sequential review packet to `screens/py-latest/page-review/`, incl
 - `page-XX-review.json`
 - `page-XX-subagent-prompt.md`
 
+Each `page-XX-review.json` now contains:
+
+- the HTML page screenshot path
+- the rendered PDF page screenshot path
+- parity metadata such as dimension match and visual-diff score
+- heuristic flags for both layout density and PDF-export drift
+
 Single-page review screenshots are not generic viewport captures. They must be clipped to the exact printable page area so the exported PNG keeps true A4 page proportions for layout review. If the validator reports non-A4 page screenshots, the review packet is not acceptable for subagent review.
 
-Review page 1 first. Give the page screenshot, `page-XX-review.json`, and `page-XX-subagent-prompt.md` to a fresh review subagent. If page 1 fails, fix it, rerun the packet, and re-review page 1. Only then move to page 2.
+Review page 1 first. Give the HTML screenshot, PDF screenshot, `page-XX-review.json`, and `page-XX-subagent-prompt.md` to a fresh review subagent. If page 1 fails, fix it, rerun the packet, and re-review page 1. Only then move to page 2.
 
 The subagent must review at least:
 
@@ -294,6 +326,7 @@ The subagent must review at least:
 - large lower-page blank regions
 - clipped or cramped figures, tables, callouts, code, and captions
 - print-page balance and break quality
+- whether the exported PDF page still matches the HTML page in layout, spacing, scaling, margins, clipping, and content presence
 - information hierarchy and teaching clarity
 - whether the page reads like a study handout rather than a web hero, dashboard, or marketing page
 

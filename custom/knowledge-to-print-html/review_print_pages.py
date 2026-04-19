@@ -70,16 +70,25 @@ def run_validation(args: argparse.Namespace, html_path: Path, prefix: str) -> Pa
     if args.browser_path:
         command.extend(["--browser-path", args.browser_path])
 
-    subprocess.run(command, check=True)
-
     output_dir = Path(args.out_dir).expanduser().resolve() if args.out_dir else html_path.parent / "screens" / "py-latest"
-    return output_dir / f"{prefix}-validation-report.json"
+    report_path = output_dir / f"{prefix}-validation-report.json"
+
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError:
+        if report_path.exists():
+            return report_path
+        raise
+
+    return report_path
 
 
 def build_flags(
     page: dict[str, Any],
     thresholds: dict[str, float],
     screenshot: dict[str, Any],
+    pdf_screenshot: dict[str, Any] | None,
+    parity: dict[str, Any] | None,
 ) -> list[dict[str, Any]]:
     flags: list[dict[str, Any]] = []
     density = page.get("density") or {}
@@ -148,12 +157,59 @@ def build_flags(
             }
         )
 
+    if not pdf_screenshot:
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "pdf_page_capture_missing",
+                "message": "No rendered PDF page screenshot was available for this page.",
+            }
+        )
+    elif not pdf_screenshot.get("usesA4Aspect", False):
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "pdf_page_not_a4",
+                "message": "The rendered PDF page screenshot does not preserve an A4-like aspect ratio.",
+            }
+        )
+
+    if not parity:
+        flags.append(
+            {
+                "severity": "fail",
+                "code": "pdf_parity_missing",
+                "message": "No HTML-vs-PDF parity metadata was generated for this page.",
+            }
+        )
+    else:
+        if parity.get("sameDimensions") is False:
+            flags.append(
+                {
+                    "severity": "warn",
+                    "code": "pdf_dimension_drift",
+                    "message": "HTML and PDF screenshots were rendered at noticeably different dimensions.",
+                }
+            )
+        if (parity.get("visualDiffScore") or 0) > 0.035:
+            flags.append(
+                {
+                    "severity": "warn",
+                    "code": "pdf_visual_drift",
+                    "message": "Rendered PDF page appears visually different from the HTML page screenshot.",
+                    "actual": parity.get("visualDiffScore"),
+                    "threshold": 0.035,
+                }
+            )
+
     return flags
 
 
 def build_subagent_prompt(page_packet: dict[str, Any]) -> str:
     page_number = page_packet["page"]
-    screenshot_path = page_packet["screenshot"]
+    html_screenshot_path = page_packet["htmlScreenshot"]
+    pdf_screenshot_path = page_packet["pdfScreenshot"]
+    parity = page_packet.get("parity") or {}
     flags = page_packet["heuristicFlags"]
     heuristic_summary = "none" if not flags else ", ".join(
         f"{flag['severity']}:{flag['code']}" for flag in flags
@@ -163,8 +219,11 @@ def build_subagent_prompt(page_packet: dict[str, Any]) -> str:
         "REQUIRED: You are a page-review subagent, not the editing agent.\n"
         "Do not edit files. Do not rewrite the handout. Do not review any other page.\n"
         f"Review page {page_number} of a print-first teaching handout.\n"
-        f"Screenshot: {screenshot_path}\n"
+        f"HTML screenshot: {html_screenshot_path}\n"
+        f"PDF screenshot: {pdf_screenshot_path}\n"
         f"Heuristic flags: {heuristic_summary}\n\n"
+        "Compare the HTML page screenshot against the PDF page screenshot.\n"
+        f"Advisory visual diff score: {parity.get('visualDiffScore')}\n\n"
         "Decide whether this single page passes the print-review gate.\n"
         "Return only JSON with keys: page, pass, issues, fixes.\n"
         "Each issue must include: type, severity, evidence, fix.\n"
@@ -174,6 +233,7 @@ def build_subagent_prompt(page_packet: dict[str, Any]) -> str:
         "- Fail if the page leaves a large empty lower region without a deliberate full-page composition reason.\n"
         "- Fail if visual hierarchy feels like a web hero or dashboard rather than a study handout.\n"
         "- Fail if figures, callouts, tables, or code blocks are clipped, awkwardly split, or visually cramped.\n"
+        "- Fail if the PDF export changes layout, spacing, scaling, clipping, or missing content compared with the HTML page.\n"
         "- Fail if headings, examples, captions, and body text do not form a clear teaching hierarchy.\n"
         "- Issues must be concrete and page-local.\n"
         "- Fixes must describe how to change layout/content for this page before page "
@@ -202,16 +262,26 @@ def write_review_packets(
     screenshot_index = {
         item["page"]: item for item in report["screenshots"]["pages"]
     }
+    pdf_screenshot_index = {
+        item["page"]: item for item in report.get("pdf", {}).get("screenshots", {}).get("pages", [])
+    }
+    parity_index = {
+        item["page"]: item for item in report.get("parity", {}).get("pages", [])
+    }
 
     pages: list[dict[str, Any]] = []
     for page in report["analysis"]["sheets"]:
         page_number = int(page["page"])
         screenshot = screenshot_index[page_number]
-        flags = build_flags(page, thresholds, screenshot)
+        pdf_screenshot = pdf_screenshot_index.get(page_number)
+        parity = parity_index.get(page_number)
+        flags = build_flags(page, thresholds, screenshot, pdf_screenshot, parity)
         subagent_prompt = build_subagent_prompt(
             {
                 "page": page_number,
-                "screenshot": screenshot["path"],
+                "htmlScreenshot": screenshot["path"],
+                "pdfScreenshot": pdf_screenshot["path"] if pdf_screenshot else None,
+                "parity": parity,
                 "heuristicFlags": flags,
             }
         )
@@ -223,12 +293,16 @@ def write_review_packets(
         packet = {
             "page": page_number,
             "screenshot": screenshot["path"],
+            "htmlScreenshot": screenshot["path"],
+            "pdfScreenshot": pdf_screenshot["path"] if pdf_screenshot else None,
             "metrics": {
                 "overflow": page.get("overflow"),
                 "issueCount": page.get("issueCount"),
                 "density": page.get("density"),
                 "figures": page.get("figures"),
             },
+            "pdfMetrics": pdf_screenshot,
+            "parity": parity,
             "heuristicFlags": flags,
             "heuristicPass": not any(flag["severity"] == "fail" for flag in flags),
             "subagentRequired": True,
