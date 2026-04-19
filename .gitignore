@@ -5,6 +5,9 @@ __pycache__/
 automation/runtime/
 custom/knowledge-to-print-html/artifacts/
 custom/knowledge-to-print-html/evals/
+custom/knowledge-to-print-html/.local-libs/
+custom/knowledge-to-print-html/.local-qpdf/
+custom/knowledge-to-print-html/.venv-print/
 
 # Syncthing transient and conflict files
 ~syncthing~*.tmp
