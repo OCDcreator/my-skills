@@ -56,6 +56,7 @@ Follow `references/output-contract.md`.
 
 Standard pipeline files:
 
+- `raw-input.md`
 - `brief.md`
 - `research.md`
 - `outline.md`
@@ -114,6 +115,12 @@ Convert raw user input into:
 Ask only the shortest follow-up questions needed to unblock real work.
 
 ### 2. Extract what the user already knows
+
+Save the untouched user input to `raw-input.md` first.
+
+Do not normalize, summarize, or reorder the raw sample before saving it.
+
+Then extract from that preserved sample into `brief.md`.
 
 Split incoming material into:
 
@@ -339,6 +346,7 @@ Do not place those hand-off notes inside the printed teaching body.
 ## Common Failure Modes
 
 - starting from HTML before the argument is solid → Fix: finish `brief.md`, `research.md`, and `outline.md` first.
+- losing the user's original wording and structure too early → Fix: save the untouched sample to `raw-input.md` before any normalization or classification.
 - doing unstructured broad browsing instead of per-point research → Fix: return to the core knowledge point list and research each point with focused queries.
 - searching only the points that feel uncertain → Fix: research every core knowledge point before drafting, even when the user already supplied a rough explanation.
 - producing stylish pages with weak teaching value → Fix: strengthen the mental model, worked example, and diagram purpose before polishing visuals.

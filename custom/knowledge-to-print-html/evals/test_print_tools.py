@@ -234,6 +234,21 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("authoritative explanation", contract_text)
         self.assertIn("example, application, or counterexample", contract_text)
 
+    def test_skill_text_preserves_raw_input_before_analysis(self) -> None:
+        skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+
+        self.assertIn("`raw-input.md`", skill_text)
+        self.assertIn("Save the untouched user input to `raw-input.md` first.", skill_text)
+        self.assertIn("Do not normalize, summarize, or reorder the raw sample before saving it.", skill_text)
+        self.assertIn("Then extract from that preserved sample into `brief.md`.", skill_text)
+
+    def test_output_contract_includes_raw_input_working_file(self) -> None:
+        contract_text = (SKILL_DIR / "references" / "output-contract.md").read_text(encoding="utf-8")
+
+        self.assertIn("├── raw-input.md", contract_text)
+        self.assertIn("| `raw-input.md` | Preserve the original user input", contract_text)
+        self.assertIn("Keep the original order and wording", contract_text)
+
     def test_evals_pressure_comprehensive_and_constrained_research_paths(self) -> None:
         evals = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
         prompts = [item["prompt"] for item in evals["evals"]]
@@ -248,6 +263,12 @@ class PrintToolTests(unittest.TestCase):
         self.assertTrue(
             any("research.md" in output and "core knowledge point" in output for output in expected_outputs)
         )
+
+    def test_evals_expect_raw_input_preservation(self) -> None:
+        evals = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
+        outputs = [item["expected_output"] for item in evals["evals"]]
+
+        self.assertTrue(any("raw-input.md" in output for output in outputs))
 
     def test_ensure_python_package_installs_missing_dependency_before_retry(self) -> None:
         from scripts import validate_print_layout as validator

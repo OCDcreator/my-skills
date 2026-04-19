@@ -12,6 +12,7 @@ Inside that folder, create:
 
 ```text
 artifacts/knowledge-handout/<slug>/
+├── raw-input.md
 ├── brief.md
 ├── research.md
 ├── outline.md
@@ -28,6 +29,7 @@ artifacts/knowledge-handout/<slug>/
 
 | File | Role |
 |------|------|
+| `raw-input.md` | Preserve the original user input before analysis; keep the original order and wording |
 | `brief.md` | Normalize user intent, defaults, questions resolved, research mode, and research constraints |
 | `research.md` | Source-backed notes organized by core knowledge point, including links, dates, facts, case studies, and claim support |
 | `outline.md` | Final section plan before full drafting |
@@ -36,6 +38,10 @@ artifacts/knowledge-handout/<slug>/
 | `diagrams/*.svg` | Teaching diagrams generated for the article |
 
 ## Research Working File Minimums
+
+Before writing `brief.md`, save the original user material to `raw-input.md`.
+
+Keep the original order and wording in `raw-input.md`; it is a preservation file, not an analysis file.
 
 Record the research mode in `brief.md`:
 
