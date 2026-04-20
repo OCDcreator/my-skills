@@ -40,6 +40,9 @@ def load_module_from_path(path: Path, module_name: str):
     module = importlib.util.module_from_spec(spec)
     module_parent = str(path.parent)
     inserted_path = False
+    stale_package_modules = [name for name in sys.modules if name == "_autopilot" or name.startswith("_autopilot.")]
+    for stale_module_name in stale_package_modules:
+        sys.modules.pop(stale_module_name, None)
     if module_parent not in sys.path:
         sys.path.insert(0, module_parent)
         inserted_path = True
@@ -124,8 +127,11 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertTrue(marker["scaffold_version"])
                 autopilot_text = (repo_root / "automation" / "autopilot.py").read_text(encoding="utf-8")
                 self.assertIn("AUTOPILOT_SCAFFOLD_VERSION", autopilot_text)
+                self.assertLess(len(autopilot_text.splitlines()), 600)
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "__init__.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "cli_parser.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "controller_builders.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "controller_runtime.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "doctor.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "lanes.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "locking.py").exists())
@@ -156,6 +162,8 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         str(repo_root / "automation" / "autopilot.py"),
                         str(repo_root / "automation" / "_autopilot" / "__init__.py"),
                         str(repo_root / "automation" / "_autopilot" / "cli_parser.py"),
+                        str(repo_root / "automation" / "_autopilot" / "controller_builders.py"),
+                        str(repo_root / "automation" / "_autopilot" / "controller_runtime.py"),
                         str(repo_root / "automation" / "_autopilot" / "doctor.py"),
                         str(repo_root / "automation" / "_autopilot" / "lanes.py"),
                         str(repo_root / "automation" / "_autopilot" / "locking.py"),

@@ -5,7 +5,7 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 ## Files
 
 - `automation/autopilot.py`: cross-platform CLI entrypoint for the repo-local controller
-- `automation/_autopilot/`: stdlib-only support modules for lane/state lifecycle handling, locking, CLI assembly, start/runtime orchestration, watch/status flows, runner execution, round lifecycle/prompt flow, process lifecycle/restart flows, doctor checks, and result validation
+- `automation/_autopilot/`: stdlib-only support modules for controller runtime helpers and support wiring, lane/state lifecycle handling, locking, CLI assembly, start/runtime orchestration, watch/status flows, runner execution, round lifecycle/prompt flow, process lifecycle/restart flows, doctor checks, and result validation
 - `automation/autopilot-scaffold-version.json`: deployed scaffold name/version marker
 - `automation/Arm-AutopilotCutover.ps1`: Windows post-commit cutover wrapper
 - `automation/arm-autopilot-cutover.sh`: macOS post-commit cutover wrapper
