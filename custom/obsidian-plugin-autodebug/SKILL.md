@@ -61,6 +61,16 @@ This skill is the higher-level workflow wrapper. Prefer CLI-first automation whe
 
 In this source repo, the mirrored skill lives at `external/kepano-obsidian-skills/obsidian-cli/SKILL.md`. In an installed agent environment, load the skill named `obsidian-cli` when it is available; do not confuse that skill with the Obsidian desktop application's `obsidian` executable.
 
+## Optional Agentic Control Surfaces
+
+Default remains CLI-first, with bundled CDP scripts as the portable fallback. Treat MCP/REST surfaces as optional enhancements when the runtime already provides them.
+
+Use `references/agentic-control-surfaces.md` to choose the control lane by task. It explicitly separates:
+
+- plugin reload/log/screenshot/DOM control surfaces;
+- vault-content-only MCP surfaces;
+- MCP server inspection surfaces.
+
 ## Preconditions
 
 Before editing or running a long loop, quickly detect:
@@ -205,6 +215,16 @@ Before CDP work, auto-launch the app if it is closed, then probe the target list
 Auto-launch can open Obsidian and the target vault, but it cannot retroactively add a debug port to an already-running desktop instance on every platform. If CDP is still unavailable after auto-launch, use a restart helper such as `scripts/obsidian_mac_restart_cdp.sh` or a repo-local restart command.
 
 If the agent runtime already exposes `obsidian-devtools-mcp` or another DevTools MCP surface attached to the Obsidian Electron target, that can replace the bundled CDP scripts as an alternate control surface. This is an optional path; keep the built-in scripts as the portable fallback.
+
+## Optional AI-Plugin Safety And Review-Readiness Support
+
+Use these as optional support gates after baseline doctor/smoke loops, not as blockers for the default debug path:
+
+- AI-plugin safety checks: secret storage, redaction, network/tool boundary hints.
+- Official review-readiness heuristics: manifest hygiene, sample residue, logging/DOM/network disclosure checks.
+
+Reference: `references/review-readiness.md`.
+These checks are heuristic and advisory; they are not official Obsidian approval outcomes.
 
 ## CI, Optional E2E, And Release-Adjacent Checks
 

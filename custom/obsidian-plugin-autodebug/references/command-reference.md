@@ -84,6 +84,26 @@ If your agent runtime already exposes `obsidian-devtools-mcp` or a DevTools MCP 
 
 Auto-launch can open the app, but it may not retroactively add a debug port to an already-running Obsidian instance. If CDP still fails after auto-launch, use an explicit restart helper.
 
+## Optional Agentic Surface Probes
+
+Use these only when needed; default loop remains CLI/CDP-first.
+
+```bash
+# Probe Obsidian CLI REST health (placeholder host/key; never commit real secrets)
+curl -sS "http://127.0.0.1:<obsidian-cli-rest-port>/health"
+curl -sS "http://127.0.0.1:<obsidian-cli-rest-port>/tools" \
+  -H "Authorization: Bearer $OBSIDIAN_CLI_REST_API_KEY"
+
+# Probe MCP servers with Inspector (example)
+npx @modelcontextprotocol/inspector
+
+# Validate CDP target list when DevTools MCP/CDP attach is unclear
+curl -sS "http://127.0.0.1:<cdp-port>/json/list"
+```
+
+Read `references/agentic-control-surfaces.md` before choosing among CLI, CDP, DevTools MCP, Playwright MCP, Vault MCP, or MCP Inspector.
+Do not treat Vault MCP/Nexus-style vault servers as proof that plugin reload/log capture is available.
+
 ## Scenario And UI Assertions
 
 - Use `scenarios/open-plugin-view.json` when a plugin has a known open-view command or view type.
@@ -115,6 +135,25 @@ node scripts/obsidian_debug_analyze.mjs \
 ```
 
 The bundled `rules/opencodian-issue-signatures.json` and `rules/opencodian-issue-playbooks.json` are examples for OpenCodian/OpenCode-style projects only; they are not generic Obsidian plugin defaults.
+
+## Agent Handoff Manifest
+
+Use `agent-tools.json` for model-to-model continuation. Keep commands secret-free and path-only.
+
+```bash
+# Standalone generation
+node scripts/obsidian_debug_agent_tools.mjs \
+  --summary .obsidian-debug/summary.json \
+  --diagnosis .obsidian-debug/diagnosis.json \
+  --doctor .obsidian-debug/doctor.json \
+  --output .obsidian-debug/agent-tools.json
+```
+
+Expected usage:
+
+- Produce `agent-tools.json` after diagnosis/report generation.
+- Hand off `safeActions`, `controlSurfaces`, `evidence`, and `warnings` to the next agent.
+- Never include API keys, bearer tokens, or machine-local secret values in the manifest.
 
 ## State, Watch, Profile, And Baseline
 

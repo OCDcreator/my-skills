@@ -26,6 +26,7 @@ import {
   detectHotReloadContext,
 } from './obsidian_debug_hot_reload_support.mjs';
 import { detectAdapterSupport } from './obsidian_debug_adapter_support.mjs';
+import { detectAgenticSupport } from './obsidian_debug_agentic_support.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
 import { discoverLogstravaganzaCapture } from './obsidian_debug_logstravaganza.mjs';
 import {
@@ -33,6 +34,7 @@ import {
   getPreflightGate,
 } from './obsidian_debug_preflight_support.mjs';
 import { detectRepoRuntime } from './obsidian_debug_repo_runtime.mjs';
+import { detectReviewReadiness } from './obsidian_debug_review_readiness.mjs';
 import { detectTestingFrameworkSupport } from './obsidian_debug_testing_framework_support.mjs';
 
 const options = parseArgs(process.argv.slice(2));
@@ -305,6 +307,11 @@ const runtimeSupport = await detectRepoRuntime({ repoDir });
 const packageJson = runtimeSupport.packageJson ?? await readJsonOrNull(packagePath);
 const repoRuntime = runtimeSupport.packageJson ? runtimeSupport : null;
 const ecosystemSupport = await detectEcosystemSupport({ repoDir });
+const agenticSupport = await detectAgenticSupport({
+  repoDir,
+  testVaultPluginDir,
+});
+const reviewReadiness = await detectReviewReadiness({ repoDir });
 const preflightSupport = await detectPreflightSupport({
   repoDir,
   runtimeSupport,
@@ -821,6 +828,59 @@ if (testVaultPluginDir) {
   );
 }
 
+checks.push(
+  check(
+    agenticSupport.errors.length > 0 ? 'warn' : 'info',
+    'agentic-support-signals',
+    'agentic',
+    agenticSupport.summary.detectedSignalCount > 0
+      ? `Heuristic optional agentic-support signals detected (${agenticSupport.summary.detectedSignalCount}/${agenticSupport.summary.detectedSignalCount + agenticSupport.summary.undetectedSignals.length}): ${agenticSupport.summary.detectedSignals.join(', ')}.`
+      : 'No optional MCP/REST/DevTools/AI heuristics were detected; default CLI/CDP-first workflows remain primary.',
+    {
+      heuristic: true,
+      disclaimer: agenticSupport.heuristicsDisclaimer,
+      summary: agenticSupport.summary,
+      signals: agenticSupport.signals,
+      scan: agenticSupport.scan,
+      vault: agenticSupport.vault,
+      errors: agenticSupport.errors,
+    },
+  ),
+);
+
+const reviewWarningChecks = reviewReadiness.checks.filter((entry) => entry.status === 'warn');
+checks.push(
+  check(
+    reviewReadiness.summary.warningCount > 0 ? 'warn' : 'info',
+    'review-readiness-overview',
+    'review',
+    reviewReadiness.summary.warningCount > 0
+      ? `Heuristic review-readiness scan flagged ${reviewReadiness.summary.warningCount} warning check(s): ${reviewWarningChecks.map((entry) => entry.id).join(', ')}.`
+      : 'Heuristic review-readiness scan found no warning-level checks.',
+    {
+      heuristic: true,
+      disclaimer: reviewReadiness.heuristicsDisclaimer,
+      summary: reviewReadiness.summary,
+      checks: reviewReadiness.checks,
+      errors: reviewReadiness.errors,
+    },
+  ),
+);
+checks.push(
+  check(
+    reviewReadiness.summary.highRiskCheckIds.length > 0 ? 'warn' : 'info',
+    'review-readiness-high-risk',
+    'review',
+    reviewReadiness.summary.highRiskCheckIds.length > 0
+      ? `Heuristic high-risk pattern checks were flagged: ${reviewReadiness.summary.highRiskCheckIds.join(', ')}. This is advisory only and not official Obsidian acceptance proof.`
+      : 'No heuristic high-risk pattern checks were flagged (advisory only; not official Obsidian acceptance proof).',
+    {
+      heuristic: true,
+      highRiskCheckIds: reviewReadiness.summary.highRiskCheckIds,
+    },
+  ),
+);
+
 const obsidianHelp = await runProcess(obsidianCommand, ['help'], 7000);
 const helpText = `${obsidianHelp.stdout}\n${obsidianHelp.stderr}`;
 checks.push(
@@ -1190,6 +1250,8 @@ const report = {
     ...hotReloadContext,
     guidance: hotReloadGuidance,
   },
+  agenticSupport,
+  reviewReadiness,
   checks,
   fixPlan: {
     requested: fixRequested,

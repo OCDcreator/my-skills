@@ -233,6 +233,79 @@
         "Records an app-launch report or equivalent readiness artifact path.",
         "Continues into the normal build/deploy/reload/capture flow after app readiness succeeds."
       ]
+    },
+    {
+      "id": 17,
+      "name": "agentic-control-surface-selection",
+      "prompt": "我的环境里同时有 Obsidian CLI REST 和 Chrome DevTools MCP。请你给一个任务分流方案：哪些用 CLI/REST，哪些用 DevTools MCP，哪些继续用内置 CDP，并说明最基本的安全检查。",
+      "expected_output": "Chooses control surfaces by task, keeps CLI/CDP-first defaults, and includes security checks such as localhost binding, auth key handling, and tool allowlisting for optional REST/MCP lanes.",
+      "files": [
+        "references/agentic-control-surfaces.md",
+        "references/command-reference.md"
+      ],
+      "expectations": [
+        "Selects surfaces by capability and task instead of treating all lanes as equivalent.",
+        "Keeps default flow CLI/CDP-first while presenting REST and DevTools MCP as optional support paths.",
+        "Mentions basic security checks for REST or MCP exposure without hardcoding secrets."
+      ]
+    },
+    {
+      "id": 18,
+      "name": "vault-mcp-not-devtools",
+      "prompt": "我这边已经接了 Vault MCP，是不是就可以直接 reload 插件并抓开发者日志了？",
+      "expected_output": "Explains that vault MCP surfaces are for vault content operations and do not by themselves provide plugin reload/devtools log control, then routes to CLI/CDP/devtools-capable lanes for runtime debugging.",
+      "files": [
+        "references/agentic-control-surfaces.md"
+      ],
+      "expectations": [
+        "Explicitly distinguishes vault-content MCP from plugin runtime control.",
+        "Does not claim Vault MCP alone can replace reload/log/screenshot control surfaces.",
+        "Redirects runtime-debug actions to CLI, CDP, or DevTools-capable surfaces."
+      ]
+    },
+    {
+      "id": 19,
+      "name": "ai-plugin-safety-secret-guidance",
+      "prompt": "这个插件要接第三方 AI 服务。给我一版默认安全建议：API key 怎么存、日志怎么脱敏、网络请求边界怎么描述，别把它当成强制阻断。",
+      "expected_output": "Provides optional AI-plugin safety guidance emphasizing secret storage, redaction, and network-boundary disclosure while framing checks as advisory support paths rather than mandatory blockers.",
+      "files": [
+        "references/review-readiness.md",
+        "SKILL.md"
+      ],
+      "expectations": [
+        "Recommends secret-storage patterns over plaintext token storage.",
+        "Covers log redaction and network-boundary disclosure guidance.",
+        "Keeps the safety lane optional and advisory, not a hard fail gate."
+      ]
+    },
+    {
+      "id": 20,
+      "name": "official-review-readiness-gate",
+      "prompt": "本地 smoke 过了。再给我一个官方 review-ready 的补充 gate，重点看 manifest 基础项、sample 残留、DOM/日志/网络风险，但不要声称这是官方最终结论。",
+      "expected_output": "Adds an optional review-readiness heuristic gate aligned with official guideline themes and explicitly states it is not equivalent to Obsidian's final review decision.",
+      "files": [
+        "references/review-readiness.md",
+        "SKILL.md"
+      ],
+      "expectations": [
+        "Checks manifest basics and sample residue as part of review-readiness heuristics.",
+        "Includes logging, DOM safety, and network/privacy risk checks.",
+        "Clearly states the gate is heuristic and not official acceptance."
+      ]
+    },
+    {
+      "id": 21,
+      "name": "agent-handoff-manifest-usage",
+      "prompt": "这轮你先别继续修，先生成一个给下一位 agent 的 handoff manifest：告诉对方有哪些可用控制面、哪些证据文件、下一步 safe actions，且不能带任何密钥。",
+      "expected_output": "Uses the planned agent handoff manifest pattern to capture safe actions, detected control surfaces, and evidence paths without embedding secrets, and positions it for model-to-model continuation.",
+      "files": [
+        "references/command-reference.md"
+      ],
+      "expectations": [
+        "References the handoff manifest workflow for model-to-model continuation.",
+        "Includes control-surface and evidence-path context in the handoff payload.",
+        "Explicitly avoids secret or token material in the manifest."
+      ]
     }
   ]
 }

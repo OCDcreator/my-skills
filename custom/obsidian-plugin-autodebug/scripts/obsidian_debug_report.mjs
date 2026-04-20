@@ -22,6 +22,7 @@ Options:
   --output <path>           HTML report output path. Defaults next to diagnosis.
   --comparison <path>       Optional comparison JSON.
   --profile <path>          Optional profile summary JSON.
+  --agent-tools <path>      Optional agent-tools.json path.
 `);
 }
 
@@ -32,6 +33,7 @@ if (!diagnosisPath) {
 
 const comparisonPath = getStringOption(options, 'comparison', '').trim();
 const profilePath = getStringOption(options, 'profile', '').trim();
+const agentToolsPathOption = getStringOption(options, 'agent-tools', '').trim();
 const outputPath = path.resolve(
   getStringOption(options, 'output', path.join(path.dirname(path.resolve(diagnosisPath)), 'report.html')),
 );
@@ -77,6 +79,10 @@ function escapeHtml(value) {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+function stringValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function renderList(items, mapper) {
@@ -308,6 +314,36 @@ function renderStatusSummary(label, value, cssClass = '') {
   return `<span class="badge ${escapeHtml(cssClass || normalizeStatusClass(value))}">${escapeHtml(label)}: ${escapeHtml(value ?? 'n/a')}</span>`;
 }
 
+function normalizeAgentSurfaceStatus(surface) {
+  if (!surface || typeof surface !== 'object') {
+    return 'missing';
+  }
+  const status = stringValue(surface.status).toLowerCase();
+  if (status) {
+    return status;
+  }
+  if (surface.available === true) {
+    return 'available';
+  }
+  if (surface.detected === true) {
+    return 'detected';
+  }
+  return 'missing';
+}
+
+function normalizeAgentSurfaceClass(status) {
+  switch (status) {
+    case 'available':
+      return 'pass';
+    case 'detected':
+      return 'info';
+    case 'missing':
+      return 'skipped';
+    default:
+      return normalizeStatusClass(status);
+  }
+}
+
 const diagnosis = await readJsonOrNull(diagnosisPath);
 if (!diagnosis) {
   throw new Error(`Unable to read diagnosis JSON: ${diagnosisPath}`);
@@ -315,6 +351,15 @@ if (!diagnosis) {
 
 const comparison = await readJsonOrNull(comparisonPath);
 const profile = await readJsonOrNull(profilePath);
+const diagnosisAgentToolsPath = stringValue(diagnosis.agentToolsPath);
+const agentToolsPath = agentToolsPathOption
+  ? path.resolve(agentToolsPathOption)
+  : (diagnosisAgentToolsPath
+    ? (path.isAbsolute(diagnosisAgentToolsPath)
+      ? path.resolve(diagnosisAgentToolsPath)
+      : path.resolve(path.dirname(path.resolve(diagnosisPath)), diagnosisAgentToolsPath))
+    : '');
+const agentTools = await readJsonOrNull(agentToolsPath);
 const diagnosisArtifacts = resolveArtifactPaths(diagnosis, path.resolve(diagnosisPath));
 const comparisonBaselineArtifacts = comparison?.baseline?.artifacts ?? {};
 const comparisonCandidateArtifacts = comparison?.candidate?.artifacts ?? {};
@@ -349,6 +394,7 @@ const artifactEntries = [
   { scope: 'candidate', label: 'vault log capture', path: diagnosisArtifacts.vaultLogCapture, state: diagnosisArtifactStates.vaultLogs ?? null },
   { scope: 'candidate', label: 'deploy report', path: diagnosisArtifacts.deployReport },
   { scope: 'candidate', label: 'scenario report', path: diagnosisArtifacts.scenarioReport },
+  { scope: 'candidate', label: 'agent handoff manifest', path: agentToolsPath || null },
   { scope: 'comparison', label: 'comparison JSON', path: comparisonPath ? path.resolve(comparisonPath) : null },
   {
     scope: 'comparison',
@@ -573,6 +619,30 @@ const html = `<!doctype html>
     <ul>
       ${renderList(diagnosis.recommendations ?? [], (entry) => `<li>${escapeHtml(entry)}</li>`)}
     </ul>
+  </div>
+
+  <div class="card">
+    <h2>Agent handoff</h2>
+    ${agentTools ? `
+      <p>${renderArtifactLink(agentToolsPath, 'agent-tools.json')}</p>
+      <p>
+        ${renderStatusSummary('Status', agentTools.metadata?.status ?? 'unknown')}
+        ${renderStatusSummary('Safe Actions', (agentTools.safeActions ?? []).length, (agentTools.safeActions ?? []).length > 0 ? 'info' : 'skipped')}
+        ${renderStatusSummary('Evidence', `${agentTools.evidence?.availableCount ?? 0}/${agentTools.evidence?.items?.length ?? 0}`, (agentTools.evidence?.missingCount ?? 0) > 0 ? 'warn' : 'pass')}
+      </p>
+      <p>
+        ${Object.entries(agentTools.controlSurfaces ?? {}).map(([name, surface]) => {
+          const status = normalizeAgentSurfaceStatus(surface);
+          return `<span class="badge ${escapeHtml(normalizeAgentSurfaceClass(status))}">${escapeHtml(name)}: ${escapeHtml(status)}</span>`;
+        }).join('') || '<span class="badge skipped">No control surfaces</span>'}
+      </p>
+      <p><strong>Top actions</strong></p>
+      <ul>${renderList((agentTools.safeActions ?? []).slice(0, 4), (entry) => `<li><strong>${escapeHtml(entry.label ?? entry.id ?? 'Action')}</strong>${entry.command ? ` — <code>${escapeHtml(entry.command)}</code>` : ''}</li>`)}</ul>
+      <p><strong>Top warnings</strong></p>
+      <ul>${renderList((agentTools.warnings ?? []).slice(0, 4), (entry) => `<li>${escapeHtml(entry)}</li>`)}</ul>
+    ` : (agentToolsPath
+      ? `<p class="muted">Agent handoff manifest was referenced but could not be read: <code>${escapeHtml(agentToolsPath)}</code></p>`
+      : '<p class="muted">No agent handoff manifest supplied.</p>')}
   </div>
 
   ${comparison ? `<div class="card">

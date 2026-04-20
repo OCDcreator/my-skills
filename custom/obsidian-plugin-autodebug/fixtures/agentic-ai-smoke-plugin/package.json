@@ -1,0 +1,23 @@
+{
+  "name": "agentic-ai-smoke-plugin",
+  "version": "0.0.1",
+  "description": "Fixture for optional agentic-support and review-readiness detection",
+  "main": "dist/main.js",
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "build": "node -e \"console.log('agentic-ai smoke fixture already built')\"",
+    "test": "node -e \"console.log('agentic-ai smoke fixture test')\"",
+    "dev:cdp": "node -e \"console.log('devtools cdp helper')\"",
+    "mcp:serve": "node -e \"console.log('mcp server mock')\"",
+    "review:dry-run": "node -e \"console.log('review readiness dry run')\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "openai": "^4.0.0"
+  },
+  "devDependencies": {
+    "axios": "^1.8.0"
+  },
+  "author": "my-skills",
+  "license": "MIT"
+}

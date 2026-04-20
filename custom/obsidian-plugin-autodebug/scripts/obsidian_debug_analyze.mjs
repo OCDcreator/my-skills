@@ -18,6 +18,7 @@ import {
   discoverLogstravaganzaCapture,
   ingestLogstravaganzaCapture,
 } from './obsidian_debug_logstravaganza.mjs';
+import { generateAgentToolsManifest } from './obsidian_debug_agent_tools.mjs';
 
 const options = parseArgs(process.argv.slice(2));
 if (hasHelpOption(options)) {
@@ -33,6 +34,10 @@ Options:
   --dom-selector <selector> Selector used for DOM health evidence.
   --signatures <path>       Issue signature rules JSON.
   --playbooks <path>        Issue playbooks JSON.
+  --doctor <path>           Optional doctor JSON (used for agent-tools generation).
+  --agent-tools-output <path>
+                           Optional path to generate agent-tools.json.
+  --agent-tools <path>      Optional existing agent-tools.json reference path.
 `);
 }
 
@@ -58,6 +63,12 @@ const playbooksPath = getStringOption(
   'playbooks',
   path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'rules', 'issue-playbooks.json'),
 );
+const doctorPath = getStringOption(options, 'doctor', '').trim();
+const agentToolsOutputOption = getStringOption(options, 'agent-tools-output', '').trim();
+const agentToolsReferenceOption = getStringOption(options, 'agent-tools', '').trim();
+const agentToolsOutputPath = agentToolsOutputOption ? path.resolve(agentToolsOutputOption) : '';
+const agentToolsReferencePath = agentToolsReferenceOption ? path.resolve(agentToolsReferenceOption) : '';
+const agentToolsPath = agentToolsOutputPath || agentToolsReferencePath || '';
 
 function normalizeTimestamp(raw) {
   if (!raw) {
@@ -1830,8 +1841,19 @@ const diagnosis = {
       return parsed ? new Date(parsed).toISOString() : null;
     })(),
   },
+  ...(agentToolsPath ? { agentToolsPath } : {}),
 };
 
 await ensureParentDirectory(outputPath);
 await fs.writeFile(outputPath, `${JSON.stringify(diagnosis, null, 2)}\n`, 'utf8');
+
+if (agentToolsOutputPath) {
+  await generateAgentToolsManifest({
+    summaryPath: path.resolve(summaryPath),
+    diagnosisPath: path.resolve(outputPath),
+    doctorPath: doctorPath ? path.resolve(doctorPath) : '',
+    outputPath: agentToolsOutputPath,
+  });
+}
+
 console.log(JSON.stringify(diagnosis, null, 2));

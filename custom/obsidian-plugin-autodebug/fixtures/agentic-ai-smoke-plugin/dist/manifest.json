@@ -1,0 +1,9 @@
+{
+  "id": "agentic-ai-smoke-plugin",
+  "name": "Agentic AI Smoke Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.4.5",
+  "description": "Fixture dist manifest for doctor smoke runs.",
+  "author": "my-skills",
+  "isDesktopOnly": false
+}
