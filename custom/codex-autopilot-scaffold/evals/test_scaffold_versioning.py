@@ -127,12 +127,16 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "__init__.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "cli_parser.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "doctor.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "lanes.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "locking.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "process_control.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "round_flow.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "runner.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "start_runtime.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "state_runtime.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "status_views.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "validation.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "watch_runtime.py").exists())
                 version_result = subprocess.run(
                     [sys.executable, str(repo_root / "automation" / "autopilot.py"), "version"],
                     cwd=repo_root,
@@ -153,12 +157,16 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         str(repo_root / "automation" / "_autopilot" / "__init__.py"),
                         str(repo_root / "automation" / "_autopilot" / "cli_parser.py"),
                         str(repo_root / "automation" / "_autopilot" / "doctor.py"),
+                        str(repo_root / "automation" / "_autopilot" / "lanes.py"),
+                        str(repo_root / "automation" / "_autopilot" / "locking.py"),
                         str(repo_root / "automation" / "_autopilot" / "process_control.py"),
                         str(repo_root / "automation" / "_autopilot" / "round_flow.py"),
                         str(repo_root / "automation" / "_autopilot" / "runner.py"),
                         str(repo_root / "automation" / "_autopilot" / "start_runtime.py"),
+                        str(repo_root / "automation" / "_autopilot" / "state_runtime.py"),
                         str(repo_root / "automation" / "_autopilot" / "status_views.py"),
                         str(repo_root / "automation" / "_autopilot" / "validation.py"),
+                        str(repo_root / "automation" / "_autopilot" / "watch_runtime.py"),
                     ],
                     cwd=repo_root,
                     text=True,
@@ -222,6 +230,37 @@ class ScaffoldVersioningTests(unittest.TestCase):
             autopilot_module.release_lock(runtime_directory, {"hostname": socket.gethostname()})
 
             self.assertFalse(lock_path.exists(), "Matching lock file should be removed even without pid fields.")
+
+    def test_start_runtime_support_wraps_state_runtime_helpers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+
+            autopilot_module = load_module_from_path(
+                repo_root / "automation" / "autopilot.py",
+                "_generated_autopilot_support_under_test",
+            )
+            config, _, _ = autopilot_module.load_config(
+                autopilot_module.DEFAULT_CONFIG_PATH,
+                autopilot_module.DEFAULT_PROFILE_NAME,
+                None,
+            )
+            runtime_directory = repo_root / "automation" / "runtime"
+            runtime_directory.mkdir(parents=True, exist_ok=True)
+            state_path = runtime_directory / "autopilot-state.json"
+
+            support = autopilot_module.build_start_runtime_support()
+            state = support.new_state(config)
+            normalized_state = support.normalize_state_for_lanes(state, config)
+            self.assertEqual(normalized_state["active_lane_id"], state["active_lane_id"])
+
+            normalized_state["status"] = "stopped_max_rounds"
+            normalized_state["current_round"] = max(int(config["max_rounds"]) - 1, 0)
+            resumed_state = support.resume_state_if_threshold_allows(normalized_state, config, state_path)
+
+            self.assertEqual(resumed_state["status"], "active")
+            self.assertTrue(state_path.exists())
 
     def test_no_auto_upgrade_leaves_existing_common_files_untouched(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
