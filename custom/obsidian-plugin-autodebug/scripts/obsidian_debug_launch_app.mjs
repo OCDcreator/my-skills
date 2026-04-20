@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   ensureParentDirectory,
   getNumberOption,
@@ -159,6 +160,10 @@ function buildVaultUri() {
   return '';
 }
 
+function helperScriptPath(fileName) {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), fileName);
+}
+
 async function defaultWindowsAppPath() {
   const candidates = [
     appPath,
@@ -311,6 +316,91 @@ async function launchLinux(uri) {
   return steps;
 }
 
+async function restartForCdp() {
+  const vaultTargetUri = buildVaultUri();
+  const waitSeconds = Math.max(1, Math.ceil(waitMs / 1000));
+
+  if (process.platform === 'darwin') {
+    const resolvedAppPath = await defaultMacAppPath();
+    const scriptPath = helperScriptPath('obsidian_mac_restart_cdp.sh');
+    const result = await runProcess(
+      'bash',
+      [
+        scriptPath,
+        resolvedAppPath,
+        String(cdpPort),
+        String(waitSeconds),
+        vaultTargetUri,
+      ].filter((entry) => entry.length > 0),
+      waitMs + 5000,
+    );
+    return {
+      attempted: true,
+      platform: 'darwin',
+      scriptPath,
+      appPath: resolvedAppPath,
+      ok: result.ok,
+      stdout: result.stdout.trim(),
+      stderr: result.stderr.trim(),
+      timedOut: result.timedOut,
+      detail: result.ok
+        ? (result.stdout.trim() || 'macOS CDP restart helper succeeded.')
+        : (result.stderr.trim() || result.stdout.trim() || 'macOS CDP restart helper failed.'),
+    };
+  }
+
+  if (process.platform === 'win32') {
+    const resolvedAppPath = await defaultWindowsAppPath();
+    if (!resolvedAppPath || !(await exists(resolvedAppPath))) {
+      return {
+        attempted: true,
+        platform: 'win32',
+        ok: false,
+        detail: 'No restartable Obsidian app executable was found for Windows CDP fallback.',
+      };
+    }
+    const scriptPath = helperScriptPath('obsidian_windows_restart_cdp.ps1');
+    const result = await runProcess(
+      'powershell',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptPath,
+        '-AppPath',
+        resolvedAppPath,
+        '-Port',
+        String(cdpPort),
+        '-WaitSeconds',
+        String(waitSeconds),
+        ...(vaultTargetUri ? ['-VaultUri', vaultTargetUri] : []),
+      ],
+      waitMs + 5000,
+    );
+    return {
+      attempted: true,
+      platform: 'win32',
+      scriptPath,
+      appPath: resolvedAppPath,
+      ok: result.ok,
+      stdout: result.stdout.trim(),
+      stderr: result.stderr.trim(),
+      timedOut: result.timedOut,
+      detail: result.ok
+        ? (result.stdout.trim() || 'Windows CDP restart helper succeeded.')
+        : (result.stderr.trim() || result.stdout.trim() || 'Windows CDP restart helper failed.'),
+    };
+  }
+
+  return {
+    attempted: true,
+    platform: process.platform,
+    ok: false,
+    detail: 'CDP restart fallback is only implemented for Windows and macOS.',
+  };
+}
+
 async function launchApp() {
   const uri = buildVaultUri();
   if (process.platform === 'win32') {
@@ -325,6 +415,12 @@ async function launchApp() {
 const initialReadiness = await probeReadiness();
 let launchSteps = [];
 let finalReadiness = initialReadiness;
+let cdpRestartFallback = {
+  attempted: false,
+  ok: false,
+  readyAfterRestart: false,
+  detail: null,
+};
 
 if (!initialReadiness.ok) {
   launchSteps = await launchApp();
@@ -334,6 +430,21 @@ if (!initialReadiness.ok) {
     finalReadiness = await probeReadiness();
     if (finalReadiness.ok) {
       break;
+    }
+  }
+}
+
+if (mode === 'cdp' && !finalReadiness.ok) {
+  cdpRestartFallback = await restartForCdp();
+  if (cdpRestartFallback.ok) {
+    const deadline = Date.now() + waitMs;
+    while (Date.now() <= deadline) {
+      await sleep(pollIntervalMs);
+      finalReadiness = await probeReadiness();
+      if (finalReadiness.ok) {
+        cdpRestartFallback.readyAfterRestart = true;
+        break;
+      }
     }
   }
 }
@@ -357,10 +468,11 @@ const report = {
   },
   initialReadiness,
   launchSteps,
+  cdpRestartFallback,
   finalReadiness,
   recommendation: finalReadiness.ok
     ? 'Continue with build/deploy/reload/capture automation.'
-    : 'Launch or focus Obsidian manually, confirm the target vault is open, or use a CDP restart helper when an already-running app lacks a debug port.',
+    : 'Launch or focus Obsidian manually, confirm the target vault is open, or inspect the platform CDP restart helper when an already-running app lacks a debug port.',
 };
 
 if (outputPath) {

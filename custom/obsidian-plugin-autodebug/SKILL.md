@@ -43,6 +43,8 @@ Before any real reload, console, screenshot, DOM, or plugin command:
 
 If `obsidian help`, `obsidian dev:console`, or any plugin command says it cannot find Obsidian, first run the auto-launch helper or let the cycle wrappers retry it for you. Treat that error as a missing desktop/app-control precondition, not as a plugin build failure.
 
+When a run explicitly needs CDP, the helper now has a second fallback: if launch/focus recovery still does not expose the debug port, it can perform one platform-specific Obsidian restart on Windows or macOS and probe CDP again before giving up.
+
 On macOS, the app binary is not a full CLI replacement. If the full CLI is unavailable, start Obsidian with a CDP debug port and use the CDP-first path.
 
 ## Relationship To `obsidian-cli`
@@ -212,7 +214,7 @@ Use CDP when:
 
 Before CDP work, auto-launch the app if it is closed, then probe the target list and attach to the `app://obsidian.md/index.html` target. In multi-window setups, filter by vault title.
 
-Auto-launch can open Obsidian and the target vault, but it cannot retroactively add a debug port to an already-running desktop instance on every platform. If CDP is still unavailable after auto-launch, use a restart helper such as `scripts/obsidian_mac_restart_cdp.sh` or a repo-local restart command.
+Auto-launch can open Obsidian and the target vault, but it cannot retroactively add a debug port to an already-running desktop instance on every platform. In CDP mode, the helper now performs one automatic restart fallback on Windows or macOS before failing. The platform helpers are `scripts/obsidian_windows_restart_cdp.ps1` and `scripts/obsidian_mac_restart_cdp.sh`.
 
 If the agent runtime already exposes `obsidian-devtools-mcp` or another DevTools MCP surface attached to the Obsidian Electron target, that can replace the bundled CDP scripts as an alternate control surface. This is an optional path; keep the built-in scripts as the portable fallback.
 

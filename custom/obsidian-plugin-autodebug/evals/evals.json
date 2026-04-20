@@ -297,7 +297,7 @@
       "id": 21,
       "name": "agent-handoff-manifest-usage",
       "prompt": "这轮你先别继续修，先生成一个给下一位 agent 的 handoff manifest：告诉对方有哪些可用控制面、哪些证据文件、下一步 safe actions，且不能带任何密钥。",
-      "expected_output": "Uses the planned agent handoff manifest pattern to capture safe actions, detected control surfaces, and evidence paths without embedding secrets, and positions it for model-to-model continuation.",
+      "expected_output": "Uses the handoff manifest pattern to capture safe actions, detected control surfaces, and evidence paths without embedding secrets, and positions it for model-to-model continuation.",
       "files": [
         "references/command-reference.md"
       ],
@@ -305,6 +305,22 @@
         "References the handoff manifest workflow for model-to-model continuation.",
         "Includes control-surface and evidence-path context in the handoff payload.",
         "Explicitly avoids secret or token material in the manifest."
+      ]
+    },
+    {
+      "id": 22,
+      "name": "cdp-restart-fallback-on-missing-port",
+      "prompt": "Obsidian 已经开着，但不是带调试端口启动的。现在我要走 CDP 链路；如果自动聚焦后还是连不上 9222，就自动强制重启 Obsidian，带上 remote-debugging-port，再继续 CDP reload/capture。",
+      "expected_output": "Uses the launch helper in CDP mode, attempts normal launch or focus recovery first, then performs one platform-specific restart fallback on Windows or macOS when the debug port is still unavailable, and records that recovery in the app-launch artifact.",
+      "files": [
+        "scripts/obsidian_debug_launch_app.mjs",
+        "scripts/obsidian_windows_restart_cdp.ps1",
+        "scripts/obsidian_mac_restart_cdp.sh"
+      ],
+      "expectations": [
+        "Keeps restart as a secondary fallback after ordinary launch or focus recovery fails.",
+        "Uses a platform-specific restart helper on Windows or macOS instead of vague manual instructions.",
+        "Records whether the CDP restart fallback was attempted and whether CDP became reachable afterward."
       ]
     }
   ]

@@ -406,6 +406,32 @@ const appLaunchFixes = [
     cwd: '{{repoDir}}',
   },
 ];
+const cdpRecoveryFixes = [
+  {
+    id: 'recover-cdp-port',
+    label: 'Recover CDP by relaunching or restarting Obsidian',
+    summary: 'Runs the launch helper in CDP mode so it first tries launch/focus recovery and then performs one platform-specific restart fallback if the debug port is still missing.',
+    safety: 'launches-app',
+    dryRunFriendly: false,
+    executable: 'node',
+    args: [
+      '{{toolRoot}}/scripts/obsidian_debug_launch_app.mjs',
+      '--mode',
+      'cdp',
+      '--obsidian-command',
+      '{{obsidianCommand}}',
+      ...(appPath ? ['--app-path', appPath] : []),
+      ...(vaultName ? ['--vault-name', '{{vaultName}}'] : []),
+      ...(vaultUri ? ['--vault-uri', vaultUri] : []),
+      ...(vaultPath ? ['--vault-path', '{{vaultPath}}'] : []),
+      '--cdp-host',
+      '{{cdpHost}}',
+      '--cdp-port',
+      '{{cdpPort}}',
+    ],
+    cwd: '{{repoDir}}',
+  },
+];
 const bootstrapFixes = expectedPluginId && testVaultPluginDir
   ? [
       {
@@ -1136,7 +1162,7 @@ try {
         port: cdpPort,
         targetTitleContains: cdpTargetTitleContains || null,
       },
-      [...appLaunchFixes, ...cdpProbeFixes],
+      [...cdpRecoveryFixes, ...cdpProbeFixes],
     ),
   );
 }

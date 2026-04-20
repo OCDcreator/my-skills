@@ -7,6 +7,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 - The built-in wrappers now try to auto-launch/focus Obsidian and the target vault before relying on `obsidian help`, `obsidian dev:*`, or `obsidian plugin:*`.
 - If `obsidian help` says it cannot find Obsidian, treat that as a missing app-control precondition, not a plugin build failure; run the launch helper first instead of debugging plugin code immediately.
 - CDP helpers require Obsidian to be started with a reachable debug port, normally `127.0.0.1:9222`.
+- In CDP mode, the launch helper now performs one restart fallback on Windows or macOS if launch/focus recovery still fails to expose the debug port.
 - In multi-window setups, pass `--target-title-contains <vault-name>` or the equivalent job-spec setting to avoid attaching to the wrong vault window.
 
 ## Primary Entrypoints
@@ -14,6 +15,8 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 | Need | Script | Typical command |
 | --- | --- | --- |
 | Launch/focus Obsidian first | `scripts/obsidian_debug_launch_app.mjs` | `node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json` |
+| Restart for CDP on Windows | `scripts/obsidian_windows_restart_cdp.ps1` | `powershell -File scripts/obsidian_windows_restart_cdp.ps1 -AppPath "C:\Program Files\Obsidian\Obsidian.exe" -Port 9222` |
+| Restart for CDP on macOS | `scripts/obsidian_mac_restart_cdp.sh` | `bash scripts/obsidian_mac_restart_cdp.sh /Applications/Obsidian.app 9222` |
 | Check environment | `scripts/obsidian_debug_doctor.mjs` | `node scripts/obsidian_debug_doctor.mjs --repo-dir <repo> --plugin-id <id> --test-vault-plugin-dir <vault>/.obsidian/plugins/<id> --output .obsidian-debug/doctor.json --fix` |
 | Scaffold sample plugin | `scripts/obsidian_debug_scaffold_plugin.mjs` | `node scripts/obsidian_debug_scaffold_plugin.mjs --output-dir <sample> --plugin-id sample-plugin --plugin-name "Sample Plugin"` |
 | Run config-driven loop | `scripts/obsidian_debug_job.mjs` | `node scripts/obsidian_debug_job.mjs --job .obsidian-debug/job.json --platform auto --mode run` |
@@ -82,7 +85,7 @@ bash scripts/obsidian_mac_restart_cdp.sh /Applications/Obsidian.app 9222
 
 If your agent runtime already exposes `obsidian-devtools-mcp` or a DevTools MCP target bound to the Obsidian Electron window, you can drive that instead of the bundled CDP scripts. Keep the built-in scripts as the portable fallback.
 
-Auto-launch can open the app, but it may not retroactively add a debug port to an already-running Obsidian instance. If CDP still fails after auto-launch, use an explicit restart helper.
+Auto-launch can open the app, but it may not retroactively add a debug port to an already-running Obsidian instance. The launch helper now retries with one explicit restart fallback on Windows or macOS before it gives up.
 
 ## Optional Agentic Surface Probes
 
@@ -203,6 +206,6 @@ Keep the split explicit:
 ## Troubleshooting
 
 - `obsidian help` cannot find Obsidian: run `node scripts/obsidian_debug_launch_app.mjs --mode cli ...`, then retry.
-- CDP fetch fails: restart Obsidian with a debug port and probe `http://127.0.0.1:9222/json/list`.
+- CDP fetch fails: let `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` perform its restart fallback, or run `scripts/obsidian_windows_restart_cdp.ps1` / `scripts/obsidian_mac_restart_cdp.sh` directly and then probe `http://127.0.0.1:9222/json/list`.
 - Logs show Hot Reload churn: use controlled mode for deterministic timing or coexist mode when intentionally letting Hot Reload drive reload.
 - UI selectors are flaky: add a surface profile, then assert stable root selectors/text instead of screenshot-only evidence.

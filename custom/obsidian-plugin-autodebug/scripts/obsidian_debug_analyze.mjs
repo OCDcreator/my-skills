@@ -1775,6 +1775,7 @@ const diagnosis = {
           launched: appLaunchReport.launched === true,
           mode: appLaunchReport.mode ?? null,
           elapsedMs: appLaunchReport.elapsedMs ?? null,
+          cdpRestartFallback: appLaunchReport.cdpRestartFallback ?? null,
           recommendation: appLaunchReport.recommendation ?? null,
         }
       : null,
