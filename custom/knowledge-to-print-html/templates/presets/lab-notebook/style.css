@@ -1,0 +1,53 @@
+:root {
+  --paper: #fbfdf7;
+  --desk: #e1e7d7;
+  --ink: #1b261c;
+  --muted: #61705f;
+  --accent: #3f7d4f;
+  --accent-soft: #eaf3e7;
+  --surface: #ffffff;
+  --surface-soft: #f1f7ee;
+  --line: rgba(38, 70, 43, 0.18);
+  --line-strong: rgba(38, 70, 43, 0.42);
+  --font-display: "Aptos Display", "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", sans-serif;
+}
+
+.preset-lab-notebook {
+  background:
+    linear-gradient(0deg, rgba(63, 125, 79, 0.075) 1px, transparent 1px),
+    var(--paper);
+  background-size: 100% 8mm;
+}
+
+.lab-header {
+  display: grid;
+  grid-template-columns: 1fr 62mm;
+  gap: 6mm;
+  padding-bottom: 4mm;
+  border-bottom: 2px solid var(--line-strong);
+}
+
+.lab-meta {
+  align-self: end;
+  font-size: 11.5px;
+}
+
+.lab-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+}
+
+.lab-wide {
+  grid-column: 1 / -1;
+}
+
+.preset-lab-notebook .note-box {
+  border-radius: 0;
+  border-left: 2mm solid var(--accent);
+}
+
+.preset-lab-notebook th {
+  color: var(--accent);
+}

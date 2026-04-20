@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Concept Map Handout</title>
+  <link rel="stylesheet" href="../_shared/print-base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <article class="sheet preset-concept-map" data-page="1">
+    <header class="map-header">
+      <div class="eyebrow">Concept Map</div>
+      <h1>关系型知识地图</h1>
+      <p class="lead">当主题的难点不在单个定义，而在概念之间的关系时，用一张大图承载主结构，再用短段落解释节点。</p>
+    </header>
+
+    <main class="map-layout">
+      <figure class="map-canvas">
+        <svg class="svg-frame" viewBox="0 0 560 330" role="img" aria-label="概念关系图">
+          <rect x="16" y="16" width="528" height="298" rx="18" fill="var(--surface-soft)" stroke="var(--line-strong)"/>
+          <circle cx="280" cy="164" r="52" fill="#fff" stroke="var(--accent)" stroke-width="2"/>
+          <rect x="58" y="56" width="122" height="54" rx="12" fill="#fff" stroke="var(--line-strong)"/>
+          <rect x="380" y="56" width="122" height="54" rx="12" fill="#fff" stroke="var(--line-strong)"/>
+          <rect x="58" y="224" width="122" height="54" rx="12" fill="#fff" stroke="var(--line-strong)"/>
+          <rect x="380" y="224" width="122" height="54" rx="12" fill="#fff" stroke="var(--line-strong)"/>
+          <path d="M180 83L232 134M380 83L328 134M180 251L232 194M380 251L328 194" stroke="var(--accent)" stroke-width="2"/>
+          <text x="280" y="159" text-anchor="middle" font-size="15" font-family="sans-serif" fill="var(--ink)">核心概念</text>
+          <text x="280" y="181" text-anchor="middle" font-size="11" font-family="sans-serif" fill="var(--muted)">central claim</text>
+          <text x="119" y="88" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">原因</text>
+          <text x="441" y="88" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">结构</text>
+          <text x="119" y="256" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">例子</text>
+          <text x="441" y="256" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">边界</text>
+        </svg>
+        <figcaption>节点标签必须短；不要把解释段落塞进 SVG 节点。</figcaption>
+      </figure>
+
+      <section class="map-notes">
+        <div class="map-card"><h2>Cause</h2><p>解释为什么关系成立，而不是只画箭头。</p></div>
+        <div class="map-card"><h2>Structure</h2><p>说明上位概念、下位概念或并列关系。</p></div>
+        <div class="map-card"><h2>Example</h2><p>用一个具体例子把抽象关系落地。</p></div>
+        <div class="map-card"><h2>Boundary</h2><p>写出何时不能套用这张图。</p></div>
+      </section>
+    </main>
+
+    <footer class="sheet-footer">
+      <span>Preset: concept-map</span>
+      <span>Split the map when arrows or labels become dense.</span>
+    </footer>
+  </article>
+</body>
+</html>

@@ -1,0 +1,60 @@
+:root {
+  --paper: #ffffff;
+  --desk: #dce6f2;
+  --ink: #082044;
+  --muted: #4b6688;
+  --accent: #185fa3;
+  --accent-soft: #edf5ff;
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-soft: #f3f8ff;
+  --line: rgba(8, 32, 68, 0.16);
+  --line-strong: rgba(8, 32, 68, 0.5);
+  --font-display: "Cascadia Mono", "JetBrains Mono", "Consolas", monospace;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", "Consolas", monospace;
+}
+
+.preset-blueprint-briefing {
+  background:
+    repeating-linear-gradient(0deg, rgba(24, 95, 163, 0.07) 0 1px, transparent 1px 8mm),
+    repeating-linear-gradient(90deg, rgba(24, 95, 163, 0.07) 0 1px, transparent 1px 8mm),
+    var(--paper);
+}
+
+.blueprint-header {
+  display: grid;
+  grid-template-columns: 1fr 50mm;
+  gap: 6mm;
+  padding-bottom: 4mm;
+  border-bottom: 2px solid var(--accent);
+}
+
+.blueprint-stamp {
+  align-self: start;
+  padding: 3mm;
+  border: 2px solid var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+  color: var(--accent);
+}
+
+.blueprint-grid {
+  display: grid;
+  grid-template-columns: 1.45fr 0.8fr;
+  gap: 4mm;
+}
+
+.blueprint-diagram {
+  grid-row: span 2;
+  border: 2px solid var(--line-strong);
+}
+
+.spec-card,
+.spec-table {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.spec-table {
+  grid-column: 1 / -1;
+}

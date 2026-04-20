@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab Notebook Handout</title>
+  <link rel="stylesheet" href="../_shared/print-base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <article class="sheet preset-lab-notebook" data-page="1">
+    <header class="lab-header">
+      <div>
+        <div class="eyebrow">Lab Notebook</div>
+        <h1>实验逻辑与观察记录页</h1>
+      </div>
+      <table class="lab-meta">
+        <tbody>
+          <tr><th>Question</th><td>What changes, and why?</td></tr>
+          <tr><th>Evidence</th><td>Observation + interpretation</td></tr>
+        </tbody>
+      </table>
+    </header>
+
+    <main class="lab-grid">
+      <section class="note-box">
+        <h2>Hypothesis</h2>
+        <p>把预测写成因果句：如果条件改变，那么现象会怎样变化，因为背后的机制是什么。</p>
+      </section>
+
+      <section class="note-box">
+        <h2>Variables</h2>
+        <ul>
+          <li><strong>Independent:</strong> 被主动改变的条件。</li>
+          <li><strong>Dependent:</strong> 被观察或测量的结果。</li>
+          <li><strong>Control:</strong> 需要保持稳定的条件。</li>
+        </ul>
+      </section>
+
+      <section class="lab-wide">
+        <h2>Observation Table</h2>
+        <table>
+          <thead><tr><th>Step</th><th>What to observe</th><th>What it may mean</th><th>Boundary</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>初始状态</td><td>建立对照</td><td>记录条件</td></tr>
+            <tr><td>2</td><td>变化过程</td><td>连接机制</td><td>避免只看结果</td></tr>
+            <tr><td>3</td><td>最终状态</td><td>形成解释</td><td>区分证据和猜测</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <figure class="figure-panel lab-wide">
+        <svg class="svg-frame" viewBox="0 0 520 190" role="img" aria-label="实验变量关系图">
+          <rect x="18" y="18" width="484" height="154" rx="10" fill="#fff" stroke="var(--line-strong)"/>
+          <rect x="42" y="58" width="122" height="58" rx="8" fill="var(--surface-soft)" stroke="var(--accent)"/>
+          <rect x="199" y="58" width="122" height="58" rx="8" fill="var(--surface-soft)" stroke="var(--accent)"/>
+          <rect x="356" y="58" width="122" height="58" rx="8" fill="var(--surface-soft)" stroke="var(--accent)"/>
+          <path d="M170 87h22M327 87h22" stroke="var(--accent)" stroke-width="3"/>
+          <text x="103" y="83" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">条件</text>
+          <text x="260" y="83" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">机制</text>
+          <text x="417" y="83" text-anchor="middle" font-size="13" font-family="sans-serif" fill="var(--ink)">现象</text>
+        </svg>
+        <figcaption>实验图优先表达变量关系，不要把整段步骤塞进 SVG 标签。</figcaption>
+      </figure>
+    </main>
+
+    <footer class="sheet-footer">
+      <span>Preset: lab-notebook</span>
+      <span>Use tables and observation panels before decorative diagrams.</span>
+    </footer>
+  </article>
+</body>
+</html>

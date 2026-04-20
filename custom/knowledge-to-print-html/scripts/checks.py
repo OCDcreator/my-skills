@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import re
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 try:
     from .svg_enclosure import attach_svg_visual_enclosure_issues
@@ -21,6 +24,85 @@ DEFAULT_MIN_BODY_FONT_SIZE_PX = 11.5
 DEFAULT_MIN_BODY_LINE_HEIGHT_RATIO = 1.35
 
 DEFAULT_MIN_PARAGRAPH_SPACING_RATIO = 0.45
+
+STYLE_RULE_PATTERNS = {
+    "a4Page": re.compile(r"@page\s*\{[^}]*size\s*:\s*A4", re.IGNORECASE),
+    "breakAvoid": re.compile(r"break-inside\s*:\s*avoid", re.IGNORECASE),
+    "printMedia": re.compile(r"@media\s+print", re.IGNORECASE),
+    "printColorAdjust": re.compile(r"print-color-adjust\s*:\s*exact", re.IGNORECASE),
+}
+
+
+class StylesheetCollector(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.stylesheet_hrefs: list[str] = []
+        self.style_texts: list[str] = []
+        self._style_buffer: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attrs_by_name = {name.lower(): value or "" for name, value in attrs}
+        if tag.lower() == "style":
+            self._style_buffer = []
+            return
+        if tag.lower() != "link":
+            return
+        rel = attrs_by_name.get("rel", "")
+        href = attrs_by_name.get("href", "")
+        if href and "stylesheet" in rel.lower().split():
+            self.stylesheet_hrefs.append(href)
+
+    def handle_data(self, data: str) -> None:
+        if self._style_buffer is not None:
+            self._style_buffer.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "style" and self._style_buffer is not None:
+            self.style_texts.append("".join(self._style_buffer))
+            self._style_buffer = None
+
+
+def resolve_local_stylesheet_path(html_path: Path, href: str) -> Path | None:
+    parsed = urlparse(href)
+    if parsed.scheme in {"http", "https", "data"}:
+        return None
+    if parsed.scheme == "file":
+        path = unquote(parsed.path)
+        if re.match(r"^/[A-Za-z]:/", path):
+            path = path[1:]
+        return Path(path)
+    if parsed.scheme:
+        return None
+    if href.startswith("#"):
+        return None
+    return (html_path.parent / unquote(parsed.path)).resolve()
+
+
+def detect_style_rules_from_text(style_text: str) -> dict[str, bool]:
+    return {
+        name: bool(pattern.search(style_text))
+        for name, pattern in STYLE_RULE_PATTERNS.items()
+    }
+
+
+def detect_local_style_rules(html_path: Path) -> dict[str, bool]:
+    try:
+        html_text = html_path.read_text(encoding="utf-8")
+    except OSError:
+        return {name: False for name in STYLE_RULE_PATTERNS}
+
+    collector = StylesheetCollector()
+    collector.feed(html_text)
+    style_texts = list(collector.style_texts)
+    for href in collector.stylesheet_hrefs:
+        stylesheet_path = resolve_local_stylesheet_path(html_path, href)
+        if stylesheet_path is None or not stylesheet_path.exists():
+            continue
+        try:
+            style_texts.append(stylesheet_path.read_text(encoding="utf-8"))
+        except OSError:
+            continue
+    return detect_style_rules_from_text("\n".join(style_texts))
 
 IMAGE_EVAL_JS = r"""
 elements => elements.map((image) => ({
@@ -408,9 +490,30 @@ elements => {
 
 STYLE_RULES_EVAL_JS = r"""
 () => {
+  const collectRuleText = (rule) => {
+    let text = rule.cssText || "";
+    if (rule.cssRules) {
+      try {
+        text += "\n" + Array.from(rule.cssRules).map(collectRuleText).join("\n");
+      } catch (_error) {
+        return text;
+      }
+    }
+    return text;
+  };
   const styleText = Array.from(document.querySelectorAll("style"))
     .map((style) => style.textContent || "")
-    .join("\n");
+    .join("\n")
+    + "\n"
+    + Array.from(document.styleSheets)
+      .map((sheet) => {
+        try {
+          return Array.from(sheet.cssRules).map(collectRuleText).join("\n");
+        } catch (_error) {
+          return "";
+        }
+      })
+      .join("\n");
 
   return {
     a4Page: /@page\s*\{[^}]*size\s*:\s*A4/i.test(styleText),
@@ -475,6 +578,15 @@ def analyze_document(page: Any, html_path: Path) -> dict[str, Any]:
         "images": page.locator("img").evaluate_all(IMAGE_EVAL_JS),
         "sheets": page.locator(".sheet").evaluate_all(SHEET_EVAL_JS),
         "rules": page.evaluate(STYLE_RULES_EVAL_JS),
+    }
+    local_rules = detect_local_style_rules(html_path)
+    analysis["ruleSources"] = {
+        "browser": analysis["rules"],
+        "localCss": local_rules,
+    }
+    analysis["rules"] = {
+        name: bool(analysis["rules"].get(name) or local_rules.get(name))
+        for name in STYLE_RULE_PATTERNS
     }
     attach_svg_visual_enclosure_issues(html_path=html_path, analysis=analysis)
     return analysis

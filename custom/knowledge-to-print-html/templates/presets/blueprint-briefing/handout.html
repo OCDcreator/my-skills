@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blueprint Briefing Handout</title>
+  <link rel="stylesheet" href="../_shared/print-base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <article class="sheet preset-blueprint-briefing" data-page="1">
+    <header class="blueprint-header">
+      <div>
+        <div class="eyebrow">Blueprint Briefing</div>
+        <h1>结构、协议与机制白图</h1>
+      </div>
+      <div class="blueprint-stamp">A4 / PRINT / SPEC</div>
+    </header>
+
+    <main class="blueprint-grid">
+      <figure class="figure-panel blueprint-diagram">
+        <svg class="svg-frame" viewBox="0 0 560 300" role="img" aria-label="架构组件示意图">
+          <rect x="16" y="16" width="528" height="268" fill="#fff" stroke="var(--line-strong)"/>
+          <rect x="54" y="66" width="132" height="72" fill="var(--surface-soft)" stroke="var(--accent)"/>
+          <rect x="214" y="66" width="132" height="72" fill="var(--surface-soft)" stroke="var(--accent)"/>
+          <rect x="374" y="66" width="132" height="72" fill="var(--surface-soft)" stroke="var(--accent)"/>
+          <rect x="132" y="190" width="296" height="54" fill="#fff" stroke="var(--accent)"/>
+          <path d="M192 102h16M352 102h16M280 142v42" stroke="var(--accent)" stroke-width="3"/>
+          <text x="120" y="98" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">SOURCE</text>
+          <text x="280" y="98" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">ROUTER</text>
+          <text x="440" y="98" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">RESULT</text>
+          <text x="280" y="222" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">VALIDATION LAYER</text>
+        </svg>
+        <figcaption>主图必须足够大；如果组件超过一页能解释清楚的范围，拆成多张白图。</figcaption>
+      </figure>
+
+      <section class="spec-card">
+        <h2>Component Notes</h2>
+        <ol>
+          <li>命名每个组件的职责。</li>
+          <li>写出输入和输出边界。</li>
+          <li>标记验证点和失败点。</li>
+        </ol>
+      </section>
+
+      <section class="spec-table">
+        <h2>Specification</h2>
+        <table>
+          <thead><tr><th>ID</th><th>Part</th><th>Responsibility</th><th>Check</th></tr></thead>
+          <tbody>
+            <tr><td>01</td><td>Source</td><td>提供原始条件</td><td>完整性</td></tr>
+            <tr><td>02</td><td>Router</td><td>选择处理路径</td><td>规则一致性</td></tr>
+            <tr><td>03</td><td>Validation</td><td>确认输出可靠</td><td>边界和异常</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <footer class="sheet-footer">
+      <span>Preset: blueprint-briefing</span>
+      <span>Whiteprint, not dark blueprint; keep home printing clean.</span>
+    </footer>
+  </article>
+</body>
+</html>

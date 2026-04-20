@@ -80,6 +80,7 @@ Read these references before finalizing:
 - `references/runtime-requirements.md`
 - `references/visual-presets.md`
 - `references/working-file-templates.md`
+- `templates/presets/README.md`
 
 ## Skill Routing And Fallbacks
 
@@ -201,14 +202,31 @@ Full readability rules live in `references/diagram-guardrails.md`.
 
 ### 7. Choose the visual preset
 
-Use `references/visual-presets.md`.
+Use `references/visual-presets.md` and `templates/presets/README.md`.
 
 Default to `editorial-atlas`.
 
-Only switch when the topic clearly calls for it:
+Built-in presets:
 
+- `editorial-atlas`
 - `refined-minimal`
 - `technical-briefing`
+- `exam-workbook`
+- `lab-notebook`
+- `blueprint-briefing`
+- `concept-map`
+- `field-guide`
+
+If the user asks to choose a style, show a concise preset menu with the preset name, best use case, and tradeoff. If the user does not choose, pick the best fit from the selection rules in `references/visual-presets.md`.
+
+When building the final artifact, start from the matching preset folder when it helps:
+
+1. copy `templates/presets/<preset>/handout.html`
+2. copy `templates/presets/<preset>/style.css`
+3. copy or inline `templates/presets/_shared/print-base.css`
+4. replace sample blocks with the real `article.md` content
+
+Keep the template's `.sheet`, `@page`, print media, wrap protection, and break-avoid rules. You may inline CSS into `handout.html` for a single-file deliverable, but do not link the final artifact to the skill's template directory unless the output intentionally remains inside this skill folder.
 
 If the user explicitly wants a real product or brand feel, route through `design-reference-router` first.
 
@@ -219,6 +237,8 @@ Default rendering path:
 1. convert `article.md` into semantic HTML
 2. refine layout and CSS for A4
 3. save final artifact as `handout.html`
+
+If a preset template is used, keep `style.css` beside `handout.html` or inline it into `handout.html`. The user-facing handout should not depend on `templates/presets/` paths after hand-off.
 
 The final HTML must be:
 

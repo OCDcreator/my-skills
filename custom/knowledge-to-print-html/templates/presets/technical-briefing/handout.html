@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Technical Briefing Handout</title>
+  <link rel="stylesheet" href="../_shared/print-base.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <article class="sheet preset-technical-briefing" data-page="1">
+    <header class="briefing-header">
+      <div>
+        <div class="eyebrow">Technical Briefing</div>
+        <h1>系统机制说明页</h1>
+      </div>
+      <div class="status-stack">
+        <span class="pill">scope: mechanism</span>
+        <span class="pill">mode: print safe</span>
+      </div>
+    </header>
+
+    <main class="briefing-grid">
+      <section class="briefing-main">
+        <h2>1. 输入如何变成结果</h2>
+        <p>技术型讲义先给结构，再解释每个环节的职责、输入、输出和失败模式。每个标签保持短，细节放在正文或表格中。</p>
+        <figure class="figure-panel">
+          <svg class="svg-frame" viewBox="0 0 520 230" role="img" aria-label="系统流程示意图">
+            <rect x="14" y="16" width="492" height="198" fill="#ffffff" stroke="var(--line-strong)"/>
+            <rect x="40" y="72" width="98" height="58" fill="var(--surface-soft)" stroke="var(--accent)"/>
+            <rect x="210" y="72" width="98" height="58" fill="var(--surface-soft)" stroke="var(--accent)"/>
+            <rect x="380" y="72" width="98" height="58" fill="var(--surface-soft)" stroke="var(--accent)"/>
+            <path d="M150 101h48M320 101h48" stroke="var(--accent)" stroke-width="3"/>
+            <text x="89" y="96" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">INPUT</text>
+            <text x="259" y="96" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">TRANSFORM</text>
+            <text x="429" y="96" text-anchor="middle" font-size="14" font-family="monospace" fill="var(--ink)">OUTPUT</text>
+            <text x="40" y="168" font-size="12" font-family="sans-serif" fill="var(--muted)">Use one large diagram instead of many tiny system cards.</text>
+          </svg>
+          <figcaption>机制图应优先展示边界、方向和责任分配。</figcaption>
+        </figure>
+      </section>
+
+      <aside class="spec-card">
+        <h2>Key Checks</h2>
+        <ul>
+          <li>输入边界是否清楚</li>
+          <li>中间步骤是否可追踪</li>
+          <li>输出标准是否可验证</li>
+          <li>失败模式是否被说明</li>
+        </ul>
+      </aside>
+
+      <section class="briefing-wide">
+        <h2>2. 规格表</h2>
+        <table>
+          <thead><tr><th>环节</th><th>职责</th><th>常见误区</th><th>验证方式</th></tr></thead>
+          <tbody>
+            <tr><td>输入</td><td>收集条件</td><td>把样例当规则</td><td>列出边界条件</td></tr>
+            <tr><td>转换</td><td>执行机制</td><td>跳过中间因果</td><td>追踪每一步输出</td></tr>
+            <tr><td>输出</td><td>判断结果</td><td>只看表面格式</td><td>回到目标检查</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <footer class="sheet-footer">
+      <span>Preset: technical-briefing</span>
+      <span>Use for systems, processes, and operational explainers.</span>
+    </footer>
+  </article>
+</body>
+</html>

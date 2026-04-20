@@ -18,6 +18,7 @@ artifacts/knowledge-handout/<slug>/
 ├── outline.md
 ├── article.md
 ├── handout.html
+├── style.css                # optional if CSS is inlined into handout.html
 ├── diagrams/
 │   ├── 01-*.svg
 │   └── 02-*.svg
@@ -35,11 +36,14 @@ artifacts/knowledge-handout/<slug>/
 | `outline.md` | Final section plan before full drafting |
 | `article.md` | Source of truth for the written content |
 | `handout.html` | Final printable HTML artifact |
+| `style.css` | Optional copied preset stylesheet when CSS is not inlined into `handout.html` |
 | `diagrams/*.svg` | Teaching diagrams generated for the article |
 
 ## Research Working File Minimums
 
 For lightweight starter shapes, see `references/working-file-templates.md`.
+
+For print-safe HTML/CSS visual starters, see `templates/presets/README.md`.
 
 Before writing `brief.md`, save the original user material to `raw-input.md`.
 

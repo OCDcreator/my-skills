@@ -1,0 +1,60 @@
+:root {
+  --paper: #fffaf1;
+  --desk: #e7dfd1;
+  --ink: #231713;
+  --muted: #77685f;
+  --accent: #9b3f2c;
+  --accent-soft: #f4e2d6;
+  --surface: #fffdf8;
+  --surface-soft: #f7efe3;
+  --line: rgba(52, 34, 25, 0.16);
+  --line-strong: rgba(52, 34, 25, 0.34);
+  --font-display: "Newsreader", "Georgia", "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --sheet-padding: 13mm 13mm 15mm;
+}
+
+.preset-editorial-atlas {
+  background:
+    linear-gradient(90deg, rgba(155, 63, 44, 0.08) 0 1.8mm, transparent 1.8mm),
+    var(--paper);
+}
+
+.atlas-hero {
+  display: grid;
+  grid-template-columns: 1fr 43mm;
+  gap: 8mm;
+  padding-bottom: 6mm;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.atlas-hero h1 {
+  max-width: 128mm;
+  font-size: 34px;
+}
+
+.atlas-index {
+  align-self: end;
+  padding: 4mm;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.68);
+  display: grid;
+  gap: 1.6mm;
+  font-size: 9.4px;
+}
+
+.atlas-index span {
+  padding-top: 1.4mm;
+  border-top: 1px solid var(--line);
+}
+
+.atlas-band {
+  padding: 5mm;
+  border-top: 2px solid var(--accent);
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.figure-panel {
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(80, 52, 33, 0.08);
+}

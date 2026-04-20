@@ -7,3 +7,4 @@ It is **not** part of the runtime skill contract. The runtime contract lives in:
 - `SKILL.md`
 - `references/`
 - `scripts/`
+- `templates/`

@@ -1,0 +1,60 @@
+:root {
+  --paper: #fffdf4;
+  --desk: #e4dfc9;
+  --ink: #262112;
+  --muted: #756c55;
+  --accent: #6f7f2a;
+  --accent-soft: #eef1d7;
+  --surface: #ffffff;
+  --surface-soft: #f8f5e6;
+  --line: rgba(38, 33, 18, 0.18);
+  --line-strong: rgba(111, 127, 42, 0.42);
+  --font-display: "Georgia", "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", sans-serif;
+}
+
+.field-header {
+  display: grid;
+  grid-template-columns: 1fr 58mm;
+  gap: 7mm;
+  padding-bottom: 5mm;
+  border-bottom: 2px solid var(--line-strong);
+}
+
+.field-summary {
+  align-self: end;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4mm;
+}
+
+.field-wide {
+  grid-column: 1 / -1;
+}
+
+.field-card {
+  background: var(--surface);
+  border-top: 2mm solid var(--accent);
+}
+
+.specimen-box {
+  min-height: 32mm;
+  margin-bottom: 3mm;
+  padding: 4mm;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-soft);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9.2px;
+}
+
+.specimen-box.alt {
+  background: #f4efe1;
+}

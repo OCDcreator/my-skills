@@ -1,0 +1,62 @@
+:root {
+  --paper: #fffdf5;
+  --desk: #e8e3d3;
+  --ink: #1f1c16;
+  --muted: #706a5f;
+  --accent: #b45309;
+  --accent-soft: #fff1d6;
+  --surface: #ffffff;
+  --surface-soft: #fbf6e8;
+  --line: rgba(31, 28, 22, 0.18);
+  --line-strong: rgba(31, 28, 22, 0.42);
+  --font-display: "Aptos Display", "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", sans-serif;
+}
+
+.workbook-header {
+  display: grid;
+  grid-template-columns: 1fr 54mm;
+  gap: 6mm;
+  padding-bottom: 4mm;
+  border-bottom: 2px solid var(--accent);
+}
+
+.score-box {
+  padding: 4mm;
+  border: 2px solid var(--line-strong);
+  background: var(--accent-soft);
+  display: grid;
+  gap: 1mm;
+}
+
+.score-box span {
+  font-family: var(--font-mono);
+  font-size: 8.8px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.workbook-layout {
+  display: grid;
+  grid-template-columns: 1fr 0.86fr;
+  gap: 4mm;
+}
+
+.question-block {
+  border-width: 2px;
+}
+
+.answer-lane {
+  background: linear-gradient(0deg, rgba(180, 83, 9, 0.08) 1px, transparent 1px), #fff;
+  background-size: 100% 8mm;
+}
+
+.writing-line {
+  height: 10mm;
+  border-bottom: 1px solid var(--line);
+}
+
+.mark-scheme {
+  grid-column: 1 / -1;
+}

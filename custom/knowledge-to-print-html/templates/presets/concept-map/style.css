@@ -1,0 +1,51 @@
+:root {
+  --paper: #fbfaf4;
+  --desk: #e8e2d1;
+  --ink: #201a13;
+  --muted: #776b5e;
+  --accent: #7a4eaa;
+  --accent-soft: #eee6f8;
+  --surface: #ffffff;
+  --surface-soft: #f6f0fb;
+  --line: rgba(32, 26, 19, 0.15);
+  --line-strong: rgba(122, 78, 170, 0.36);
+  --font-display: "Georgia", "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", sans-serif;
+}
+
+.map-header {
+  padding-bottom: 5mm;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.map-header h1 {
+  max-width: 138mm;
+}
+
+.map-layout {
+  display: grid;
+  gap: 4mm;
+}
+
+.map-canvas {
+  padding: 5mm;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+}
+
+.map-notes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3mm;
+}
+
+.map-card {
+  padding: 3.2mm;
+  border-top: 2px solid var(--accent);
+  background: var(--surface);
+}
+
+.map-card h2 {
+  font-size: 13px;
+  margin-bottom: 1.5mm;
+}

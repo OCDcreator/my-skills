@@ -1,0 +1,62 @@
+:root {
+  --paper: #fbfcfd;
+  --desk: #dfe6ef;
+  --ink: #0d1b2a;
+  --muted: #526173;
+  --accent: #1c5a88;
+  --accent-soft: #e8f1f7;
+  --surface: #ffffff;
+  --surface-soft: #f1f6fa;
+  --line: rgba(13, 27, 42, 0.14);
+  --line-strong: rgba(13, 27, 42, 0.42);
+  --font-display: "Aptos Display", "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", "Consolas", monospace;
+}
+
+.preset-technical-briefing {
+  background:
+    linear-gradient(90deg, rgba(28, 90, 136, 0.055) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(28, 90, 136, 0.045) 1px, transparent 1px),
+    var(--paper);
+  background-size: 12mm 12mm;
+}
+
+.briefing-header,
+.briefing-grid {
+  display: grid;
+  gap: 4mm;
+}
+
+.briefing-header {
+  grid-template-columns: 1fr 42mm;
+  align-items: start;
+  padding-bottom: 3mm;
+  border-bottom: 2px solid var(--line-strong);
+}
+
+.status-stack {
+  display: grid;
+  gap: 1.4mm;
+}
+
+.briefing-grid {
+  grid-template-columns: 1.45fr 0.75fr;
+}
+
+.briefing-main,
+.briefing-wide {
+  padding: 4mm;
+  border: 1px solid var(--line-strong);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.briefing-wide {
+  grid-column: 1 / -1;
+}
+
+.spec-card {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: var(--surface-soft);
+}

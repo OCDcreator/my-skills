@@ -1,0 +1,62 @@
+:root {
+  --paper: #fffefa;
+  --desk: #e8e6df;
+  --ink: #171717;
+  --muted: #73706b;
+  --accent: #4b4a45;
+  --accent-soft: #f1eee7;
+  --surface: #ffffff;
+  --surface-soft: #f7f5ef;
+  --line: rgba(23, 23, 23, 0.12);
+  --line-strong: rgba(23, 23, 23, 0.32);
+  --font-display: "Iowan Old Style", "Georgia", "Noto Serif SC", "Songti SC", serif;
+  --font-body: "Aptos", "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --sheet-padding: 16mm 18mm 17mm;
+  --section-gap: 6mm;
+}
+
+.preset-refined-minimal {
+  background: var(--paper);
+}
+
+.preset-refined-minimal h1 {
+  font-size: 32px;
+  max-width: 132mm;
+}
+
+.header-note {
+  width: 48mm;
+  margin-bottom: 0;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.minimal-flow {
+  display: grid;
+  gap: 7mm;
+}
+
+.opening {
+  padding: 0 0 5mm;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-note {
+  padding-left: 5mm;
+  border-left: 1px solid var(--line-strong);
+  color: var(--muted);
+}
+
+.minimal-rule {
+  padding-top: 2mm;
+}
+
+.preset-refined-minimal blockquote {
+  margin: 0;
+  padding: 4mm 0 0 8mm;
+  border-top: 1px solid var(--line);
+  border-left: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 1.35;
+}
