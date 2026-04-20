@@ -5,6 +5,7 @@ import json
 import socket
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -49,10 +50,29 @@ def load_scaffold_module():
     return load_module_from_path(SCAFFOLD_SCRIPT, "_scaffold_repo_under_test")
 
 
-def create_target_repo(tmp_path: Path) -> Path:
+def write_files(root: Path, files: dict[str, str]) -> None:
+    for relative_path, content in files.items():
+        target_path = root / relative_path
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(content, encoding="utf-8")
+
+
+def create_repo_with_files(tmp_path: Path, files: dict[str, str]) -> Path:
     repo_root = tmp_path / "target"
     repo_root.mkdir()
-    (repo_root / "package.json").write_text('{"scripts":{"test":"vitest"}}\n', encoding="utf-8")
+    write_files(repo_root, files)
+    return repo_root
+
+
+def detect_commands_for_files(files: dict[str, str]):
+    scaffold_module = load_scaffold_module()
+    with tempfile.TemporaryDirectory() as temp_dir:
+        repo_root = create_repo_with_files(Path(temp_dir), files)
+        return scaffold_module.detect_commands(repo_root)
+
+
+def create_target_repo(tmp_path: Path) -> Path:
+    repo_root = create_repo_with_files(tmp_path, {"package.json": '{"scripts":{"test":"vitest"}}\n'})
     assert run_git(repo_root, "init").returncode == 0
     assert run_git(repo_root, "checkout", "-b", "autopilot/version-smoke").returncode == 0
     assert run_git(repo_root, "add", ".").returncode == 0
@@ -86,8 +106,6 @@ def read_version_marker(repo_root: Path) -> dict[str, str]:
 class ScaffoldVersioningTests(unittest.TestCase):
     def test_fresh_scaffold_records_current_scaffold_version(self) -> None:
         with self.subTest("fresh scaffold"):
-            import tempfile
-
             with tempfile.TemporaryDirectory() as temp_dir:
                 repo_root = create_target_repo(Path(temp_dir))
 
@@ -112,8 +130,6 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertIn(marker["scaffold_version"], version_result.stdout)
 
     def test_older_scaffold_auto_upgrades_common_files_without_overwriting_queue_config(self) -> None:
-        import tempfile
-
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))
             first_result = run_scaffold(repo_root)
@@ -149,8 +165,6 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertEqual(preserved_config["objective"], "Preserve this project-specific queue objective.")
 
     def test_release_lock_removes_matching_lock_even_when_pid_is_missing(self) -> None:
-        import tempfile
-
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))
             scaffold_result = run_scaffold(repo_root)
@@ -170,8 +184,6 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertFalse(lock_path.exists(), "Matching lock file should be removed even without pid fields.")
 
     def test_no_auto_upgrade_leaves_existing_common_files_untouched(self) -> None:
-        import tempfile
-
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))
             first_result = run_scaffold(repo_root)
@@ -202,14 +214,195 @@ class ScaffoldVersioningTests(unittest.TestCase):
     def test_parse_semver_supports_short_forms_and_rejects_invalid_versions(self) -> None:
         scaffold_module = load_scaffold_module()
 
+        self.assertEqual(scaffold_module.parse_semver(""), (0, 0, 0))
         self.assertEqual(scaffold_module.parse_semver("1"), (1, 0, 0))
         self.assertEqual(scaffold_module.parse_semver("1.2"), (1, 2, 0))
         self.assertEqual(scaffold_module.parse_semver("1.2.3"), (1, 2, 3))
+        self.assertEqual(scaffold_module.parse_semver(" 2.4 "), (2, 4, 0))
 
         with self.assertRaises(scaffold_module.ScaffoldError):
             scaffold_module.parse_semver("1.2.3.4")
         with self.assertRaises(scaffold_module.ScaffoldError):
             scaffold_module.parse_semver("v1.2.3")
+        with self.assertRaises(scaffold_module.ScaffoldError):
+            scaffold_module.parse_semver("1.two.3")
+
+    def test_detect_commands_from_package_json_scripts(self) -> None:
+        result = detect_commands_for_files(
+            {
+                "package.json": json.dumps(
+                    {
+                        "scripts": {
+                            "lint": "eslint .",
+                            "typecheck": "tsc --noEmit",
+                            "test": "vitest run",
+                            "build": "tsc -p tsconfig.json",
+                            "vulture": "vulture src",
+                        }
+                    },
+                    indent=2,
+                )
+                + "\n",
+                "src/index.ts": "export const value = 1;\n",
+                "tests/sample.test.ts": "export {};\n",
+            }
+        )
+
+        self.assertEqual(result.lint_command, "npm run lint")
+        self.assertEqual(result.typecheck_command, "npm run typecheck")
+        self.assertEqual(result.full_test_command, "npm test")
+        self.assertEqual(result.build_command, "npm run build")
+        self.assertEqual(result.vulture_command, "npm run vulture")
+        self.assertEqual(result.targeted_test_prefixes, ["npm test --", "npm run test --"])
+        self.assertEqual(result.command_sources["lint_command"], "package.json:scripts.lint")
+        self.assertEqual(result.command_sources["typecheck_command"], "package.json:scripts.typecheck")
+        self.assertEqual(result.command_sources["full_test_command"], "package.json:scripts.test")
+        self.assertEqual(result.command_sources["build_command"], "package.json:scripts.build")
+        self.assertEqual(result.command_sources["vulture_command"], "package.json:scripts.vulture")
+
+    def test_detect_commands_from_pyproject_tooling(self) -> None:
+        result = detect_commands_for_files(
+            {
+                "pyproject.toml": """
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+python_version = "3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.vulture]
+paths = ["src"]
+""".strip()
+                + "\n",
+                "tests/test_sample.py": "def test_ok() -> None:\n    assert True\n",
+                "src/app.py": "VALUE = 1\n",
+            }
+        )
+
+        self.assertEqual(result.lint_command, "ruff check .")
+        self.assertEqual(result.typecheck_command, "python -m mypy .")
+        self.assertEqual(result.full_test_command, "pytest")
+        self.assertEqual(result.vulture_command, "python -m vulture .")
+        self.assertEqual(result.targeted_test_prefixes, ["pytest ", "python -m pytest "])
+        self.assertEqual(result.command_sources["lint_command"], "pyproject.toml:tool.ruff")
+        self.assertEqual(result.command_sources["typecheck_command"], "pyproject.toml:tool.mypy")
+        self.assertEqual(result.command_sources["full_test_command"], "pyproject.toml / tests/")
+        self.assertEqual(result.command_sources["vulture_command"], "pyproject.toml:tool.vulture")
+
+    def test_detect_commands_from_cargo_toml(self) -> None:
+        result = detect_commands_for_files(
+            {
+                "Cargo.toml": """
+[package]
+name = "demo"
+version = "0.1.0"
+edition = "2021"
+""".strip()
+                + "\n",
+                "src/main.rs": "fn main() {}\n",
+            }
+        )
+
+        self.assertEqual(result.lint_command, "cargo clippy --all-targets --all-features -- -D warnings")
+        self.assertEqual(result.typecheck_command, "cargo check")
+        self.assertEqual(result.full_test_command, "cargo test")
+        self.assertEqual(result.build_command, "cargo build")
+        self.assertEqual(result.targeted_test_prefixes, ["cargo test "])
+        self.assertEqual(result.command_sources["lint_command"], "Cargo.toml")
+        self.assertEqual(result.command_sources["typecheck_command"], "Cargo.toml")
+        self.assertEqual(result.command_sources["full_test_command"], "Cargo.toml")
+        self.assertEqual(result.command_sources["build_command"], "Cargo.toml")
+
+    def test_detect_commands_from_go_mod(self) -> None:
+        result = detect_commands_for_files(
+            {
+                "go.mod": "module example.com/demo\n\ngo 1.22\n",
+                "main.go": "package main\n\nfunc main() {}\n",
+            }
+        )
+
+        self.assertEqual(result.full_test_command, "go test ./...")
+        self.assertEqual(result.build_command, "go build ./...")
+        self.assertEqual(result.targeted_test_prefixes, ["go test "])
+        self.assertEqual(result.command_sources["full_test_command"], "go.mod")
+        self.assertEqual(result.command_sources["build_command"], "go.mod")
+
+    def test_detect_commands_from_makefile_targets(self) -> None:
+        result = detect_commands_for_files(
+            {
+                "Makefile": """
+lint:
+\t@echo lint
+
+typecheck:
+\t@echo typecheck
+
+test:
+\t@echo test
+
+build:
+\t@echo build
+""".strip()
+                + "\n",
+                "src/app.py": "VALUE = 1\n",
+            }
+        )
+
+        self.assertEqual(result.lint_command, "make lint")
+        self.assertEqual(result.typecheck_command, "make typecheck")
+        self.assertEqual(result.full_test_command, "make test")
+        self.assertEqual(result.build_command, "make build")
+        self.assertEqual(result.command_sources["lint_command"], "Makefile:lint")
+        self.assertEqual(result.command_sources["typecheck_command"], "Makefile:typecheck")
+        self.assertEqual(result.command_sources["full_test_command"], "Makefile:test")
+        self.assertEqual(result.command_sources["build_command"], "Makefile:build")
+
+    def test_detect_commands_from_justfile_targets(self) -> None:
+        result = detect_commands_for_files(
+            {
+                "justfile": """
+lint:
+    @echo lint
+
+typecheck:
+    @echo typecheck
+
+test:
+    @echo test
+
+build:
+    @echo build
+""".strip()
+                + "\n",
+                "src/app.py": "VALUE = 1\n",
+            }
+        )
+
+        self.assertEqual(result.lint_command, "just lint")
+        self.assertEqual(result.typecheck_command, "just typecheck")
+        self.assertEqual(result.full_test_command, "just test")
+        self.assertEqual(result.build_command, "just build")
+        self.assertEqual(result.command_sources["lint_command"], "justfile:lint")
+        self.assertEqual(result.command_sources["typecheck_command"], "justfile:typecheck")
+        self.assertEqual(result.command_sources["full_test_command"], "justfile:test")
+        self.assertEqual(result.command_sources["build_command"], "justfile:build")
+
+    def test_force_overwrites_existing_generated_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            first_result = run_scaffold(repo_root)
+            self.assertEqual(first_result.returncode, 0, first_result.stderr)
+
+            round_prompt_path = repo_root / "automation" / "round-prompt.md"
+            round_prompt_path.write_text("# stale prompt that should be replaced\n", encoding="utf-8")
+
+            force_result = run_scaffold(repo_root, "--force")
+
+            self.assertEqual(force_result.returncode, 0, force_result.stderr)
+            self.assertNotIn("stale prompt", round_prompt_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
