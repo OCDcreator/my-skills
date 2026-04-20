@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Use when developing, debugging, or pre-release checking an Obsidian community plugin, extension, or add-on and the user mentions white screens after reload, slow startup, manual refresh loops, a plugin not showing up in a fresh vault, console or DevTools capture, screenshots, DOM assertions, watch-on-save, state reset, or automated smoke testing before release.
+description: Use when any Obsidian community plugin work turns into debugging, smoke testing, or release validation, especially for white screens after reload, slow startup, manual refresh loops, fresh-vault install or discovery failures, BUILD_ID deploy checks, console or DevTools capture, screenshots, DOM assertions, watch-on-save, state reset, or other implicit plugin troubleshooting.
 ---
 
 # Obsidian Plugin Autodebug
@@ -10,6 +10,8 @@ Use this skill to turn Obsidian plugin development into a repeatable debug loop:
 Keep the loaded skill focused on decisions and workflow. For script flags and copy-ready commands, read `references/command-reference.md` or run any runnable `.mjs` helper with `--help`.
 
 ## When To Use
+
+Default to this skill for implicit Obsidian plugin debugging or pre-release validation even when the user does not explicitly ask for a full smoke loop, a test-vault deploy, or "autodebug".
 
 Use this skill when the user asks for:
 
@@ -21,6 +23,7 @@ Use this skill when the user asks for:
 - CI/headless quality-gate templates that stay separate from desktop-only checks;
 - a minimal sample plugin workspace when no real plugin repo exists yet;
 - plugin white screens after reload, plugins that do not show up in a fresh vault, or manual refresh loops;
+- deploy verification such as BUILD_ID or hash checks in a test vault before release;
 - pre-release smoke checks before publishing an Obsidian plugin.
 
 Do not use it for normal note/vault operations. Use `obsidian-cli` directly for reading notes, creating files, searching vault content, or simple one-shot vault management.
