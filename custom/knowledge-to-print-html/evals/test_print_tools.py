@@ -459,6 +459,25 @@ class PrintToolTests(unittest.TestCase):
         self.assertTrue(ROOT_VALIDATOR_WRAPPER.exists())
         self.assertTrue(ROOT_REVIEW_WRAPPER.exists())
 
+    def test_validation_tool_uses_split_maintenance_modules(self) -> None:
+        expected_modules = [
+            "checks.py",
+            "page_capture.py",
+            "pdf_artifacts.py",
+            "runtime_bootstrap.py",
+            "svg_enclosure.py",
+        ]
+        for module_name in expected_modules:
+            self.assertTrue((SKILL_DIR / "scripts" / module_name).exists())
+
+        entrypoint_text = VALIDATOR.read_text(encoding="utf-8")
+        self.assertIn("from .checks import", entrypoint_text)
+        self.assertIn("from .page_capture import", entrypoint_text)
+        self.assertIn("from .pdf_artifacts import", entrypoint_text)
+        self.assertIn("from .runtime_bootstrap import", entrypoint_text)
+        self.assertIn("from .svg_enclosure import", entrypoint_text)
+        self.assertLess(len(entrypoint_text.splitlines()), 400)
+
     def test_root_wrappers_only_import_main(self) -> None:
         validator_wrapper = ROOT_VALIDATOR_WRAPPER.read_text(encoding="utf-8")
         review_wrapper = ROOT_REVIEW_WRAPPER.read_text(encoding="utf-8")
@@ -653,7 +672,7 @@ class PrintToolTests(unittest.TestCase):
         )
 
     def test_ensure_python_package_installs_missing_dependency_before_retry(self) -> None:
-        from scripts import validate_print_layout as validator
+        from scripts import runtime_bootstrap
 
         imported_module = object()
         real_import_module = importlib.import_module
@@ -669,7 +688,7 @@ class PrintToolTests(unittest.TestCase):
 
         with mock.patch("subprocess.run") as run:
             with mock.patch("importlib.import_module", side_effect=fake_import_module):
-                result = validator.ensure_python_package(
+                result = runtime_bootstrap.ensure_python_package(
                     "playwright.sync_api",
                     pip_name="playwright",
                     auto_install=True,
@@ -855,7 +874,7 @@ class PrintToolTests(unittest.TestCase):
             self.assertGreater(report["analysis"]["sheets"][0]["rect"]["height"], report["analysis"]["sheets"][0]["expectedA4Height"])
 
     def test_optimize_pdf_for_fast_view_runs_qpdf_linearize(self) -> None:
-        from scripts import validate_print_layout as validator
+        from scripts import pdf_artifacts
 
         with tempfile.TemporaryDirectory() as temp_name:
             temp_dir = Path(temp_name)
@@ -876,9 +895,9 @@ class PrintToolTests(unittest.TestCase):
                 )
                 final_pdf.write_bytes(b"%PDF-1.7\n/Linearized 1\n/ObjStm 1\n")
 
-            with mock.patch.object(validator, "resolve_qpdf_path", return_value="qpdf"):
-                with mock.patch.object(validator, "run_bootstrap_command", side_effect=fake_run):
-                    info = validator.optimize_pdf_for_fast_view(
+            with mock.patch.object(pdf_artifacts, "resolve_qpdf_path", return_value="qpdf"):
+                with mock.patch.object(pdf_artifacts, "run_bootstrap_command", side_effect=fake_run):
+                    info = pdf_artifacts.optimize_pdf_for_fast_view(
                         raw_pdf,
                         final_pdf,
                         auto_install=True,
