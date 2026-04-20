@@ -126,6 +126,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertIn("AUTOPILOT_SCAFFOLD_VERSION", autopilot_text)
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "__init__.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "runner.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "status_views.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "validation.py").exists())
                 version_result = subprocess.run(
                     [sys.executable, str(repo_root / "automation" / "autopilot.py"), "version"],
@@ -146,6 +147,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         str(repo_root / "automation" / "autopilot.py"),
                         str(repo_root / "automation" / "_autopilot" / "__init__.py"),
                         str(repo_root / "automation" / "_autopilot" / "runner.py"),
+                        str(repo_root / "automation" / "_autopilot" / "status_views.py"),
                         str(repo_root / "automation" / "_autopilot" / "validation.py"),
                     ],
                     cwd=repo_root,
