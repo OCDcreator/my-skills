@@ -5,7 +5,6 @@ import argparse
 import json
 import os
 import re
-import signal
 import shutil
 import socket
 import subprocess
@@ -17,6 +16,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from _autopilot.doctor import DoctorSupport, run_doctor as run_doctor_command
+from _autopilot.process_control import (
+    ProcessControlSupport,
+    run_restart_after_next_commit as run_restart_after_next_commit_command,
+)
 from _autopilot.runner import RunnerSupport, invoke_runner_round, resolve_runner_executable
 from _autopilot.status_views import (
     StatusViewSupport,
@@ -815,6 +819,48 @@ def build_status_view_support() -> StatusViewSupport:
     )
 
 
+def build_process_control_support() -> ProcessControlSupport:
+    return ProcessControlSupport(
+        repo_root=REPO_ROOT,
+        default_profile_name=DEFAULT_PROFILE_NAME,
+        default_config_path=DEFAULT_CONFIG_PATH,
+        default_state_path=DEFAULT_STATE_PATH,
+        lock_filename=LOCK_FILENAME,
+        error_type=AutopilotError,
+        info=info,
+        pid_exists=pid_exists,
+        parse_int=parse_int,
+        clean_string=clean_string,
+        resolve_repo_path=resolve_repo_path,
+        read_json=read_json,
+        read_lock=read_lock,
+        get_head_sha=get_head_sha,
+        run_git=run_git,
+        run_git_no_capture=run_git_no_capture,
+        windows_hidden_process_kwargs=windows_hidden_process_kwargs,
+    )
+
+
+def build_doctor_support() -> DoctorSupport:
+    return DoctorSupport(
+        repo_root=REPO_ROOT,
+        lock_filename=LOCK_FILENAME,
+        error_type=AutopilotError,
+        clean_string=clean_string,
+        compact_text=compact_text,
+        load_config=load_config,
+        build_runner_support=build_runner_support,
+        resolve_runner_executable=resolve_runner_executable,
+        read_vulture_snapshot=read_vulture_snapshot,
+        ensure_path_within_repo=ensure_path_within_repo,
+        get_current_branch=get_current_branch,
+        test_branch_allowed=test_branch_allowed,
+        is_working_tree_dirty=is_working_tree_dirty,
+        resolve_repo_path=resolve_repo_path,
+        read_lock=read_lock,
+    )
+
+
 def pid_exists(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -1369,167 +1415,6 @@ def run_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def stop_process(pid: int, *, graceful_timeout_seconds: int = 30) -> None:
-    if pid <= 0:
-        return
-    if not pid_exists(pid):
-        info(f"Process {pid} already exited.")
-        return
-
-    info(f"Stopping process {pid}.")
-    if os.name == "nt":
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except OSError:
-            pass
-        deadline = time.time() + graceful_timeout_seconds
-        while time.time() < deadline:
-            if not pid_exists(pid):
-                info(f"Process {pid} stopped cleanly.")
-                return
-            time.sleep(1)
-
-        taskkill_result = subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-            **windows_hidden_process_kwargs(),
-        )
-        if taskkill_result.returncode != 0 and pid_exists(pid):
-            combined = "\n".join(part for part in (taskkill_result.stdout, taskkill_result.stderr) if part.strip())
-            raise AutopilotError(f"Failed to force-stop pid {pid}: {combined}")
-    else:
-        os.kill(pid, signal.SIGTERM)
-        deadline = time.time() + graceful_timeout_seconds
-        while time.time() < deadline:
-            if not pid_exists(pid):
-                info(f"Process {pid} stopped cleanly.")
-                return
-            time.sleep(1)
-
-        os.kill(pid, signal.SIGKILL)
-        deadline = time.time() + 10
-        while time.time() < deadline:
-            if not pid_exists(pid):
-                info(f"Process {pid} force-stopped.")
-                return
-            time.sleep(1)
-
-    if pid_exists(pid):
-        raise AutopilotError(f"Failed to stop pid {pid}.")
-
-
-def remove_stale_lock(runtime_directory: Path, *, expected_pid: int | None = None) -> None:
-    lock_path = runtime_directory / LOCK_FILENAME
-    lock_data = read_lock(lock_path)
-    if not lock_data:
-        return
-
-    lock_pid = parse_int(lock_data.get("pid"), -1)
-
-    if expected_pid is not None and lock_pid not in (-1, expected_pid):
-        return
-
-    if lock_pid > 0 and pid_exists(lock_pid):
-        raise AutopilotError(f"Refusing to remove active lock owned by pid {lock_pid}.")
-
-    lock_path.unlink(missing_ok=True)
-    info(f"Removed stale lock file at {lock_path}.")
-
-
-def build_restart_start_args(args: argparse.Namespace) -> list[str]:
-    restart_profile = clean_string(args.restart_profile) or clean_string(args.profile) or DEFAULT_PROFILE_NAME
-    restart_config_path = clean_string(args.restart_config_path) or clean_string(args.config_path) or DEFAULT_CONFIG_PATH
-    restart_state_path = clean_string(args.restart_state_path) or clean_string(args.state_path) or DEFAULT_STATE_PATH
-    restart_profile_path = clean_string(args.restart_profile_path) or clean_string(args.profile_path)
-
-    start_args = [
-        sys.executable,
-        str(resolve_repo_path("automation/autopilot.py")),
-        "start",
-        "--profile",
-        restart_profile,
-        "--config-path",
-        restart_config_path,
-        "--state-path",
-        restart_state_path,
-    ]
-    if restart_profile_path:
-        start_args.extend(["--profile-path", restart_profile_path])
-    return start_args
-
-
-def git_ref_exists(ref_name: str) -> bool:
-    return run_git(["rev-parse", "--verify", f"{ref_name}^{{commit}}"], check=False).returncode == 0
-
-
-def git_is_ancestor(ancestor_ref: str, descendant_ref: str) -> bool:
-    return run_git(["merge-base", "--is-ancestor", ancestor_ref, descendant_ref], check=False).returncode == 0
-
-
-def sync_repo_to_restart_ref(
-    *,
-    restart_sync_ref: str,
-    stopped_head: str,
-    timeout_seconds: int,
-    refresh_seconds: int,
-) -> None:
-    started_monotonic = time.monotonic()
-    while True:
-        run_git_no_capture(["fetch", "--all", "--prune"], check=True)
-
-        if git_ref_exists(restart_sync_ref):
-            if git_is_ancestor(stopped_head, restart_sync_ref):
-                info(f"Fast-forwarding repo to cutover ref {restart_sync_ref}.")
-                run_git_no_capture(["merge", "--ff-only", restart_sync_ref], check=True)
-                return
-            info(f"Ref {restart_sync_ref} exists but is not a fast-forward successor of stopped HEAD {stopped_head}.")
-        else:
-            info(f"Waiting for cutover ref {restart_sync_ref} to appear.")
-
-        if timeout_seconds > 0 and time.monotonic() - started_monotonic >= timeout_seconds:
-            raise AutopilotError(
-                f"Timed out waiting for cutover ref '{restart_sync_ref}' to become a fast-forward successor of {stopped_head}."
-            )
-
-        time.sleep(refresh_seconds)
-
-
-def spawn_background_autopilot(command_args: list[str], *, output_path: Path, pid_path: Path | None = None) -> int:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_handle = output_path.open("ab")
-    popen_kwargs: dict[str, Any] = {
-        "args": command_args,
-        "cwd": str(REPO_ROOT),
-        "stdin": subprocess.DEVNULL,
-        "stdout": output_handle,
-        "stderr": subprocess.STDOUT,
-    }
-
-    if os.name == "nt":
-        popen_kwargs.update(
-            windows_hidden_process_kwargs(
-                detached=True,
-                new_process_group=True,
-            )
-        )
-    else:
-        popen_kwargs["start_new_session"] = True
-
-    try:
-        process = subprocess.Popen(**popen_kwargs)
-    finally:
-        output_handle.close()
-
-    if pid_path:
-        pid_path.parent.mkdir(parents=True, exist_ok=True)
-        pid_path.write_text(f"{process.pid}\n", encoding="utf-8")
-    return int(process.pid)
-
-
 def run_watch(args: argparse.Namespace) -> int:
     runtime_directory = resolve_repo_path(args.runtime_path)
     status_view_support = build_status_view_support()
@@ -1596,188 +1481,11 @@ def run_watch(args: argparse.Namespace) -> int:
 
 
 def run_restart_after_next_commit(args: argparse.Namespace) -> int:
-    state_path = resolve_repo_path(args.state_path)
-    runtime_directory = state_path.parent
-    if not state_path.exists():
-        raise AutopilotError(f"State file not found: {state_path}")
-
-    state = read_json(state_path)
-    target_commit_sha = clean_string(state.get("last_commit_sha"))
-    if not target_commit_sha:
-        raise AutopilotError("State file does not have last_commit_sha; nothing to watch yet.")
-
-    lock_path = runtime_directory / LOCK_FILENAME
-    lock_data = read_lock(lock_path)
-    current_pid = -1
-    if lock_data:
-        try:
-            current_pid = int(lock_data.get("pid", -1))
-        except (TypeError, ValueError):
-            current_pid = -1
-
-    info(
-        "Watching for the next successful commit after "
-        f"{target_commit_sha} (current pid {current_pid if current_pid > 0 else 'unknown'})."
-    )
-
-    refresh_seconds = max(1, int(args.refresh_seconds))
-    while True:
-        time.sleep(refresh_seconds)
-        state = read_json(state_path)
-        latest_commit_sha = clean_string(state.get("last_commit_sha"))
-        current_round = state.get("current_round")
-        current_status = clean_string(state.get("status"))
-
-        if latest_commit_sha and latest_commit_sha != target_commit_sha:
-            info(
-                "Detected new commit "
-                f"{latest_commit_sha} at round {current_round} with status {current_status or '<empty>'}."
-            )
-            break
-
-        if current_status and current_status != "active" and args.stop_if_status_changes:
-            raise AutopilotError(f"State changed to '{current_status}' before a new commit was detected.")
-
-    if current_pid > 0:
-        stop_process(current_pid, graceful_timeout_seconds=max(1, int(args.stop_timeout_seconds)))
-    else:
-        info("No active pid was captured from the lock file; skipping process stop step.")
-
-    remove_stale_lock(runtime_directory, expected_pid=current_pid if current_pid > 0 else None)
-
-    stopped_head = get_head_sha()
-
-    if args.hard_reset:
-        run_git_no_capture(["reset", "--hard", "HEAD"], check=True)
-
-    restart_sync_ref = clean_string(args.restart_sync_ref)
-    if restart_sync_ref:
-        sync_repo_to_restart_ref(
-            restart_sync_ref=restart_sync_ref,
-            stopped_head=stopped_head,
-            timeout_seconds=max(0, int(args.restart_sync_timeout_seconds)),
-            refresh_seconds=max(1, int(args.restart_sync_refresh_seconds)),
-        )
-
-    restart_args = build_restart_start_args(args)
-    restart_output_path = resolve_repo_path(args.restart_output_path)
-    restart_pid_path = resolve_repo_path(args.restart_pid_path) if clean_string(args.restart_pid_path) else None
-    new_pid = spawn_background_autopilot(restart_args, output_path=restart_output_path, pid_path=restart_pid_path)
-    info(f"Started replacement autopilot pid {new_pid}.")
-    return 0
+    return run_restart_after_next_commit_command(args, support=build_process_control_support())
 
 
 def run_doctor(args: argparse.Namespace) -> int:
-    config, config_path, profile_path = load_config(args.config_path, args.profile, args.profile_path)
-    failures = 0
-
-    print(f"[doctor] repo: {REPO_ROOT}")
-    print(f"[doctor] config: {config_path}")
-    print(f"[doctor] profile: {profile_path}")
-
-    git_path = shutil.which("git")
-    if git_path:
-        print(f"[doctor] ok   command git: {git_path}")
-    else:
-        print("[doctor] fail command git: not found in PATH")
-        failures += 1
-
-    try:
-        runner_support = build_runner_support()
-        runner_path = resolve_runner_executable(
-            config,
-            clean_string=runner_support.clean_string,
-            error_type=runner_support.error_type,
-        )
-        print(f"[doctor] ok   runner command: {runner_path}")
-    except AutopilotError as exc:
-        print(f"[doctor] fail runner command: {exc}")
-        failures += 1
-
-    for extra_directory in config.get("runner_additional_dirs", []):
-        extra_directory_text = clean_string(extra_directory)
-        if not extra_directory_text:
-            continue
-        if Path(extra_directory_text).exists():
-            print(f"[doctor] ok   runner add-dir: {extra_directory_text}")
-        else:
-            print(f"[doctor] fail runner add-dir: {extra_directory_text}")
-            failures += 1
-
-    deploy_verify_path = clean_string(config.get("deploy_verify_path"))
-    if deploy_verify_path:
-        if Path(deploy_verify_path).exists():
-            print(f"[doctor] ok   deploy verify path: {deploy_verify_path}")
-        else:
-            print(f"[doctor] fail deploy verify path: {deploy_verify_path}")
-            failures += 1
-    else:
-        print("[doctor] ok   deploy verify path: <not configured>")
-
-    vulture_command = clean_string(config.get("vulture_command"))
-    if vulture_command:
-        snapshot = read_vulture_snapshot(config)
-        if snapshot and not snapshot["error"]:
-            print(
-                "[doctor] ok   vulture command: "
-                f"{vulture_command} (findings={snapshot['count']}, exit={snapshot['returncode']})"
-            )
-        else:
-            error_text = snapshot["error"] if snapshot else "vulture snapshot unavailable"
-            print(f"[doctor] fail vulture command: {compact_text(clean_string(error_text), max_length=220)}")
-            failures += 1
-    else:
-        print("[doctor] info vulture command: <not configured>")
-
-    print(f"[doctor] info lanes: {len(config.get('lanes', []))}")
-    for lane in config.get("lanes", []):
-        lane_id = lane["id"]
-        try:
-            ensure_path_within_repo(f"{lane['phase_doc_prefix']}0.md", label=f"Lane '{lane_id}' phase_doc_prefix probe")
-            print(f"[doctor] ok   lane {lane_id} phase prefix: {lane['phase_doc_prefix']}")
-        except AutopilotError as exc:
-            print(f"[doctor] fail lane {lane_id} phase prefix: {exc}")
-            failures += 1
-
-        for label, path_value in [
-            ("starting phase", lane["starting_phase_doc"]),
-            ("roadmap", lane["roadmap_path"]),
-            ("prompt", lane["prompt_template"]),
-        ]:
-            try:
-                ensure_path_within_repo(path_value, label=f"Lane '{lane_id}' {label}", must_exist=True)
-                print(f"[doctor] ok   lane {lane_id} {label}: {path_value}")
-            except AutopilotError as exc:
-                print(f"[doctor] fail lane {lane_id} {label}: {exc}")
-                failures += 1
-
-    branch_name = get_current_branch()
-    allowed_prefixes = list(config.get("allowed_branch_prefixes", []))
-    if test_branch_allowed(branch_name, allowed_prefixes):
-        print(f"[doctor] ok   branch '{branch_name}' matches allowed prefixes")
-    else:
-        print(f"[doctor] fail branch '{branch_name}' does not match allowed prefixes: {', '.join(allowed_prefixes)}")
-        failures += 1
-
-    if is_working_tree_dirty():
-        print("[doctor] fail working tree is dirty")
-        failures += 1
-    else:
-        print("[doctor] ok   working tree is clean")
-
-    runtime_directory = resolve_repo_path(args.runtime_path)
-    print(f"[doctor] info runtime directory: {runtime_directory}")
-    lock_path = runtime_directory / LOCK_FILENAME
-    lock_data = read_lock(lock_path)
-    if lock_data:
-        print(
-            "[doctor] warn lock present: "
-            f"host={lock_data.get('hostname')} pid={lock_data.get('pid')} profile={lock_data.get('profile')}"
-        )
-    else:
-        print("[doctor] ok   no autopilot lock present")
-
-    return 1 if failures else 0
+    return run_doctor_command(args, support=build_doctor_support())
 
 
 def run_version(args: argparse.Namespace) -> int:
