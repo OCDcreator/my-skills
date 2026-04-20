@@ -87,6 +87,14 @@ If your agent runtime already exposes `obsidian-devtools-mcp` or a DevTools MCP 
 
 Auto-launch can open the app, but it may not retroactively add a debug port to an already-running Obsidian instance. The launch helper now retries with one explicit restart fallback on Windows or macOS before it gives up.
 
+Synthetic Windows smoke for the restart path:
+
+```bash
+node scripts/obsidian_debug_cdp_restart_fallback_smoke.mjs
+```
+
+This compiles a temporary fake Obsidian executable with `csc.exe`, verifies that `scripts/obsidian_debug_launch_app.mjs` records `cdpRestartFallback.attempted|ok|readyAfterRestart`, and then cleans up the synthetic process. It is meant for regression-proofing the fallback path without restarting a real Obsidian session.
+
 ## Optional Agentic Surface Probes
 
 Use these only when needed; default loop remains CLI/CDP-first.
