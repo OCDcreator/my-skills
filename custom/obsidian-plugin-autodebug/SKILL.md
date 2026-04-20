@@ -225,7 +225,9 @@ Use these as optional support gates after baseline doctor/smoke loops, not as bl
 - AI-plugin safety checks: secret storage, redaction, network/tool boundary hints.
 - Official review-readiness heuristics: manifest hygiene, sample residue, logging/DOM/network disclosure checks.
 
-Reference: `references/review-readiness.md`.
+Doctor emits these as advisory checks such as `ai-plugin-secret-storage`, `ai-plugin-network-boundary`, `mcp-rest-security`, and `agentic-control-surfaces`. When a local REST/MCP bridge is available, pass `--agentic-rest-base-url` plus an API key placeholder or environment-backed value; never paste secrets into handoff artifacts.
+
+References: `references/review-readiness.md` and `references/agentic-control-surfaces.md`.
 These checks are heuristic and advisory; they are not official Obsidian approval outcomes.
 
 ## CI, Optional E2E, And Release-Adjacent Checks

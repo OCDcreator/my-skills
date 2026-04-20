@@ -322,6 +322,23 @@
         "Uses a platform-specific restart helper on Windows or macOS instead of vague manual instructions.",
         "Records whether the CDP restart fallback was attempted and whether CDP became reachable afterward."
       ]
+    },
+    {
+      "id": 23,
+      "name": "agentic-ai-security-and-rest-probe",
+      "prompt": "这个 AI 插件有 Obsidian CLI REST/MCP 桥，也会调用第三方模型。请先跑 doctor 的 agentic checks：确认 SecretStorage、脱敏、外部请求边界、localhost/auth/tool whitelist，再把结果放进 handoff 工具包。",
+      "expected_output": "Uses the optional agentic support detector and doctor checks to validate AI-plugin safety evidence plus local REST/MCP endpoint boundaries before generating a secret-free agent handoff manifest.",
+      "files": [
+        "scripts/obsidian_debug_agentic_support.mjs",
+        "scripts/obsidian_debug_doctor.mjs",
+        "scripts/obsidian_debug_agent_tools.mjs",
+        "references/command-reference.md"
+      ],
+      "expectations": [
+        "Checks `ai-plugin-secret-storage` and `ai-plugin-network-boundary` instead of only generic warnings.",
+        "Checks `mcp-rest-security` for localhost, auth, and tool whitelist evidence.",
+        "Keeps all API keys out of `agent-tools.json` and other handoff artifacts."
+      ]
     }
   ]
 }

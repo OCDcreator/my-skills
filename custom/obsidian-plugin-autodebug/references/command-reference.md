@@ -100,6 +100,21 @@ This compiles a temporary fake Obsidian executable with `csc.exe`, verifies that
 Use these only when needed; default loop remains CLI/CDP-first.
 
 ```bash
+# Generate static AI/MCP/REST safety/control-surface evidence
+node scripts/obsidian_debug_agentic_support.mjs \
+  --repo-dir <repo> \
+  --rest-base-url "http://127.0.0.1:<obsidian-cli-rest-port>" \
+  --rest-api-key "$OBSIDIAN_CLI_REST_API_KEY" \
+  --output .obsidian-debug/agentic-support.json
+
+# Surface the same evidence as doctor checks
+node scripts/obsidian_debug_doctor.mjs \
+  --repo-dir <repo> \
+  --plugin-id <id> \
+  --agentic-rest-base-url "http://127.0.0.1:<obsidian-cli-rest-port>" \
+  --agentic-rest-api-key "$OBSIDIAN_CLI_REST_API_KEY" \
+  --output .obsidian-debug/doctor.json
+
 # Probe Obsidian CLI REST health (placeholder host/key; never commit real secrets)
 curl -sS "http://127.0.0.1:<obsidian-cli-rest-port>/health"
 curl -sS "http://127.0.0.1:<obsidian-cli-rest-port>/tools" \
@@ -114,6 +129,8 @@ curl -sS "http://127.0.0.1:<cdp-port>/json/list"
 
 Read `references/agentic-control-surfaces.md` before choosing among CLI, CDP, DevTools MCP, Playwright MCP, Vault MCP, or MCP Inspector.
 Do not treat Vault MCP/Nexus-style vault servers as proof that plugin reload/log capture is available.
+The doctor emits optional `agentic-control-surfaces`, `ai-plugin-secret-storage`, `ai-plugin-network-boundary`, and `mcp-rest-security` checks when these signals are available.
+Regression smoke: `node scripts/obsidian_debug_agentic_security_smoke.mjs`.
 
 ## Scenario And UI Assertions
 

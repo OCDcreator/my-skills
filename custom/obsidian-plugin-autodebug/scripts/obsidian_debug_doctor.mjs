@@ -52,6 +52,11 @@ Common options:
   --vault-uri <uri>                 Optional obsidian:// URI for auto-launch fixes.
   --vault-path <path>               Optional vault/file path for auto-launch fixes.
   --cdp-host <host> --cdp-port <n>  CDP endpoint. Defaults to 127.0.0.1:9222.
+  --agentic-rest-base-url <url>     Optional local REST/MCP HTTP endpoint to probe.
+  --agentic-rest-api-key <key>      Optional API key for REST/MCP tools endpoint.
+  --agentic-rest-health-path <path> Health path for REST/MCP probe. Defaults to /health.
+  --agentic-rest-tools-path <path>  Tools path for REST/MCP probe. Defaults to /tools.
+  --agentic-probe-timeout-ms <n>    Per-request timeout for agentic probes. Defaults to 2000.
   --platform <auto|windows|bash>    Fix-plan command platform.
   --output <path>                   Doctor JSON output path.
   --fix                            Emit reviewable fix scripts/plan.
@@ -69,6 +74,11 @@ const vaultPath = getStringOption(options, 'vault-path', '').trim();
 const cdpHost = getStringOption(options, 'cdp-host', '127.0.0.1');
 const cdpPort = getNumberOption(options, 'cdp-port', 9222);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '');
+const agenticRestBaseUrl = getStringOption(options, 'agentic-rest-base-url', '').trim();
+const agenticRestApiKey = getStringOption(options, 'agentic-rest-api-key', '').trim();
+const agenticRestHealthPath = getStringOption(options, 'agentic-rest-health-path', '/health').trim() || '/health';
+const agenticRestToolsPath = getStringOption(options, 'agentic-rest-tools-path', '/tools').trim() || '/tools';
+const agenticProbeTimeoutMs = Math.max(250, getNumberOption(options, 'agentic-probe-timeout-ms', 2000));
 const outputPath = getStringOption(options, 'output', '').trim();
 const platform = normalizePlatform(getStringOption(options, 'platform', 'auto'));
 const fixRequested = getBooleanOption(options, 'fix', false);
@@ -310,6 +320,11 @@ const ecosystemSupport = await detectEcosystemSupport({ repoDir });
 const agenticSupport = await detectAgenticSupport({
   repoDir,
   testVaultPluginDir,
+  restBaseUrl: agenticRestBaseUrl,
+  restApiKey: agenticRestApiKey,
+  restHealthPath: agenticRestHealthPath,
+  restToolsPath: agenticRestToolsPath,
+  probeTimeoutMs: agenticProbeTimeoutMs,
 });
 const reviewReadiness = await detectReviewReadiness({ repoDir });
 const preflightSupport = await detectPreflightSupport({
@@ -853,6 +868,100 @@ if (testVaultPluginDir) {
       : check('info', 'test-vault-styles', 'deploy', 'Test vault styles.css is missing; this is OK for plugins without CSS', { path: vaultStylesPath }),
   );
 }
+
+const agenticControlSurfaces = agenticSupport.controlSurfaces ?? {};
+const agenticSurfaceEntries = Object.entries(agenticControlSurfaces);
+const detectedAgenticSurfaces = agenticSurfaceEntries.filter(([, surface]) => surface?.detected);
+const availableAgenticSurfaces = agenticSurfaceEntries.filter(([, surface]) => surface?.available);
+const restProbe = agenticSupport.runtimeProbes?.rest ?? {};
+const aiSafety = agenticSupport.aiSafety ?? {};
+const aiSecretStorageStatus = aiSafety.keyMaterial?.present
+  ? (aiSafety.secretStorage?.present ? 'pass' : 'warn')
+  : 'info';
+const aiNetworkBoundaryStatus = aiSafety.externalRequests?.present
+  ? ((aiSafety.settingsPrivacy?.present || aiSafety.redaction?.present) ? 'pass' : 'warn')
+  : 'info';
+const mcpRestSecurityStatus = restProbe.configured
+  ? (restProbe.ok && restProbe.localhost && restProbe.authProvided && restProbe.toolAllowlist ? 'pass' : 'warn')
+  : (agenticControlSurfaces.mcpRest?.detected ? 'info' : 'info');
+
+checks.push(
+  check(
+    restProbe.configured && !restProbe.ok
+      ? 'warn'
+      : detectedAgenticSurfaces.length > 0
+        ? (availableAgenticSurfaces.length > 0 ? 'pass' : 'info')
+        : 'info',
+    'agentic-control-surfaces',
+    'agentic',
+    detectedAgenticSurfaces.length > 0
+      ? `Optional agentic control surface heuristics detected: ${detectedAgenticSurfaces.map(([name]) => name).join(', ')}.`
+      : 'No optional MCP/REST/DevTools/AI control surface heuristics were detected.',
+    {
+      heuristic: true,
+      controlSurfaces: agenticControlSurfaces,
+      runtimeProbes: agenticSupport.runtimeProbes ?? {},
+      recommendations: agenticSupport.recommendations ?? [],
+    },
+  ),
+);
+checks.push(
+  check(
+    aiSecretStorageStatus,
+    'ai-plugin-secret-storage',
+    'agentic',
+    aiSafety.keyMaterial?.present
+      ? aiSafety.secretStorage?.present
+        ? 'AI key/token-like signals are paired with SecretStorage evidence.'
+        : 'AI key/token-like signals were found without SecretStorage evidence.'
+      : 'No AI key/token-like storage signals were detected.',
+    {
+      heuristic: true,
+      keyMaterial: aiSafety.keyMaterial ?? null,
+      secretStorage: aiSafety.secretStorage ?? null,
+      redaction: aiSafety.redaction ?? null,
+      warnings: aiSafety.summary?.warnings ?? [],
+    },
+  ),
+);
+checks.push(
+  check(
+    aiNetworkBoundaryStatus,
+    'ai-plugin-network-boundary',
+    'agentic',
+    aiSafety.externalRequests?.present
+      ? (aiSafety.settingsPrivacy?.present || aiSafety.redaction?.present)
+        ? 'External request signals have user-facing settings/privacy or redaction evidence.'
+        : 'External request signals were found without user-facing settings/privacy or redaction evidence.'
+      : 'No external request signals were detected in AI-plugin safety heuristics.',
+    {
+      heuristic: true,
+      externalRequests: aiSafety.externalRequests ?? null,
+      settingsPrivacy: aiSafety.settingsPrivacy ?? null,
+      redaction: aiSafety.redaction ?? null,
+      warnings: aiSafety.summary?.warnings ?? [],
+    },
+  ),
+);
+checks.push(
+  check(
+    mcpRestSecurityStatus,
+    'mcp-rest-security',
+    'agentic',
+    restProbe.configured
+      ? restProbe.ok && restProbe.localhost && restProbe.authProvided && restProbe.toolAllowlist
+        ? 'REST/MCP runtime probe reached a localhost endpoint with auth and tool allowlist evidence.'
+        : 'REST/MCP runtime probe lacks confirmed localhost, auth, tool allowlist, or availability evidence.'
+      : agenticControlSurfaces.mcpRest?.detected
+        ? 'MCP/REST heuristic signals were detected; pass --agentic-rest-base-url to probe runtime security boundaries.'
+        : 'No MCP/REST runtime endpoint was provided or detected.',
+    {
+      heuristic: true,
+      runtimeProbe: restProbe,
+      mcpRest: agenticControlSurfaces.mcpRest ?? null,
+    },
+  ),
+);
 
 checks.push(
   check(
