@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass(frozen=True)
@@ -318,3 +318,49 @@ def print_watch_detail_lines(
             print(f"{prefix} {line}")
         else:
             print(prefix)
+
+
+def print_state_summary(
+    state: dict[str, Any],
+    *,
+    runtime_directory: Path | None = None,
+    support: StatusViewSupport,
+    read_lock: Callable[[Path], dict[str, Any] | None],
+) -> None:
+    queue_progress = read_watch_queue_progress(state, support=support)
+    lane_id = clean_string(state.get("active_lane_id")) or "legacy"
+    print(
+        "[status] "
+        f"status={state.get('status')} round={state.get('current_round')} "
+        f"lane={lane_id} phase={state.get('next_phase_number')} failures={state.get('consecutive_failures')}"
+    )
+    if queue_progress and queue_progress.get("total_count") is not None:
+        print(f"[status] queue: {queue_progress['done_count']}/{queue_progress['total_count']} done")
+    if state.get("last_phase_doc"):
+        print(f"[status] last phase doc: {state.get('last_phase_doc')}")
+    if state.get("last_next_focus"):
+        print(f"[status] next focus: {state.get('last_next_focus')}")
+    if state.get("last_commit_sha"):
+        print(f"[status] last commit: {state.get('last_commit_sha')}")
+    if clean_string(state.get("vulture_command")):
+        if clean_string(state.get("vulture_last_error")):
+            print(f"[status] vulture: error={compact_text(clean_string(state.get('vulture_last_error')), max_length=220)}")
+        else:
+            print(
+                "[status] vulture: "
+                f"count={state.get('vulture_current_count')} "
+                f"delta={format_metric_delta(state.get('vulture_delta'))}"
+            )
+            if state.get("vulture_updated_at"):
+                print(f"[status] vulture updated: {state.get('vulture_updated_at')}")
+    if runtime_directory:
+        lock_path = runtime_directory / support.lock_filename
+        lock_data = read_lock(lock_path)
+        if lock_data:
+            print(
+                "[status] lock: "
+                f"host={lock_data.get('hostname')} pid={lock_data.get('pid')} "
+                f"profile={lock_data.get('profile')} started_at={lock_data.get('started_at')}"
+            )
+        else:
+            print("[status] lock: none")
