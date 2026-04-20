@@ -1,0 +1,26 @@
+{
+  "skill_name": "module-doc-guard-kit",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bootstrap-typescript-doc-guard",
+      "prompt": "这个 TypeScript 项目想复制 OpenCodian 的 docs/modules 机制：每个 src 模块都有一篇文档，而且以后新增、删除、修改模块时文档没同步就不能过 CI。请帮我整理并接入这套机制。",
+      "expected_output": "Assistant should trigger the skill, inspect repo instructions and package/CI gates, install module-doc templates plus coverage/diff scripts, configure src-to-doc mappings, wire both checks into validation, and report exact commands/results.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "retrofit-existing-docs-with-hard-gate",
+      "prompt": "仓库里已经有 docs/modules，但是经常代码改了文档没改。帮我加硬约束：模块改了但对应文档没动就失败，删模块但文档还在也失败。",
+      "expected_output": "Assistant should trigger the skill, preserve existing docs, add coverage and diff checks, encode any real exceptions in config instead of hand-waving, run the checks, and fix or list missing/orphan/stale paths.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "model-handoff-package",
+      "prompt": "把模块文档同步规则做成另一个大模型可以直接拿去用的通用包，最好有 AGENTS 片段、package.json 脚本、CI 示例和提示词。",
+      "expected_output": "Assistant should trigger the skill and produce a reusable package with repo templates, hard-check scripts, config, AGENTS/package/CI snippets, and clear model handoff workflow instead of only giving advice.",
+      "files": []
+    }
+  ]
+}

@@ -12,6 +12,7 @@ my-skills/
 │   ├── fork-upstream-workflow/                # fork 仓库个人维护与同步上游工作流
 │   ├── liquid-glass-compose/                  # Apple Liquid Glass UI
 │   ├── knowledge-to-print-html/               # 知识点整理为适合打印 PDF 的 HTML 讲义
+│   ├── module-doc-guard-kit/                  # 模块文档覆盖与 diff 硬约束通用包
 │   ├── obsidian-plugin-autodebug/              # Obsidian 插件全自动调试开发循环
 │   ├── obsidian-plugin-debug-logging/          # Obsidian 插件调试日志治理
 │   ├── obsidian-plugin-release-manager/       # Obsidian 插件版本号与测试库部署
@@ -49,6 +50,7 @@ my-skills/
 | [fork-upstream-workflow](custom/fork-upstream-workflow/) | 个人 fork 仓库的 `origin` / `upstream` / `main` / `feat/*` 维护策略与同步上游工作流 |
 | [knowledge-to-print-html](custom/knowledge-to-print-html/) | 把知识点、草稿和研究资料整理成适合打印 PDF 的 HTML 讲义，内置版式约束、打印验证与逐页子代理审版循环 |
 | [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
+| [module-doc-guard-kit](custom/module-doc-guard-kit/) | 为任意仓库接入 `docs/modules` 一对一模块文档、覆盖检查和 diff 硬约束，防止新增/修改/删除源码时文档不同步 |
 | [obsidian-plugin-autodebug](custom/obsidian-plugin-autodebug/) | 通用 Obsidian 插件 build → deploy → clean-vault bootstrap → reload → log watch → screenshot/DOM check 全自动调试开发循环，含 Node/WebSocket/CDP doctor、watch on save、state reset、baseline、playbook、多轮 profile、断言、对比、HTML 报告、native smoke fixture 与 vault 状态恢复 |
 | [obsidian-plugin-debug-logging](custom/obsidian-plugin-debug-logging/) | Obsidian 插件调试日志、诊断报告、BUILD_ID 与 Windows/macOS 日志导出治理 |
 | [obsidian-plugin-release-manager](custom/obsidian-plugin-release-manager/) | Obsidian plugin 的 semver + codename、BUILD_ID、release build 自动 patch bump 与 test vault deploy |

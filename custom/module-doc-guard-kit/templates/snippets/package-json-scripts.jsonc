@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "check:module-docs:coverage": "node scripts/check-module-doc-coverage.mjs",
+    "check:module-docs:diff": "node scripts/check-module-doc-diff.mjs",
+    "check:module-docs": "npm run check:module-docs:coverage && npm run check:module-docs:diff",
+    "list:module-docs": "node scripts/list-module-doc-targets-from-diff.mjs"
+  }
+}

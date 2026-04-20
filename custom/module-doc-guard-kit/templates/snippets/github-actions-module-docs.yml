@@ -1,0 +1,19 @@
+name: Module Docs
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  module-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/check-module-doc-coverage.mjs
+      - run: node scripts/check-module-doc-diff.mjs --range "origin/${{ github.base_ref }}...HEAD"

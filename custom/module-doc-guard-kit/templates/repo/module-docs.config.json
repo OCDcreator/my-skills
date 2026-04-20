@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "name": "typescript-src",
+      "sourceRoot": "src",
+      "docsRoot": "docs/modules",
+      "include": [
+        "**/*.ts",
+        "**/*.tsx"
+      ],
+      "exclude": [
+        "**/*.d.ts",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx"
+      ],
+      "docIgnore": [
+        "README.md",
+        "_TEMPLATE.md",
+        "_WORKFLOW.md",
+        "infrastructure/**/*.md"
+      ],
+      "exactMappings": {
+        "src/main.ts": "docs/modules/entry-point/main.md"
+      }
+    }
+  ]
+}
