@@ -6,6 +6,8 @@ The goal is not "fancy for its own sake". Every preset must teach clearly, print
 
 Use this file to choose the direction. Use `templates/presets/README.md` to copy the matching starter `handout.html` and `style.css`.
 
+Each preset folder also includes a committed `preview.png` screenshot for quick human visual comparison.
+
 ## Preset Contract
 
 Across all presets:

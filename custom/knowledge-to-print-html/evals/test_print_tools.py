@@ -453,6 +453,33 @@ MEDIUM_FRAME_UNEVEN_PADDING_SVG = """<svg xmlns="http://www.w3.org/2000/svg" wid
 
 
 class PrintToolTests(unittest.TestCase):
+    def test_preset_preview_script_exists(self) -> None:
+        self.assertTrue((SKILL_DIR / "scripts" / "render_preset_previews.py").exists())
+
+    def test_preset_templates_include_preview_images(self) -> None:
+        from scripts.page_capture import read_png_dimensions
+
+        presets_dir = SKILL_DIR / "templates" / "presets"
+        preset_dirs = sorted(
+            path for path in presets_dir.iterdir() if path.is_dir() and path.name != "_shared"
+        )
+
+        self.assertGreaterEqual(len(preset_dirs), 8)
+        for preset_dir in preset_dirs:
+            preview_path = preset_dir / "preview.png"
+            self.assertTrue(preview_path.exists(), f"Missing preview image for {preset_dir.name}")
+            width_px, height_px = read_png_dimensions(preview_path)
+            self.assertGreater(width_px, 0)
+            self.assertGreater(height_px, 0)
+            self.assertAlmostEqual(width_px / height_px, 210 / 297, delta=0.02)
+
+    def test_preset_readme_references_preview_images(self) -> None:
+        readme_text = (SKILL_DIR / "templates" / "presets" / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("preview.png", readme_text)
+        self.assertIn("render_preset_previews.py", readme_text)
+        self.assertIn("![editorial-atlas preview]", readme_text)
+
     def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
         self.assertTrue((SKILL_DIR / "scripts" / "validate_print_layout.py").exists())
         self.assertTrue((SKILL_DIR / "scripts" / "review_print_pages.py").exists())

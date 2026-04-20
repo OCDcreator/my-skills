@@ -219,6 +219,8 @@ Built-in presets:
 
 If the user asks to choose a style, show a concise preset menu with the preset name, best use case, and tradeoff. If the user does not choose, pick the best fit from the selection rules in `references/visual-presets.md`.
 
+For human visual selection, use the committed preview images at `templates/presets/<preset>/preview.png`. Regenerate them with `python scripts/render_preset_previews.py --no-auto-install` after editing preset HTML/CSS.
+
 When building the final artifact, start from the matching preset folder when it helps:
 
 1. copy `templates/presets/<preset>/handout.html`
