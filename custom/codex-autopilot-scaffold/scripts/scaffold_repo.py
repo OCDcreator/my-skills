@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.0.0"
+SCAFFOLD_VERSION = "1.0.1"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 
 ALLOWED_SOURCE_SUFFIXES = {
@@ -703,20 +703,20 @@ def render_template_tree(
     return results
 
 
-def ensure_runtime_gitignore(repo_root: Path, *, force: bool) -> str:
+def ensure_gitignore_entries(repo_root: Path, entries: list[str], *, force: bool) -> str:
     gitignore_path = repo_root / ".gitignore"
-    entry = "automation/runtime/"
     if not gitignore_path.exists():
-        write_text(gitignore_path, entry + "\n")
+        write_text(gitignore_path, "\n".join(entries) + "\n")
         return "written"
 
     existing = read_text(gitignore_path)
     lines = existing.splitlines()
-    if any(line.strip() == entry for line in lines):
+    missing_entries = [entry for entry in entries if not any(line.strip() == entry for line in lines)]
+    if not missing_entries:
         return "unchanged"
 
     suffix = "" if existing.endswith("\n") or not existing else "\n"
-    new_content = existing + suffix + entry + "\n"
+    new_content = existing + suffix + "\n".join(missing_entries) + "\n"
     write_text(gitignore_path, new_content)
     return "written"
 
@@ -867,7 +867,15 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         force=args.force,
         on_conflict=preset_conflict_policy,
     )
-    gitignore_result = ensure_runtime_gitignore(repo_root, force=args.force)
+    gitignore_result = ensure_gitignore_entries(
+        repo_root,
+        [
+            "automation/runtime/",
+            "automation/**/__pycache__/",
+            "automation/**/*.pyc",
+        ],
+        force=args.force,
+    )
 
     print(f"[scaffold] target repo: {repo_root}")
     print(f"[scaffold] preset: {args.preset} ({PRESET_METADATA[args.preset]['label']})")
@@ -892,7 +900,7 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("  python automation/autopilot.py start --profile windows --dry-run --single-round")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
         print("  python3 ./automation/autopilot.py start --profile mac --dry-run --single-round")
-        print("  ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round")
+        print("  bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round")
 
     return 0
 

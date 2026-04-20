@@ -10,6 +10,8 @@ else
   exit 1
 fi
 
+export PYTHONDONTWRITEBYTECODE=1
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOPILOT_PY="$SCRIPT_DIR/autopilot.py"
 

@@ -8,7 +8,7 @@ ARGS=()
 
 usage() {
   cat <<'EOF'
-Usage: ./automation/start-autopilot.sh [options] [-- autopilot-args...]
+Usage: bash ./automation/start-autopilot.sh [options] [-- autopilot-args...]
 
 Options:
   --background             Launch unattended work through nohup and return immediately
@@ -39,6 +39,8 @@ else
   echo "[start] neither python3 nor python was found in PATH" >&2
   exit 1
 fi
+
+export PYTHONDONTWRITEBYTECODE=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 AUTOPILOT_PY="$SCRIPT_DIR/autopilot.py"

@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from typing import TYPE_CHECKING, Any, cast
+
+sys.dont_write_bytecode = True
 
 from _autopilot.cli_parser import build_parser as build_parser_command
 from _autopilot.controller_builders import (

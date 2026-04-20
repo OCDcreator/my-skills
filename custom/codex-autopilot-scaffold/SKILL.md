@@ -163,8 +163,8 @@ If the operator explicitly wants a no-window unattended launch, do **not** start
 ```bash
 python3 ./automation/autopilot.py doctor --profile mac
 python3 ./automation/autopilot.py start --profile mac --dry-run --single-round
-./automation/start-autopilot.sh -- --profile mac --dry-run --single-round
-./automation/watch-autopilot.sh --state-path automation/runtime/autopilot-state.json --tail 80
+bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round
+bash ./automation/watch-autopilot.sh --state-path automation/runtime/autopilot-state.json --tail 80
 ```
 
 If the repo has no allowed autopilot branch yet, create one first. Prefer names like:
@@ -303,7 +303,7 @@ Sentinel guidance:
 - Keep custom sentinels local and uncommitted under a user config path such as `~/.config/<project>/`.
 - When a repo has multiple concurrent state lines, always pass the exact `--state-path` for the run you are handing off.
 - If the user asks for a future unattended cutover, explicitly report the sentinel command, output log path, pid path, and watched state path.
-- Sentinels must clean known transient Python bytecode directories (`automation/__pycache__/` and `automation/runtime/__pycache__/`) before relaunching; these can make the next `doctor` or `start` reject the worktree as dirty.
+- Keep Python bytecode disabled in custom sentinels or wrappers (`PYTHONDONTWRITEBYTECODE=1`) and make sure the target repo ignores `automation/**/__pycache__/` plus `automation/**/*.pyc`; otherwise the next `doctor` or `start` can reject the worktree as dirty.
 
 Reusable scaffolded wrappers:
 
@@ -320,7 +320,7 @@ Reusable scaffolded wrappers:
 ### macOS
 
 ```bash
-./automation/arm-autopilot-cutover.sh \
+bash ./automation/arm-autopilot-cutover.sh \
   --state-path automation/runtime/<state-file>.json \
   --profile mac \
   --config-path automation/<config>.json \

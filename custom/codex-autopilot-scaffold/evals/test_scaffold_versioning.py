@@ -154,6 +154,15 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 )
                 self.assertEqual(version_result.returncode, 0, version_result.stderr)
                 self.assertIn(marker["scaffold_version"], version_result.stdout)
+                self.assertFalse((repo_root / "automation" / "__pycache__").exists())
+                self.assertFalse((repo_root / "automation" / "_autopilot" / "__pycache__").exists())
+                gitignore_text = (repo_root / ".gitignore").read_text(encoding="utf-8")
+                self.assertIn("automation/runtime/", gitignore_text)
+                self.assertIn("automation/**/__pycache__/", gitignore_text)
+                self.assertIn("automation/**/*.pyc", gitignore_text)
+                readme_text = (repo_root / "automation" / "README.md").read_text(encoding="utf-8")
+                self.assertIn("bash ./automation/start-autopilot.sh", readme_text)
+                self.assertIn("bash ./automation/watch-autopilot.sh", readme_text)
                 compile_result = subprocess.run(
                     [
                         sys.executable,
@@ -184,6 +193,15 @@ class ScaffoldVersioningTests(unittest.TestCase):
                     check=False,
                 )
                 self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+
+    def test_scaffold_next_steps_use_bash_wrappers_for_mac_shell_scripts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+
+            result = run_scaffold(repo_root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round", result.stdout)
 
     def test_older_scaffold_auto_upgrades_common_files_without_overwriting_queue_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
