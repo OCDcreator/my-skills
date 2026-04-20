@@ -46,6 +46,9 @@ Common options:
   --test-vault-plugin-dir <path>    Target vault plugin directory.
   --obsidian-command <command>      Obsidian CLI/app command. Defaults to obsidian.
   --vault-name <name>               Vault name for CLI commands.
+  --app-path <path>                 Optional Obsidian desktop app/executable path.
+  --vault-uri <uri>                 Optional obsidian:// URI for auto-launch fixes.
+  --vault-path <path>               Optional vault/file path for auto-launch fixes.
   --cdp-host <host> --cdp-port <n>  CDP endpoint. Defaults to 127.0.0.1:9222.
   --platform <auto|windows|bash>    Fix-plan command platform.
   --output <path>                   Doctor JSON output path.
@@ -58,6 +61,9 @@ const testVaultPluginDir = getStringOption(options, 'test-vault-plugin-dir', '')
 const expectedPluginId = getStringOption(options, 'plugin-id', '').trim();
 const obsidianCommand = getStringOption(options, 'obsidian-command', 'obsidian').trim();
 const vaultName = getStringOption(options, 'vault-name', '').trim();
+const appPath = getStringOption(options, 'app-path', '').trim();
+const vaultUri = getStringOption(options, 'vault-uri', '').trim();
+const vaultPath = getStringOption(options, 'vault-path', '').trim();
 const cdpHost = getStringOption(options, 'cdp-host', '127.0.0.1');
 const cdpPort = getNumberOption(options, 'cdp-port', 9222);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '');
@@ -86,6 +92,9 @@ const commandContext = {
   pluginId: expectedPluginId,
   vaultName,
   obsidianCommand,
+  appPath,
+  vaultUri,
+  vaultPath,
   cdpHost,
   cdpPort,
   cdpTargetTitleContains,
@@ -362,6 +371,32 @@ const cdpProbeFixes = [
     dryRunFriendly: true,
     executable: 'node',
     args: ['--input-type=module', '-e', cdpProbeSnippet, '{{cdpHost}}', '{{cdpPort}}'],
+  },
+];
+const appLaunchFixes = [
+  {
+    id: 'launch-obsidian-app',
+    label: 'Launch or focus Obsidian',
+    summary: 'Starts or focuses Obsidian, opens the target vault when provided, and waits for CLI or CDP readiness before retrying automation.',
+    safety: 'launches-app',
+    dryRunFriendly: false,
+    executable: 'node',
+    args: [
+      '{{toolRoot}}/scripts/obsidian_debug_launch_app.mjs',
+      '--mode',
+      'auto',
+      '--obsidian-command',
+      '{{obsidianCommand}}',
+      ...(appPath ? ['--app-path', appPath] : []),
+      ...(vaultName ? ['--vault-name', '{{vaultName}}'] : []),
+      ...(vaultUri ? ['--vault-uri', vaultUri] : []),
+      ...(vaultPath ? ['--vault-path', vaultPath] : []),
+      '--cdp-host',
+      '{{cdpHost}}',
+      '--cdp-port',
+      '{{cdpPort}}',
+    ],
+    cwd: '{{repoDir}}',
   },
 ];
 const bootstrapFixes = expectedPluginId && testVaultPluginDir
@@ -798,6 +833,7 @@ checks.push(
           ? 'Obsidian CLI is available with developer commands'
           : 'Obsidian command ran, but developer commands were not detected',
         { command: obsidianCommand, exitCode: obsidianHelp.exitCode },
+        helpText.includes('Developer:') || helpText.includes('dev:console') ? [] : appLaunchFixes,
       )
     : check(
         'warn',
@@ -807,6 +843,7 @@ checks.push(
           ? 'Obsidian command timed out while checking help'
           : `Obsidian command failed: ${obsidianHelp.stderr.trim() || 'not available'}`,
         { command: obsidianCommand, exitCode: obsidianHelp.exitCode, timedOut: obsidianHelp.timedOut },
+        appLaunchFixes,
       ),
 );
 
@@ -1039,7 +1076,7 @@ try {
         port: cdpPort,
         targetTitleContains: cdpTargetTitleContains || null,
       },
-      cdpProbeFixes,
+      [...appLaunchFixes, ...cdpProbeFixes],
     ),
   );
 }
@@ -1077,6 +1114,11 @@ const report = {
   vaultName: vaultName || null,
   testVaultPluginDir: testVaultPluginDir ? path.resolve(testVaultPluginDir) : null,
   obsidianCommand,
+  appLaunch: {
+    appPath: appPath || null,
+    vaultUri: vaultUri || null,
+    vaultPath: vaultPath || null,
+  },
   cdp: {
     host: cdpHost,
     port: cdpPort,

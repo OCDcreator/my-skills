@@ -12,6 +12,15 @@
     "testVaultPluginDir": "/path/to/test-vault/.obsidian/plugins/your-plugin-id",
     "vaultName": "",
     "obsidianCommand": "obsidian",
+    "appLaunch": {
+      "enabled": true,
+      "mode": "auto",
+      "appPath": "",
+      "vaultUri": "",
+      "vaultPath": "",
+      "waitMs": 20000,
+      "pollIntervalMs": 1000
+    },
     "outputDir": ".obsidian-debug/{{jobId}}-{{platform}}"
   },
   "build": {

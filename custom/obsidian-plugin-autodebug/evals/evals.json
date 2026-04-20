@@ -218,6 +218,21 @@
         "Keeps the built-in scaffold positioned as a minimal debug fixture rather than the default real-project path.",
         "Explains which user situation fits each scaffold flow."
       ]
+    },
+    {
+      "id": 16,
+      "name": "auto-launch-obsidian-before-debug",
+      "prompt": "Obsidian app 现在没开，你不要再等我手动打开。自动把 app 拉起来、聚焦到测试库，再继续 build、deploy、reload、抓日志和截图。",
+      "expected_output": "Detects that Obsidian is not ready, uses the built-in launch helper or auto-launch policy before the main debug cycle, records an app-launch artifact, and then continues the normal build/deploy/reload/capture flow.",
+      "files": [
+        "job-specs/generic-debug-job.template.json",
+        "scripts/obsidian_debug_launch_app.mjs"
+      ],
+      "expectations": [
+        "Attempts auto-launch or focus recovery before asking the user to open Obsidian manually.",
+        "Records an app-launch report or equivalent readiness artifact path.",
+        "Continues into the normal build/deploy/reload/capture flow after app readiness succeeds."
+      ]
     }
   ]
 }

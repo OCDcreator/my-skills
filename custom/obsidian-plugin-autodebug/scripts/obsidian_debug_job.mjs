@@ -166,6 +166,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   const comparison = asObject(spec.comparison);
   const capture = asObject(spec.capture);
   const job = asObject(spec.job);
+  const appLaunch = asObject(runtime.appLaunch);
   const jobId = stringValue(job.id, 'obsidian-debug-job');
   const outputDir = outputDirOverride || interpolate(stringValue(runtime.outputDir, `.obsidian-debug/${jobId}`), {
     jobId,
@@ -201,6 +202,12 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addValue(args, '-TestVaultPluginDir', testVaultPluginDir);
     addValue(args, '-VaultName', runtime.vaultName);
     addValue(args, '-ObsidianCommand', runtime.obsidianCommand);
+    addValue(args, '-AppLaunchMode', stringValue(appLaunch.mode, 'auto'));
+    addValue(args, '-AppLaunchAppPath', appLaunch.appPath);
+    addValue(args, '-AppLaunchVaultUri', appLaunch.vaultUri);
+    addValue(args, '-AppLaunchVaultPath', appLaunch.vaultPath);
+    addValue(args, '-AppLaunchWaitMs', numberValue(appLaunch.waitMs, 20000));
+    addValue(args, '-AppLaunchPollIntervalMs', numberValue(appLaunch.pollIntervalMs, 1000));
     addValue(args, '-DeployFrom', stringValue(deploy.from, 'dist'));
     addValue(args, '-OutputDir', outputDir);
     const buildCommand = asArray(build.command);
@@ -236,6 +243,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addValue(args, '-BootstrapRestartWaitMs', numberValue(bootstrap.restartWaitMs, 8000));
     addValue(args, '-BootstrapEnableWaitMs', numberValue(bootstrap.enableWaitMs, 1000));
     addSwitch(args, '-DomText', booleanValue(assertions.domText, false));
+    addSwitch(args, '-SkipAppLaunch', !enabled(appLaunch, true));
     addSwitch(args, '-SkipBuild', !enabled(build, true));
     addSwitch(args, '-SkipDeploy', !enabled(deploy, true));
     addSwitch(args, '-SkipReload', !enabled(reload, true));
@@ -256,6 +264,12 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   addValue(args, '--test-vault-plugin-dir', testVaultPluginDir);
   addValue(args, '--vault-name', runtime.vaultName);
   addValue(args, '--obsidian-command', runtime.obsidianCommand);
+  addValue(args, '--app-launch-mode', stringValue(appLaunch.mode, 'auto'));
+  addValue(args, '--app-launch-app-path', appLaunch.appPath);
+  addValue(args, '--app-launch-vault-uri', appLaunch.vaultUri);
+  addValue(args, '--app-launch-vault-path', appLaunch.vaultPath);
+  addValue(args, '--app-launch-wait-ms', numberValue(appLaunch.waitMs, 20000));
+  addValue(args, '--app-launch-poll-interval-ms', numberValue(appLaunch.pollIntervalMs, 1000));
   addValue(args, '--deploy-from', stringValue(deploy.from, 'dist'));
   addValue(args, '--output-dir', outputDir);
   const buildCommand = asArray(build.command);
@@ -290,6 +304,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   addValue(args, '--bootstrap-restart-wait-ms', numberValue(bootstrap.restartWaitMs, 8000));
   addValue(args, '--bootstrap-enable-wait-ms', numberValue(bootstrap.enableWaitMs, 1000));
   addSwitch(args, '--dom-text', booleanValue(assertions.domText, false));
+  addSwitch(args, '--skip-app-launch', !enabled(appLaunch, true));
   addSwitch(args, '--use-cdp', useCdp);
   addSwitch(args, '--skip-build', !enabled(build, true));
   addSwitch(args, '--skip-deploy', !enabled(deploy, true));

@@ -55,6 +55,42 @@
         "obsidianCommand": {
           "type": "string"
         },
+        "appLaunch": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "mode": {
+              "enum": [
+                "auto",
+                "cli",
+                "cdp"
+              ],
+              "description": "Readiness probe required before the cycle continues. auto resolves to CLI for CLI cycles and CDP for CDP cycles."
+            },
+            "appPath": {
+              "type": "string",
+              "description": "Optional Obsidian desktop app/executable path."
+            },
+            "vaultUri": {
+              "type": "string",
+              "description": "Optional explicit obsidian:// URI used to open or focus a vault."
+            },
+            "vaultPath": {
+              "type": "string",
+              "description": "Optional vault or file path used to build obsidian://open?path=..."
+            },
+            "waitMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "pollIntervalMs": {
+              "type": "integer",
+              "minimum": 100
+            }
+          }
+        },
         "outputDir": {
           "type": "string",
           "description": "Output directory. Supports {{jobId}} and {{platform}}."

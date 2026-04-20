@@ -153,6 +153,7 @@ function normalizeSummaryPaths(summary, documentPath) {
     repoDir: resolveDocumentPath(documentPath, base.repoDir),
     outputDir: resolveDocumentPath(documentPath, base.outputDir),
     testVaultPluginDir: resolveDocumentPath(documentPath, base.testVaultPluginDir),
+    appLaunch: resolveDocumentPath(documentPath, base.appLaunch),
     buildLog: resolveDocumentPath(documentPath, base.buildLog),
     deployReport: resolveDocumentPath(documentPath, base.deployReport),
     bootstrapReport: resolveDocumentPath(documentPath, base.bootstrapReport),
@@ -880,6 +881,7 @@ const consoleText = await readTextIfExists(summary.consoleLog);
 const errorsText = await readTextIfExists(summary.errorsLog);
 const cdpTraceText = await readTextIfExists(summary.cdpTrace);
 const domText = await readTextIfExists(summary.dom);
+const appLaunchReport = await readJsonIfExists(summary.appLaunch);
 const deployReport = await readJsonIfExists(summary.deployReport);
 const cdpSummary = await readJsonIfExists(summary.cdpSummary);
 const scenarioReport = await readJsonIfExists(summary.scenarioReport);
@@ -1756,9 +1758,19 @@ const diagnosis = {
     testVaultPluginDir: testVaultPluginDir || null,
     vaultRoot: runtimeContext.vaultRoot || null,
     obsidianCommand: runtimeContext.obsidianCommand || null,
+    appLaunch: appLaunchReport
+      ? {
+          ready: appLaunchReport.ready === true,
+          launched: appLaunchReport.launched === true,
+          mode: appLaunchReport.mode ?? null,
+          elapsedMs: appLaunchReport.elapsedMs ?? null,
+          recommendation: appLaunchReport.recommendation ?? null,
+        }
+      : null,
   },
   artifacts: {
     summary: path.resolve(summaryPath),
+    appLaunch: summary.appLaunch ?? null,
     buildLog: summary.buildLog,
     deployReport: summary.deployReport,
     bootstrapReport: summary.bootstrapReport ?? null,

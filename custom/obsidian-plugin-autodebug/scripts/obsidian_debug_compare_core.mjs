@@ -81,6 +81,7 @@ export function resolveArtifactPaths(diagnosis, diagnosisPath) {
   const artifacts = diagnosis?.artifacts ?? {};
   return {
     summary: resolveDocumentPath(diagnosisPath, artifacts.summary),
+    appLaunch: resolveDocumentPath(diagnosisPath, artifacts.appLaunch),
     buildLog: resolveDocumentPath(diagnosisPath, artifacts.buildLog),
     deployReport: resolveDocumentPath(diagnosisPath, artifacts.deployReport),
     consoleLog: resolveDocumentPath(diagnosisPath, artifacts.consoleLog),

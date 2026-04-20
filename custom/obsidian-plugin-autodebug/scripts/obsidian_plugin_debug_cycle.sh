@@ -5,6 +5,12 @@ PLUGIN_ID=""
 TEST_VAULT_PLUGIN_DIR=""
 VAULT_NAME=""
 OBSIDIAN_COMMAND=""
+APP_LAUNCH_MODE="auto"
+APP_LAUNCH_APP_PATH=""
+APP_LAUNCH_VAULT_URI=""
+APP_LAUNCH_VAULT_PATH=""
+APP_LAUNCH_WAIT_MS=20000
+APP_LAUNCH_POLL_INTERVAL_MS=1000
 DEPLOY_FROM="dist"
 OUTPUT_DIR=".obsidian-debug"
 BUILD_COMMAND="npm run build"
@@ -35,6 +41,7 @@ BOOTSTRAP_DISCOVERY_TIMEOUT_MS=12000
 BOOTSTRAP_RELOAD_WAIT_MS=1500
 BOOTSTRAP_RESTART_WAIT_MS=8000
 BOOTSTRAP_ENABLE_WAIT_MS=1000
+SKIP_APP_LAUNCH=0
 SKIP_BUILD=0
 SKIP_DEPLOY=0
 SKIP_RELOAD=0
@@ -47,6 +54,12 @@ while [[ $# -gt 0 ]]; do
     --test-vault-plugin-dir) TEST_VAULT_PLUGIN_DIR="$2"; shift 2 ;;
     --vault-name) VAULT_NAME="$2"; shift 2 ;;
     --obsidian-command) OBSIDIAN_COMMAND="$2"; shift 2 ;;
+    --app-launch-mode) APP_LAUNCH_MODE="$2"; shift 2 ;;
+    --app-launch-app-path) APP_LAUNCH_APP_PATH="$2"; shift 2 ;;
+    --app-launch-vault-uri) APP_LAUNCH_VAULT_URI="$2"; shift 2 ;;
+    --app-launch-vault-path) APP_LAUNCH_VAULT_PATH="$2"; shift 2 ;;
+    --app-launch-wait-ms) APP_LAUNCH_WAIT_MS="$2"; shift 2 ;;
+    --app-launch-poll-interval-ms) APP_LAUNCH_POLL_INTERVAL_MS="$2"; shift 2 ;;
     --deploy-from) DEPLOY_FROM="$2"; shift 2 ;;
     --output-dir) OUTPUT_DIR="$2"; shift 2 ;;
     --build-command) BUILD_COMMAND="$2"; shift 2 ;;
@@ -77,6 +90,7 @@ while [[ $# -gt 0 ]]; do
     --bootstrap-enable-wait-ms) BOOTSTRAP_ENABLE_WAIT_MS="$2"; shift 2 ;;
     --dom-text) DOM_TEXT=1; shift ;;
     --use-cdp) USE_CDP=1; shift ;;
+    --skip-app-launch) SKIP_APP_LAUNCH=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --skip-deploy) SKIP_DEPLOY=1; shift ;;
     --skip-reload) SKIP_RELOAD=1; shift ;;
@@ -106,6 +120,11 @@ fi
 
 if [[ "$HOT_RELOAD_SETTLE_MS" -lt 0 ]]; then
   echo "--hot-reload-settle-ms must be 0 or greater" >&2
+  exit 1
+fi
+
+if [[ "$APP_LAUNCH_MODE" != "auto" && "$APP_LAUNCH_MODE" != "cli" && "$APP_LAUNCH_MODE" != "cdp" ]]; then
+  echo "--app-launch-mode must be auto, cli, or cdp" >&2
   exit 1
 fi
 
@@ -159,9 +178,11 @@ DIAGNOSIS_PATH="$OUTPUT_DIR/diagnosis.json"
 SCENARIO_REPORT_PATH="$OUTPUT_DIR/scenario-report.json"
 COMPARISON_PATH="$OUTPUT_DIR/comparison.json"
 BOOTSTRAP_REPORT_PATH="$OUTPUT_DIR/bootstrap-report.json"
+APP_LAUNCH_REPORT_PATH="$OUTPUT_DIR/app-launch.json"
 CDP_TRACE_PATH="$OUTPUT_DIR/cdp-reload-trace.log"
 CDP_SUMMARY_PATH="$CDP_TRACE_PATH.summary.json"
 VAULT_LOG_CAPTURE_PATH="$OUTPUT_DIR/vault-log-capture.json"
+RESOLVED_APP_LAUNCH_REPORT_PATH=""
 RESOLVED_VAULT_LOG_CAPTURE_PATH=""
 VERSION_PATH="$OUTPUT_DIR/obsidian-version.txt"
 
@@ -424,7 +445,54 @@ run_bootstrap_if_needed() {
   node "${bootstrap_args[@]}"
 }
 
+ensure_obsidian_app() {
+  if [[ "$SKIP_APP_LAUNCH" -eq 1 ]]; then
+    return
+  fi
+
+  local effective_mode="$APP_LAUNCH_MODE"
+  if [[ "$effective_mode" == "auto" ]]; then
+    if [[ "$USE_CDP" -eq 1 ]]; then
+      effective_mode="cdp"
+    else
+      effective_mode="cli"
+    fi
+  fi
+
+  write_section "Ensure Obsidian App"
+  local launch_args=(
+    "$SCRIPT_DIR/obsidian_debug_launch_app.mjs"
+    --mode "$effective_mode"
+    --obsidian-command "$OBS_CMD"
+    --cdp-host "$CDP_HOST"
+    --cdp-port "$CDP_PORT"
+    --wait-ms "$APP_LAUNCH_WAIT_MS"
+    --poll-interval-ms "$APP_LAUNCH_POLL_INTERVAL_MS"
+    --output "$APP_LAUNCH_REPORT_PATH"
+  )
+  if [[ -n "$VAULT_NAME" ]]; then
+    launch_args+=(--vault-name "$VAULT_NAME")
+  fi
+  if [[ -n "$APP_LAUNCH_APP_PATH" ]]; then
+    launch_args+=(--app-path "$APP_LAUNCH_APP_PATH")
+  fi
+  if [[ -n "$APP_LAUNCH_VAULT_URI" ]]; then
+    launch_args+=(--vault-uri "$APP_LAUNCH_VAULT_URI")
+  fi
+  if [[ -n "$APP_LAUNCH_VAULT_PATH" ]]; then
+    launch_args+=(--vault-path "$APP_LAUNCH_VAULT_PATH")
+  fi
+  if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
+    launch_args+=(--target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
+  fi
+
+  echo "node ${launch_args[*]}"
+  node "${launch_args[@]}"
+  RESOLVED_APP_LAUNCH_REPORT_PATH="$APP_LAUNCH_REPORT_PATH"
+}
+
 write_section "Preflight"
+ensure_obsidian_app
 if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
   obsidian_cli --quiet version > "$VERSION_PATH" 2>&1 || true
 else
@@ -678,6 +746,7 @@ cat > "$SUMMARY_PATH" <<EOF
   "obsidianCommand": "$OBS_CMD",
   "testVaultPluginDir": "$TEST_VAULT_PLUGIN_DIR",
   "outputDir": "$OUTPUT_DIR",
+  "appLaunch": $( [[ "$SKIP_APP_LAUNCH" -eq 1 ]] && printf 'null' || json_path_or_null "$RESOLVED_APP_LAUNCH_REPORT_PATH" ),
   "buildLog": $( [[ "$SKIP_BUILD" -eq 0 ]] && json_path_or_null "$BUILD_LOG_PATH" || printf 'null' ),
   "deployReport": $( [[ "$SKIP_DEPLOY" -eq 0 ]] && json_path_or_null "$DEPLOY_REPORT_PATH" || printf 'null' ),
   "bootstrapReport": $( [[ "$SKIP_BOOTSTRAP" -eq 0 ]] && json_path_or_null "$BOOTSTRAP_REPORT_PATH" || printf 'null' ),

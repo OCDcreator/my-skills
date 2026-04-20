@@ -4,8 +4,8 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 
 ## Desktop Control Preconditions
 
-- The Obsidian CLI controls an already-running desktop app. Launch Obsidian and open/focus the target test vault before relying on `obsidian help`, `obsidian dev:*`, or `obsidian plugin:*`.
-- If `obsidian help` says it cannot find Obsidian, treat that as a missing app-control precondition, not a plugin build failure.
+- The built-in wrappers now try to auto-launch/focus Obsidian and the target vault before relying on `obsidian help`, `obsidian dev:*`, or `obsidian plugin:*`.
+- If `obsidian help` says it cannot find Obsidian, treat that as a missing app-control precondition, not a plugin build failure; run the launch helper first instead of debugging plugin code immediately.
 - CDP helpers require Obsidian to be started with a reachable debug port, normally `127.0.0.1:9222`.
 - In multi-window setups, pass `--target-title-contains <vault-name>` or the equivalent job-spec setting to avoid attaching to the wrong vault window.
 
@@ -13,6 +13,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 
 | Need | Script | Typical command |
 | --- | --- | --- |
+| Launch/focus Obsidian first | `scripts/obsidian_debug_launch_app.mjs` | `node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json` |
 | Check environment | `scripts/obsidian_debug_doctor.mjs` | `node scripts/obsidian_debug_doctor.mjs --repo-dir <repo> --plugin-id <id> --test-vault-plugin-dir <vault>/.obsidian/plugins/<id> --output .obsidian-debug/doctor.json --fix` |
 | Scaffold sample plugin | `scripts/obsidian_debug_scaffold_plugin.mjs` | `node scripts/obsidian_debug_scaffold_plugin.mjs --output-dir <sample> --plugin-id sample-plugin --plugin-name "Sample Plugin"` |
 | Run config-driven loop | `scripts/obsidian_debug_job.mjs` | `node scripts/obsidian_debug_job.mjs --job .obsidian-debug/job.json --platform auto --mode run` |
@@ -20,12 +21,14 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 | Bash/macOS ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.sh` | `bash scripts/obsidian_plugin_debug_cycle.sh --plugin-id <id> --test-vault-plugin-dir <dir>` |
 
 Prefer `obsidian_debug_job.mjs` for repeatable work and the shell wrappers for one-off local smoke passes.
+Both shell wrappers call the launch helper automatically unless you opt out with `--skip-app-launch`.
 
 ## Job Specs
 
 Start from `job-specs/generic-debug-job.template.json` for an existing plugin. Fill only repo-local values in the copied job file:
 
 - `runtime`: plugin id, repo cwd, test-vault plugin directory, vault name, Obsidian command, output directory.
+- `runtime.appLaunch`: optional auto-launch policy (`enabled`, `mode`, `appPath`, `vaultUri`, `vaultPath`, `waitMs`, `pollIntervalMs`).
 - `build` / `deploy` / `bootstrap` / `reload` / `logWatch`: package-manager-aware build, generated artifact copy, fresh-vault discovery, CLI/CDP reload, console polling.
 - `scenario` / `assertions`: view-opening strategy, surface profile, assertion JSON, DOM selector.
 - `comparison` / `profile` / `report`: baseline comparison, repeated-run profiling, HTML report generation.
@@ -55,6 +58,12 @@ obsidian dev:dom selector=".workspace-leaf.mod-active" all
 
 If the plugin is new to the vault, run bootstrap immediately after deploy and before the reload/log-watch pass. The job runner and cycle wrappers do this automatically unless bootstrap is skipped.
 
+If Obsidian is closed, run the launch helper first:
+
+```bash
+node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json
+```
+
 ## CDP Fallback
 
 Use direct CDP when CLI polling misses early logs, exact event ordering matters, or the user asks for real-time console capture.
@@ -72,6 +81,8 @@ bash scripts/obsidian_mac_restart_cdp.sh /Applications/Obsidian.app 9222
 ```
 
 If your agent runtime already exposes `obsidian-devtools-mcp` or a DevTools MCP target bound to the Obsidian Electron window, you can drive that instead of the bundled CDP scripts. Keep the built-in scripts as the portable fallback.
+
+Auto-launch can open the app, but it may not retroactively add a debug port to an already-running Obsidian instance. If CDP still fails after auto-launch, use an explicit restart helper.
 
 ## Scenario And UI Assertions
 
@@ -152,7 +163,7 @@ Keep the split explicit:
 
 ## Troubleshooting
 
-- `obsidian help` cannot find Obsidian: launch/focus Obsidian desktop and target vault, then retry.
+- `obsidian help` cannot find Obsidian: run `node scripts/obsidian_debug_launch_app.mjs --mode cli ...`, then retry.
 - CDP fetch fails: restart Obsidian with a debug port and probe `http://127.0.0.1:9222/json/list`.
 - Logs show Hot Reload churn: use controlled mode for deterministic timing or coexist mode when intentionally letting Hot Reload drive reload.
 - UI selectors are flaky: add a surface profile, then assert stable root selectors/text instead of screenshot-only evidence.

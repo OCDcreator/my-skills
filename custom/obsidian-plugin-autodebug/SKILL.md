@@ -1,11 +1,11 @@
 ---
 name: obsidian-plugin-autodebug
-description: Use when any Obsidian community plugin work turns into debugging, smoke testing, or release validation, especially for white screens after reload, slow startup, manual refresh loops, fresh-vault install or discovery failures, BUILD_ID deploy checks, console or DevTools capture, screenshots, DOM assertions, watch-on-save, state reset, or other implicit plugin troubleshooting.
+description: Use when any Obsidian community plugin work turns into debugging, smoke testing, or release validation, especially for white screens after reload, slow startup, manual refresh loops, closed-app recovery, fresh-vault install or discovery failures, BUILD_ID deploy checks, console or DevTools capture, screenshots, DOM assertions, watch-on-save, state reset, or other implicit plugin troubleshooting.
 ---
 
 # Obsidian Plugin Autodebug
 
-Use this skill to turn Obsidian plugin development into a repeatable debug loop: prepare the app-control surface, build, deploy to a test vault, bootstrap fresh-vault discovery, reload, capture logs/UI artifacts, analyze diagnosis output, patch, and repeat.
+Use this skill to turn Obsidian plugin development into a repeatable debug loop: prepare or auto-launch the app-control surface, build, deploy to a test vault, bootstrap fresh-vault discovery, reload, capture logs/UI artifacts, analyze diagnosis output, patch, and repeat.
 
 Keep the loaded skill focused on decisions and workflow. For script flags and copy-ready commands, read `references/command-reference.md` or run any runnable `.mjs` helper with `--help`.
 
@@ -30,16 +30,18 @@ Do not use it for normal note/vault operations. Use `obsidian-cli` directly for 
 
 ## App-Control Reality Check
 
-The Obsidian CLI controls an already-running Obsidian desktop instance. It is not a headless runner and should not be treated as proof that Obsidian has launched.
+The Obsidian CLI controls an Obsidian desktop instance. It is not a headless runner and should not be treated as proof that Obsidian has launched.
+
+Before asking the user to launch Obsidian manually, let the wrappers or `scripts/obsidian_debug_launch_app.mjs` try to auto-launch/focus the app and open the target vault first.
 
 Before any real reload, console, screenshot, DOM, or plugin command:
 
-- launch Obsidian desktop;
+- auto-launch or focus Obsidian desktop when it is not ready;
 - open or focus the target test vault;
 - run `obsidian help`;
 - confirm the help output includes `Developer:` commands.
 
-If `obsidian help`, `obsidian dev:console`, or any plugin command says it cannot find Obsidian, first launch/focus Obsidian and retry. Treat that error as a missing desktop/app-control precondition, not as a plugin build failure.
+If `obsidian help`, `obsidian dev:console`, or any plugin command says it cannot find Obsidian, first run the auto-launch helper or let the cycle wrappers retry it for you. Treat that error as a missing desktop/app-control precondition, not as a plugin build failure.
 
 On macOS, the app binary is not a full CLI replacement. If the full CLI is unavailable, start Obsidian with a CDP debug port and use the CDP-first path.
 
@@ -63,7 +65,7 @@ In this source repo, the mirrored skill lives at `external/kepano-obsidian-skill
 
 Before editing or running a long loop, quickly detect:
 
-- Obsidian desktop is running with the target vault open or recently focused.
+- Obsidian desktop is launchable or already running with the target vault open; the wrappers now try auto-launch by default.
 - `obsidian help` works and includes `Developer:` commands, or a CDP port is reachable.
 - The repo is an Obsidian plugin: `manifest.json`, `package.json`, and generated `dist/main.js` or equivalent output.
 - The plugin id from `manifest.json`.
@@ -79,6 +81,7 @@ If the repo already has a release/deploy script or skill, reuse it instead of in
 | Existing plugin repo | Copy `job-specs/generic-debug-job.template.json`, tailor runtime/build/deploy values, run doctor, dry-run, then execute. |
 | No plugin repo yet, production scaffold needed | Start from `generator-obsidian-plugin`. |
 | No plugin repo yet, minimal debug fixture needed | Use `scripts/obsidian_debug_scaffold_plugin.mjs` when you want a lightweight fixture plus test vault, job spec, assertions, scenario, and CI templates. |
+| Obsidian app is closed or the wrong vault is focused | Use `scripts/obsidian_debug_launch_app.mjs` or let the cycle wrappers/job spec auto-launch first, then continue doctor/reload/capture. |
 | CLI developer commands work | Use CLI-first reload/log/screenshot/DOM capture. |
 | CLI cannot see Obsidian but app can expose CDP | Start Obsidian with a debug port and use CDP capture/reload scripts. |
 | One-off local pass | Use `scripts/obsidian_plugin_debug_cycle.ps1` or `scripts/obsidian_plugin_debug_cycle.sh`. |
@@ -88,7 +91,7 @@ For exact commands, read `references/command-reference.md`.
 
 ## Default Debug Loop
 
-1. **Preflight**: run the doctor to catch missing Node/WebSocket support, bad plugin ids, missing build outputs, unavailable CLI developer commands, CDP reachability, Hot Reload interference, package-manager signals, fresh-vault discovery gaps, and optional ecosystem adapters such as official lint rules, repo-owned E2E scripts, and vault logging helpers when they are detectable.
+1. **Preflight**: auto-launch/focus Obsidian when needed, then run the doctor to catch missing Node/WebSocket support, bad plugin ids, missing build outputs, unavailable CLI developer commands, CDP reachability, Hot Reload interference, package-manager signals, fresh-vault discovery gaps, and optional ecosystem adapters such as official lint rules, repo-owned E2E scripts, and vault logging helpers when they are detectable.
 2. **Build**: prefer the repo’s documented command. Respect package-manager signals such as `packageManager`, lockfiles, Corepack, and repo-owned scripts. If the repo already routes build/dev through `obsidian-dev-utils`, prefer those repo-owned scripts over reconstructing a parallel copy/reload loop.
 3. **Deploy**: copy only generated runtime artifacts into the test vault plugin directory: `main.js`, `manifest.json`, `styles.css`, and changed bundled assets.
 4. **Bootstrap**: for a brand-new plugin in a fresh vault, bootstrap discovery immediately after deploy and before the real reload/log-watch pass.
@@ -104,7 +107,7 @@ Save runtime artifacts under `.obsidian-debug/` or another repo-local debug fold
 
 Use config-driven jobs for repeatability across Windows PowerShell and macOS/Linux Bash. A job spec can describe:
 
-- `runtime`: plugin id, test vault plugin directory, cwd, Obsidian command, vault name, output directory;
+- `runtime`: plugin id, test vault plugin directory, cwd, Obsidian command, vault name, optional `appLaunch` policy, output directory;
 - `build` / `deploy` / `bootstrap` / `reload` / `logWatch`: build argv, deploy source, fresh-vault bootstrap policy, CLI/CDP reload, Hot Reload coordination, polling;
 - `scenario` / `assertions` / `comparison`: view-opening scenario, surface profile, assertion JSON, DOM selector, baseline comparison;
 - `profile` / `report`: repeated-cycle timing and optional HTML report generation;
@@ -197,7 +200,9 @@ Use CDP when:
 - JavaScript must run repeatedly during startup;
 - macOS lacks the full CLI but the app can be launched with a debug port.
 
-Before CDP work, probe the target list and attach to the `app://obsidian.md/index.html` target. In multi-window setups, filter by vault title.
+Before CDP work, auto-launch the app if it is closed, then probe the target list and attach to the `app://obsidian.md/index.html` target. In multi-window setups, filter by vault title.
+
+Auto-launch can open Obsidian and the target vault, but it cannot retroactively add a debug port to an already-running desktop instance on every platform. If CDP is still unavailable after auto-launch, use a restart helper such as `scripts/obsidian_mac_restart_cdp.sh` or a repo-local restart command.
 
 If the agent runtime already exposes `obsidian-devtools-mcp` or another DevTools MCP surface attached to the Obsidian Electron target, that can replace the bundled CDP scripts as an alternate control surface. This is an optional path; keep the built-in scripts as the portable fallback.
 
@@ -253,6 +258,7 @@ Summarize important log lines with artifact paths and line numbers. Do not paste
 ## Common Mistakes
 
 - Treating `obsidian` command availability as proof that Obsidian desktop is running.
+- Waiting for the user to manually open Obsidian when the built-in auto-launch helper can do that first.
 - Debugging plugin code when the real failure is “CLI cannot find Obsidian.”
 - Reloading before deploy/bootstrap finishes.
 - Committing machine-local vault paths or raw runtime logs.

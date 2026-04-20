@@ -340,6 +340,7 @@ const baselineScreenshotExists = await exists(comparisonBaselineArtifacts.screen
 const artifactEntries = [
   { scope: 'candidate', label: 'diagnosis', path: path.resolve(diagnosisPath) },
   { scope: 'candidate', label: 'summary', path: diagnosisArtifacts.summary },
+  { scope: 'candidate', label: 'app launch report', path: diagnosisArtifacts.appLaunch },
   { scope: 'candidate', label: 'screenshot', path: diagnosisArtifacts.screenshot, state: diagnosisArtifactStates.screenshot ?? null },
   { scope: 'candidate', label: 'DOM snapshot', path: diagnosisArtifacts.dom, state: diagnosisArtifactStates.dom ?? null },
   { scope: 'candidate', label: 'console log', path: diagnosisArtifacts.consoleLog, state: diagnosis.useCdp ? null : (diagnosisArtifactStates.trace ?? null) },

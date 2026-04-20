@@ -9,6 +9,13 @@ param(
 
   [string]$VaultName = "",
   [string]$ObsidianCommand = "",
+  [ValidateSet("auto", "cli", "cdp")]
+  [string]$AppLaunchMode = "auto",
+  [string]$AppLaunchAppPath = "",
+  [string]$AppLaunchVaultUri = "",
+  [string]$AppLaunchVaultPath = "",
+  [int]$AppLaunchWaitMs = 20000,
+  [int]$AppLaunchPollIntervalMs = 1000,
   [string]$DeployFrom = "dist",
   [string]$OutputDir = ".obsidian-debug",
   [string[]]$BuildCommand = @("npm", "run", "build"),
@@ -40,6 +47,7 @@ param(
   [int]$BootstrapRestartWaitMs = 8000,
   [int]$BootstrapEnableWaitMs = 1000,
   [switch]$DomText,
+  [switch]$SkipAppLaunch,
   [switch]$SkipBuild,
   [switch]$SkipDeploy,
   [switch]$SkipReload,
@@ -150,6 +158,55 @@ function Invoke-ObsidianCli {
   }
 
   return $text
+}
+
+function Invoke-AppLaunch {
+  param(
+    [string]$Executable,
+    [string]$Mode,
+    [string]$OutputPath
+  )
+
+  $scriptPath = Join-Path $PSScriptRoot "obsidian_debug_launch_app.mjs"
+  if (-not (Test-Path -LiteralPath $scriptPath)) {
+    throw "App launch helper not found: $scriptPath"
+  }
+
+  $args = @(
+    $scriptPath,
+    "--mode", $Mode,
+    "--obsidian-command", $Executable,
+    "--cdp-host", $CdpHost,
+    "--cdp-port", "$CdpPort",
+    "--wait-ms", "$AppLaunchWaitMs",
+    "--poll-interval-ms", "$AppLaunchPollIntervalMs",
+    "--output", $OutputPath
+  )
+
+  if ($VaultName.Trim().Length -gt 0) {
+    $args += @("--vault-name", $VaultName)
+  }
+  if ($AppLaunchAppPath.Trim().Length -gt 0) {
+    $args += @("--app-path", $AppLaunchAppPath)
+  }
+  if ($AppLaunchVaultUri.Trim().Length -gt 0) {
+    $args += @("--vault-uri", $AppLaunchVaultUri)
+  }
+  if ($AppLaunchVaultPath.Trim().Length -gt 0) {
+    $args += @("--vault-path", $AppLaunchVaultPath)
+  }
+  if ($CdpTargetTitleContains.Trim().Length -gt 0) {
+    $args += @("--target-title-contains", $CdpTargetTitleContains)
+  }
+
+  Write-Section "Ensure Obsidian App"
+  Write-Host "node $($args -join ' ')"
+  & node @args 2>&1 | ForEach-Object { Write-Host $_ }
+  if ($LASTEXITCODE -ne 0) {
+    throw "Obsidian app launch/readiness failed with exit code $LASTEXITCODE. See $OutputPath"
+  }
+
+  return $OutputPath
 }
 
 function Invoke-Build {
@@ -560,9 +617,11 @@ $diagnosisPath = Join-Path $resolvedOutputDir "diagnosis.json"
 $scenarioReportPath = Join-Path $resolvedOutputDir "scenario-report.json"
 $comparisonPath = Join-Path $resolvedOutputDir "comparison.json"
 $bootstrapReportPath = Join-Path $resolvedOutputDir "bootstrap-report.json"
+$appLaunchReportPath = Join-Path $resolvedOutputDir "app-launch.json"
 $cdpTracePath = Join-Path $resolvedOutputDir "cdp-reload-trace.log"
 $vaultLogCapturePath = Join-Path $resolvedOutputDir "vault-log-capture.json"
 $cdpSummaryPath = $null
+$resolvedAppLaunchReportPath = $null
 $resolvedVaultLogCapturePath = $null
 $resolvedBootstrapReportPath = $null
 $resolvedScenarioReportPath = $null
@@ -572,6 +631,13 @@ $hotReloadExplicitReloadPerformed = $false
 $hotReloadReloadChannel = "none"
 
 Write-Section "Preflight"
+if (-not $SkipAppLaunch) {
+  $effectiveAppLaunchMode = $AppLaunchMode
+  if ($effectiveAppLaunchMode -eq "auto") {
+    $effectiveAppLaunchMode = if ($UseCdp) { "cdp" } else { "cli" }
+  }
+  $resolvedAppLaunchReportPath = Invoke-AppLaunch -Executable $resolvedObsidianCommand -Mode $effectiveAppLaunchMode -OutputPath $appLaunchReportPath
+}
 $versionText = Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "version" -AllowFailure -Quiet
 Set-Content -LiteralPath (Join-Path $resolvedOutputDir "obsidian-version.txt") -Value $versionText -Encoding UTF8
 
@@ -674,6 +740,7 @@ $summary = [ordered]@{
   obsidianCommand = $resolvedObsidianCommand
   testVaultPluginDir = $TestVaultPluginDir
   outputDir = $resolvedOutputDir
+  appLaunch = if ($SkipAppLaunch -or -not $resolvedAppLaunchReportPath -or -not (Test-Path -LiteralPath $resolvedAppLaunchReportPath)) { $null } else { $resolvedAppLaunchReportPath }
   buildLog = if ($SkipBuild -or -not (Test-Path -LiteralPath $buildLogPath)) { $null } else { $buildLogPath }
   deployReport = if ($SkipDeploy -or -not (Test-Path -LiteralPath $deployReportPath)) { $null } else { $deployReportPath }
   bootstrapReport = if ($SkipBootstrap -or -not $resolvedBootstrapReportPath -or -not (Test-Path -LiteralPath $resolvedBootstrapReportPath)) { $null } else { $resolvedBootstrapReportPath }
