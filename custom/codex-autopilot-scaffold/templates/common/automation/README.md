@@ -4,7 +4,8 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 
 ## Files
 
-- `automation/autopilot.py`: cross-platform outer controller, intentionally kept self-contained so scaffolded repos do not need extra Python packages
+- `automation/autopilot.py`: cross-platform CLI entrypoint for the repo-local controller
+- `automation/_autopilot/`: stdlib-only support modules for runner execution and result validation
 - `automation/autopilot-scaffold-version.json`: deployed scaffold name/version marker
 - `automation/Arm-AutopilotCutover.ps1`: Windows post-commit cutover wrapper
 - `automation/arm-autopilot-cutover.sh`: macOS post-commit cutover wrapper
@@ -101,7 +102,7 @@ Prefer `deploy_policy=targeted` or `deploy_policy=never` for most unattended rep
 
 The scaffold records its deployed version in `automation/autopilot-scaffold-version.json`.
 
-- Re-running the scaffold script against an older deployed version auto-refreshes common controller assets such as `automation/autopilot.py`, wrappers, profiles, schema, and this version marker.
+- Re-running the scaffold script against an older deployed version auto-refreshes common controller assets such as `automation/autopilot.py`, `automation/_autopilot/`, wrappers, profiles, schema, and this version marker.
 - Repo-local queue docs, prompts, and `automation/autopilot-config.json` stay in place during that automatic upgrade path.
 - Use `python automation/autopilot.py version` to confirm what version a target repo is currently running.
 - Use `--force` only when you intentionally want to overwrite repo-local generated files beyond the shared controller layer.

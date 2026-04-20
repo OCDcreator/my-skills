@@ -10,13 +10,15 @@ import shutil
 import socket
 import subprocess
 import sys
-import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, BinaryIO, cast
+from typing import TYPE_CHECKING, Any, cast
+
+from _autopilot.runner import RunnerSupport, invoke_runner_round, resolve_runner_executable
+from _autopilot.validation import ValidationSupport, validate_round_result
 
 
 if TYPE_CHECKING:
@@ -35,13 +37,6 @@ LOCK_FILENAME = "autopilot.lock.json"
 ROUND_DIRECTORY_RE = re.compile(r"^round-(\d+)$")
 QUEUE_ITEM_STATUS_RE = re.compile(r"^### \[(DONE|NEXT|QUEUED)\]\s+")
 VULTURE_FINDING_RE = re.compile(r"^.+:\d+:\s+")
-SCHEMA_REQUIRED_TYPES: dict[str, tuple[type, ...]] = {
-    "string": (str,),
-    "boolean": (bool,),
-    "array": (list,),
-    "object": (dict,),
-    "null": (type(None),),
-}
 LANE_OVERRIDE_KEYS = {
     "focus_hint",
     "phase_doc_prefix",
@@ -723,154 +718,6 @@ def reset_worktree_to_head(head_sha: str) -> None:
     run_git(["clean", "-fd"])
 
 
-def get_commit_files(commit_sha: str) -> list[str]:
-    output = run_git(["diff-tree", "--no-commit-id", "--name-only", "-r", commit_sha]).stdout
-    if not output:
-        return []
-    return [line for line in output.splitlines() if line.strip()]
-
-
-def normalize_repo_file_path(file_path: str) -> str:
-    return file_path.replace("\\", "/").strip()
-
-
-def path_matches_any(file_path: str, configured_paths: list[str]) -> bool:
-    normalized = normalize_repo_file_path(file_path)
-    for configured_path in configured_paths:
-        candidate = normalize_repo_file_path(str(configured_path))
-        if not candidate:
-            continue
-        if candidate.endswith("/"):
-            if normalized.startswith(candidate):
-                return True
-            continue
-        if normalized == candidate or normalized.startswith(f"{candidate}/"):
-            return True
-    return False
-
-
-def test_targeted_tests_required(files: list[str], config: dict[str, Any]) -> bool:
-    configured_paths = list(config.get("targeted_test_required_paths", []))
-    if configured_paths:
-        return any(path_matches_any(file_path, configured_paths) for file_path in files)
-
-    for file_path in files:
-        normalized = normalize_repo_file_path(file_path)
-        if normalized.startswith(("src/", "app/", "lib/", "pkg/", "internal/", "cmd/", "crates/", "tests/")):
-            return True
-        if normalized in {"package.json", "package-lock.json", "pyproject.toml", "Cargo.toml", "go.mod", "Makefile", "justfile"}:
-            return True
-    return False
-
-
-def test_build_required(files: list[str], config: dict[str, Any]) -> bool:
-    if not clean_string(config.get("build_command")):
-        return False
-
-    configured_paths = list(config.get("build_required_paths", []))
-    if configured_paths:
-        return any(path_matches_any(file_path, configured_paths) for file_path in files)
-
-    for file_path in files:
-        normalized = normalize_repo_file_path(file_path)
-        if normalized.startswith(("src/", "app/", "lib/", "pkg/", "internal/", "cmd/", "crates/", "assets/", "scripts/")):
-            return True
-        if normalized in {
-            "package.json",
-            "package-lock.json",
-            "pyproject.toml",
-            "Cargo.toml",
-            "go.mod",
-            "Makefile",
-            "justfile",
-            "manifest.json",
-        }:
-            return True
-        if normalized.endswith((".ts", ".tsx", ".js", ".mjs", ".cjs", ".css", ".py", ".rs", ".go")) and not normalized.startswith(
-            ("tests/", "docs/", "automation/")
-        ):
-            return True
-    return False
-
-
-def test_full_test_required(files: list[str], attempt_number: int, config: dict[str, Any]) -> bool:
-    configured_paths = list(config.get("full_test_required_paths", []))
-    cadence_rounds = int(config.get("full_test_cadence_rounds", 0) or 0)
-    if cadence_rounds > 0 and attempt_number > 0 and attempt_number % cadence_rounds == 0:
-        return True
-    return any(path_matches_any(file_path, configured_paths) for file_path in files)
-
-
-def test_deploy_required(files: list[str], config: dict[str, Any]) -> bool:
-    deploy_policy = clean_string(config.get("deploy_policy")).lower()
-    configured_paths = list(config.get("deploy_required_paths", []))
-    if deploy_policy == "always":
-        return True
-    if deploy_policy == "targeted":
-        return any(path_matches_any(file_path, configured_paths) for file_path in files)
-    return bool(config.get("deploy_after_build"))
-
-
-def count_command_occurrences(commands_run: list[str], needle: str) -> int:
-    return sum(str(command).count(needle) for command in commands_run)
-
-
-def test_command_budget_exceeded(commands_run: list[str], config: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    max_git_status = int(config.get("max_git_status_per_round", 0) or 0)
-    max_git_diff_stat = int(config.get("max_git_diff_stat_per_round", 0) or 0)
-
-    git_status_count = count_command_occurrences(commands_run, "git status --short")
-    git_diff_stat_count = count_command_occurrences(commands_run, "git diff --stat")
-
-    if max_git_status > 0 and git_status_count > max_git_status:
-        errors.append(
-            f"commands_run used 'git status --short' {git_status_count} times, exceeding limit {max_git_status}."
-        )
-    if max_git_diff_stat > 0 and git_diff_stat_count > max_git_diff_stat:
-        errors.append(
-            f"commands_run used 'git diff --stat' {git_diff_stat_count} times, exceeding limit {max_git_diff_stat}."
-        )
-    return errors
-
-
-def command_matches_full_test(command: str, full_test_command: str) -> bool:
-    return clean_string(command) == clean_string(full_test_command)
-
-
-def command_matches_targeted_test(command: str, targeted_prefixes: list[str]) -> bool:
-    normalized_command = clean_string(command)
-    if not normalized_command:
-        return False
-    return any(normalized_command.startswith(clean_string(prefix)) for prefix in targeted_prefixes if clean_string(prefix))
-
-
-def tests_run_include_exact(tests_run: list[str], command: str) -> bool:
-    normalized_command = clean_string(command)
-    if not normalized_command:
-        return True
-    return any(clean_string(test_command) == normalized_command for test_command in tests_run)
-
-
-def test_runs_include_targeted_tests(tests_run: list[str], config: dict[str, Any]) -> bool:
-    targeted_prefixes = [str(prefix) for prefix in config.get("targeted_test_prefixes", [])]
-    return any(command_matches_targeted_test(str(command), targeted_prefixes) for command in tests_run)
-
-
-def test_runs_include_full_test(tests_run: list[str], config: dict[str, Any]) -> bool:
-    full_test_command = clean_string(config.get("full_test_command"))
-    if not full_test_command:
-        return True
-    return any(command_matches_full_test(str(command), full_test_command) for command in tests_run)
-
-
-def test_deployed_build_id(verify_path: str, build_id: str) -> bool:
-    deployed_artifact_path = Path(verify_path)
-    if not deployed_artifact_path.exists():
-        return False
-    return build_id in deployed_artifact_path.read_text(encoding="utf-8", errors="replace")
-
-
 def count_vulture_findings(output_text: str) -> int:
     lines = [line.strip() for line in output_text.splitlines() if line.strip()]
     if not lines:
@@ -926,6 +773,27 @@ def refresh_vulture_metrics(state: dict[str, Any], config: dict[str, Any]) -> No
     state["vulture_current_count"] = current_count
     state["vulture_delta"] = None if previous_count is None else current_count - int(previous_count)
     state["vulture_last_error"] = None
+
+
+def build_runner_support() -> RunnerSupport:
+    return RunnerSupport(
+        repo_root=REPO_ROOT,
+        error_type=AutopilotError,
+        clean_string=clean_string,
+        compact_text=compact_text,
+        progress=progress,
+        get_codex_event_summary=get_codex_event_summary,
+        windows_hidden_process_kwargs=windows_hidden_process_kwargs,
+    )
+
+
+def build_validation_support() -> ValidationSupport:
+    return ValidationSupport(
+        clean_string=clean_string,
+        resolve_repo_path=resolve_repo_path,
+        run_git=run_git,
+        info=info,
+    )
 
 
 def format_metric_delta(value: Any) -> str:
@@ -1136,193 +1004,6 @@ def get_codex_event_summary(json_line: str) -> str | None:
     return None
 
 
-def validate_schema_value(name: str, value: Any, property_schema: dict[str, Any]) -> str | None:
-    allowed_types = property_schema.get("type")
-    if allowed_types:
-        type_names = [allowed_types] if isinstance(allowed_types, str) else list(allowed_types)
-        allowed_python_types = tuple(
-            python_type
-            for type_name in type_names
-            for python_type in SCHEMA_REQUIRED_TYPES.get(type_name, ())
-        )
-        if allowed_python_types and not isinstance(value, allowed_python_types):
-            return f"{name} has invalid type."
-
-    enum_values = property_schema.get("enum")
-    if enum_values and value not in enum_values:
-        return f"{name} must be one of: {', '.join(map(str, enum_values))}."
-
-    min_length = property_schema.get("minLength")
-    if isinstance(min_length, int) and isinstance(value, str) and len(value) < min_length:
-        return f"{name} must be at least {min_length} characters."
-
-    if property_schema.get("type") == "array" and isinstance(value, list):
-        item_schema = property_schema.get("items")
-        if isinstance(item_schema, dict):
-            for index, item in enumerate(value):
-                item_error = validate_schema_value(f"{name}[{index}]", item, item_schema)
-                if item_error:
-                    return item_error
-
-    return None
-
-
-def validate_result_shape(result: Any, schema: dict[str, Any]) -> list[str]:
-    errors: list[str] = []
-    if not isinstance(result, dict):
-        return ["Agent output must be a JSON object."]
-
-    required_fields = schema.get("required", [])
-    for field_name in required_fields:
-        if field_name not in result:
-            errors.append(f"Agent output is missing required field '{field_name}'.")
-
-    if schema.get("additionalProperties") is False:
-        allowed_fields = set((schema.get("properties") or {}).keys())
-        for field_name in result.keys():
-            if field_name not in allowed_fields:
-                errors.append(f"Agent output includes unexpected field '{field_name}'.")
-
-    for field_name, property_schema in (schema.get("properties") or {}).items():
-        if field_name not in result:
-            continue
-        field_error = validate_schema_value(field_name, result[field_name], property_schema)
-        if field_error:
-            errors.append(field_error)
-
-    return errors
-
-
-def resolve_runner_executable(config: dict[str, Any]) -> str:
-    runner_kind = clean_string(config.get("runner_kind")).lower() or "codex"
-    if runner_kind != "codex":
-        raise AutopilotError(
-            f"runner_kind='{runner_kind}' is not implemented by this scaffold yet. "
-            "Use runner_kind='codex' or replace the runner seam deliberately."
-        )
-
-    configured_runner = clean_string(config.get("runner_command"))
-    if configured_runner:
-        resolved = shutil.which(configured_runner)
-        if resolved:
-            return resolved
-        runner_path = Path(configured_runner)
-        if runner_path.exists():
-            return str(runner_path)
-        raise AutopilotError(f"Configured runner_command was not found: {configured_runner}")
-
-    return shutil.which("codex.cmd") or shutil.which("codex") or "codex"
-
-
-def invoke_runner_round(
-    *,
-    prompt_path: Path,
-    schema_path: Path,
-    assistant_output_path: Path,
-    events_log_path: Path,
-    progress_log_path: Path,
-    config: dict[str, Any],
-) -> int:
-    prompt_text = prompt_path.read_bytes()
-    runner_kind = clean_string(config.get("runner_kind")).lower() or "codex"
-    if runner_kind != "codex":
-        raise AutopilotError(f"runner_kind='{runner_kind}' is not supported by this runner.")
-
-    codex_executable = resolve_runner_executable(config)
-    codex_args = [
-        codex_executable,
-        "exec",
-        "-C",
-        str(REPO_ROOT),
-        "--dangerously-bypass-approvals-and-sandbox",
-        "--json",
-        "--color",
-        "never",
-        "--output-schema",
-        str(schema_path),
-        "-o",
-        str(assistant_output_path),
-    ]
-
-    model_name = clean_string(config.get("runner_model"))
-    if model_name:
-        codex_args.extend(["-m", model_name])
-
-    for additional_directory in config.get("runner_additional_dirs", []):
-        directory_text = clean_string(additional_directory)
-        if directory_text:
-            codex_args.extend(["--add-dir", directory_text])
-
-    for extra_arg in config.get("runner_extra_args", []):
-        extra_arg_text = clean_string(extra_arg)
-        if extra_arg_text:
-            codex_args.append(extra_arg_text)
-
-    codex_args.append("-")
-
-    stderr_log_path = events_log_path.with_suffix(".stderr.log")
-    for log_path in (events_log_path, progress_log_path, stderr_log_path):
-        if log_path.exists():
-            log_path.unlink()
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.write_text("", encoding="utf-8")
-
-    process = subprocess.Popen(
-        codex_args,
-        cwd=str(REPO_ROOT),
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=False,
-        **windows_hidden_process_kwargs(),
-    )
-
-    if not process.stdin or not process.stdout or not process.stderr:
-        raise AutopilotError("Failed to start codex subprocess with redirected pipes.")
-    stdin_pipe = cast(BinaryIO, process.stdin)
-    stdout_pipe = cast(BinaryIO, process.stdout)
-    stderr_pipe = cast(BinaryIO, process.stderr)
-
-    def stdout_worker() -> None:
-        with events_log_path.open("a", encoding="utf-8", newline="\n") as events_handle:
-            while True:
-                stdout_line = stdout_pipe.readline()
-                if not stdout_line:
-                    break
-                decoded_line = stdout_line.decode("utf-8", errors="replace").rstrip("\r\n")
-                events_handle.write(decoded_line + "\n")
-                events_handle.flush()
-                summary = get_codex_event_summary(decoded_line)
-                if summary:
-                    progress(progress_log_path, summary)
-
-    def stderr_worker() -> None:
-        with stderr_log_path.open("a", encoding="utf-8", newline="\n") as stderr_handle:
-            while True:
-                stderr_line = stderr_pipe.readline()
-                if not stderr_line:
-                    break
-                decoded_line = stderr_line.decode("utf-8", errors="replace").rstrip("\r\n")
-                stderr_handle.write(decoded_line + "\n")
-                stderr_handle.flush()
-                if decoded_line.strip():
-                    progress(progress_log_path, compact_text(decoded_line, max_length=220), channel="stderr")
-
-    stdout_thread = threading.Thread(target=stdout_worker, daemon=True)
-    stderr_thread = threading.Thread(target=stderr_worker, daemon=True)
-    stdout_thread.start()
-    stderr_thread.start()
-
-    stdin_pipe.write(prompt_text)
-    stdin_pipe.flush()
-    stdin_pipe.close()
-
-    return_code = process.wait()
-    stdout_thread.join()
-    stderr_thread.join()
-    return return_code
-
-
 def build_history_entry(
     *,
     attempt_number: int,
@@ -1363,140 +1044,6 @@ def advance_lane_after_nonfailure(state: dict[str, Any], config: dict[str, Any],
     state["status"] = "complete"
 
 
-def validate_round_result(
-    *,
-    attempt_number: int,
-    result: dict[str, Any],
-    schema: dict[str, Any],
-    phase_doc_relative_path: str,
-    expected_lane_id: str,
-    config: dict[str, Any],
-    ending_head: str,
-    working_tree_dirty: bool,
-) -> str | None:
-    validation_errors = validate_result_shape(result, schema)
-
-    if validation_errors:
-        return " ".join(validation_errors)
-
-    status = clean_string(result.get("status"))
-    reported_lane_id = clean_string(result.get("lane_id"))
-    if reported_lane_id != expected_lane_id:
-        validation_errors.append(
-            f"Result lane_id '{reported_lane_id}' does not match active lane '{expected_lane_id}'."
-        )
-
-    if status == "success":
-        phase_doc_path_from_result = clean_string(result.get("phase_doc_path"))
-        if not phase_doc_path_from_result:
-            validation_errors.append("success result is missing phase_doc_path.")
-        elif phase_doc_path_from_result != phase_doc_relative_path:
-            validation_errors.append(
-                f"success result phase_doc_path '{phase_doc_path_from_result}' does not match expected '{phase_doc_relative_path}'."
-            )
-        elif not resolve_repo_path(phase_doc_path_from_result).exists():
-            validation_errors.append(f"phase doc '{phase_doc_path_from_result}' does not exist.")
-
-        commit_sha = clean_string(result.get("commit_sha"))
-        if not commit_sha:
-            validation_errors.append("success result is missing commit_sha.")
-
-        commit_message = clean_string(result.get("commit_message"))
-        if not commit_message:
-            validation_errors.append("success result is missing commit_message.")
-
-        if commit_sha and ending_head != commit_sha:
-            validation_errors.append(f"HEAD '{ending_head}' does not match commit_sha '{commit_sha}'.")
-
-        if commit_sha:
-            actual_commit_message = run_git(["log", "-1", "--pretty=%s", commit_sha]).stdout
-            if actual_commit_message != commit_message:
-                validation_errors.append(
-                    f"Actual commit message '{actual_commit_message}' does not match reported '{commit_message}'."
-                )
-
-            commit_prefix = f"{clean_string(config.get('commit_prefix'))}:"
-            if commit_prefix != ":" and not actual_commit_message.lower().startswith(commit_prefix.lower()):
-                validation_errors.append(f"Commit message must start with '{commit_prefix}'.")
-
-            validated_commit_files = get_commit_files(commit_sha)
-            if test_build_required(validated_commit_files, config) and not bool(result.get("build_ran")):
-                validation_errors.append("This round changed build-relevant files but reported build_ran=false.")
-
-            tests_run = [str(command) for command in result.get("tests_run", [])]
-            lint_command = clean_string(config.get("lint_command"))
-            if lint_command and not tests_run_include_exact(tests_run, lint_command):
-                validation_errors.append(f"This round did not report configured lint command '{lint_command}'.")
-
-            typecheck_command = clean_string(config.get("typecheck_command"))
-            if typecheck_command and not tests_run_include_exact(tests_run, typecheck_command):
-                validation_errors.append(
-                    f"This round did not report configured typecheck command '{typecheck_command}'."
-                )
-
-            if bool(config.get("targeted_test_required")) and test_targeted_tests_required(validated_commit_files, config):
-                if not test_runs_include_targeted_tests(tests_run, config):
-                    validation_errors.append("This round changed code/test files but did not report targeted tests.")
-
-            if test_full_test_required(validated_commit_files, attempt_number, config):
-                if not test_runs_include_full_test(tests_run, config):
-                    validation_errors.append(
-                        "This round required full test coverage but did not report the configured full test command."
-                    )
-
-            validation_errors.extend(
-                test_command_budget_exceeded([str(command) for command in result.get("commands_run", [])], config)
-            )
-
-        build_id = clean_string(result.get("build_id"))
-        if bool(result.get("build_ran")) and not build_id:
-            validation_errors.append("build_ran=true requires a non-empty build_id.")
-
-        validated_commit_files = get_commit_files(commit_sha) if commit_sha else []
-        deploy_required = test_deploy_required(validated_commit_files, config)
-
-        if bool(result.get("build_ran")) and deploy_required and not bool(result.get("deploy_ran")):
-            validation_errors.append("This round required deployment after build but reported deploy_ran=false.")
-
-        if bool(result.get("deploy_ran")) and not deploy_required:
-            info("Result reported deployment for a non-deploy-required round; allowing it.")
-
-        if bool(result.get("deploy_ran")) and not bool(result.get("deploy_verified")):
-            validation_errors.append("deploy_ran=true requires deploy_verified=true.")
-
-        deploy_verify_path = clean_string(config.get("deploy_verify_path"))
-        if (
-            bool(result.get("deploy_ran"))
-            and build_id
-            and deploy_verify_path
-            and not test_deployed_build_id(deploy_verify_path, build_id)
-        ):
-            validation_errors.append(f"Deploy verification artifact does not contain BUILD_ID '{build_id}'.")
-
-        if working_tree_dirty:
-            validation_errors.append("Working tree is dirty after success commit.")
-
-    elif status == "failure":
-        blocking_reason = clean_string(result.get("blocking_reason"))
-        if not blocking_reason:
-            validation_errors.append("Agent reported failure without blocking_reason.")
-        else:
-            return " ".join(validation_errors + [blocking_reason]) if validation_errors else blocking_reason
-    elif status == "goal_complete":
-        if working_tree_dirty:
-            validation_errors.append("goal_complete returned with a dirty working tree.")
-        else:
-            goal_commit_sha = clean_string(result.get("commit_sha"))
-            if goal_commit_sha and goal_commit_sha != ending_head:
-                validation_errors.append(
-                    f"goal_complete reported commit_sha '{goal_commit_sha}' but HEAD is '{ending_head}'."
-                )
-    else:
-        validation_errors.append(f"Unknown agent status '{status}'.")
-
-    return " ".join(validation_errors) if validation_errors else None
-
-
 def get_current_branch() -> str:
     return run_git(["branch", "--show-current"]).stdout
 
@@ -1521,8 +1068,14 @@ def run_start(args: argparse.Namespace) -> int:
 
     schema_path = resolve_repo_path(str(config["result_schema"]))
     schema = read_json(schema_path)
+    runner_support = build_runner_support()
+    validation_support = build_validation_support()
 
-    runner_executable = resolve_runner_executable(config)
+    runner_executable = resolve_runner_executable(
+        config,
+        clean_string=runner_support.clean_string,
+        error_type=runner_support.error_type,
+    )
     missing_commands = ensure_commands_available(["git"])
     if runner_executable == "codex":
         missing_commands.extend(ensure_commands_available(["codex"]))
@@ -1643,6 +1196,7 @@ def run_start(args: argparse.Namespace) -> int:
                 events_log_path=events_log_path,
                 progress_log_path=progress_log_path,
                 config=config,
+                support=runner_support,
             )
             rounds_executed += 1
 
@@ -1686,6 +1240,7 @@ def run_start(args: argparse.Namespace) -> int:
                     config=round_config,
                     ending_head=ending_head,
                     working_tree_dirty=working_tree_dirty,
+                    support=validation_support,
                 )
 
             state["current_round"] = int(state["current_round"]) + 1
@@ -2374,7 +1929,12 @@ def run_doctor(args: argparse.Namespace) -> int:
         failures += 1
 
     try:
-        runner_path = resolve_runner_executable(config)
+        runner_support = build_runner_support()
+        runner_path = resolve_runner_executable(
+            config,
+            clean_string=runner_support.clean_string,
+            error_type=runner_support.error_type,
+        )
         print(f"[doctor] ok   runner command: {runner_path}")
     except AutopilotError as exc:
         print(f"[doctor] fail runner command: {exc}")

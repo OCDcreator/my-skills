@@ -38,11 +38,18 @@ def load_module_from_path(path: Path, module_name: str):
     spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
+    module_parent = str(path.parent)
+    inserted_path = False
+    if module_parent not in sys.path:
+        sys.path.insert(0, module_parent)
+        inserted_path = True
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
     finally:
         sys.modules.pop(module_name, None)
+        if inserted_path and sys.path and sys.path[0] == module_parent:
+            sys.path.pop(0)
     return module
 
 
@@ -117,6 +124,9 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertTrue(marker["scaffold_version"])
                 autopilot_text = (repo_root / "automation" / "autopilot.py").read_text(encoding="utf-8")
                 self.assertIn("AUTOPILOT_SCAFFOLD_VERSION", autopilot_text)
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "__init__.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "runner.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "validation.py").exists())
                 version_result = subprocess.run(
                     [sys.executable, str(repo_root / "automation" / "autopilot.py"), "version"],
                     cwd=repo_root,
@@ -128,6 +138,24 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 )
                 self.assertEqual(version_result.returncode, 0, version_result.stderr)
                 self.assertIn(marker["scaffold_version"], version_result.stdout)
+                compile_result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "py_compile",
+                        str(repo_root / "automation" / "autopilot.py"),
+                        str(repo_root / "automation" / "_autopilot" / "__init__.py"),
+                        str(repo_root / "automation" / "_autopilot" / "runner.py"),
+                        str(repo_root / "automation" / "_autopilot" / "validation.py"),
+                    ],
+                    cwd=repo_root,
+                    text=True,
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    check=False,
+                )
+                self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
 
     def test_older_scaffold_auto_upgrades_common_files_without_overwriting_queue_config(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
