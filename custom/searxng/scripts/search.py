@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 from typing import Optional
 
-SEARXNG_URL = "http://192.168.31.98:9900"
+SEARXNG_URL = "http://192.168.31.147:9900"
 
 
 def search(

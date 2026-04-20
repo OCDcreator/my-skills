@@ -2,7 +2,7 @@
 # SearXNG Search Script
 # Usage: search.sh "query" [num_results]
 
-SEARXNG_URL="http://192.168.31.98:9900"
+SEARXNG_URL="http://192.168.31.147:9900"
 QUERY="${1:-test}"
 NUM="${2:-5}"
 
