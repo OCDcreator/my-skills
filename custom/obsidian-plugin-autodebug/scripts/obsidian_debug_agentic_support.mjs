@@ -60,6 +60,14 @@ const SIGNAL_DEFINITIONS = [
     vaultPatterns: [/\bdevtools?\b/i, /\bhot[-:_ ]reload\b/i, /\bcdp\b/i],
   },
   {
+    id: 'playwrightMcp',
+    label: 'Playwright MCP',
+    packagePatterns: [/@playwright\/mcp/i, /playwright[-_]?mcp/i],
+    scriptPatterns: [/playwright[-_]?mcp/i, /browser_(?:snapshot|click|fill|take_screenshot)/i],
+    filePatterns: [/@playwright\/mcp/i, /playwright[-_]?mcp/i, /browser_(?:snapshot|click|fill|take_screenshot)/i],
+    vaultPatterns: [/playwright[-_]?mcp/i],
+  },
+  {
     id: 'aiPlugin',
     label: 'AI plugin',
     packagePatterns: [/^openai$/i, /^anthropic$/i, /^@anthropic-ai\//i, /^@google\/genai$/i, /^langchain/i, /\bllm\b/i],
@@ -571,6 +579,7 @@ async function probeRestControlSurface({
 function buildControlSurfaces({ signals, runtimeProbes }) {
   const mcpRestDetected = Boolean(signals.mcp?.present || signals.rest?.present || runtimeProbes.rest.configured);
   const devtoolsDetected = Boolean(signals.devtools?.present);
+  const playwrightMcpDetected = Boolean(signals.playwrightMcp?.present);
 
   return {
     mcpRest: {
@@ -588,6 +597,14 @@ function buildControlSurfaces({ signals, runtimeProbes }) {
       detail: devtoolsDetected
         ? 'DevTools/CDP/MCP-like heuristic signals were detected; attach target and MCP runtime still need confirmation.'
         : 'No DevTools MCP heuristic signals were detected.',
+    },
+    playwrightMcp: {
+      detected: playwrightMcpDetected,
+      available: false,
+      source: 'heuristic-signals',
+      detail: playwrightMcpDetected
+        ? 'Playwright MCP heuristic signals were detected; agent runtime tool availability and target selection still need confirmation.'
+        : 'No Playwright MCP heuristic signals were detected.',
     },
     aiPlugin: {
       detected: Boolean(signals.aiPlugin?.present),
@@ -617,6 +634,9 @@ function buildRecommendations({ aiSafety, controlSurfaces, runtimeProbes }) {
   }
   if (controlSurfaces.mcpRest.detected && !runtimeProbes.rest.configured) {
     recommendations.push('Probe MCP/REST runtime endpoints with --rest-base-url before trusting tool availability.');
+  }
+  if (controlSurfaces.playwrightMcp?.detected) {
+    recommendations.push('Confirm Playwright MCP tool availability and target selection before using it for locator or screenshot steps.');
   }
   if (runtimeProbes.rest.configured && !runtimeProbes.rest.localhost) {
     recommendations.push('Review non-local MCP/REST endpoint exposure before handing control to another agent.');

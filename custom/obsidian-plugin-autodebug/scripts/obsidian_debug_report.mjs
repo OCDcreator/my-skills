@@ -636,6 +636,12 @@ const html = `<!doctype html>
           return `<span class="badge ${escapeHtml(normalizeAgentSurfaceClass(status))}">${escapeHtml(name)}: ${escapeHtml(status)}</span>`;
         }).join('') || '<span class="badge skipped">No control surfaces</span>'}
       </p>
+      <p>
+        ${Object.values(agentTools.controlBackends?.backends ?? {}).map((backend) => {
+          const status = backend.available ? 'available' : backend.detected ? 'detected' : 'missing';
+          return `<span class="badge ${escapeHtml(normalizeAgentSurfaceClass(status))}">${escapeHtml(backend.id ?? backend.label ?? 'backend')}: ${escapeHtml(status)}</span>`;
+        }).join('') || '<span class="badge skipped">No control backends</span>'}
+      </p>
       <p><strong>Top actions</strong></p>
       <ul>${renderList((agentTools.safeActions ?? []).slice(0, 4), (entry) => `<li><strong>${escapeHtml(entry.label ?? entry.id ?? 'Action')}</strong>${entry.command ? ` — <code>${escapeHtml(entry.command)}</code>` : ''}</li>`)}</ul>
       <p><strong>Top warnings</strong></p>

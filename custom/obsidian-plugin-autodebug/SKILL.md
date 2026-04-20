@@ -73,6 +73,8 @@ Use `references/agentic-control-surfaces.md` to choose the control lane by task.
 - vault-content-only MCP surfaces;
 - MCP server inspection surfaces.
 
+When another agent needs an explicit switchboard, generate `control-backends.json` with `scripts/obsidian_debug_control_backend_support.mjs`. It maps capabilities such as reload, console capture, DOM, screenshot, scenario, locator actions, and visual review to `obsidian-cli`, bundled CDP, REST/MCP, Chrome DevTools MCP, repo Playwright, or Playwright MCP. Local scripts directly execute CLI/CDP/Playwright-script backends; MCP/REST entries are routing descriptors until the current agent runtime exposes callable tools.
+
 ## Preconditions
 
 Before editing or running a long loop, quickly detect:
@@ -91,7 +93,7 @@ If the repo already has a release/deploy script or skill, reuse it instead of in
 | Situation | Preferred path |
 | --- | --- |
 | Existing plugin repo | Copy `job-specs/generic-debug-job.template.json`, tailor runtime/build/deploy values, run doctor, dry-run, then execute. |
-| No plugin repo yet, production scaffold needed | Start from `generator-obsidian-plugin`. |
+| No plugin repo yet, production scaffold needed | Read `references/plugin-development-tooling.md`, then start from `generator-obsidian-plugin` or the official sample plugin. |
 | No plugin repo yet, minimal debug fixture needed | Use `scripts/obsidian_debug_scaffold_plugin.mjs` when you want a lightweight fixture plus test vault, job spec, assertions, scenario, and CI templates. |
 | Obsidian app is closed or the wrong vault is focused | Use `scripts/obsidian_debug_launch_app.mjs` or let the cycle wrappers/job spec auto-launch first, then continue doctor/reload/capture. |
 | CLI developer commands work | Use CLI-first reload/log/screenshot/DOM capture. |
@@ -110,8 +112,9 @@ For exact commands, read `references/command-reference.md`.
 5. **Reload**: use `obsidian plugin:reload id=<plugin-id>` first. Fall back to disable/enable or CDP only when reload is unavailable or stuck.
 6. **Capture**: clear stale buffers, watch console/errors, capture screenshot and DOM/CSS evidence, and run any configured scenario. If the target vault intentionally enables `Logstravaganza`, treat its NDJSON files as a persistent secondary log source alongside CLI/CDP capture and preserve the discovered source metadata in the generated `vault-log-capture.json`.
 7. **Generate diagnosis**: wrappers and `scripts/obsidian_debug_job.mjs` write `diagnosis.json` automatically; for a manual path, run `scripts/obsidian_debug_analyze.mjs --summary .obsidian-debug/summary.json --assertions assertions/plugin-view-health.template.json --output .obsidian-debug/diagnosis.json`.
-8. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
-9. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
+8. **Create review/handoff artifacts**: generate `visual-review.json/html` when a screenshot exists, and generate `agent-tools.json` plus `control-backends.json` when another model will continue the run.
+9. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
+10. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
 
 Save runtime artifacts under `.obsidian-debug/` or another repo-local debug folder. Do not commit raw runtime logs unless the user asks.
 
@@ -148,6 +151,8 @@ The scenario runner resolves surface-opening strategies in this order:
 3. CDP DOM heuristics.
 
 `scenario-report.json` records the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, and empty states.
+
+For screenshot-based GUI handoff, run `scripts/obsidian_debug_visual_review.mjs` after diagnosis. The generated `visual-review.html` is useful for human review of blank panes, visible errors, clipped text, contrast, obvious layout regressions, and target surface reachability. It does **not** replace reliable manual GUI validation for hover/focus/drag behavior, keyboard feel, timing-sensitive animation, or final official-review judgment. Back critical visual findings with DOM/text/log assertions whenever possible.
 
 ## Performance Debugging Pattern
 
@@ -202,6 +207,8 @@ When the surrounding repo or target vault already uses these tools, integrate wi
 - `generator-obsidian-plugin`: recommend it when the user wants a real plugin project scaffold rather than a minimal debug fixture.
 - `semantic-release-obsidian-plugin`: release automation belongs in `obsidian-plugin-release-manager`, not the default autodebug loop.
 
+For from-zero plugin architecture, read `references/plugin-development-tooling.md` and encode official rule themes early: naming/release hygiene, command/UI style, lifecycle cleanup, mobile compatibility, network/privacy disclosure, data API choices, and startup performance.
+
 ## CDP Fallback
 
 Use CDP when:
@@ -216,7 +223,7 @@ Before CDP work, auto-launch the app if it is closed, then probe the target list
 
 Auto-launch can open Obsidian and the target vault, but it cannot retroactively add a debug port to an already-running desktop instance on every platform. In CDP mode, the helper now performs one automatic restart fallback on Windows or macOS before failing. The platform helpers are `scripts/obsidian_windows_restart_cdp.ps1` and `scripts/obsidian_mac_restart_cdp.sh`.
 
-If the agent runtime already exposes `obsidian-devtools-mcp` or another DevTools MCP surface attached to the Obsidian Electron target, that can replace the bundled CDP scripts as an alternate control surface. This is an optional path; keep the built-in scripts as the portable fallback.
+If the agent runtime already exposes `obsidian-devtools-mcp`, Chrome DevTools MCP, or Playwright MCP attached to the Obsidian Electron target, route through `control-backends.json` before choosing the lane. These MCP backends can replace specific capture/locator steps when callable tools exist, but keep the bundled CLI/CDP scripts as the portable fallback.
 
 ## Optional AI-Plugin Safety And Review-Readiness Support
 
@@ -225,9 +232,9 @@ Use these as optional support gates after baseline doctor/smoke loops, not as bl
 - AI-plugin safety checks: secret storage, redaction, network/tool boundary hints.
 - Official review-readiness heuristics: manifest hygiene, sample residue, logging/DOM/network disclosure checks.
 
-Doctor emits these as advisory checks such as `ai-plugin-secret-storage`, `ai-plugin-network-boundary`, `mcp-rest-security`, and `agentic-control-surfaces`. When a local REST/MCP bridge is available, pass `--agentic-rest-base-url` plus an API key placeholder or environment-backed value; never paste secrets into handoff artifacts.
+Doctor emits these as advisory checks such as `ai-plugin-secret-storage`, `ai-plugin-network-boundary`, `mcp-rest-security`, `agentic-control-surfaces`, `control-backend-routing`, and `visual-review-pack`. When a local REST/MCP bridge is available, pass `--agentic-rest-base-url` plus an API key placeholder or environment-backed value; never paste secrets into handoff artifacts.
 
-References: `references/review-readiness.md` and `references/agentic-control-surfaces.md`.
+References: `references/review-readiness.md`, `references/agentic-control-surfaces.md`, and `references/plugin-development-tooling.md`.
 These checks are heuristic and advisory; they are not official Obsidian approval outcomes.
 
 ## CI, Optional E2E, And Release-Adjacent Checks
@@ -262,6 +269,8 @@ If diagnosis is inconclusive, inspect raw console/CDP logs and consider adding a
 - `fixtures/testing-framework-smoke-plugin/`: optional `obsidian-testing-framework` fixture with a repo-owned adapter config and CI dry-run job sample.
 - `fixtures/obsidian-e2e-smoke-plugin/`: optional Vitest-style `obsidian-e2e` fixture with repo-owned adapter config and CI dry-run job sample.
 - `fixtures/wdio-obsidian-service-smoke-plugin/`: optional WebdriverIO-style `wdio-obsidian-service` fixture with repo-owned adapter config and CI dry-run job sample.
+- `scripts/obsidian_debug_visual_review_smoke.mjs`: verifies screenshot/DOM/scenario evidence becomes a human-review-gated visual pack.
+- `scripts/obsidian_debug_control_backend_smoke.mjs`: verifies capability routing across CLI, CDP, REST/MCP, DevTools MCP, and Playwright lanes.
 - `evals/evals.json`: behavior prompts for evaluating whether the skill still covers common autodebug workflows.
 
 ## Final Report Format
@@ -289,3 +298,4 @@ Summarize important log lines with artifact paths and line numbers. Do not paste
 - Using screenshots as the only assertion when stable DOM/text checks are available.
 - Mixing cold-start and warm-start timings in the same baseline class.
 - Putting desktop-only Obsidian phases into CI instead of local smoke workflows.
+- Claiming full manual GUI validation from a screenshot or visual diff alone.

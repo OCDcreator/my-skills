@@ -27,6 +27,7 @@ import {
 } from './obsidian_debug_hot_reload_support.mjs';
 import { detectAdapterSupport } from './obsidian_debug_adapter_support.mjs';
 import { detectAgenticSupport } from './obsidian_debug_agentic_support.mjs';
+import { detectControlBackends } from './obsidian_debug_control_backend_support.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
 import { discoverLogstravaganzaCapture } from './obsidian_debug_logstravaganza.mjs';
 import {
@@ -1276,6 +1277,57 @@ try {
   );
 }
 
+const controlBackends = detectControlBackends({
+  doctorDocument: {
+    repoDir,
+    obsidianCommand,
+    vaultName,
+    cdp: {
+      host: cdpHost,
+      port: cdpPort,
+      available: checks.some((entry) => entry.id === 'cdp-target' && entry.status === 'pass'),
+    },
+    checks,
+    adapterLanes: adapterSupport.adapters,
+    agenticSupport,
+  },
+});
+const availableControlBackends = Object.values(controlBackends.backends).filter((entry) => entry.available);
+const detectedControlBackends = Object.values(controlBackends.backends).filter((entry) => entry.detected);
+checks.push(
+  check(
+    availableControlBackends.length > 0 ? 'pass' : detectedControlBackends.length > 0 ? 'warn' : 'info',
+    'control-backend-routing',
+    'control-backend',
+    availableControlBackends.length > 0
+      ? `Control backend abstraction has available backend(s): ${availableControlBackends.map((entry) => entry.id).join(', ')}.`
+      : detectedControlBackends.length > 0
+        ? `Control backend abstraction detected backend(s) that still need runtime confirmation: ${detectedControlBackends.map((entry) => entry.id).join(', ')}.`
+        : 'No runtime control backend is confirmed; use doctor fixes to enable CLI/CDP before running GUI capture.',
+    {
+      backends: controlBackends.backends,
+      selections: controlBackends.selections,
+      recommendations: controlBackends.recommendations,
+      boundary: controlBackends.boundary,
+    },
+  ),
+);
+checks.push(
+  check(
+    controlBackends.selections.visualReview?.backendId ? 'info' : 'warn',
+    'visual-review-pack',
+    'visual',
+    controlBackends.selections.visualReview?.backendId
+      ? `Visual review pack can be generated after screenshot capture via ${controlBackends.selections.visualReview.backendId}; it remains a human-review artifact, not proof of full manual GUI validation.`
+      : 'No screenshot-capable backend was routed for visual review; enable CLI/CDP/Playwright capture first.',
+    {
+      selection: controlBackends.selections.visualReview ?? null,
+      script: path.join(toolRoot, 'scripts', 'obsidian_debug_visual_review.mjs'),
+      canReplaceManualGuiValidation: false,
+    },
+  ),
+);
+
 const status = checks.reduce((current, entry) => (statusRank(entry.status) > statusRank(current) ? entry.status : current), 'pass');
 const categoryCounts = checks.reduce((counts, entry) => {
   counts[entry.category] = counts[entry.category] ?? { pass: 0, info: 0, warn: 0, fail: 0 };
@@ -1338,6 +1390,7 @@ const report = {
   },
   preflight: preflightSupport,
   adapterLanes: adapterSupport.adapters,
+  controlBackends,
   ecosystem: {
     tools: ecosystemSupport.tools,
     scripts: ecosystemSupport.scripts,

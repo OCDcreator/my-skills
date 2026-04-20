@@ -18,8 +18,10 @@ Important boundary:
 
 ## Upstream References
 
+- Obsidian self-critique checklist: <https://docs.obsidian.md/oo/plugin>
 - Plugin guidelines: <https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines>
 - Submit your plugin: <https://docs.obsidian.md/Plugins/Releasing/Submit+your+plugin>
 - TypeScript API (requestUrl): <https://docs.obsidian.md/Reference/TypeScript+API/requestUrl>
 - TypeScript API (SecretStorage): <https://docs.obsidian.md/Reference/TypeScript+API/SecretStorage>
+- Official ESLint plugin: <https://github.com/obsidianmd/eslint-plugin>
 - Developer docs source repo: <https://github.com/obsidianmd/obsidian-developer-docs>
