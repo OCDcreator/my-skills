@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.0.1"
+SCAFFOLD_VERSION = "1.0.2"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 
 ALLOWED_SOURCE_SUFFIXES = {
@@ -703,6 +703,13 @@ def render_template_tree(
     return results
 
 
+def merge_render_results(*result_maps: dict[str, str]) -> dict[str, str]:
+    merged: dict[str, str] = {}
+    for result_map in result_maps:
+        merged.update(result_map)
+    return merged
+
+
 def ensure_gitignore_entries(repo_root: Path, entries: list[str], *, force: bool) -> str:
     gitignore_path = repo_root / ".gitignore"
     if not gitignore_path.exists():
@@ -852,7 +859,6 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         raise ScaffoldError(f"Preset template directory not found: {preset_root}")
 
     common_conflict_policy = "overwrite" if existing_scaffold.needs_auto_upgrade else "error"
-    preset_conflict_policy = "preserve" if existing_scaffold.needs_auto_upgrade else "error"
     common_results = render_template_tree(
         common_root,
         repo_root,
@@ -860,13 +866,31 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         force=args.force,
         on_conflict=common_conflict_policy,
     )
-    preset_results = render_template_tree(
-        preset_root,
-        repo_root,
-        tokens,
-        force=args.force,
-        on_conflict=preset_conflict_policy,
-    )
+    if existing_scaffold.needs_auto_upgrade:
+        preset_results = merge_render_results(
+            render_template_tree(
+                preset_root / "automation",
+                repo_root / "automation",
+                tokens,
+                force=args.force,
+                on_conflict="overwrite",
+            ),
+            render_template_tree(
+                preset_root / "docs",
+                repo_root / "docs",
+                tokens,
+                force=args.force,
+                on_conflict="preserve",
+            ),
+        )
+    else:
+        preset_results = render_template_tree(
+            preset_root,
+            repo_root,
+            tokens,
+            force=args.force,
+            on_conflict="error",
+        )
     gitignore_result = ensure_gitignore_entries(
         repo_root,
         [
@@ -883,7 +907,7 @@ def scaffold_repo(args: argparse.Namespace) -> int:
     if existing_scaffold.needs_auto_upgrade:
         print(
             "[scaffold] auto-upgrade: "
-            f"detected scaffold_version={existing_scaffold.version}; refreshed common controller assets and preserved existing preset/config files."
+            f"detected scaffold_version={existing_scaffold.version}; refreshed common assets plus preset automation files, and preserved existing queue docs."
         )
     print("[scaffold] inferred validation commands:")
     print(build_validation_bullets(detection))

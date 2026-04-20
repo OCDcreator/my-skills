@@ -40,7 +40,7 @@ This skill should only scaffold autopilot assets and adjacent docs/config:
 
 Do not refactor the target app itself while scaffolding.
 
-The scaffold now records its deployed version in `automation/autopilot-scaffold-version.json`. When you invoke this skill against a repo that already has an older autopilot scaffold, prefer rerunning `scripts/scaffold_repo.py` without `--force`: it should auto-refresh the shared controller/wrapper assets to the current scaffold version while preserving repo-specific queue docs, prompts, and `automation/autopilot-config.json`.
+The scaffold now records its deployed version in `automation/autopilot-scaffold-version.json`. When you invoke this skill against a repo that already has an older autopilot scaffold, prefer rerunning `scripts/scaffold_repo.py` without `--force`: it should auto-refresh the shared controller/wrapper assets and preset `automation/*` files to the current scaffold version while preserving repo-specific lane queue docs under `docs/status/`.
 
 ## First decide the preset
 
@@ -121,7 +121,7 @@ It also prints:
 
 Commit the scaffold first, because the autopilot controller expects a clean worktree before unattended execution.
 
-If the target repo already has this scaffold and the deployed `scaffold_version` is older than the current skill version, the script should auto-upgrade shared controller assets first. Treat that as a scaffold refresh, not as user intent to regenerate or reset the repo-specific lane docs.
+If the target repo already has this scaffold and the deployed `scaffold_version` is older than the current skill version, the script should auto-upgrade shared controller assets plus preset `automation/*` files first. Treat that as a scaffold refresh, not as user intent to regenerate or reset the repo-specific lane docs.
 
 ### Commit prefix gate
 

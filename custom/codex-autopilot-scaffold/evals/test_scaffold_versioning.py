@@ -203,7 +203,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round", result.stdout)
 
-    def test_older_scaffold_auto_upgrades_common_files_without_overwriting_queue_config(self) -> None:
+    def test_older_scaffold_auto_upgrades_common_files_and_refreshes_preset_automation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))
             first_result = run_scaffold(repo_root)
@@ -225,7 +225,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
             autopilot_path.write_text("# stale controller from old scaffold\n", encoding="utf-8")
             config_path = repo_root / "automation" / "autopilot-config.json"
             config = json.loads(config_path.read_text(encoding="utf-8"))
-            config["objective"] = "Preserve this project-specific queue objective."
+            config["objective"] = "Stale project-specific queue objective."
             config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
 
             upgrade_result = run_scaffold(repo_root)
@@ -235,8 +235,61 @@ class ScaffoldVersioningTests(unittest.TestCase):
             upgraded_marker = read_version_marker(repo_root)
             self.assertNotEqual(upgraded_marker["scaffold_version"], "0.0.1")
             self.assertNotIn("stale controller", autopilot_path.read_text(encoding="utf-8"))
-            preserved_config = json.loads(config_path.read_text(encoding="utf-8"))
-            self.assertEqual(preserved_config["objective"], "Preserve this project-specific queue objective.")
+            refreshed_config = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                refreshed_config["objective"],
+                "Reduce ownership concentration and maintainability hotspots one queued slice at a time while keeping configured validation commands green.",
+            )
+
+    def test_older_scaffold_auto_upgrade_refreshes_preset_automation_but_preserves_lane_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            first_result = run_scaffold(repo_root)
+            self.assertEqual(first_result.returncode, 0, first_result.stderr)
+
+            version_path = repo_root / "automation" / "autopilot-scaffold-version.json"
+            version_path.write_text(
+                json.dumps(
+                    {
+                        "scaffold_name": "codex-autopilot-scaffold",
+                        "scaffold_version": "0.0.1",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            prompt_path = repo_root / "automation" / "round-prompt.md"
+            stale_prompt = "# stale top-level prompt\nRead docs/status/maintainability-round-roadmap.md only.\n"
+            prompt_path.write_text(stale_prompt, encoding="utf-8")
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            stale_config = json.loads(config_path.read_text(encoding="utf-8"))
+            stale_config["focus_hint"] = "Stale focus hint that should be refreshed."
+            stale_config["targeted_test_prefixes"] = []
+            config_path.write_text(json.dumps(stale_config, indent=2) + "\n", encoding="utf-8")
+
+            lane_roadmap_path = repo_root / "docs" / "status" / "lanes" / "m1-hotspot-slice" / "autopilot-round-roadmap.md"
+            preserved_lane_marker = "<!-- preserve lane roadmap edits -->\n"
+            lane_roadmap_path.write_text(preserved_lane_marker + lane_roadmap_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+            upgrade_result = run_scaffold(repo_root)
+
+            self.assertEqual(upgrade_result.returncode, 0, upgrade_result.stderr)
+            self.assertIn("refreshed common assets plus preset automation files", upgrade_result.stdout)
+
+            refreshed_prompt = prompt_path.read_text(encoding="utf-8")
+            self.assertNotIn(stale_prompt.strip(), refreshed_prompt)
+            self.assertIn("{{current_lane_roadmap}}", refreshed_prompt)
+            self.assertIn("Stay inside lane `{{current_lane_id}}`", refreshed_prompt)
+
+            refreshed_config = json.loads(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(refreshed_config["focus_hint"], "R1 - First maintainability / refactor slice")
+            self.assertEqual(refreshed_config["targeted_test_prefixes"], ["npm test --", "npm run test --"])
+
+            preserved_lane_text = lane_roadmap_path.read_text(encoding="utf-8")
+            self.assertTrue(preserved_lane_text.startswith(preserved_lane_marker))
 
     def test_release_lock_removes_matching_lock_even_when_pid_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

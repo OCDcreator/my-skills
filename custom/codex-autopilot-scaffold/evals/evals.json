@@ -52,7 +52,7 @@
     {
       "id": 9,
       "prompt": "这个仓库之前已经装过 repo-local Codex autopilot，但现在技能升级了。我希望你在不重置现有 lane queue 和 autopilot-config 的前提下，把旧 scaffold 自动刷新到当前版本，并明确告诉我怎么检查已部署版本号。",
-      "expected_output": "Assistant should detect an older deployed scaffold version, rerun the bundled scaffold script in upgrade mode, preserve repo-specific queue/config files, refresh common controller assets, and mention the deployed version marker plus `python automation/autopilot.py version`.",
+      "expected_output": "Assistant should detect an older deployed scaffold version, rerun the bundled scaffold script in upgrade mode, refresh common controller assets plus preset automation files, preserve repo-specific lane queue docs, and mention the deployed version marker plus `python automation/autopilot.py version`.",
       "files": []
     }
   ]
