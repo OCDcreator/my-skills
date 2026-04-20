@@ -145,6 +145,16 @@ node scripts/obsidian_debug_control_backend_support.mjs \
 
 `control-backends.json` maps capabilities such as `reloadPlugin`, `captureDom`, `captureScreenshot`, `runScenario`, `locatorActions`, and `visualReview` to `obsidian-cli`, `bundled-cdp`, `obsidian-cli-rest`, `chrome-devtools-mcp`, `playwright-script`, or `playwright-mcp`. Local scripts directly execute CLI/CDP/Playwright-script backends; MCP/REST backends are routing descriptors until the current agent runtime exposes callable tools.
 
+For the local `playwright-script` backend, resolution is module-first and CLI-second:
+
+1. repo-local Playwright module (`playwright`, `playwright-core`, `@playwright/test`);
+2. explicit `--playwright-cli-command <cmd>`;
+3. `playwright-cli` on `PATH`;
+4. local `npx --no-install playwright-cli`;
+5. automatic bootstrap via `npm exec --yes --package=@playwright/cli@latest -- playwright-cli` unless `--playwright-no-bootstrap` is set.
+
+On Windows, the launcher automatically uses `npm.cmd` / `npx.cmd` through `cmd.exe /c`.
+
 ## Scenario And UI Assertions
 
 - Use `scenarios/open-plugin-view.json` when a plugin has a known open-view command or view type.
@@ -152,6 +162,10 @@ node scripts/obsidian_debug_control_backend_support.mjs \
 - Start generic assertions from `assertions/plugin-view-health.template.json` and replace placeholder selectors/text with plugin-specific expectations.
 - Use `scripts/obsidian_debug_scenario_runner.mjs --dry-run` with `surface-profiles/synthetic-plugin-surface.fixture.json` to validate strategy selection without touching Obsidian.
 - Use `--control-backend obsidian-cli|bundled-cdp|playwright-script` as a backend alias for local scenario runs. DevTools MCP and Playwright MCP are external agent-native backends, so route them through the MCP client rather than this local runner.
+- Use `--playwright-cli-command <cmd>` when the repo has no Playwright dependency but a known `playwright-cli` entrypoint exists.
+- Use `--playwright-no-bootstrap` when the environment must not auto-install `@playwright/cli`.
+
+If Playwright setup fails, the scenario runner still writes `scenario-report.json` and exits `1`, so automation can inspect a structured error instead of parsing a raw stack trace.
 
 ## Analysis And Reports
 

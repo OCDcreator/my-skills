@@ -142,7 +142,17 @@ Use DOM checks for deterministic assertions and screenshots for visual review. G
 
 Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/plugin-surface.template.json` when the plugin does not have one obvious command id or root selector.
 
-Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` only when Playwright is explicitly available and the plugin needs click/locator assertions.
+Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` when the plugin needs click/locator assertions and either a Playwright module is installed in the repo or `playwright-cli` can be resolved.
+
+For the local `playwright-script` lane, Playwright resolution is:
+
+1. repo-local Playwright module (`playwright`, `playwright-core`, or `@playwright/test`);
+2. explicit `--playwright-cli-command <cmd>`;
+3. `playwright-cli` from `PATH`;
+4. local `npx --no-install playwright-cli`;
+5. automatic bootstrap via `npm exec --yes --package=@playwright/cli@latest -- playwright-cli` unless `--playwright-no-bootstrap` is set.
+
+On Windows, the runner transparently uses `npm.cmd` / `npx.cmd` through `cmd.exe /c`, so the fallback still works in a default PowerShell environment.
 
 The scenario runner resolves surface-opening strategies in this order:
 
@@ -150,7 +160,7 @@ The scenario runner resolves surface-opening strategies in this order:
 2. known Obsidian command ids or view types;
 3. CDP DOM heuristics.
 
-`scenario-report.json` records the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, and empty states.
+`scenario-report.json` records the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, empty states, and Playwright driver details. When Playwright cannot be acquired, the runner writes a structured failure report and exits with code `1` instead of crashing with a raw stack trace.
 
 For screenshot-based GUI handoff, run `scripts/obsidian_debug_visual_review.mjs` after diagnosis. The generated `visual-review.html` is useful for human review of blank panes, visible errors, clipped text, contrast, obvious layout regressions, and target surface reachability. It does **not** replace reliable manual GUI validation for hover/focus/drag behavior, keyboard feel, timing-sensitive animation, or final official-review judgment. Back critical visual findings with DOM/text/log assertions whenever possible.
 

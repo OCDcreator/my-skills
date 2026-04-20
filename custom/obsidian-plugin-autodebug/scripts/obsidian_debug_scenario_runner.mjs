@@ -24,6 +24,7 @@ import {
   loadPlaywrightSupport,
   normalizeScenarioAdapter,
   resolvePlaywrightArtifactPaths,
+  runPlaywrightCliCommand,
   selectPlaywrightPage,
 } from './obsidian_debug_playwright_support.mjs';
 
@@ -41,6 +42,8 @@ Common options:
   --surface-profile <path>           Plugin surface metadata.
   --control-backend <id>             Backend id alias: obsidian-cli, bundled-cdp, playwright-script.
   --adapter <cli|playwright>         Scenario adapter when supported.
+  --playwright-cli-command <cmd>     Explicit Playwright CLI command override.
+  --playwright-no-bootstrap          Disable npm-based Playwright CLI bootstrap fallback.
   --dry-run                          Resolve strategy without touching Obsidian.
   --output <path>                    Scenario report JSON output.
 `);
@@ -67,6 +70,8 @@ const scenarioAdapterOption = getStringOption(
   getStringOption(options, 'adapter', ''),
 ).trim();
 const playwrightModuleNameOption = getStringOption(options, 'playwright-module', '').trim();
+const playwrightCliCommandOption = getStringOption(options, 'playwright-cli-command', '').trim();
+const playwrightAllowBootstrap = !getBooleanOption(options, 'playwright-no-bootstrap', false);
 const playwrightTraceOption = getBooleanOption(options, 'playwright-trace', false);
 const playwrightTracePathOption = getStringOption(options, 'playwright-trace-path', '').trim();
 const playwrightScreenshotPathOption = getStringOption(options, 'playwright-screenshot-path', '').trim();
@@ -96,6 +101,34 @@ function numberValue(value, fallback = 0) {
 
 function booleanValue(value, fallback = false) {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function jsStringLiteral(value) {
+  return JSON.stringify(String(value ?? ''));
+}
+
+function buildPlaywrightCliSessionName() {
+  const segments = [
+    'obsidian-debug',
+    pluginId || 'session',
+    process.pid,
+    Date.now().toString(36),
+  ];
+  return segments.join('-').replace(/[^a-zA-Z0-9._-]+/g, '-');
+}
+
+function wrapPlaywrightCliCode(code) {
+  const text = String(code ?? '').trim();
+  if (/^(async\s+)?\(?\s*page\b/.test(text)) {
+    return text;
+  }
+  return `async page => {\n${text}\n}`;
+}
+
+function resolvePlaywrightCliTimeout(actionTimeoutMs = 60000) {
+  const parsed = Number(actionTimeoutMs);
+  const baseTimeout = Number.isFinite(parsed) ? parsed : 0;
+  return Math.max(60000, baseTimeout + 10000);
 }
 
 function adapterFromControlBackend(backendId) {
@@ -297,6 +330,8 @@ async function preparePlaywrightSetup() {
   const support = await detectPlaywrightSupport({
     repoDir: process.cwd(),
     moduleName: resolvedPlaywrightModuleName,
+    cliCommand: playwrightCliCommandOption,
+    allowBootstrap: playwrightAllowBootstrap,
   });
   playwrightSupport = support;
 
@@ -308,7 +343,7 @@ async function preparePlaywrightSetup() {
       ok: false,
       adapter: scenarioAdapter,
       error: [support.detail, ...support.errors].filter(Boolean).join(' '),
-      module: support,
+      driver: support,
     };
   }
 
@@ -320,7 +355,7 @@ async function preparePlaywrightSetup() {
       ok: false,
       adapter: scenarioAdapter,
       error: 'Playwright adapter requires --cdp-port so it can attach to the running Obsidian window.',
-      module: support,
+      driver: support,
     };
   }
 
@@ -331,13 +366,37 @@ async function preparePlaywrightSetup() {
     ok: true,
     adapter: scenarioAdapter,
     dryRun,
-    module: support,
+    driver: support,
     cdp: {
       host: cdpHost,
       port: cdpPort,
       targetTitleContains: cdpTargetTitleContains || null,
     },
   };
+}
+
+async function runPlaywrightCli(args, {
+  extraEnv = {},
+  timeoutMs = 60000,
+} = {}) {
+  const runtime = await getPlaywrightRuntime();
+  return runPlaywrightCliCommand({
+    support: runtime.support,
+    repoDir: process.cwd(),
+    sessionName: runtime.sessionName,
+    args,
+    timeoutMs,
+    env: {
+      ...process.env,
+      ...extraEnv,
+    },
+  });
+}
+
+async function runPlaywrightCliCode(code, timeoutMs = 60000) {
+  await runPlaywrightCli(['run-code', wrapPlaywrightCliCode(code)], {
+    timeoutMs: resolvePlaywrightCliTimeout(timeoutMs),
+  });
 }
 
 async function getPlaywrightRuntime() {
@@ -348,8 +407,56 @@ async function getPlaywrightRuntime() {
   const support = await loadPlaywrightSupport({
     repoDir: process.cwd(),
     moduleName: resolvedPlaywrightModuleName,
+    cliCommand: playwrightCliCommandOption,
+    allowBootstrap: playwrightAllowBootstrap,
   });
   playwrightSupport = support;
+  if (support.mode === 'cli') {
+    const sessionName = buildPlaywrightCliSessionName();
+    await runPlaywrightCliCommand({
+      support,
+      repoDir: process.cwd(),
+      sessionName,
+      args: ['attach', `--cdp=http://${cdpHost}:${cdpPort}`],
+    });
+
+    if (resolvedPlaywrightTraceRequested) {
+      try {
+        await runPlaywrightCliCommand({
+          support,
+          repoDir: process.cwd(),
+          sessionName,
+          args: [
+            'run-code',
+            wrapPlaywrightCliCode(
+              'await page.context().tracing.start({ screenshots: true, snapshots: true });',
+            ),
+          ],
+          timeoutMs: resolvePlaywrightCliTimeout(),
+        });
+        playwrightTraceStarted = true;
+        playwrightTraceDetail = resolvedPlaywrightTracePath
+          ? `Trace capture is enabled at ${resolvedPlaywrightTracePath}.`
+          : 'Trace capture is enabled through Playwright CLI.';
+      } catch (error) {
+        playwrightTraceDetail = `Playwright trace could not start: ${error instanceof Error ? error.message : String(error)}`;
+        warnings.push(playwrightTraceDetail);
+      }
+    }
+
+    playwrightRuntime = {
+      support,
+      mode: 'cli',
+      sessionName,
+      context: null,
+      page: null,
+      browser: null,
+      title: '',
+      url: `http://${cdpHost}:${cdpPort}`,
+    };
+    return playwrightRuntime;
+  }
+
   const browser = await support.chromium.connectOverCDP(`http://${cdpHost}:${cdpPort}`);
   const selectedPage = await selectPlaywrightPage({
     browser,
@@ -523,7 +630,10 @@ function resolvePlaywrightSelector(step) {
 }
 
 function resolveStepTimeoutMs(step, fallback = resolvedPlaywrightSelectorTimeoutMs) {
-  return numberValue(substituteTemplate(String(step.timeoutMs ?? ''), variableContext), fallback);
+  const rawValue = substituteTemplate(String(step.timeoutMs ?? ''), variableContext).trim();
+  return rawValue.length > 0
+    ? numberValue(rawValue, fallback)
+    : fallback;
 }
 
 async function capturePlaywrightScreenshot({ page, stepPath = '', fullPage = false }) {
@@ -533,10 +643,22 @@ async function capturePlaywrightScreenshot({ page, stepPath = '', fullPage = fal
       : resolvedPlaywrightScreenshotPath || playwrightArtifacts.screenshotPath,
   );
   await ensureParentDirectory(targetPath);
-  await page.screenshot({
-    path: targetPath,
-    fullPage,
-  });
+  const runtime = await getPlaywrightRuntime();
+  if (runtime.support.mode === 'cli') {
+    const args = [
+      'screenshot',
+      `--filename=${targetPath}`,
+    ];
+    if (fullPage) {
+      args.push('--full-page');
+    }
+    await runPlaywrightCli(args);
+  } else {
+    await page.screenshot({
+      path: targetPath,
+      fullPage,
+    });
+  }
   playwrightScreenshotCaptured = true;
   playwrightScreenshotPath = targetPath;
   return targetPath;
@@ -545,13 +667,18 @@ async function capturePlaywrightScreenshot({ page, stepPath = '', fullPage = fal
 async function runPlaywrightStep(step) {
   const runtime = await getPlaywrightRuntime();
   const { page } = runtime;
+  const useCliDriver = runtime.support.mode === 'cli';
   const startedAt = nowIso();
 
   if (step.type === 'locator-wait') {
     const selector = resolvePlaywrightSelector(step);
     const state = stringValue(step.state, 'visible');
     const timeout = resolveStepTimeoutMs(step);
-    await page.locator(selector).first().waitFor({ state, timeout });
+    if (useCliDriver) {
+      await runPlaywrightCliCode(`const locator = page.locator(${jsStringLiteral(selector)}).first(); await locator.waitFor({ state: ${jsStringLiteral(state)}, timeout: ${timeout} });`, timeout);
+    } else {
+      await page.locator(selector).first().waitFor({ state, timeout });
+    }
     return {
       type: 'locator-wait',
       selector,
@@ -566,10 +693,15 @@ async function runPlaywrightStep(step) {
   if (step.type === 'locator-click') {
     const selector = resolvePlaywrightSelector(step);
     const timeout = resolveStepTimeoutMs(step);
-    await page.locator(selector).first().click({
-      timeout,
-      button: stringValue(step.button, 'left'),
-    });
+    const button = stringValue(step.button, 'left');
+    if (useCliDriver) {
+      await runPlaywrightCliCode(`await page.locator(${jsStringLiteral(selector)}).first().click({ timeout: ${timeout}, button: ${jsStringLiteral(button)} });`, timeout);
+    } else {
+      await page.locator(selector).first().click({
+        timeout,
+        button,
+      });
+    }
     return {
       type: 'locator-click',
       selector,
@@ -584,7 +716,11 @@ async function runPlaywrightStep(step) {
     const selector = resolvePlaywrightSelector(step);
     const value = substituteTemplate(step.value ?? '', variableContext);
     const timeout = resolveStepTimeoutMs(step);
-    await page.locator(selector).first().fill(value, { timeout });
+    if (useCliDriver) {
+      await runPlaywrightCliCode(`await page.locator(${jsStringLiteral(selector)}).first().fill(${jsStringLiteral(value)}, { timeout: ${timeout} });`, timeout);
+    } else {
+      await page.locator(selector).first().fill(value, { timeout });
+    }
     return {
       type: 'locator-fill',
       selector,
@@ -603,7 +739,11 @@ async function runPlaywrightStep(step) {
       throw new Error('locator-press steps require a key.');
     }
     const timeout = resolveStepTimeoutMs(step);
-    await page.locator(selector).first().press(key, { timeout });
+    if (useCliDriver) {
+      await runPlaywrightCliCode(`await page.locator(${jsStringLiteral(selector)}).first().press(${jsStringLiteral(key)}, { timeout: ${timeout} });`, timeout);
+    } else {
+      await page.locator(selector).first().press(key, { timeout });
+    }
     return {
       type: 'locator-press',
       selector,
@@ -619,28 +759,50 @@ async function runPlaywrightStep(step) {
     const selector = resolvePlaywrightSelector(step);
     const state = stringValue(step.state, 'visible');
     const timeout = resolveStepTimeoutMs(step);
-    const locator = page.locator(selector);
-    await locator.first().waitFor({ state, timeout });
-    const count = await locator.count();
     const expectedCount = step.count === undefined
       ? null
       : numberValue(substituteTemplate(String(step.count), variableContext), NaN);
-    if (Number.isFinite(expectedCount) && count !== expectedCount) {
-      throw new Error(`Expected ${selector} count=${expectedCount}, received ${count}.`);
-    }
     const textIncludes = substituteTemplate(step.textIncludes ?? '', variableContext).trim();
     const textMatches = substituteTemplate(step.textMatches ?? '', variableContext).trim();
     const flags = substituteTemplate(step.regexFlags ?? '', variableContext).trim();
-    const actualText = count > 0
-      ? String(await locator.first().innerText()).replace(/\s+/g, ' ').trim()
-      : '';
-    if (textIncludes && !actualText.includes(textIncludes)) {
-      throw new Error(`Expected ${selector} text to include ${textIncludes}, received ${actualText || '(empty)'}.`);
-    }
-    if (textMatches) {
-      const matcher = new RegExp(textMatches, flags);
-      if (!matcher.test(actualText)) {
-        throw new Error(`Expected ${selector} text to match /${textMatches}/${flags}, received ${actualText || '(empty)'}.`);
+    let actualText = '';
+    let resolvedCount = null;
+    if (useCliDriver) {
+      const cliScript = [
+        `const selector = ${jsStringLiteral(selector)};`,
+        'const locator = page.locator(selector);',
+        `await locator.first().waitFor({ state: ${jsStringLiteral(state)}, timeout: ${timeout} });`,
+        'const count = await locator.count();',
+        Number.isFinite(expectedCount)
+          ? `if (count !== ${expectedCount}) { throw new Error(${jsStringLiteral(`Expected ${selector} count=${expectedCount}.`)} + ' Received ' + count + '.'); }`
+          : '',
+        "const actualText = count > 0 ? String(await locator.first().innerText()).replace(/\\s+/g, ' ').trim() : '';",
+        textIncludes
+          ? `if (!actualText.includes(${jsStringLiteral(textIncludes)})) { throw new Error(${jsStringLiteral(`Expected ${selector} text to include ${textIncludes}.`)} + ' Received ' + (actualText || '(empty)') + '.'); }`
+          : '',
+        textMatches
+          ? `if (!(new RegExp(${jsStringLiteral(textMatches)}, ${jsStringLiteral(flags)})).test(actualText)) { throw new Error(${jsStringLiteral(`Expected ${selector} text to match /${textMatches}/${flags}.`)} + ' Received ' + (actualText || '(empty)') + '.'); }`
+          : '',
+      ].filter(Boolean).join(' ');
+      await runPlaywrightCliCode(cliScript, timeout);
+    } else {
+      const locator = page.locator(selector);
+      await locator.first().waitFor({ state, timeout });
+      resolvedCount = await locator.count();
+      if (Number.isFinite(expectedCount) && resolvedCount !== expectedCount) {
+        throw new Error(`Expected ${selector} count=${expectedCount}, received ${resolvedCount}.`);
+      }
+      actualText = resolvedCount > 0
+        ? String(await locator.first().innerText()).replace(/\s+/g, ' ').trim()
+        : '';
+      if (textIncludes && !actualText.includes(textIncludes)) {
+        throw new Error(`Expected ${selector} text to include ${textIncludes}, received ${actualText || '(empty)'}.`);
+      }
+      if (textMatches) {
+        const matcher = new RegExp(textMatches, flags);
+        if (!matcher.test(actualText)) {
+          throw new Error(`Expected ${selector} text to match /${textMatches}/${flags}, received ${actualText || '(empty)'}.`);
+        }
       }
     }
     return {
@@ -648,7 +810,7 @@ async function runPlaywrightStep(step) {
       selector,
       state,
       timeout,
-      count,
+      count: resolvedCount,
       text: actualText,
       startedAt,
       finishedAt: nowIso(),
@@ -833,7 +995,22 @@ try {
     }
   }
 
-  if (playwrightRuntime?.context && playwrightTraceStarted && resolvedPlaywrightTracePath) {
+  if (playwrightRuntime?.support?.mode === 'cli' && playwrightTraceStarted && resolvedPlaywrightTracePath) {
+    try {
+      await ensureParentDirectory(resolvedPlaywrightTracePath);
+      await runPlaywrightCliCode(
+        `await page.context().tracing.stop({ path: ${jsStringLiteral(resolvedPlaywrightTracePath)} });`,
+      );
+      playwrightTraceCaptured = await pathExists(resolvedPlaywrightTracePath);
+      playwrightTraceDetail = playwrightTraceCaptured
+        ? `Captured Playwright trace at ${resolvedPlaywrightTracePath}.`
+        : `Playwright trace stop completed, but ${resolvedPlaywrightTracePath} was not written.`;
+    } catch (error) {
+      playwrightTraceCaptured = false;
+      playwrightTraceDetail = `Playwright trace capture failed: ${error instanceof Error ? error.message : String(error)}`;
+      warnings.push(playwrightTraceDetail);
+    }
+  } else if (playwrightRuntime?.context && playwrightTraceStarted && resolvedPlaywrightTracePath) {
     try {
       await ensureParentDirectory(resolvedPlaywrightTracePath);
       await playwrightRuntime.context.tracing.stop({
@@ -850,7 +1027,13 @@ try {
     }
   }
 
-  if (playwrightRuntime?.browser) {
+  if (playwrightRuntime?.support?.mode === 'cli') {
+    try {
+      await runPlaywrightCli(['close']);
+    } catch (error) {
+      warnings.push(`Playwright CLI close reported: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else if (playwrightRuntime?.browser) {
     try {
       await playwrightRuntime.browser.close();
     } catch (error) {
@@ -888,7 +1071,20 @@ const report = {
   },
   playwright: scenarioAdapter === 'playwright'
     ? {
+        driver: playwrightSupport
+          ? {
+              available: playwrightSupport.available,
+              mode: playwrightSupport.mode ?? null,
+              label: playwrightSupport.driverLabel ?? null,
+              version: playwrightSupport.version,
+              via: playwrightSupport.via,
+              command: playwrightSupport.commandText || null,
+              detail: playwrightSupport.detail,
+              errors: playwrightSupport.errors ?? [],
+            }
+          : null,
         module: playwrightSupport
+          && playwrightSupport.mode === 'module'
           ? {
               available: playwrightSupport.available,
               moduleName: playwrightSupport.moduleName,
@@ -949,5 +1145,5 @@ await fs.writeFile(outputPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 console.log(JSON.stringify(report, null, 2));
 
 if (!success) {
-  throw new Error(`Scenario failed: ${report.scenarioName}`);
+  process.exitCode = 1;
 }

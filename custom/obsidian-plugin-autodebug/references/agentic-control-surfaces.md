@@ -38,7 +38,9 @@ Backend ids:
 - `bundled-cdp`: bundled CDP scripts for console/error trace, screenshot, DOM, scenario, and network/perf inspection.
 - `obsidian-cli-rest`: local REST/MCP bridge when probed with localhost/auth/allowlist evidence.
 - `chrome-devtools-mcp`: agent-native DevTools backend after target selection is confirmed.
-- `playwright-script`: repo-owned Playwright/WDIO/E2E script lane for locator assertions and visual review evidence.
+- `playwright-script`: repo-owned Playwright/WDIO/E2E script lane for locator assertions and visual review evidence. It can use a repo-local Playwright module or fall back to Microsoft `playwright-cli`, including `npm exec --yes --package=@playwright/cli@latest -- playwright-cli` bootstrap when allowed.
 - `playwright-mcp`: agent-native Playwright backend for snapshot/click/fill/screenshot style UI work.
 
 Capability routing is advisory, not magic. External MCP/REST backends still need the agent runtime to provide actual callable tools. Local scripts can execute `obsidian-cli`, `bundled-cdp`, and `playwright-script` paths directly; DevTools MCP and Playwright MCP remain agent-native external backends unless the current runtime exposes their tools.
+
+For dependency-light environments, `playwright-script` now probes `--playwright-cli-command`, `PATH`, local `npx --no-install`, and optional `npm exec` bootstrap after module resolution fails. If no backend can be acquired, it returns a structured failed scenario report instead of terminating with an unhandled stack.

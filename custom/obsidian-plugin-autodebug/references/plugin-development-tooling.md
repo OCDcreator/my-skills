@@ -60,10 +60,12 @@ node scripts/obsidian_debug_ci_templates.mjs --repo-dir <repo> --job <repo>/.obs
 - `obsidian-dev-utils`: <https://github.com/mnaoumov/obsidian-dev-utils>
 - WDIO Obsidian service docs: <https://webdriver.io/docs/wdio-obsidian-service/>
 - Chrome DevTools MCP: <https://github.com/ChromeDevTools/chrome-devtools-mcp>
+- Playwright CLI: <https://github.com/microsoft/playwright-cli>
 - Playwright MCP: <https://github.com/microsoft/playwright-mcp>
 
 ## Boundaries
 
 - Do not install new frameworks by default; recommend them only when the project shape or user request justifies them.
+- `playwright-cli` is an execution fallback for the local scenario runner, not a requirement for every plugin repo. Prefer existing repo-local Playwright when present; allow `npm exec --package=@playwright/cli` bootstrap only when the environment permits dependency acquisition.
 - Do not replace the runtime smoke loop with static review rules. Use both: lint/review gates catch preventable issues; CLI/CDP/Playwright evidence catches real Obsidian behavior.
 - Do not claim review-readiness output equals official Obsidian acceptance.

@@ -57,8 +57,15 @@ Default order:
 
 1. `obsidian-cli` for reload, logs, screenshot, DOM.
 2. `bundled-cdp` when CLI misses early logs or cannot see Obsidian.
-3. `playwright-script` for repo-owned locator/assertion flows.
+3. `playwright-script` for repo-owned locator/assertion flows. It prefers repo-local Playwright modules, then falls back to `playwright-cli` (explicit command, `PATH`, local `npx --no-install`, then `npm exec --yes --package=@playwright/cli@latest -- playwright-cli` unless bootstrap is disabled).
 4. `obsidian-cli-rest`, `chrome-devtools-mcp`, or `playwright-mcp` only when the current agent runtime exposes safe callable tools.
+
+Useful runner flags for the Playwright lane:
+
+- `--playwright-cli-command <cmd>`: pin an explicit `playwright-cli` entrypoint.
+- `--playwright-no-bootstrap`: forbid the automatic `npm exec` bootstrap fallback.
+
+If Playwright resolution still fails, the local runner exits `1` with a structured JSON report instead of dumping a raw stack trace. On Windows, `npm.cmd` / `npx.cmd` are handled automatically.
 
 ## 4. Run The Loop
 
