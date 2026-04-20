@@ -16,6 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from _autopilot.cli_parser import CliParserSupport, build_parser as build_parser_command
 from _autopilot.doctor import DoctorSupport, run_doctor as run_doctor_command
 from _autopilot.process_control import (
     ProcessControlSupport,
@@ -23,17 +24,15 @@ from _autopilot.process_control import (
 )
 from _autopilot.round_flow import (
     RoundFlowSupport,
-    evaluate_round_execution,
-    prepare_round_context,
 )
 from _autopilot.runner import RunnerSupport, invoke_runner_round, resolve_runner_executable
+from _autopilot.start_runtime import StartRuntimeSupport, run_start as run_start_command
 from _autopilot.status_views import (
     StatusViewSupport,
     build_watch_state_signature,
-    format_metric_delta,
+    print_state_summary,
     print_watch_detail_lines,
     print_watch_snapshot,
-    read_watch_queue_progress,
     resolve_watch_state_path,
     watched_round_directory,
 )
@@ -884,6 +883,53 @@ def build_round_flow_support() -> RoundFlowSupport:
     )
 
 
+def build_start_runtime_support() -> StartRuntimeSupport:
+    return StartRuntimeSupport(
+        error_type=AutopilotError,
+        clean_string=clean_string,
+        info=info,
+        load_config=load_config,
+        resolve_repo_path=resolve_repo_path,
+        read_json=read_json,
+        save_state=save_state,
+        new_state=new_state,
+        normalize_state_for_lanes=normalize_state_for_lanes,
+        resume_state_if_threshold_allows=resume_state_if_threshold_allows,
+        get_current_branch=get_current_branch,
+        test_branch_allowed=test_branch_allowed,
+        is_working_tree_dirty=is_working_tree_dirty,
+        get_head_sha=get_head_sha,
+        autopilot_lock=autopilot_lock,
+        refresh_vulture_metrics=refresh_vulture_metrics,
+        reset_worktree_to_head=reset_worktree_to_head,
+        append_history_entry=append_history_entry,
+        increment_active_lane_phase=increment_active_lane_phase,
+        has_remaining_lane_work=has_remaining_lane_work,
+        set_active_lane=set_active_lane,
+        mark_lane_complete=mark_lane_complete,
+        next_unfinished_lane_id=next_unfinished_lane_id,
+        config_lane_map=config_lane_map,
+        active_lane_id_for_state=active_lane_id_for_state,
+        active_lane_config=active_lane_config,
+        sync_active_lane_mirror_fields=sync_active_lane_mirror_fields,
+    )
+
+
+def build_cli_parser_support() -> CliParserSupport:
+    return CliParserSupport(
+        default_profile_name=DEFAULT_PROFILE_NAME,
+        default_config_path=DEFAULT_CONFIG_PATH,
+        default_state_path=DEFAULT_STATE_PATH,
+        default_runtime_path=DEFAULT_RUNTIME_PATH,
+        run_start=run_start,
+        run_watch=run_watch,
+        run_status=run_status,
+        run_doctor=run_doctor,
+        run_version=run_version,
+        run_restart_after_next_commit=run_restart_after_next_commit,
+    )
+
+
 def pid_exists(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -1128,240 +1174,14 @@ def get_head_sha() -> str:
     return run_git(["rev-parse", "HEAD"]).stdout
 
 
-def ensure_commands_available(command_names: list[str]) -> list[str]:
-    missing: list[str] = []
-    for command_name in command_names:
-        if shutil.which(command_name) is None:
-            missing.append(command_name)
-    return missing
-
-
 def run_start(args: argparse.Namespace) -> int:
-    config, _, _ = load_config(args.config_path, args.profile, args.profile_path)
-    state_path = resolve_repo_path(args.state_path)
-    runtime_directory = state_path.parent
-    runtime_directory.mkdir(parents=True, exist_ok=True)
-
-    schema_path = resolve_repo_path(str(config["result_schema"]))
-    schema = read_json(schema_path)
-    runner_support = build_runner_support()
-    validation_support = build_validation_support()
-    round_flow_support = build_round_flow_support()
-
-    runner_executable = resolve_runner_executable(
-        config,
-        clean_string=runner_support.clean_string,
-        error_type=runner_support.error_type,
+    return run_start_command(
+        args,
+        support=build_start_runtime_support(),
+        runner_support=build_runner_support(),
+        validation_support=build_validation_support(),
+        round_flow_support=build_round_flow_support(),
     )
-    missing_commands = ensure_commands_available(["git"])
-    if runner_executable == "codex":
-        missing_commands.extend(ensure_commands_available(["codex"]))
-    if missing_commands:
-        raise AutopilotError(f"Required command(s) not found in PATH: {', '.join(missing_commands)}")
-
-    state = read_json(state_path) if state_path.exists() else new_state(config)
-    state = normalize_state_for_lanes(state, config)
-    save_state(state, state_path)
-    state = resume_state_if_threshold_allows(state, config, state_path)
-
-    current_branch = get_current_branch()
-    if not args.no_branch_guard and not test_branch_allowed(current_branch, list(config.get("allowed_branch_prefixes", []))):
-        raise AutopilotError(
-            "Refusing to run on branch "
-            f"'{current_branch}'. Use a dedicated worktree branch with one of these prefixes: "
-            f"{', '.join(config.get('allowed_branch_prefixes', []))}."
-        )
-
-    if not args.allow_dirty_worktree and is_working_tree_dirty():
-        raise AutopilotError("Working tree must be clean before unattended execution.")
-
-    rounds_executed = 0
-    head_sha = get_head_sha()
-
-    with autopilot_lock(
-        runtime_directory,
-        branch=current_branch,
-        head_sha=head_sha,
-        profile_name=args.profile,
-        force_lock=args.force_lock,
-    ):
-        if clean_string(config.get("vulture_command")):
-            refresh_vulture_metrics(state, config)
-            save_state(state, state_path)
-
-        while True:
-            if args.single_round and rounds_executed >= 1:
-                info("Single round requested; stopping.")
-                break
-
-            if args.max_rounds_this_run > 0 and rounds_executed >= args.max_rounds_this_run:
-                info(f"Reached MaxRoundsThisRun={args.max_rounds_this_run}; stopping.")
-                break
-
-            if clean_string(state.get("status")) != "active":
-                info(f"State status is '{state.get('status')}'; stopping.")
-                break
-
-            if int(state["current_round"]) >= int(config["max_rounds"]):
-                state["status"] = "stopped_max_rounds"
-                save_state(state, state_path)
-                info(f"Reached max_rounds={config['max_rounds']}; stopping.")
-                break
-
-            if int(state["consecutive_failures"]) >= int(config["max_consecutive_failures"]):
-                state["status"] = "stopped_failures"
-                save_state(state, state_path)
-                info(f"Reached max_consecutive_failures={config['max_consecutive_failures']}; stopping.")
-                break
-
-            round_context = prepare_round_context(
-                state=state,
-                config=config,
-                runtime_directory=runtime_directory,
-                current_branch=current_branch,
-                support=round_flow_support,
-            )
-            attempt_number = round_context.attempt_number
-            current_lane_id = round_context.lane_id
-            round_config = round_context.round_config
-            phase_number = round_context.phase_number
-
-            if args.dry_run:
-                info(f"Dry run complete. Prompt written to {round_context.prompt_path}")
-                break
-
-            starting_head = get_head_sha()
-            info(f"Starting round {attempt_number} (phase {phase_number}).")
-            codex_exit_code = invoke_runner_round(
-                prompt_path=round_context.prompt_path,
-                schema_path=schema_path,
-                assistant_output_path=round_context.assistant_output_path,
-                events_log_path=round_context.events_log_path,
-                progress_log_path=round_context.progress_log_path,
-                config=config,
-                support=runner_support,
-            )
-            rounds_executed += 1
-
-            round_evaluation = evaluate_round_execution(
-                round_context=round_context,
-                codex_exit_code=codex_exit_code,
-                schema=schema,
-                validation_support=validation_support,
-                support=round_flow_support,
-            )
-            result = round_evaluation.result
-            ending_head = round_evaluation.ending_head
-            working_tree_dirty = round_evaluation.working_tree_dirty
-            failure_reason = round_evaluation.failure_reason
-
-            state["current_round"] = int(state["current_round"]) + 1
-            history_entry = build_history_entry(
-                attempt_number=attempt_number,
-                phase_number=phase_number,
-                lane_id=current_lane_id,
-                result=result,
-                failure_reason=failure_reason,
-            )
-
-            if failure_reason:
-                info(f"Round {attempt_number} failed: {failure_reason}")
-                if ending_head != starting_head or working_tree_dirty:
-                    info(f"Reverting worktree to {starting_head}")
-                    reset_worktree_to_head(starting_head)
-
-                state["consecutive_failures"] = int(state["consecutive_failures"]) + 1
-                state["last_result"] = "failure"
-                state["last_blocking_reason"] = failure_reason
-                if result and clean_string(result.get("next_focus")):
-                    state["last_next_focus"] = result.get("next_focus")
-                append_history_entry(runtime_directory, history_entry)
-                save_state(state, state_path)
-
-                if failure_reason == "runner could not read the round prompt as UTF-8.":
-                    state["status"] = "stopped_infra_error"
-                    save_state(state, state_path)
-                    info("Stopping after infrastructure error: prompt encoding.")
-                    break
-
-                continue
-
-            assert result is not None
-            state["consecutive_failures"] = 0
-            state["last_result"] = result["status"]
-            state["last_blocking_reason"] = None
-            state["last_summary"] = result["summary"]
-
-            if clean_string(result.get("next_focus")):
-                state["last_next_focus"] = result["next_focus"]
-            if clean_string(result.get("phase_doc_path")):
-                state["lane_progress"][current_lane_id]["last_phase_doc"] = result["phase_doc_path"]
-            if clean_string(result.get("commit_sha")):
-                state["last_commit_sha"] = result["commit_sha"]
-
-            sync_active_lane_mirror_fields(state, config)
-
-            if result["status"] == "success":
-                advance_lane_after_nonfailure(state, config, completed_lane_id=current_lane_id)
-                info(f"Round {attempt_number} succeeded with commit {result['commit_sha']}.")
-            elif result["status"] == "goal_complete":
-                advance_lane_after_nonfailure(state, config, completed_lane_id=current_lane_id)
-                if clean_string(state.get("status")) == "complete":
-                    info("Autopilot objective reported complete.")
-                else:
-                    info("Round reported goal_complete; controller advanced without wasting an empty discovery round.")
-
-            if clean_string(state.get("status")) != "complete" and active_lane_id_for_state(state, config) != current_lane_id:
-                next_lane = active_lane_config(state, config)
-                info(f"Switching active lane to {next_lane['id']}.")
-
-            if clean_string(config.get("vulture_command")):
-                refresh_vulture_metrics(state, config)
-            append_history_entry(runtime_directory, history_entry)
-            save_state(state, state_path)
-
-    return 0
-
-
-def print_state_summary(state: dict[str, Any], *, runtime_directory: Path | None = None) -> None:
-    status_view_support = build_status_view_support()
-    queue_progress = read_watch_queue_progress(state, support=status_view_support)
-    lane_id = clean_string(state.get("active_lane_id")) or "legacy"
-    print(
-        "[status] "
-        f"status={state.get('status')} round={state.get('current_round')} "
-        f"lane={lane_id} phase={state.get('next_phase_number')} failures={state.get('consecutive_failures')}"
-    )
-    if queue_progress and queue_progress.get("total_count") is not None:
-        print(f"[status] queue: {queue_progress['done_count']}/{queue_progress['total_count']} done")
-    if state.get("last_phase_doc"):
-        print(f"[status] last phase doc: {state.get('last_phase_doc')}")
-    if state.get("last_next_focus"):
-        print(f"[status] next focus: {state.get('last_next_focus')}")
-    if state.get("last_commit_sha"):
-        print(f"[status] last commit: {state.get('last_commit_sha')}")
-    if clean_string(state.get("vulture_command")):
-        if clean_string(state.get("vulture_last_error")):
-            print(f"[status] vulture: error={compact_text(clean_string(state.get('vulture_last_error')), max_length=220)}")
-        else:
-            print(
-                "[status] vulture: "
-                f"count={state.get('vulture_current_count')} "
-                f"delta={format_metric_delta(state.get('vulture_delta'))}"
-            )
-            if state.get("vulture_updated_at"):
-                print(f"[status] vulture updated: {state.get('vulture_updated_at')}")
-    if runtime_directory:
-        lock_path = runtime_directory / LOCK_FILENAME
-        lock_data = read_lock(lock_path)
-        if lock_data:
-            print(
-                "[status] lock: "
-                f"host={lock_data.get('hostname')} pid={lock_data.get('pid')} "
-                f"profile={lock_data.get('profile')} started_at={lock_data.get('started_at')}"
-            )
-        else:
-            print("[status] lock: none")
 
 
 def run_status(args: argparse.Namespace) -> int:
@@ -1370,7 +1190,12 @@ def run_status(args: argparse.Namespace) -> int:
         print(f"[status] state file not found: {state_path}")
         return 1
     state = read_json(state_path)
-    print_state_summary(state, runtime_directory=state_path.parent)
+    print_state_summary(
+        state,
+        runtime_directory=state_path.parent,
+        support=build_status_view_support(),
+        read_lock=read_lock,
+    )
     return 0
 
 
@@ -1453,115 +1278,7 @@ def run_version(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Cross-platform repository autopilot.")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    start_parser = subparsers.add_parser("start", help="Run unattended autopilot rounds.")
-    start_parser.add_argument("--profile", default=DEFAULT_PROFILE_NAME, help="Profile name under automation/profiles.")
-    start_parser.add_argument("--profile-path", help="Explicit profile JSON path.")
-    start_parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH, help="Base config JSON path.")
-    start_parser.add_argument("--state-path", default=DEFAULT_STATE_PATH, help="State JSON path.")
-    start_parser.add_argument("--max-rounds-this-run", type=int, default=0, help="Limit rounds for this process only.")
-    start_parser.add_argument("--single-round", action="store_true", help="Run exactly one unattended round.")
-    start_parser.add_argument("--dry-run", action="store_true", help="Render the next prompt only.")
-    start_parser.add_argument("--no-branch-guard", action="store_true", help="Skip allowed-branch validation.")
-    start_parser.add_argument("--allow-dirty-worktree", action="store_true", help="Skip clean-worktree validation.")
-    start_parser.add_argument("--force-lock", action="store_true", help="Override an existing autopilot lock.")
-    start_parser.set_defaults(handler=run_start)
-
-    watch_parser = subparsers.add_parser("watch", help="Watch the latest round progress log.")
-    watch_parser.add_argument("--runtime-path", default=DEFAULT_RUNTIME_PATH, help="Runtime directory path.")
-    watch_parser.add_argument("--state-path", default="", help="Optional explicit state JSON path.")
-    watch_parser.add_argument("--tail", type=int, default=20, help="How many lines to show when switching logs.")
-    watch_parser.add_argument("--refresh-seconds", type=int, default=2, help="Polling interval.")
-    watch_parser.add_argument(
-        "--prefix-format",
-        choices=["long", "short"],
-        default="long",
-        help="Prefix style for streamed progress.log lines.",
-    )
-    watch_parser.add_argument("--once", action="store_true", help="Print current status once and exit.")
-    watch_parser.set_defaults(handler=run_watch)
-
-    status_parser = subparsers.add_parser("status", help="Show current autopilot state.")
-    status_parser.add_argument("--state-path", default=DEFAULT_STATE_PATH, help="State JSON path.")
-    status_parser.set_defaults(handler=run_status)
-
-    doctor_parser = subparsers.add_parser("doctor", help="Check environment and profile readiness.")
-    doctor_parser.add_argument("--profile", default=DEFAULT_PROFILE_NAME, help="Profile name under automation/profiles.")
-    doctor_parser.add_argument("--profile-path", help="Explicit profile JSON path.")
-    doctor_parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH, help="Base config JSON path.")
-    doctor_parser.add_argument("--runtime-path", default=DEFAULT_RUNTIME_PATH, help="Runtime directory path.")
-    doctor_parser.set_defaults(handler=run_doctor)
-
-    version_parser = subparsers.add_parser("version", help="Print the deployed scaffold version.")
-    version_parser.set_defaults(handler=run_version)
-
-    restart_parser = subparsers.add_parser(
-        "restart-after-next-commit",
-        help="Wait for the next successful commit, then restart autopilot with replacement settings.",
-    )
-    restart_parser.add_argument("--profile", default=DEFAULT_PROFILE_NAME, help="Current profile name under automation/profiles.")
-    restart_parser.add_argument("--profile-path", help="Current explicit profile JSON path.")
-    restart_parser.add_argument("--config-path", default=DEFAULT_CONFIG_PATH, help="Current base config JSON path.")
-    restart_parser.add_argument("--state-path", default=DEFAULT_STATE_PATH, help="State JSON path to watch.")
-    restart_parser.add_argument("--restart-profile", help="Profile name to use for the replacement start command.")
-    restart_parser.add_argument("--restart-profile-path", help="Explicit profile JSON path for the replacement start command.")
-    restart_parser.add_argument("--restart-config-path", help="Config JSON path for the replacement start command.")
-    restart_parser.add_argument("--restart-state-path", help="State JSON path for the replacement start command.")
-    restart_parser.add_argument(
-        "--restart-output-path",
-        default="automation/runtime/autopilot-restart.out",
-        help="Where to write the replacement autopilot stdout/stderr stream.",
-    )
-    restart_parser.add_argument(
-        "--restart-pid-path",
-        default="automation/runtime/autopilot.pid",
-        help="Where to write the replacement autopilot pid.",
-    )
-    restart_parser.add_argument("--refresh-seconds", type=int, default=5, help="Polling interval while waiting.")
-    restart_parser.add_argument(
-        "--stop-timeout-seconds",
-        type=int,
-        default=30,
-        help="How long to wait for the current autopilot to stop before forcing it.",
-    )
-    restart_parser.add_argument(
-        "--hard-reset",
-        action="store_true",
-        default=True,
-        help="Run `git reset --hard HEAD` before launching the replacement process.",
-    )
-    restart_parser.add_argument(
-        "--no-hard-reset",
-        dest="hard_reset",
-        action="store_false",
-        help="Skip `git reset --hard HEAD` before relaunching.",
-    )
-    restart_parser.add_argument(
-        "--stop-if-status-changes",
-        action="store_true",
-        help="Abort instead of waiting forever if the watched state leaves `active` before a new commit appears.",
-    )
-    restart_parser.add_argument(
-        "--restart-sync-ref",
-        help="After stopping the current autopilot, wait for this git ref and fast-forward merge it before relaunching.",
-    )
-    restart_parser.add_argument(
-        "--restart-sync-timeout-seconds",
-        type=int,
-        default=0,
-        help="How long to wait for the cutover ref to become a fast-forward successor; 0 waits forever.",
-    )
-    restart_parser.add_argument(
-        "--restart-sync-refresh-seconds",
-        type=int,
-        default=5,
-        help="Polling interval while waiting for the cutover ref.",
-    )
-    restart_parser.set_defaults(handler=run_restart_after_next_commit)
-
-    return parser
+    return build_parser_command(support=build_cli_parser_support())
 
 
 def main(argv: list[str] | None = None) -> int:

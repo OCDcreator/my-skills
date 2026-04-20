@@ -125,10 +125,12 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 autopilot_text = (repo_root / "automation" / "autopilot.py").read_text(encoding="utf-8")
                 self.assertIn("AUTOPILOT_SCAFFOLD_VERSION", autopilot_text)
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "__init__.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "cli_parser.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "doctor.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "process_control.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "round_flow.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "runner.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "start_runtime.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "status_views.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "validation.py").exists())
                 version_result = subprocess.run(
@@ -149,10 +151,12 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         "py_compile",
                         str(repo_root / "automation" / "autopilot.py"),
                         str(repo_root / "automation" / "_autopilot" / "__init__.py"),
+                        str(repo_root / "automation" / "_autopilot" / "cli_parser.py"),
                         str(repo_root / "automation" / "_autopilot" / "doctor.py"),
                         str(repo_root / "automation" / "_autopilot" / "process_control.py"),
                         str(repo_root / "automation" / "_autopilot" / "round_flow.py"),
                         str(repo_root / "automation" / "_autopilot" / "runner.py"),
+                        str(repo_root / "automation" / "_autopilot" / "start_runtime.py"),
                         str(repo_root / "automation" / "_autopilot" / "status_views.py"),
                         str(repo_root / "automation" / "_autopilot" / "validation.py"),
                     ],
