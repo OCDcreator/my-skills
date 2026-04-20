@@ -19,7 +19,15 @@ DEFAULT_MIN_PARAGRAPH_SPACING_RATIO = 0.45
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate a sequential page-review packet for print handouts."
+        description="Generate a sequential page-review packet for print handouts.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python scripts/review_print_pages.py --html artifacts/knowledge-handout/topic/handout.html\n"
+            "  python scripts/review_print_pages.py --html artifacts/knowledge-handout/topic/handout.html --review-language zh\n"
+            "\n"
+            "Run this after layout validation so the packet includes the latest screenshots, parity data, and subagent prompt files."
+        ),
     )
     parser.add_argument("--html", required=True, help="Path to the handout.html file.")
     parser.add_argument(

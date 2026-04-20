@@ -1,7 +1,8 @@
-# Local runtime artifacts for this skill.
-# The repo root already ignores these paths; keep this file so the skill stays self-contained.
+# Auto-created local runtime artifacts for this skill.
+# These paths are generated during validation/review runs and are safe to delete.
 __pycache__/
 *.pyc
+*.sync-conflict-*
 .venv-print/
 .local-libs/
 .local-qpdf/

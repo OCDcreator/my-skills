@@ -468,6 +468,15 @@ class PrintToolTests(unittest.TestCase):
         self.assertNotIn("import *", validator_wrapper)
         self.assertNotIn("import *", review_wrapper)
 
+    def test_root_wrappers_explain_canonical_script_paths(self) -> None:
+        validator_wrapper = ROOT_VALIDATOR_WRAPPER.read_text(encoding="utf-8")
+        review_wrapper = ROOT_REVIEW_WRAPPER.read_text(encoding="utf-8")
+
+        self.assertIn("Compatibility wrapper", validator_wrapper)
+        self.assertIn("Prefer `python scripts/validate_print_layout.py ...`", validator_wrapper)
+        self.assertIn("Compatibility wrapper", review_wrapper)
+        self.assertIn("Prefer `python scripts/review_print_pages.py ...`", review_wrapper)
+
     def test_evals_include_machine_checkable_assertions(self) -> None:
         evals = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
         for item in evals["evals"]:
@@ -536,6 +545,43 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("144 DPI", combined)
         self.assertIn("450 DPI", combined)
         self.assertIn("600 DPI", combined)
+
+    def test_runtime_requirements_explain_generated_local_state(self) -> None:
+        gitignore_text = (SKILL_DIR / ".gitignore").read_text(encoding="utf-8")
+        runtime_text = (SKILL_DIR / "references" / "runtime-requirements.md").read_text(encoding="utf-8")
+
+        self.assertIn("*.sync-conflict-*", gitignore_text)
+        self.assertIn("safe to delete", gitignore_text)
+        self.assertIn("`.venv-print/`", runtime_text)
+        self.assertIn("`.local-libs/`", runtime_text)
+        self.assertIn("`.local-qpdf/`", runtime_text)
+        self.assertIn("`artifacts/knowledge-handout/<slug>/`", runtime_text)
+        self.assertIn("safe to delete", runtime_text)
+
+    def test_script_help_text_includes_examples(self) -> None:
+        validate_result = subprocess.run(
+            [sys.executable, str(VALIDATOR), "--help"],
+            cwd=SKILL_DIR,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        review_result = subprocess.run(
+            [sys.executable, str(SKILL_DIR / "scripts" / "review_print_pages.py"), "--help"],
+            cwd=SKILL_DIR,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(validate_result.returncode, 0, validate_result.stdout + validate_result.stderr)
+        self.assertEqual(review_result.returncode, 0, review_result.stdout + review_result.stderr)
+        self.assertIn("Examples:", validate_result.stdout)
+        self.assertIn("--device-scale-factor 3.125", validate_result.stdout)
+        self.assertIn("Examples:", review_result.stdout)
+        self.assertIn("--review-language zh", review_result.stdout)
 
     def test_review_loop_requires_container_level_text_overflow_check(self) -> None:
         review_text = (SKILL_DIR / "references" / "review-loop.md").read_text(encoding="utf-8")

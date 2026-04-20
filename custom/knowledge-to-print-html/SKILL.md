@@ -1,6 +1,6 @@
 ---
 name: knowledge-to-print-html
-description: Use when the user wants notes, keywords, drafts, lesson content, or research findings turned into a print-ready HTML/PDF teaching handout, including requests like “知识点整理成讲义”, “可打印 HTML”, “打印成 PDF”, “教学页”, “knowledge handout”, “print-ready HTML handout”, “teaching handout from notes”, or “A4 learning handout with diagrams”.
+description: Use when the user wants notes, keywords, drafts, lesson content, or research findings turned into a print-ready HTML/PDF teaching handout. Trigger aggressively for requests like “知识点整理成讲义”, “把这些笔记整理成讲义”, “可打印 HTML”, “打印成 PDF”, “教学页”, “复习手册”, “make it printable”, “knowledge handout”, “teaching handout from notes”, or “A4 learning handout with diagrams”, even when the user does not explicitly mention HTML, PDF, or page review.
 ---
 
 # Knowledge To Print HTML

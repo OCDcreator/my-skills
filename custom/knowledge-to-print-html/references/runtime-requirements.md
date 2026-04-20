@@ -17,6 +17,18 @@ Default behavior:
 - permission to install Python packages and browser/runtime dependencies
 - enough disk space for browser artifacts, screenshots, and exported PDFs
 
+## Auto-created local runtime directories
+
+This skill intentionally creates a few local working directories when validation or review runs execute:
+
+- `.venv-print/` — local Python environment for the print toolchain
+- `.local-libs/` — locally installed Python packages when auto-install is used
+- `.local-qpdf/` — locally discovered or installed `qpdf` helper files
+- `artifacts/knowledge-handout/<slug>/` — generated working files, screenshots, and exported PDFs
+- `__pycache__/` plus nested `evals/__pycache__/` / `scripts/__pycache__/` — Python bytecode caches
+
+These are runtime byproducts, not part of the authored skill contract. In this repo they are ignored by Git and are safe to delete whenever you want to reset local state.
+
 ## High-DPI image-only PDF output
 
 The validator's default `--device-scale-factor 1.5` is suitable for layout review, but its A4 page PNGs are only about 144 DPI. When a user asks for a 图片型 PDF / raster PDF / image-only PDF, run a separate final pass at 300 DPI:

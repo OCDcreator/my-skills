@@ -846,7 +846,15 @@ pageNumber => {
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Validate a local print-first handout.html and export screenshots, PDF, and a JSON report."
+        description="Validate a local print-first handout.html and export screenshots, PDF, and a JSON report.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python scripts/validate_print_layout.py --html artifacts/knowledge-handout/topic/handout.html\n"
+            "  python scripts/validate_print_layout.py --html artifacts/knowledge-handout/topic/handout.html --device-scale-factor 3.125 --out-dir artifacts/knowledge-handout/topic/screens/high-dpi\n"
+            "\n"
+            "Use the high-DPI example when you need a raster/image-only PDF at roughly 300 DPI."
+        ),
     )
     parser.add_argument("--html", required=True, help="Path to the local handout.html file.")
     parser.add_argument(
