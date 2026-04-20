@@ -127,6 +127,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "__init__.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "doctor.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "process_control.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "round_flow.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "runner.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "status_views.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "validation.py").exists())
@@ -150,6 +151,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         str(repo_root / "automation" / "_autopilot" / "__init__.py"),
                         str(repo_root / "automation" / "_autopilot" / "doctor.py"),
                         str(repo_root / "automation" / "_autopilot" / "process_control.py"),
+                        str(repo_root / "automation" / "_autopilot" / "round_flow.py"),
                         str(repo_root / "automation" / "_autopilot" / "runner.py"),
                         str(repo_root / "automation" / "_autopilot" / "status_views.py"),
                         str(repo_root / "automation" / "_autopilot" / "validation.py"),

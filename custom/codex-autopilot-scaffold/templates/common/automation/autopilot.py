@@ -21,6 +21,11 @@ from _autopilot.process_control import (
     ProcessControlSupport,
     run_restart_after_next_commit as run_restart_after_next_commit_command,
 )
+from _autopilot.round_flow import (
+    RoundFlowSupport,
+    evaluate_round_execution,
+    prepare_round_context,
+)
 from _autopilot.runner import RunnerSupport, invoke_runner_round, resolve_runner_executable
 from _autopilot.status_views import (
     StatusViewSupport,
@@ -861,6 +866,24 @@ def build_doctor_support() -> DoctorSupport:
     )
 
 
+def build_round_flow_support() -> RoundFlowSupport:
+    return RoundFlowSupport(
+        clean_string=clean_string,
+        parse_int=parse_int,
+        resolve_repo_path=resolve_repo_path,
+        read_text=read_text,
+        read_json=read_json,
+        render_template=render_template,
+        append_controller_requirements=append_controller_requirements,
+        active_lane_config=active_lane_config,
+        active_lane_progress=active_lane_progress,
+        lane_runtime_config=lane_runtime_config,
+        get_head_sha=get_head_sha,
+        is_working_tree_dirty=is_working_tree_dirty,
+        validate_round_result=validate_round_result,
+    )
+
+
 def pid_exists(pid: int) -> bool:
     if pid <= 0:
         return False
@@ -1123,6 +1146,7 @@ def run_start(args: argparse.Namespace) -> int:
     schema = read_json(schema_path)
     runner_support = build_runner_support()
     validation_support = build_validation_support()
+    round_flow_support = build_round_flow_support()
 
     runner_executable = resolve_runner_executable(
         config,
@@ -1190,111 +1214,46 @@ def run_start(args: argparse.Namespace) -> int:
                 info(f"Reached max_consecutive_failures={config['max_consecutive_failures']}; stopping.")
                 break
 
-            attempt_number = int(state["current_round"]) + 1
-            current_lane = active_lane_config(state, config)
-            current_lane_id = current_lane["id"]
-            current_lane_progress = active_lane_progress(state, config)
-            round_config = lane_runtime_config(config, current_lane)
-            template_path = resolve_repo_path(str(round_config["prompt_template"]))
-            template_text = read_text(template_path)
-            phase_number = parse_int(current_lane_progress.get("next_phase_number"), 1)
-            phase_doc_relative_path = f"{current_lane['phase_doc_prefix']}{phase_number}.md"
-            round_directory = runtime_directory / f"round-{attempt_number:03d}"
-            round_directory.mkdir(parents=True, exist_ok=True)
-
-            prompt_path = round_directory / "prompt.md"
-            assistant_output_path = round_directory / "assistant-output.json"
-            events_log_path = round_directory / "events.jsonl"
-            progress_log_path = round_directory / "progress.log"
-
-            rendered_prompt = render_template(
-                template_text,
-                {
-                    "objective": config["objective"],
-                    "round_attempt": attempt_number,
-                    "next_phase_number": phase_number,
-                    "next_phase_doc": phase_doc_relative_path,
-                    "current_branch": current_branch,
-                    "last_phase_doc": clean_string(state.get("last_phase_doc")),
-                    "last_commit_sha": clean_string(state.get("last_commit_sha")),
-                    "last_summary": clean_string(state.get("last_summary")),
-                    "focus_hint": clean_string(state.get("last_next_focus")),
-                    "lint_command": clean_string(config.get("lint_command")),
-                    "typecheck_command": clean_string(config.get("typecheck_command")),
-                    "full_test_command": clean_string(config.get("full_test_command")),
-                    "build_command": config["build_command"],
-                    "vulture_command": clean_string(config.get("vulture_command")),
-                    "runner_kind": clean_string(config.get("runner_kind")),
-                    "runner_model": clean_string(config.get("runner_model")),
-                    "commit_prefix": round_config["commit_prefix"],
-                    "platform_note": config.get("platform_note", ""),
-                    "current_lane_id": current_lane_id,
-                    "current_lane_label": current_lane["label"],
-                    "current_lane_roadmap": current_lane["roadmap_path"],
-                },
+            round_context = prepare_round_context(
+                state=state,
+                config=config,
+                runtime_directory=runtime_directory,
+                current_branch=current_branch,
+                support=round_flow_support,
             )
-            rendered_prompt = append_controller_requirements(rendered_prompt, round_config)
-            prompt_path.write_bytes(rendered_prompt.encode("utf-8"))
+            attempt_number = round_context.attempt_number
+            current_lane_id = round_context.lane_id
+            round_config = round_context.round_config
+            phase_number = round_context.phase_number
 
             if args.dry_run:
-                info(f"Dry run complete. Prompt written to {prompt_path}")
+                info(f"Dry run complete. Prompt written to {round_context.prompt_path}")
                 break
 
             starting_head = get_head_sha()
             info(f"Starting round {attempt_number} (phase {phase_number}).")
             codex_exit_code = invoke_runner_round(
-                prompt_path=prompt_path,
+                prompt_path=round_context.prompt_path,
                 schema_path=schema_path,
-                assistant_output_path=assistant_output_path,
-                events_log_path=events_log_path,
-                progress_log_path=progress_log_path,
+                assistant_output_path=round_context.assistant_output_path,
+                events_log_path=round_context.events_log_path,
+                progress_log_path=round_context.progress_log_path,
                 config=config,
                 support=runner_support,
             )
             rounds_executed += 1
 
-            result: dict[str, Any] | None = None
-            parse_error: str | None = None
-            stderr_log_path = events_log_path.with_suffix(".stderr.log")
-            if assistant_output_path.exists():
-                try:
-                    parsed_result = read_json(assistant_output_path)
-                    if isinstance(parsed_result, dict):
-                        result = parsed_result
-                    else:
-                        parse_error = "Agent output JSON was not an object."
-                except json.JSONDecodeError as exc:
-                    parse_error = str(exc)
-
-            ending_head = get_head_sha()
-            working_tree_dirty = is_working_tree_dirty()
-            failure_reason: str | None = None
-
-            if codex_exit_code != 0:
-                stderr_text = stderr_log_path.read_text(encoding="utf-8", errors="replace") if stderr_log_path.exists() else ""
-                if "input is not valid UTF-8" in stderr_text:
-                    failure_reason = "runner could not read the round prompt as UTF-8."
-                else:
-                    failure_reason = f"runner exited with code {codex_exit_code}."
-            elif result is None:
-                failure_reason = (
-                    f"Could not parse agent output JSON: {parse_error}"
-                    if parse_error
-                    else "Agent output JSON was not created."
-                )
-
-            if not failure_reason and result is not None:
-                failure_reason = validate_round_result(
-                    attempt_number=attempt_number,
-                    result=result,
-                    schema=schema,
-                    phase_doc_relative_path=phase_doc_relative_path,
-                    expected_lane_id=current_lane_id,
-                    config=round_config,
-                    ending_head=ending_head,
-                    working_tree_dirty=working_tree_dirty,
-                    support=validation_support,
-                )
+            round_evaluation = evaluate_round_execution(
+                round_context=round_context,
+                codex_exit_code=codex_exit_code,
+                schema=schema,
+                validation_support=validation_support,
+                support=round_flow_support,
+            )
+            result = round_evaluation.result
+            ending_head = round_evaluation.ending_head
+            working_tree_dirty = round_evaluation.working_tree_dirty
+            failure_reason = round_evaluation.failure_reason
 
             state["current_round"] = int(state["current_round"]) + 1
             history_entry = build_history_entry(
