@@ -27,6 +27,7 @@ import {
 } from './obsidian_debug_hot_reload_support.mjs';
 import { detectAdapterSupport } from './obsidian_debug_adapter_support.mjs';
 import { detectAgenticSupport } from './obsidian_debug_agentic_support.mjs';
+import { detectControlBackends } from './obsidian_debug_control_backend_support.mjs';
 import { detectEcosystemSupport } from './obsidian_debug_ecosystem_support.mjs';
 import { discoverLogstravaganzaCapture } from './obsidian_debug_logstravaganza.mjs';
 import {
@@ -52,6 +53,11 @@ Common options:
   --vault-uri <uri>                 Optional obsidian:// URI for auto-launch fixes.
   --vault-path <path>               Optional vault/file path for auto-launch fixes.
   --cdp-host <host> --cdp-port <n>  CDP endpoint. Defaults to 127.0.0.1:9222.
+  --agentic-rest-base-url <url>     Optional local REST/MCP HTTP endpoint to probe.
+  --agentic-rest-api-key <key>      Optional API key for REST/MCP tools endpoint.
+  --agentic-rest-health-path <path> Health path for REST/MCP probe. Defaults to /health.
+  --agentic-rest-tools-path <path>  Tools path for REST/MCP probe. Defaults to /tools.
+  --agentic-probe-timeout-ms <n>    Per-request timeout for agentic probes. Defaults to 2000.
   --platform <auto|windows|bash>    Fix-plan command platform.
   --output <path>                   Doctor JSON output path.
   --fix                            Emit reviewable fix scripts/plan.
@@ -69,6 +75,11 @@ const vaultPath = getStringOption(options, 'vault-path', '').trim();
 const cdpHost = getStringOption(options, 'cdp-host', '127.0.0.1');
 const cdpPort = getNumberOption(options, 'cdp-port', 9222);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '');
+const agenticRestBaseUrl = getStringOption(options, 'agentic-rest-base-url', '').trim();
+const agenticRestApiKey = getStringOption(options, 'agentic-rest-api-key', '').trim();
+const agenticRestHealthPath = getStringOption(options, 'agentic-rest-health-path', '/health').trim() || '/health';
+const agenticRestToolsPath = getStringOption(options, 'agentic-rest-tools-path', '/tools').trim() || '/tools';
+const agenticProbeTimeoutMs = Math.max(250, getNumberOption(options, 'agentic-probe-timeout-ms', 2000));
 const outputPath = getStringOption(options, 'output', '').trim();
 const platform = normalizePlatform(getStringOption(options, 'platform', 'auto'));
 const fixRequested = getBooleanOption(options, 'fix', false);
@@ -310,6 +321,11 @@ const ecosystemSupport = await detectEcosystemSupport({ repoDir });
 const agenticSupport = await detectAgenticSupport({
   repoDir,
   testVaultPluginDir,
+  restBaseUrl: agenticRestBaseUrl,
+  restApiKey: agenticRestApiKey,
+  restHealthPath: agenticRestHealthPath,
+  restToolsPath: agenticRestToolsPath,
+  probeTimeoutMs: agenticProbeTimeoutMs,
 });
 const reviewReadiness = await detectReviewReadiness({ repoDir });
 const preflightSupport = await detectPreflightSupport({
@@ -398,6 +414,32 @@ const appLaunchFixes = [
       ...(vaultName ? ['--vault-name', '{{vaultName}}'] : []),
       ...(vaultUri ? ['--vault-uri', vaultUri] : []),
       ...(vaultPath ? ['--vault-path', vaultPath] : []),
+      '--cdp-host',
+      '{{cdpHost}}',
+      '--cdp-port',
+      '{{cdpPort}}',
+    ],
+    cwd: '{{repoDir}}',
+  },
+];
+const cdpRecoveryFixes = [
+  {
+    id: 'recover-cdp-port',
+    label: 'Recover CDP by relaunching or restarting Obsidian',
+    summary: 'Runs the launch helper in CDP mode so it first tries launch/focus recovery and then performs one platform-specific restart fallback if the debug port is still missing.',
+    safety: 'launches-app',
+    dryRunFriendly: false,
+    executable: 'node',
+    args: [
+      '{{toolRoot}}/scripts/obsidian_debug_launch_app.mjs',
+      '--mode',
+      'cdp',
+      '--obsidian-command',
+      '{{obsidianCommand}}',
+      ...(appPath ? ['--app-path', appPath] : []),
+      ...(vaultName ? ['--vault-name', '{{vaultName}}'] : []),
+      ...(vaultUri ? ['--vault-uri', vaultUri] : []),
+      ...(vaultPath ? ['--vault-path', '{{vaultPath}}'] : []),
       '--cdp-host',
       '{{cdpHost}}',
       '--cdp-port',
@@ -828,6 +870,100 @@ if (testVaultPluginDir) {
   );
 }
 
+const agenticControlSurfaces = agenticSupport.controlSurfaces ?? {};
+const agenticSurfaceEntries = Object.entries(agenticControlSurfaces);
+const detectedAgenticSurfaces = agenticSurfaceEntries.filter(([, surface]) => surface?.detected);
+const availableAgenticSurfaces = agenticSurfaceEntries.filter(([, surface]) => surface?.available);
+const restProbe = agenticSupport.runtimeProbes?.rest ?? {};
+const aiSafety = agenticSupport.aiSafety ?? {};
+const aiSecretStorageStatus = aiSafety.keyMaterial?.present
+  ? (aiSafety.secretStorage?.present ? 'pass' : 'warn')
+  : 'info';
+const aiNetworkBoundaryStatus = aiSafety.externalRequests?.present
+  ? ((aiSafety.settingsPrivacy?.present || aiSafety.redaction?.present) ? 'pass' : 'warn')
+  : 'info';
+const mcpRestSecurityStatus = restProbe.configured
+  ? (restProbe.ok && restProbe.localhost && restProbe.authProvided && restProbe.toolAllowlist ? 'pass' : 'warn')
+  : (agenticControlSurfaces.mcpRest?.detected ? 'info' : 'info');
+
+checks.push(
+  check(
+    restProbe.configured && !restProbe.ok
+      ? 'warn'
+      : detectedAgenticSurfaces.length > 0
+        ? (availableAgenticSurfaces.length > 0 ? 'pass' : 'info')
+        : 'info',
+    'agentic-control-surfaces',
+    'agentic',
+    detectedAgenticSurfaces.length > 0
+      ? `Optional agentic control surface heuristics detected: ${detectedAgenticSurfaces.map(([name]) => name).join(', ')}.`
+      : 'No optional MCP/REST/DevTools/AI control surface heuristics were detected.',
+    {
+      heuristic: true,
+      controlSurfaces: agenticControlSurfaces,
+      runtimeProbes: agenticSupport.runtimeProbes ?? {},
+      recommendations: agenticSupport.recommendations ?? [],
+    },
+  ),
+);
+checks.push(
+  check(
+    aiSecretStorageStatus,
+    'ai-plugin-secret-storage',
+    'agentic',
+    aiSafety.keyMaterial?.present
+      ? aiSafety.secretStorage?.present
+        ? 'AI key/token-like signals are paired with SecretStorage evidence.'
+        : 'AI key/token-like signals were found without SecretStorage evidence.'
+      : 'No AI key/token-like storage signals were detected.',
+    {
+      heuristic: true,
+      keyMaterial: aiSafety.keyMaterial ?? null,
+      secretStorage: aiSafety.secretStorage ?? null,
+      redaction: aiSafety.redaction ?? null,
+      warnings: aiSafety.summary?.warnings ?? [],
+    },
+  ),
+);
+checks.push(
+  check(
+    aiNetworkBoundaryStatus,
+    'ai-plugin-network-boundary',
+    'agentic',
+    aiSafety.externalRequests?.present
+      ? (aiSafety.settingsPrivacy?.present || aiSafety.redaction?.present)
+        ? 'External request signals have user-facing settings/privacy or redaction evidence.'
+        : 'External request signals were found without user-facing settings/privacy or redaction evidence.'
+      : 'No external request signals were detected in AI-plugin safety heuristics.',
+    {
+      heuristic: true,
+      externalRequests: aiSafety.externalRequests ?? null,
+      settingsPrivacy: aiSafety.settingsPrivacy ?? null,
+      redaction: aiSafety.redaction ?? null,
+      warnings: aiSafety.summary?.warnings ?? [],
+    },
+  ),
+);
+checks.push(
+  check(
+    mcpRestSecurityStatus,
+    'mcp-rest-security',
+    'agentic',
+    restProbe.configured
+      ? restProbe.ok && restProbe.localhost && restProbe.authProvided && restProbe.toolAllowlist
+        ? 'REST/MCP runtime probe reached a localhost endpoint with auth and tool allowlist evidence.'
+        : 'REST/MCP runtime probe lacks confirmed localhost, auth, tool allowlist, or availability evidence.'
+      : agenticControlSurfaces.mcpRest?.detected
+        ? 'MCP/REST heuristic signals were detected; pass --agentic-rest-base-url to probe runtime security boundaries.'
+        : 'No MCP/REST runtime endpoint was provided or detected.',
+    {
+      heuristic: true,
+      runtimeProbe: restProbe,
+      mcpRest: agenticControlSurfaces.mcpRest ?? null,
+    },
+  ),
+);
+
 checks.push(
   check(
     agenticSupport.errors.length > 0 ? 'warn' : 'info',
@@ -1136,10 +1272,61 @@ try {
         port: cdpPort,
         targetTitleContains: cdpTargetTitleContains || null,
       },
-      [...appLaunchFixes, ...cdpProbeFixes],
+      [...cdpRecoveryFixes, ...cdpProbeFixes],
     ),
   );
 }
+
+const controlBackends = detectControlBackends({
+  doctorDocument: {
+    repoDir,
+    obsidianCommand,
+    vaultName,
+    cdp: {
+      host: cdpHost,
+      port: cdpPort,
+      available: checks.some((entry) => entry.id === 'cdp-target' && entry.status === 'pass'),
+    },
+    checks,
+    adapterLanes: adapterSupport.adapters,
+    agenticSupport,
+  },
+});
+const availableControlBackends = Object.values(controlBackends.backends).filter((entry) => entry.available);
+const detectedControlBackends = Object.values(controlBackends.backends).filter((entry) => entry.detected);
+checks.push(
+  check(
+    availableControlBackends.length > 0 ? 'pass' : detectedControlBackends.length > 0 ? 'warn' : 'info',
+    'control-backend-routing',
+    'control-backend',
+    availableControlBackends.length > 0
+      ? `Control backend abstraction has available backend(s): ${availableControlBackends.map((entry) => entry.id).join(', ')}.`
+      : detectedControlBackends.length > 0
+        ? `Control backend abstraction detected backend(s) that still need runtime confirmation: ${detectedControlBackends.map((entry) => entry.id).join(', ')}.`
+        : 'No runtime control backend is confirmed; use doctor fixes to enable CLI/CDP before running GUI capture.',
+    {
+      backends: controlBackends.backends,
+      selections: controlBackends.selections,
+      recommendations: controlBackends.recommendations,
+      boundary: controlBackends.boundary,
+    },
+  ),
+);
+checks.push(
+  check(
+    controlBackends.selections.visualReview?.backendId ? 'info' : 'warn',
+    'visual-review-pack',
+    'visual',
+    controlBackends.selections.visualReview?.backendId
+      ? `Visual review pack can be generated after screenshot capture via ${controlBackends.selections.visualReview.backendId}; it remains a human-review artifact, not proof of full manual GUI validation.`
+      : 'No screenshot-capable backend was routed for visual review; enable CLI/CDP/Playwright capture first.',
+    {
+      selection: controlBackends.selections.visualReview ?? null,
+      script: path.join(toolRoot, 'scripts', 'obsidian_debug_visual_review.mjs'),
+      canReplaceManualGuiValidation: false,
+    },
+  ),
+);
 
 const status = checks.reduce((current, entry) => (statusRank(entry.status) > statusRank(current) ? entry.status : current), 'pass');
 const categoryCounts = checks.reduce((counts, entry) => {
@@ -1203,6 +1390,7 @@ const report = {
   },
   preflight: preflightSupport,
   adapterLanes: adapterSupport.adapters,
+  controlBackends,
   ecosystem: {
     tools: ecosystemSupport.tools,
     scripts: ecosystemSupport.scripts,

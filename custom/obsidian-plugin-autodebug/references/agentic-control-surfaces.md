@@ -18,3 +18,27 @@ Quick rule:
 - Need reload, console/errors, screenshot, DOM on live plugin runtime: choose CLI/CDP/DevTools MCP lanes.
 - Need vault notes/files only: choose Vault MCP/Nexus-style lanes.
 - Need MCP server introspection/debugging: choose MCP Inspector.
+
+## Backend Contract
+
+The skill now exposes a compact control backend abstraction so agents do not have to guess which surface to use for every step.
+
+Generate it from doctor/diagnosis evidence:
+
+```bash
+node scripts/obsidian_debug_control_backend_support.mjs \
+  --doctor .obsidian-debug/doctor.json \
+  --diagnosis .obsidian-debug/diagnosis.json \
+  --output .obsidian-debug/control-backends.json
+```
+
+Backend ids:
+
+- `obsidian-cli`: local developer commands for reload, console/errors, screenshot, DOM, and scenarios.
+- `bundled-cdp`: bundled CDP scripts for console/error trace, screenshot, DOM, scenario, and network/perf inspection.
+- `obsidian-cli-rest`: local REST/MCP bridge when probed with localhost/auth/allowlist evidence.
+- `chrome-devtools-mcp`: agent-native DevTools backend after target selection is confirmed.
+- `playwright-script`: repo-owned Playwright/WDIO/E2E script lane for locator assertions and visual review evidence.
+- `playwright-mcp`: agent-native Playwright backend for snapshot/click/fill/screenshot style UI work.
+
+Capability routing is advisory, not magic. External MCP/REST backends still need the agent runtime to provide actual callable tools. Local scripts can execute `obsidian-cli`, `bundled-cdp`, and `playwright-script` paths directly; DevTools MCP and Playwright MCP remain agent-native external backends unless the current runtime exposes their tools.

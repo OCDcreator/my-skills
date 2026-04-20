@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   ensureParentDirectory,
   getNumberOption,
@@ -73,14 +74,21 @@ async function exists(filePath) {
 
 function runProcess(command, args = [], timeoutMs = 5000) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let child;
+
+    try {
+      child = spawn(command, args, {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      resolve({ ok: false, exitCode: null, stdout, stderr: describeError(error), timedOut: false });
+      return;
+    }
+
     const timeout = setTimeout(() => {
       if (!settled) {
         settled = true;
@@ -114,11 +122,6 @@ function runProcess(command, args = [], timeoutMs = 5000) {
 
 function spawnAndForget(command, args = [], { detached = true } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      detached,
-      windowsHide: true,
-      stdio: 'ignore',
-    });
     let settled = false;
     const finish = (result) => {
       if (!settled) {
@@ -126,6 +129,17 @@ function spawnAndForget(command, args = [], { detached = true } = {}) {
         resolve(result);
       }
     };
+    let child;
+    try {
+      child = spawn(command, args, {
+        detached,
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch (error) {
+      finish({ ok: false, detail: describeError(error), command, args });
+      return;
+    }
     child.on('error', (error) => finish({ ok: false, detail: describeError(error), command, args }));
     if (detached) {
       child.once('spawn', () => {
@@ -157,6 +171,10 @@ function buildVaultUri() {
     return `obsidian://open?path=${encodeURIComponent(path.resolve(vaultPath))}`;
   }
   return '';
+}
+
+function helperScriptPath(fileName) {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), fileName);
 }
 
 async function defaultWindowsAppPath() {
@@ -270,14 +288,16 @@ async function probeReadiness() {
 async function launchWindows(uri) {
   const steps = [];
   const resolvedAppPath = await defaultWindowsAppPath();
+  let launchedAppDirectly = false;
   if (mode === 'cdp' && resolvedAppPath) {
     steps.push(await spawnAndForget(resolvedAppPath, [`--remote-debugging-port=${cdpPort}`]));
+    launchedAppDirectly = true;
   }
   if (uri) {
     steps.push(await spawnAndForget('cmd', ['/c', 'start', '', uri], { detached: false }));
-  } else if (resolvedAppPath) {
+  } else if (resolvedAppPath && !launchedAppDirectly) {
     steps.push(await spawnAndForget(resolvedAppPath, mode === 'cdp' ? [`--remote-debugging-port=${cdpPort}`] : []));
-  } else {
+  } else if (!launchedAppDirectly) {
     steps.push({ ok: false, detail: 'No Obsidian app path or vault URI was available to launch.' });
   }
   return steps;
@@ -311,6 +331,91 @@ async function launchLinux(uri) {
   return steps;
 }
 
+async function restartForCdp() {
+  const vaultTargetUri = buildVaultUri();
+  const waitSeconds = Math.max(1, Math.ceil(waitMs / 1000));
+
+  if (process.platform === 'darwin') {
+    const resolvedAppPath = await defaultMacAppPath();
+    const scriptPath = helperScriptPath('obsidian_mac_restart_cdp.sh');
+    const result = await runProcess(
+      'bash',
+      [
+        scriptPath,
+        resolvedAppPath,
+        String(cdpPort),
+        String(waitSeconds),
+        vaultTargetUri,
+      ].filter((entry) => entry.length > 0),
+      waitMs + 5000,
+    );
+    return {
+      attempted: true,
+      platform: 'darwin',
+      scriptPath,
+      appPath: resolvedAppPath,
+      ok: result.ok,
+      stdout: result.stdout.trim(),
+      stderr: result.stderr.trim(),
+      timedOut: result.timedOut,
+      detail: result.ok
+        ? (result.stdout.trim() || 'macOS CDP restart helper succeeded.')
+        : (result.stderr.trim() || result.stdout.trim() || 'macOS CDP restart helper failed.'),
+    };
+  }
+
+  if (process.platform === 'win32') {
+    const resolvedAppPath = await defaultWindowsAppPath();
+    if (!resolvedAppPath || !(await exists(resolvedAppPath))) {
+      return {
+        attempted: true,
+        platform: 'win32',
+        ok: false,
+        detail: 'No restartable Obsidian app executable was found for Windows CDP fallback.',
+      };
+    }
+    const scriptPath = helperScriptPath('obsidian_windows_restart_cdp.ps1');
+    const result = await runProcess(
+      'powershell',
+      [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptPath,
+        '-AppPath',
+        resolvedAppPath,
+        '-Port',
+        String(cdpPort),
+        '-WaitSeconds',
+        String(waitSeconds),
+        ...(vaultTargetUri ? ['-VaultUri', vaultTargetUri] : []),
+      ],
+      waitMs + 5000,
+    );
+    return {
+      attempted: true,
+      platform: 'win32',
+      scriptPath,
+      appPath: resolvedAppPath,
+      ok: result.ok,
+      stdout: result.stdout.trim(),
+      stderr: result.stderr.trim(),
+      timedOut: result.timedOut,
+      detail: result.ok
+        ? (result.stdout.trim() || 'Windows CDP restart helper succeeded.')
+        : (result.stderr.trim() || result.stdout.trim() || 'Windows CDP restart helper failed.'),
+    };
+  }
+
+  return {
+    attempted: true,
+    platform: process.platform,
+    ok: false,
+    detail: 'CDP restart fallback is only implemented for Windows and macOS.',
+  };
+}
+
 async function launchApp() {
   const uri = buildVaultUri();
   if (process.platform === 'win32') {
@@ -325,6 +430,12 @@ async function launchApp() {
 const initialReadiness = await probeReadiness();
 let launchSteps = [];
 let finalReadiness = initialReadiness;
+let cdpRestartFallback = {
+  attempted: false,
+  ok: false,
+  readyAfterRestart: false,
+  detail: null,
+};
 
 if (!initialReadiness.ok) {
   launchSteps = await launchApp();
@@ -334,6 +445,21 @@ if (!initialReadiness.ok) {
     finalReadiness = await probeReadiness();
     if (finalReadiness.ok) {
       break;
+    }
+  }
+}
+
+if (mode === 'cdp' && !finalReadiness.ok) {
+  cdpRestartFallback = await restartForCdp();
+  if (cdpRestartFallback.ok) {
+    const deadline = Date.now() + waitMs;
+    while (Date.now() <= deadline) {
+      await sleep(pollIntervalMs);
+      finalReadiness = await probeReadiness();
+      if (finalReadiness.ok) {
+        cdpRestartFallback.readyAfterRestart = true;
+        break;
+      }
     }
   }
 }
@@ -357,10 +483,11 @@ const report = {
   },
   initialReadiness,
   launchSteps,
+  cdpRestartFallback,
   finalReadiness,
   recommendation: finalReadiness.ok
     ? 'Continue with build/deploy/reload/capture automation.'
-    : 'Launch or focus Obsidian manually, confirm the target vault is open, or use a CDP restart helper when an already-running app lacks a debug port.',
+    : 'Launch or focus Obsidian manually, confirm the target vault is open, or inspect the platform CDP restart helper when an already-running app lacks a debug port.',
 };
 
 if (outputPath) {

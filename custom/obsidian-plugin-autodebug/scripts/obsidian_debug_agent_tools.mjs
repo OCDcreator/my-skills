@@ -9,6 +9,7 @@ import {
   parseArgs,
   printHelpAndExit,
 } from './obsidian_cdp_common.mjs';
+import { detectControlBackends } from './obsidian_debug_control_backend_support.mjs';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -314,9 +315,14 @@ function inferControlSurfaces({ summary, diagnosis, doctor }) {
     ...findValuesByKeyPattern(agenticSupport, /(devtools.*mcp|chrome.*mcp|cdp.*mcp)/i),
     ...findValuesByKeyPattern(doctor, /(devtools.*mcp|chrome.*mcp|cdp.*mcp)/i),
   ];
+  const playwrightMcpCandidates = [
+    ...findValuesByKeyPattern(agenticSupport, /(playwright.*mcp|mcp.*playwright)/i),
+    ...findValuesByKeyPattern(doctor, /(playwright.*mcp|mcp.*playwright)/i),
+  ];
 
   const mcpRestDerived = mcpRestCandidates.map((entry) => deriveSurfaceFromNode(entry))[0] ?? { detected: false, available: false, detail: '' };
   const devtoolsMcpDerived = devtoolsMcpCandidates.map((entry) => deriveSurfaceFromNode(entry))[0] ?? { detected: false, available: false, detail: '' };
+  const playwrightMcpDerived = playwrightMcpCandidates.map((entry) => deriveSurfaceFromNode(entry))[0] ?? { detected: false, available: false, detail: '' };
 
   return {
     cli: buildControlSurface({
@@ -358,6 +364,12 @@ function inferControlSurfaces({ summary, diagnosis, doctor }) {
       available: devtoolsMcpDerived.available,
       detail: devtoolsMcpDerived.detail,
       source: devtoolsMcpCandidates.length > 0 ? 'doctor.agenticSupport' : 'inferred',
+    }),
+    playwrightMcp: buildControlSurface({
+      detected: playwrightMcpDerived.detected,
+      available: playwrightMcpDerived.available,
+      detail: playwrightMcpDerived.detail,
+      source: playwrightMcpCandidates.length > 0 ? 'doctor.agenticSupport' : 'inferred',
     }),
   };
 }
@@ -503,6 +515,52 @@ function collectSafeActions({
     }, warnings);
   }
 
+  if (diagnosisPath) {
+    const diagnosisDir = path.dirname(path.resolve(diagnosisPath));
+    pushSafeAction(actions, {
+      id: 'generate-visual-review',
+      label: 'Generate visual review pack',
+      safety: 'read-only',
+      runnable: true,
+      dryRunFriendly: true,
+      command: renderCommand('node', [
+        'scripts/obsidian_debug_visual_review.mjs',
+        '--diagnosis',
+        diagnosisPath,
+        '--output',
+        path.join(diagnosisDir, 'visual-review.json'),
+        '--html-output',
+        path.join(diagnosisDir, 'visual-review.html'),
+      ]),
+      cwd: stringValue(metadata.repoDir),
+      source: 'derived',
+    }, warnings);
+  }
+
+  if (doctorPath || diagnosisPath || summaryPath) {
+    const commandArgs = ['scripts/obsidian_debug_control_backend_support.mjs'];
+    if (summaryPath) {
+      commandArgs.push('--summary', summaryPath);
+    }
+    if (diagnosisPath) {
+      commandArgs.push('--diagnosis', diagnosisPath);
+    }
+    if (doctorPath) {
+      commandArgs.push('--doctor', doctorPath);
+    }
+    commandArgs.push('--output', path.join(path.dirname(path.resolve(doctorPath || diagnosisPath || summaryPath)), 'control-backends.json'));
+    pushSafeAction(actions, {
+      id: 'generate-control-backends',
+      label: 'Generate control backend routing',
+      safety: 'read-only',
+      runnable: true,
+      dryRunFriendly: true,
+      command: renderCommand('node', commandArgs),
+      cwd: stringValue(metadata.repoDir),
+      source: 'derived',
+    }, warnings);
+  }
+
   if (summaryPath || diagnosisPath || doctorPath) {
     const commandArgs = ['scripts/obsidian_debug_agent_tools.mjs'];
     if (summaryPath) {
@@ -573,6 +631,14 @@ async function collectEvidence({
   push('doctor', 'input', doctorPath, false);
   push('reportHtml', 'input', reportPath, false);
   push('agentTools', 'output', outputPath, true);
+  if (diagnosisPath) {
+    const diagnosisDir = path.dirname(path.resolve(diagnosisPath));
+    push('visualReview', 'derived', path.join(diagnosisDir, 'visual-review.json'));
+    push('visualReviewHtml', 'derived', path.join(diagnosisDir, 'visual-review.html'));
+    push('controlBackends', 'derived', path.join(diagnosisDir, 'control-backends.json'));
+  } else if (doctorPath) {
+    push('controlBackends', 'derived', path.join(path.dirname(path.resolve(doctorPath)), 'control-backends.json'));
+  }
 
   const artifacts = asObject(diagnosis.artifacts);
   push('screenshot', 'diagnosis.artifacts', artifacts.screenshot);
@@ -664,6 +730,13 @@ function collectWarnings({
     }
   }
 
+  const controlBackends = asObject(doctor.controlBackends);
+  for (const backend of Object.values(asObject(controlBackends.backends))) {
+    if (backend?.detected && !backend?.available) {
+      warnings.push(`Control backend "${backend.id || backend.label || 'unknown'}" is detected but not confirmed runnable.`);
+    }
+  }
+
   const mcpSignalsText = JSON.stringify({
     agenticSupport: doctor.agenticSupport ?? null,
     checks: doctor.checks ?? [],
@@ -744,6 +817,13 @@ export async function generateAgentToolsManifest({
     diagnosis,
     doctor,
   });
+  const controlBackends = Object.keys(asObject(doctor.controlBackends)).length > 0
+    ? doctor.controlBackends
+    : detectControlBackends({
+        summaryDocument: summary,
+        diagnosisDocument: diagnosis,
+        doctorDocument: doctor,
+      });
   const safeActionResult = collectSafeActions({
     summaryPath: resolvedSummaryPath || diagnosis.runtime?.summaryPath || null,
     diagnosisPath: resolvedDiagnosisPath || null,
@@ -776,6 +856,7 @@ export async function generateAgentToolsManifest({
   const manifest = {
     metadata,
     controlSurfaces,
+    controlBackends,
     safeActions: safeActionResult.actions,
     evidence,
     nextRecommendations,

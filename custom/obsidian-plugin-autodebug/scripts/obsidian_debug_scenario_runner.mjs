@@ -39,7 +39,8 @@ Common options:
   --obsidian-command <cmd>           Required for CLI-backed steps.
   --vault-name <name>                Vault name for CLI commands.
   --surface-profile <path>           Plugin surface metadata.
-  --adapter <cli|cdp|playwright>     Scenario adapter when supported.
+  --control-backend <id>             Backend id alias: obsidian-cli, bundled-cdp, playwright-script.
+  --adapter <cli|playwright>         Scenario adapter when supported.
   --dry-run                          Resolve strategy without touching Obsidian.
   --output <path>                    Scenario report JSON output.
 `);
@@ -59,6 +60,7 @@ const cdpPort = getNumberOption(options, 'cdp-port', 0);
 const cdpTargetTitleContains = getStringOption(options, 'cdp-target-title-contains', '').trim();
 const dryRun = getBooleanOption(options, 'dry-run', false);
 const cliAvailable = getBooleanOption(options, 'cli-available', obsidianCommand.length > 0);
+const controlBackendOption = getStringOption(options, 'control-backend', '').trim();
 const scenarioAdapterOption = getStringOption(
   options,
   'scenario-adapter',
@@ -94,6 +96,36 @@ function numberValue(value, fallback = 0) {
 
 function booleanValue(value, fallback = false) {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function adapterFromControlBackend(backendId) {
+  const normalized = String(backendId ?? '').trim().toLowerCase();
+  switch (normalized) {
+    case 'obsidian-cli':
+    case 'cli':
+      return 'cli';
+    case 'bundled-cdp':
+    case 'cdp':
+      return 'cli';
+    case 'playwright-script':
+    case 'playwright':
+      return 'playwright';
+    default:
+      return '';
+  }
+}
+
+function defaultBackendForAdapter(adapter) {
+  switch (adapter) {
+    case 'cli':
+      return 'obsidian-cli';
+    case 'cdp':
+      return 'bundled-cdp';
+    case 'playwright':
+      return 'playwright-script';
+    default:
+      return null;
+  }
 }
 
 async function pathExists(filePath) {
@@ -173,11 +205,14 @@ function runObsidianCli(command, args) {
 const scenarioPath = resolveScenarioPath();
 const scenario = JSON.parse(await fs.readFile(scenarioPath, 'utf8'));
 const scenarioPlaywright = asObject(scenario.playwright);
+const controlBackendAdapter = adapterFromControlBackend(controlBackendOption);
 const scenarioAdapter = normalizeScenarioAdapter(
   scenarioAdapterOption
+    || controlBackendAdapter
     || stringValue(scenario.adapter)
     || (Object.keys(scenarioPlaywright).length > 0 ? 'playwright' : 'cli'),
 );
+const selectedControlBackend = controlBackendOption || defaultBackendForAdapter(scenarioAdapter);
 const playwrightArtifacts = resolvePlaywrightArtifactPaths({
   outputPath,
   tracePath: playwrightTracePathOption || stringValue(scenarioPlaywright.tracePath),
@@ -237,6 +272,9 @@ let playwrightTraceDetail = resolvedPlaywrightTraceRequested ? 'Trace capture is
 let playwrightScreenshotCaptured = false;
 let playwrightScreenshotPath = null;
 const warnings = [];
+if (controlBackendOption && !controlBackendAdapter) {
+  warnings.push(`Control backend ${controlBackendOption} cannot be executed by the local scenario runner; use the agent-native MCP/REST client for that backend or choose obsidian-cli, bundled-cdp, or playwright-script.`);
+}
 
 async function getCdpSession() {
   if (cdpSession) {
@@ -833,6 +871,7 @@ const report = {
   generatedAt: nowIso(),
   success,
   adapter: scenarioAdapter,
+  controlBackend: selectedControlBackend,
   scenarioName: scenario.name ?? scenarioName ?? path.basename(scenarioPath, '.json'),
   description: scenario.description ?? '',
   scenarioPath,

@@ -297,7 +297,7 @@
       "id": 21,
       "name": "agent-handoff-manifest-usage",
       "prompt": "这轮你先别继续修，先生成一个给下一位 agent 的 handoff manifest：告诉对方有哪些可用控制面、哪些证据文件、下一步 safe actions，且不能带任何密钥。",
-      "expected_output": "Uses the planned agent handoff manifest pattern to capture safe actions, detected control surfaces, and evidence paths without embedding secrets, and positions it for model-to-model continuation.",
+      "expected_output": "Uses the handoff manifest pattern to capture safe actions, detected control surfaces, and evidence paths without embedding secrets, and positions it for model-to-model continuation.",
       "files": [
         "references/command-reference.md"
       ],
@@ -305,6 +305,100 @@
         "References the handoff manifest workflow for model-to-model continuation.",
         "Includes control-surface and evidence-path context in the handoff payload.",
         "Explicitly avoids secret or token material in the manifest."
+      ]
+    },
+    {
+      "id": 22,
+      "name": "cdp-restart-fallback-on-missing-port",
+      "prompt": "Obsidian 已经开着，但不是带调试端口启动的。现在我要走 CDP 链路；如果自动聚焦后还是连不上 9222，就自动强制重启 Obsidian，带上 remote-debugging-port，再继续 CDP reload/capture。",
+      "expected_output": "Uses the launch helper in CDP mode, attempts normal launch or focus recovery first, then performs one platform-specific restart fallback on Windows or macOS when the debug port is still unavailable, and records that recovery in the app-launch artifact.",
+      "files": [
+        "scripts/obsidian_debug_launch_app.mjs",
+        "scripts/obsidian_windows_restart_cdp.ps1",
+        "scripts/obsidian_mac_restart_cdp.sh"
+      ],
+      "expectations": [
+        "Keeps restart as a secondary fallback after ordinary launch or focus recovery fails.",
+        "Uses a platform-specific restart helper on Windows or macOS instead of vague manual instructions.",
+        "Records whether the CDP restart fallback was attempted and whether CDP became reachable afterward."
+      ]
+    },
+    {
+      "id": 23,
+      "name": "agentic-ai-security-and-rest-probe",
+      "prompt": "这个 AI 插件有 Obsidian CLI REST/MCP 桥，也会调用第三方模型。请先跑 doctor 的 agentic checks：确认 SecretStorage、脱敏、外部请求边界、localhost/auth/tool whitelist，再把结果放进 handoff 工具包。",
+      "expected_output": "Uses the optional agentic support detector and doctor checks to validate AI-plugin safety evidence plus local REST/MCP endpoint boundaries before generating a secret-free agent handoff manifest.",
+      "files": [
+        "scripts/obsidian_debug_agentic_support.mjs",
+        "scripts/obsidian_debug_doctor.mjs",
+        "scripts/obsidian_debug_agent_tools.mjs",
+        "references/command-reference.md"
+      ],
+      "expectations": [
+        "Checks `ai-plugin-secret-storage` and `ai-plugin-network-boundary` instead of only generic warnings.",
+        "Checks `mcp-rest-security` for localhost, auth, and tool whitelist evidence.",
+        "Keeps all API keys out of `agent-tools.json` and other handoff artifacts."
+      ]
+    },
+    {
+      "id": 24,
+      "name": "screenshot-human-review-boundary",
+      "prompt": "真实 GUI 人眼验证能不能靠截图自动化？给我一个截图/DOM/场景报告组成的审查包，但不要说它等于完整人工 GUI 验证。",
+      "expected_output": "Generates or recommends a visual-review pack from screenshot, DOM, scenario, and comparison evidence while clearly stating that screenshots support human review but do not replace full manual GUI validation.",
+      "files": [
+        "scripts/obsidian_debug_visual_review.mjs",
+        "AGENT-QUICKSTART.md",
+        "SKILL.md"
+      ],
+      "expectations": [
+        "Uses `visual-review.json/html` or the visual review script as the handoff artifact.",
+        "Includes a human checklist for blank panes, clipping, visible errors, contrast, and target surface reachability.",
+        "Explicitly refuses to claim screenshot-only proof of full manual GUI validation."
+      ]
+    },
+    {
+      "id": 25,
+      "name": "control-backend-abstraction",
+      "prompt": "环境里同时有 CLI、CDP、Chrome DevTools MCP、Playwright MCP 和 REST 桥。不要只探测，给我一个可切换 backend 的能力路由表：reload、console、DOM、screenshot、scenario、locator 分别走谁。",
+      "expected_output": "Builds a control-backends routing manifest that maps core debug capabilities to CLI, bundled CDP, REST/MCP, Chrome DevTools MCP, repo Playwright, or Playwright MCP while distinguishing executable local backends from external agent-native descriptors.",
+      "files": [
+        "scripts/obsidian_debug_control_backend_support.mjs",
+        "references/agentic-control-surfaces.md",
+        "references/command-reference.md"
+      ],
+      "expectations": [
+        "Includes backend ids and per-capability selections.",
+        "Distinguishes locally executable CLI/CDP/Playwright-script lanes from MCP/REST runtime tool descriptors.",
+        "Records backend routing in doctor or agent handoff outputs."
+      ]
+    },
+    {
+      "id": 26,
+      "name": "from-zero-production-tooling",
+      "prompt": "我从零开发一个真实 Obsidian 插件，不是只要一个最小 fixture。请把官方规则、sample plugin、generator、obsidian-dev-utils、eslint、E2E 工具怎么接入说清楚。",
+      "expected_output": "Routes real from-zero plugin work through the production tooling reference, separates official/sample/generator paths from the minimal autodebug fixture, and includes official review/lint/runtime smoke integration points.",
+      "files": [
+        "references/plugin-development-tooling.md",
+        "SKILL.md"
+      ],
+      "expectations": [
+        "Recommends production scaffolds separately from `obsidian_debug_scaffold_plugin.mjs`.",
+        "Integrates official rule themes and eslint/review-readiness checks.",
+        "Keeps optional E2E/dev-utils tooling repo-owned rather than globally installed by default."
+      ]
+    },
+    {
+      "id": 27,
+      "name": "agent-one-page-quickstart",
+      "prompt": "另一个 Agent 只愿意读一页。给它一个最短可执行入口：先看什么、跑什么 doctor、怎么选 backend、怎么生成 diagnosis/report/handoff。",
+      "expected_output": "Uses AGENT-QUICKSTART.md as the one-page operational entrypoint with exact commands, backend selection, analysis/report generation, handoff outputs, and GUI/screenshot boundaries.",
+      "files": [
+        "AGENT-QUICKSTART.md"
+      ],
+      "expectations": [
+        "Starts with target identification and doctor.",
+        "Includes backend routing plus diagnosis, visual review, report, and agent-tools generation.",
+        "States screenshot and MCP/REST boundaries clearly."
       ]
     }
   ]
