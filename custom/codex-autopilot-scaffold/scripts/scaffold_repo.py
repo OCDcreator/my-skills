@@ -25,7 +25,7 @@ SCAFFOLD_NAME = "codex-autopilot-scaffold"
 SCAFFOLD_VERSION = "1.0.0"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 
-SCALLOWED_SOURCE_SUFFIXES = {
+ALLOWED_SOURCE_SUFFIXES = {
     ".ts",
     ".tsx",
     ".js",
@@ -229,7 +229,7 @@ def parse_semver(version_text: str) -> tuple[int, int, int]:
     parts = [int(part) for part in normalized.split(".")]
     while len(parts) < 3:
         parts.append(0)
-    return tuple(parts[:3])
+    return (parts[0], parts[1], parts[2])
 
 
 def compare_semver(left: str, right: str) -> int:
@@ -542,7 +542,7 @@ def detect_commands(repo_root: Path) -> DetectionResult:
             continue
         if relative_path.startswith("automation/runtime/"):
             continue
-        if path.suffix.lower() not in SCALLOWED_SOURCE_SUFFIXES:
+        if path.suffix.lower() not in ALLOWED_SOURCE_SUFFIXES:
             continue
         try:
             line_count = len(read_text(path).splitlines())

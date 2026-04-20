@@ -4,7 +4,7 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 
 ## Files
 
-- `automation/autopilot.py`: cross-platform outer controller
+- `automation/autopilot.py`: cross-platform outer controller, intentionally kept self-contained so scaffolded repos do not need extra Python packages
 - `automation/autopilot-scaffold-version.json`: deployed scaffold name/version marker
 - `automation/Arm-AutopilotCutover.ps1`: Windows post-commit cutover wrapper
 - `automation/arm-autopilot-cutover.sh`: macOS post-commit cutover wrapper
@@ -258,7 +258,7 @@ Example override fields:
 ```json
 {
   "runner_additional_dirs": [
-    "C:\\\\absolute\\\\path\\\\to\\\\extra\\\\workspace"
+    "C:\\absolute\\path\\to\\extra\\workspace"
   ],
   "deploy_verify_path": ""
 }

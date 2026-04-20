@@ -16,15 +16,20 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, BinaryIO, cast
+from typing import TYPE_CHECKING, Any, BinaryIO, cast
+
+
+if TYPE_CHECKING:
+    SCAFFOLD_NAME_JSON = ""
+    SCAFFOLD_VERSION_JSON = ""
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = "automation/autopilot-config.json"
 DEFAULT_STATE_PATH = "automation/runtime/autopilot-state.json"
 DEFAULT_RUNTIME_PATH = "automation/runtime"
-AUTOPILOT_SCAFFOLD_NAME = [[SCAFFOLD_NAME_JSON]]
-AUTOPILOT_SCAFFOLD_VERSION = [[SCAFFOLD_VERSION_JSON]]
+AUTOPILOT_SCAFFOLD_NAME = cast(str, [[SCAFFOLD_NAME_JSON]])
+AUTOPILOT_SCAFFOLD_VERSION = cast(str, [[SCAFFOLD_VERSION_JSON]])
 DEFAULT_PROFILE_NAME = "windows"
 LOCK_FILENAME = "autopilot.lock.json"
 ROUND_DIRECTORY_RE = re.compile(r"^round-(\d+)$")
@@ -52,10 +57,10 @@ LANE_COMPLETE_STATUS = "complete"
 
 
 def ensure_console_streams() -> None:
-	if sys.stdout is None:
-		sys.stdout = open(os.devnull, "w", encoding="utf-8")
-	if sys.stderr is None:
-		sys.stderr = open(os.devnull, "w", encoding="utf-8")
+    if sys.stdout is None:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 
 ensure_console_streams()
@@ -1059,7 +1064,7 @@ def release_lock(runtime_directory: Path, lock_data: dict[str, Any] | None) -> N
         return
     if (
         clean_string(current_lock.get("hostname")) == clean_string(lock_data.get("hostname"))
-        and int(current_lock.get("pid", -1)) == int(lock_data.get("pid", -2))
+        and parse_int(current_lock.get("pid"), -1) == parse_int(lock_data.get("pid"), -1)
     ):
         lock_path.unlink(missing_ok=True)
 
