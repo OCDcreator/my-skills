@@ -74,14 +74,21 @@ async function exists(filePath) {
 
 function runProcess(command, args = [], timeoutMs = 5000) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      windowsHide: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-
     let stdout = '';
     let stderr = '';
     let settled = false;
+    let child;
+
+    try {
+      child = spawn(command, args, {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      resolve({ ok: false, exitCode: null, stdout, stderr: describeError(error), timedOut: false });
+      return;
+    }
+
     const timeout = setTimeout(() => {
       if (!settled) {
         settled = true;
@@ -115,11 +122,6 @@ function runProcess(command, args = [], timeoutMs = 5000) {
 
 function spawnAndForget(command, args = [], { detached = true } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      detached,
-      windowsHide: true,
-      stdio: 'ignore',
-    });
     let settled = false;
     const finish = (result) => {
       if (!settled) {
@@ -127,6 +129,17 @@ function spawnAndForget(command, args = [], { detached = true } = {}) {
         resolve(result);
       }
     };
+    let child;
+    try {
+      child = spawn(command, args, {
+        detached,
+        windowsHide: true,
+        stdio: 'ignore',
+      });
+    } catch (error) {
+      finish({ ok: false, detail: describeError(error), command, args });
+      return;
+    }
     child.on('error', (error) => finish({ ok: false, detail: describeError(error), command, args }));
     if (detached) {
       child.once('spawn', () => {
@@ -275,14 +288,16 @@ async function probeReadiness() {
 async function launchWindows(uri) {
   const steps = [];
   const resolvedAppPath = await defaultWindowsAppPath();
+  let launchedAppDirectly = false;
   if (mode === 'cdp' && resolvedAppPath) {
     steps.push(await spawnAndForget(resolvedAppPath, [`--remote-debugging-port=${cdpPort}`]));
+    launchedAppDirectly = true;
   }
   if (uri) {
     steps.push(await spawnAndForget('cmd', ['/c', 'start', '', uri], { detached: false }));
-  } else if (resolvedAppPath) {
+  } else if (resolvedAppPath && !launchedAppDirectly) {
     steps.push(await spawnAndForget(resolvedAppPath, mode === 'cdp' ? [`--remote-debugging-port=${cdpPort}`] : []));
-  } else {
+  } else if (!launchedAppDirectly) {
     steps.push({ ok: false, detail: 'No Obsidian app path or vault URI was available to launch.' });
   }
   return steps;
