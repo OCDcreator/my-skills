@@ -9,10 +9,18 @@
 | `always` | yes | yes | yes | 启动版本行、构建身份、极少数一次性关键状态 |
 | `error` | yes | yes | yes | 操作失败、异常、持久化失败、不可恢复状态 |
 | `warn` | yes | yes | yes | 降级、配置风险、重试、可恢复问题 |
-| `info` | no | yes | yes | 生命周期、用户动作、普通状态摘要 |
-| `debug` | no | yes | yes | 详细 payload、阶段追踪、开发排障 |
+| `info` | no | yes, but only if module toggle is on | yes, but only if module toggle is on | 生命周期、用户动作、普通状态摘要 |
+| `debug` | no | yes, but only if module toggle is on | yes, but only if module toggle is on | 详细 payload、阶段追踪、开发排障 |
 
 `always` 不是“高级 info”。它只用于 debug 关闭时也必须可见的少量身份信息。普通生命周期消息使用 `info`。
+
+## Module Toggle Contract
+
+- 除总开关 `enableDebugLogging` 外，为每个会输出可选日志的模块/子系统提供模块级开关。
+- `always/warn/error` 不受模块开关影响；模块开关只控制 `info/debug`。
+- 每个 logger scope 都应绑定稳定的 `moduleKey`，例如 `lifecycle`、`sync`、`render`、`watcher`。
+- 模块注册表应成为单一事实源：logger、设置页和测试都从同一份注册表读取，而不是三处手工维护。
+- 如果新增模块日志时忘了补设置开关或测试，CI/本地测试应直接失败。
 
 ## Destinations
 
@@ -30,6 +38,7 @@
 - 缓存在内存中即可；不要默认持续写磁盘。
 - 用户必须能从设置页清空缓存。
 - 缓冲区条目至少包含：ISO 时间戳、level、scope、message。
+- 如果某模块的 `info/debug` 开关关闭，这些可选日志不应继续偷偷进入 recent buffer。
 
 ### Diagnostic Report
 
@@ -86,6 +95,8 @@
 interface DebugSettings {
   enableDebugLogging: boolean;
   inlineSerializedDebugLogArgs: boolean;
+  debugModules: Record<string, boolean>;
+  debugHighFrequencyIntervalMs: number;
   debugLogPaths: {
     windows: string;
     macos: string;
@@ -100,6 +111,12 @@ interface DebugSettings {
 {
   enableDebugLogging: false,
   inlineSerializedDebugLogArgs: false,
+  debugModules: {
+    lifecycle: true,
+    sync: true,
+    render: true
+  },
+  debugHighFrequencyIntervalMs: 1000,
   debugLogPaths: {
     windows: '',
     macos: ''
@@ -124,6 +141,8 @@ interface DebugSettings {
 - 时间阈值，例如 500ms 或 1000ms
 - 内容增量阈值，例如文本增长超过 200 字符
 - 阶段边界仍可立即输出，例如 start / first chunk / done / error
+- 节流阈值至少有一个设置页可调入口，例如 `debugHighFrequencyIntervalMs`
+- 如果某个模块明显比其他模块更高频，可以在总阈值之外增加模块覆盖值，但仍建议先保留一个全局默认值
 
 ### Truncate
 
@@ -152,8 +171,11 @@ interface DebugSettings {
 
 - debug off 时 `info/debug` 不进 console，`always/warn/error` 仍输出
 - debug on 时 `info/debug` 输出
+- debug on 但模块开关 off 时，该模块 `info/debug` 不进 console 或 recent buffer
+- 每个 `moduleKey` 都能在设置结构和设置页控件里找到对应项
 - 最近日志缓存限制条数并保留最新条目
 - `clearRecentLogs()` 清空缓存
 - 诊断报告包含 `BUILD_ID`、版本、vault、recent logs
 - 重复 payload 抑制直到变化
 - 导出文件路径按当前平台选择
+- 调整高频日志刷新频率后，节流 helper 读取到新的设置值

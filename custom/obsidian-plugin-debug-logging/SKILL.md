@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-debug-logging
-description: Use this when developing or retrofitting an Obsidian plugin and the user mentions 调试日志, debug logging, 控制台日志, console logs, diagnostic report, 诊断报告, 日志开关, 日志分级, 默认静默, 故障排查, 最近日志缓存, 日志导出, 环境快照, BUILD_ID, version/build logs, or wants a maintainable logging/diagnostics system. Trigger even if the user only asks to make plugin logs quieter, copy troubleshooting info, export logs, add a debug toggle, or support Windows/macOS console instructions.
+description: Use this when developing or retrofitting an Obsidian plugin and the user mentions 调试日志, debug logging, 控制台日志, console logs, diagnostic report, 诊断报告, 日志开关, 日志分级, 默认静默, 模块日志开关, 子模块调试开关, 高频日志刷新频率, 故障排查, 最近日志缓存, 日志导出, 环境快照, BUILD_ID, version/build logs, or wants a maintainable logging/diagnostics system. Trigger even if the user only asks to make plugin logs quieter, copy troubleshooting info, export logs, add a debug toggle, add per-module logging controls, add refresh-rate controls for noisy logs, or support Windows/macOS console instructions.
 ---
 
 # Obsidian Plugin Debug Logging
@@ -19,8 +19,8 @@ description: Use this when developing or retrofitting an Obsidian plugin and the
 
 1. 阅读目标插件仓库适用的 `AGENTS.md` / `CLAUDE.md` / 项目说明。
 2. 确认这是 Obsidian 插件：`manifest.json`、`package.json`、入口 `src/main.ts` 或等价文件。
-3. 搜索现有实现：`createLogger`、`logger`、`console.`、`debug`、`BUILD_ID`、`diagnostic`、`诊断`、`日志`、`settings`。
-4. 找到设置结构、设置页、构建注入、启动日志、导出/剪贴板能力。
+3. 搜索现有实现：`createLogger`、`logger`、`console.`、`debug`、`BUILD_ID`、`diagnostic`、`diagnostic report`、`throttle`、`interval`、`polling`、`stream`、`resize`、`settings`。
+4. 找到设置结构、设置页、构建注入、启动日志、导出/剪贴板能力，以及模块/子系统边界。
 5. 先写 gap analysis：保留什么、改进什么、废弃什么，再动代码。
 
 ## Standard Contract
@@ -39,9 +39,12 @@ description: Use this when developing or retrofitting an Obsidian plugin and the
 
 - 默认静默：debug 关闭时，控制台只输出 `always`、`warn`、`error`。
 - `always` 是独立语义，不要把普通 `info` 都设为 always-visible。
+- `info` / `debug` 不仅受总开关控制，也受模块级开关控制；不要只做一个全局 `enableDebugLogging` 就算完成。
+- 每个会输出可选日志的模块/子系统都要有稳定 `moduleKey`，并且它必须能在设置页找到对应开关；避免代码里有 scope，但设置里没有对应项。
 - 控制台和诊断报告共享同一最近日志缓存，但职责不同：控制台实时查看，诊断报告用于复制/导出和异步排障。
 - 每条日志至少带 `timestamp`、`level`、`scope`、`message`。
 - `DISPLAY_VERSION`、`BUILD_ID`、vault 信息放在启动首行和诊断报告头部，不要塞进每条普通日志。
+- 对 streaming / polling / resize / progress 这类高频日志，不要把节流频率写死在代码里；至少提供一个设置页可调的调试刷新频率。
 
 完整契约见 `references/modern-logging-contract.md`。
 
@@ -57,14 +60,25 @@ description: Use this when developing or retrofitting an Obsidian plugin and the
 
 应支持：
 
-- `createLogger(scope)`
+- `createLogger(scope, options?)`
 - `setDebugLoggingEnabled(enabled)`
+- `setDebugModuleEnabled(moduleKey, enabled)`
+- `isDebugModuleEnabled(moduleKey)`
 - `setInlineSerializedDebugLogArgsEnabled(enabled)`
+- `setDebugRefreshIntervalMs(intervalMs)` 或按模块的 refresh interval setter
 - `getRecentLogEntries()`
 - `getRecentLogText()`
 - `clearRecentLogs()`
 - `logOnceUntilChanged()` 或等价重复 payload 抑制
-- 高频日志节流 helper
+- 高频日志节流 helper（支持读取设置里的刷新频率，而不是只接受硬编码常量）
+
+优先把模块注册表做成单一事实源（single source of truth），例如：
+
+- logger 用它决定 `moduleKey`
+- 设置页用它生成模块开关
+- 测试用它检查“每个模块都有设置映射”
+
+这样可以从根源上避免“加了新日志 scope，但忘了加设置开关/测试”的漂移。
 
 可参考 `templates/logger-contract.ts`，但要适配目标仓库的 TypeScript 风格和已有命名。
 
@@ -89,12 +103,16 @@ description: Use this when developing or retrofitting an Obsidian plugin and the
 设置页至少提供：
 
 - `启用调试日志` 开关
+- 模块/子系统级调试开关列表（至少覆盖所有会输出 `info/debug` 的模块）
 - `内联序列化调试参数` 开关
+- 高频日志刷新频率控制（至少一个全局值；复杂插件可再加模块覆盖）
 - `复制最近诊断` 按钮
 - `导出诊断日志文件` 按钮
 - `清空最近日志缓存` 按钮
 - `复制版本号 / DISPLAY_VERSION / BUILD_ID` 按钮
 - 当前版本、`BUILD_ID`、Windows/macOS 控制台打开指引
+
+不要把模块开关写成设置页里手工维护的散列表，同时在 logger 里再手工维护另一份。优先复用同一个模块注册表来生成 UI、默认值和测试输入。
 
 参考 `templates/debug-settings-section.md`。
 
@@ -117,9 +135,24 @@ description: Use this when developing or retrofitting an Obsidian plugin and the
 
 - 对相同 label + payload 的诊断日志做“直到 payload 变化才再次输出”
 - 对 streaming / progress / resize / polling 日志做时间或内容增量节流
+- 节流频率优先从设置里的调试刷新频率读取；不要要求用户改代码才能降低刷屏
 - 对大对象、长文本、文件内容、模型输出做 preview 和截断
 - 不输出 API key、token、完整隐私路径、全文文档、二进制或大块 base64
 - debug 开启时可以详细，但仍不能无限刷屏
+
+### 6. Test Hard Constraints
+
+把“日志开关和设置同步”当成部署硬约束，而不是文档约定：
+
+- 为模块日志建立单一注册表，例如 `DEBUG_MODULE_REGISTRY`
+- 写结构测试：检查每个 `moduleKey` 都有默认设置值、设置页控件和可读标签
+- 写行为测试：`enableDebugLogging=true` 但某模块开关关闭时，该模块的 `info/debug` 不应进入 console 或 recent buffer
+- 写行为测试：模块开关开启后，对应模块 `info/debug` 才恢复输出
+- 写行为测试：`always/warn/error` 不受模块开关影响
+- 写高频日志测试：修改设置里的 refresh interval 后，节流 helper 使用新频率
+- 若仓库没有完整单元测试框架，也至少补一个最小结构校验脚本或测试文件，并把它加入交付前的必跑检查
+
+重点不是“测试有没有 logger”，而是“测试每一块日志都对应设置日志中的开关，新增模块时无法静默漏掉”。
 
 ## Windows + macOS
 
@@ -130,6 +163,8 @@ description: Use this when developing or retrofitting an Obsidian plugin and the
 - logger core
 - ring buffer
 - debug 开关
+- 模块日志注册表与模块开关逻辑
+- 高频日志刷新频率设置
 - 诊断报告结构
 - 导出文件命名
 - `BUILD_ID` 与版本头信息
@@ -181,10 +216,12 @@ interface DebugLogPaths {
 
 - 当前仓库已有日志系统的优点与缺口
 - 采用的级别策略和默认静默行为
+- 总开关与模块开关如何协同，模块注册表是什么
 - 控制台输出与诊断报告的关系
 - 最近日志缓存大小、清空方式和导出方式
 - 设置页新增/调整的调试入口
+- 高频日志刷新频率如何配置，作用于哪些模块
 - `BUILD_ID`、版本号、vault 信息如何进入启动日志与诊断报告
 - Windows/macOS 哪些逻辑共享、哪些分平台
 - 采取了哪些防刷屏、防泄露、防过载措施
-- 如何验证：单元测试、类型检查、构建、Obsidian 控制台/导出文件人工验证
+- 如何验证：模块开关映射测试、日志 gating 测试、刷新频率测试、类型检查、构建、Obsidian 控制台/导出文件人工验证
