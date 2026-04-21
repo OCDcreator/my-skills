@@ -115,6 +115,12 @@ Use conservative limits first, then expand after the first run looks healthy:
 bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 3 --timeout 15
 ```
 
+For longer tasks where context growth is a concern, enable multi-session mode:
+
+```bash
+bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 30 --session-mode multi --session-rotate 10
+```
+
 Useful flags:
 
 - `--iterations N` limits unattended loop length.
@@ -122,6 +128,16 @@ Useful flags:
 - `--program FILE` points to a custom program prompt if the default template is not enough.
 - `--auto-reset` resets circuit breaker state on startup.
 - `--opencode PATH` uses a non-default `opencode` binary.
+- `--session-mode MODE` sets session strategy: `single` (default), `multi` (recommended for 10+ iterations), `auto` (experimental, context-based), `clean` (fresh session each iteration).
+- `--session-rotate N` iterations per session in multi mode (default: 5).
+- `--context-threshold PCT` context usage % trigger for auto mode (default: 70).
+- `--context-window-tokens N` model context window for auto mode estimation (default: 200000).
+
+**Multi-session recommendations**:
+- Use `multi` mode with `--session-rotate 5` or `10` for tasks over 15 iterations.
+- Use `clean` mode for maximum isolation when each iteration is independent.
+- `auto` mode is experimental — prefer `multi` for reliability.
+- The loop generates a `handoff.md` on each rotation to preserve task continuity across sessions.
 
 ### 4. Monitor And Report
 
