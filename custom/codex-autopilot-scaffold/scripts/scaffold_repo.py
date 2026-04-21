@@ -22,8 +22,10 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.0.2"
+SCAFFOLD_VERSION = "1.0.3"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
+SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
+SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
 
 ALLOWED_SOURCE_SUFFIXES = {
     ".ts",
@@ -169,6 +171,15 @@ class ExistingScaffoldState:
     warnings: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class SeedArtifact:
+    kind: str
+    source_path: Path
+    destination_path: Path
+    repo_relative_path: str
+    content: str
+
+
 def clean_string(value: Any) -> str:
     if value is None:
         return ""
@@ -303,6 +314,94 @@ def render_tokens(template_text: str, tokens: dict[str, str]) -> str:
 
 def json_token(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, indent=2)
+
+
+def resolve_seed_artifact(repo_root: Path, args: argparse.Namespace) -> SeedArtifact | None:
+    seed_plan = clean_string(getattr(args, "seed_plan", ""))
+    seed_spec = clean_string(getattr(args, "seed_spec", ""))
+    if seed_plan and seed_spec:
+        raise ScaffoldError("Use either --seed-plan or --seed-spec, not both.")
+    if not seed_plan and not seed_spec:
+        return None
+
+    kind = "plan" if seed_plan else "spec"
+    source_path = Path(seed_plan or seed_spec).expanduser().resolve()
+    if not source_path.exists() or not source_path.is_file():
+        raise ScaffoldError(f"Seed {kind} file not found: {source_path}")
+
+    destination_path = SEED_PLAN_DESTINATION if kind == "plan" else SEED_SPEC_DESTINATION
+    return SeedArtifact(
+        kind=kind,
+        source_path=source_path,
+        destination_path=destination_path,
+        repo_relative_path=destination_path.as_posix(),
+        content=read_text(source_path),
+    )
+
+
+def build_seeded_queue_override(seed: SeedArtifact) -> str:
+    return f"""## Seeded Queue Override
+
+### [NEXT] Execute the next approved {seed.kind} slice
+
+- **Seed source**: `{seed.repo_relative_path}`
+- **Queue authority**: follow the approved seed {seed.kind} before generic preset backlog text.
+- **Scope rule**: choose the first unchecked, numbered, or clearly next actionable item from the seed and execute exactly that slice.
+- **Completion rule**: update this roadmap and the seed progress notes so the next round can identify the next seed slice without re-planning.
+- **Do not** replace the seed with a broader backlog unless the seed is complete.
+"""
+
+
+def write_seed_artifact(repo_root: Path, seed: SeedArtifact, *, force: bool) -> str:
+    header = (
+        f"# Autopilot Seed {seed.kind.title()}\n\n"
+        f"> Copied from: `{seed.source_path}`\n"
+        f"> Scaffold version: `{SCAFFOLD_VERSION}`\n\n"
+        "This file is the approved execution source for seeded unattended rounds. Keep progress notes here or in lane roadmaps.\n\n"
+        "---\n\n"
+    )
+    return write_if_changed(repo_root / seed.destination_path, header + seed.content.rstrip() + "\n", force=force, on_conflict="overwrite")
+
+
+def apply_seed_to_generated_docs(repo_root: Path, seed: SeedArtifact, *, force: bool) -> dict[str, str]:
+    results: dict[str, str] = {}
+    results[seed.repo_relative_path] = write_seed_artifact(repo_root, seed, force=force)
+
+    master_plan_path = repo_root / "docs" / "status" / "autopilot-master-plan.md"
+    if master_plan_path.exists():
+        marker = "<!-- autopilot-seed-source -->"
+        master_text = read_text(master_plan_path)
+        seed_section = (
+            f"\n## Seeded Execution Source\n\n"
+            f"{marker}\n"
+            f"- Seed {seed.kind}: `{seed.repo_relative_path}`\n"
+            "- Treat the seed as the approved implementation source before generic preset language.\n"
+            "- Keep unattended rounds bounded to one seed slice at a time.\n"
+        )
+        if marker not in master_text:
+            results[normalize_repo_path(master_plan_path, repo_root)] = write_if_changed(
+                master_plan_path,
+                master_text.rstrip() + seed_section + "\n",
+                force=force,
+                on_conflict="overwrite",
+            )
+
+    seeded_override = build_seeded_queue_override(seed)
+    for roadmap_path in sorted((repo_root / "docs" / "status" / "lanes").glob("*/autopilot-round-roadmap.md")):
+        roadmap_text = read_text(roadmap_path)
+        if "## Seeded Queue Override" in roadmap_text:
+            continue
+        lines = roadmap_text.splitlines()
+        insert_at = 1 if lines and lines[0].startswith("# ") else 0
+        next_text = "\n".join([*lines[:insert_at], "", seeded_override.rstrip(), "", *lines[insert_at:]]) + "\n"
+        results[normalize_repo_path(roadmap_path, repo_root)] = write_if_changed(
+            roadmap_path,
+            next_text,
+            force=force,
+            on_conflict="overwrite",
+        )
+
+    return results
 
 
 def build_preset_lanes(preset: str) -> list[dict[str, str]]:
@@ -781,6 +880,7 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "DEPLOY_POLICY_JSON": json.dumps("never", ensure_ascii=False),
         "DEPLOY_REQUIRED_PATHS_JSON": "[]",
         "DEPLOY_VERIFY_PATH_JSON": json.dumps("", ensure_ascii=False),
+        "COMMAND_BUDGET_POLICY_JSON": json.dumps("warn", ensure_ascii=False),
         "RUNNER_KIND_JSON": json.dumps("codex", ensure_ascii=False),
         "RUNNER_COMMAND_JSON": json.dumps("", ensure_ascii=False),
         "RUNNER_MODEL_JSON": json.dumps("", ensure_ascii=False),
@@ -852,6 +952,7 @@ def scaffold_repo(args: argparse.Namespace) -> int:
     tokens = override_tokens(default_tokens(detection, args.preset), args)
     existing_scaffold = detect_existing_scaffold_state(repo_root, auto_upgrade_enabled=not args.no_auto_upgrade)
     detection.warnings.extend(existing_scaffold.warnings)
+    seed_artifact = resolve_seed_artifact(repo_root, args)
 
     common_root = COMMON_TEMPLATES_ROOT
     preset_root = PRESET_TEMPLATES_ROOT / args.preset
@@ -891,6 +992,7 @@ def scaffold_repo(args: argparse.Namespace) -> int:
             force=args.force,
             on_conflict="error",
         )
+    seed_results = apply_seed_to_generated_docs(repo_root, seed_artifact, force=args.force) if seed_artifact else {}
     gitignore_result = ensure_gitignore_entries(
         repo_root,
         [
@@ -904,6 +1006,9 @@ def scaffold_repo(args: argparse.Namespace) -> int:
     print(f"[scaffold] target repo: {repo_root}")
     print(f"[scaffold] preset: {args.preset} ({PRESET_METADATA[args.preset]['label']})")
     print(f"[scaffold] scaffold version: {SCAFFOLD_VERSION}")
+    print(f"[scaffold] scaffold source: {SKILL_ROOT}")
+    if seed_artifact:
+        print(f"[scaffold] seeded {seed_artifact.kind}: {seed_artifact.source_path} -> {seed_artifact.repo_relative_path}")
     if existing_scaffold.needs_auto_upgrade:
         print(
             "[scaffold] auto-upgrade: "
@@ -914,17 +1019,42 @@ def scaffold_repo(args: argparse.Namespace) -> int:
     for warning in detection.warnings:
         print(f"[scaffold] warning: {warning}")
 
-    written_count = sum(1 for status in [*common_results.values(), *preset_results.values(), gitignore_result] if status == "written")
-    unchanged_count = sum(1 for status in [*common_results.values(), *preset_results.values(), gitignore_result] if status == "unchanged")
+    current_branch = run_git(repo_root, ["branch", "--show-current"], check=False).stdout.strip()
+    allowed_prefixes = ["autopilot/", "automation/", "quality/", "bugfix/"]
+    if current_branch and not any(current_branch.startswith(prefix) for prefix in allowed_prefixes):
+        print(
+            "[scaffold] warning: current branch "
+            f"'{current_branch}' does not match autopilot branch prefixes. Create a dedicated worktree/branch before doctor/start."
+        )
+
+    written_count = sum(
+        1
+        for status in [*common_results.values(), *preset_results.values(), *seed_results.values(), gitignore_result]
+        if status == "written"
+    )
+    unchanged_count = sum(
+        1
+        for status in [*common_results.values(), *preset_results.values(), *seed_results.values(), gitignore_result]
+        if status == "unchanged"
+    )
     print(f"[scaffold] files written: {written_count}, unchanged: {unchanged_count}")
 
     if args.print_next_steps:
         print("[scaffold] next commands:")
+        print("  # 1) Commit scaffold, then create/switch to a dedicated autopilot branch or worktree.")
+        print("  git switch -c autopilot/<topic>")
+        print("  python automation/autopilot.py version")
         print("  python automation/autopilot.py doctor --profile windows")
         print("  python automation/autopilot.py start --profile windows --dry-run --single-round")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
         print("  python3 ./automation/autopilot.py start --profile mac --dry-run --single-round")
         print("  bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round")
+        print("[scaffold] remote mac rollout template:")
+        print("  git push")
+        print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git fetch --all --prune'")
+        print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git worktree add ../<repo>-autopilot autopilot/<topic>'")
+        print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py doctor --profile mac'")
+        print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'")
 
     return 0
 
@@ -944,6 +1074,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--full-test-command", help="Override the inferred full test command.")
     parser.add_argument("--build-command", help="Override the inferred build command.")
     parser.add_argument("--vulture-command", help="Override the inferred Vulture dead-code command.")
+    parser.add_argument("--seed-plan", help="Approved implementation plan to copy into docs/status and use as the seeded queue authority.")
+    parser.add_argument("--seed-spec", help="Approved spec to copy into docs/status and use as the seeded queue authority.")
     parser.add_argument(
         "--deploy-policy",
         choices=["never", "always", "targeted"],

@@ -175,6 +175,7 @@ def append_controller_requirements(prompt_text: str, config: dict[str, Any]) -> 
         "- If no reliable build identifier was produced, set `build_ran` to `false` instead of inventing a `build_id`.",
         "- If `deploy_ran` is `true`, only report it when this round actually performed a deploy step required by config.",
         "- If `deploy_ran` is `true`, also set `deploy_verified` to `true` only after the configured deploy verification step really passed.",
+        "- Include every real command in `commands_run`; repeated diagnostic Git commands may be reported as controller warnings, but do not hide them.",
     ]
     if commit_prefix:
         lines.append(

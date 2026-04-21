@@ -30,12 +30,19 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - Runtime state is machine-readable JSON
 - Queue routing is driven by explicit `lanes` in `automation/autopilot-config.json`
 - Failed rounds preserve the pre-reset `HEAD` under `refs/autopilot/safety/*`, stash dirty work, then reset to the round's starting `HEAD`
+- Diagnostic command budget findings default to warnings, so repeated `git status --short` or `git diff --stat` reports do not roll back otherwise successful commits
 - Successful rounds must write a phase doc and create a commit
 - A runtime lock prevents two machines from driving the same branch simultaneously
 
 ## Main commands
 
-Before starting unattended rounds, commit the scaffolded autopilot files so the worktree is clean.
+Before starting unattended rounds:
+
+1. Commit the scaffolded autopilot files so the worktree is clean.
+2. Create or switch to a dedicated branch/worktree such as `autopilot/<topic>`, `quality/<topic>`, or `bugfix/<topic>`.
+3. Then run `doctor` and `start`.
+
+Running `doctor` on `main` right after scaffold may fail the branch guard by design. That is a safety signal, not an installation failure.
 
 ## Commit Prefix Gate
 
@@ -54,6 +61,26 @@ The controller also validates build/deploy result fields in the final JSON:
 - If the round did not produce a trustworthy build marker, report `build_ran=false` instead of fabricating a `build_id`.
 - `deploy_ran=true` is only valid when the round actually performed a deploy required by config.
 - `deploy_ran=true` also requires `deploy_verified=true`, and deploy verification may additionally check that the configured artifact contains the reported `build_id`.
+
+## Command Budget Policy
+
+`automation/autopilot-config.json` includes:
+
+```json
+"command_budget_policy": "warn"
+```
+
+With the default policy, repeated diagnostic commands such as `git status --short` and `git diff --stat` are reported as controller warnings instead of hard failures. This prevents a successful commit from being reset only because the agent inspected Git state too often.
+
+If a project deliberately wants strict enforcement, set `command_budget_policy` to `hard`, `fail`, or `error`.
+
+## Seeded Plan Or Spec
+
+If the scaffold was created with `--seed-plan` or `--seed-spec`, the source is copied to `docs/status/autopilot-seed-plan.md` or `docs/status/autopilot-seed-spec.md`, and lane roadmaps contain a seeded queue override.
+
+- Treat the seed as the approved execution source before generic preset prose.
+- Execute one seed slice per round.
+- Keep progress notes current so the next unattended round can find the next seed slice without inventing a backlog.
 
 ### Windows
 
@@ -81,6 +108,20 @@ For a repo-local macOS wrapper flow, prefer `bash ./...` so Windows-authored com
 bash ./automation/start-autopilot.sh -- --profile mac
 bash ./automation/watch-autopilot.sh --state-path automation/runtime/autopilot-state.json --tail 80
 ```
+
+### Remote Mac Rollout From Windows
+
+When the scaffold is created locally on Windows but execution should happen on the Mac:
+
+```bash
+git push
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git fetch --all --prune'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git worktree add ../<repo>-autopilot autopilot/<topic>'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py doctor --profile mac'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'
+```
+
+Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch.
 
 ### Helpful modes
 

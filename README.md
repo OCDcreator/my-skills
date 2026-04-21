@@ -48,7 +48,7 @@ my-skills/
 
 | 技能 | 说明 |
 |------|------|
-| [codex-autopilot-scaffold](custom/codex-autopilot-scaffold/) | 把 Codex 风格 repo-local 无人值守 autopilot 脚手架注入任意项目，含 `maintainability`、`quality-gate recovery`、`bugfix/backlog` 三类 preset |
+| [codex-autopilot-scaffold](custom/codex-autopilot-scaffold/) | 把 Codex 风格 repo-local 无人值守 autopilot 脚手架注入任意项目，含 `maintainability`、`quality-gate recovery`、`bugfix/backlog` 三类 preset；支持已批准 plan/spec 种子、远端 Mac rollout 提示、版本感知和预算误杀防护 |
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
 | [fork-upstream-workflow](custom/fork-upstream-workflow/) | 个人 fork 仓库的 `origin` / `upstream` / `main` / `feat/*` 维护策略与同步上游工作流 |
 | [knowledge-to-print-html](custom/knowledge-to-print-html/) | 把知识点、草稿和研究资料整理成适合打印 PDF 的 HTML 讲义，内置版式约束、打印验证与逐页子代理审版循环 |

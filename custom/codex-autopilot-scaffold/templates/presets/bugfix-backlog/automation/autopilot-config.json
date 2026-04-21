@@ -21,6 +21,7 @@
   "deploy_verify_path": [[DEPLOY_VERIFY_PATH_JSON]],
   "max_git_status_per_round": 6,
   "max_git_diff_stat_per_round": 3,
+  "command_budget_policy": [[COMMAND_BUDGET_POLICY_JSON]],
   "allowed_branch_prefixes": [[ALLOWED_BRANCH_PREFIXES_JSON]],
   "commit_prefix": [[COMMIT_PREFIX_JSON]],
   "prompt_template": [[PROMPT_TEMPLATE_JSON]],

@@ -54,6 +54,24 @@
       "prompt": "这个仓库之前已经装过 repo-local Codex autopilot，但现在技能升级了。我希望你在不重置现有 lane queue 和 autopilot-config 的前提下，把旧 scaffold 自动刷新到当前版本，并明确告诉我怎么检查已部署版本号。",
       "expected_output": "Assistant should detect an older deployed scaffold version, rerun the bundled scaffold script in upgrade mode, refresh common controller assets plus preset automation files, preserve repo-specific lane queue docs, and mention the deployed version marker plus `python automation/autopilot.py version`.",
       "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "我已经有一个批准过的 docs/superpowers/plans/2026-04-21-cli-plan.md，不想让 bugfix-backlog 生成泛泛 backlog。请把 repo-local autopilot scaffold 成按这个 plan 一步步执行的队列，并提醒我不要在 main 上直接 doctor/start。",
+      "expected_output": "Assistant should trigger the skill, pass `--seed-plan` to the scaffold script, explain that the seed plan is copied into docs/status and inserted as the lane queue authority, and make the next steps emphasize creating a dedicated autopilot branch/worktree before doctor/start.",
+      "files": []
+    },
+    {
+      "id": 11,
+      "prompt": "我要在 Windows 本地给仓库铺 Codex autopilot，但真正的无人值守要放到 ssh mac 上跑。请给我脚手架，并把 push、Mac 拉取、建 worktree、doctor、dry-run、background start 的命令链写清楚。",
+      "expected_output": "Assistant should scaffold locally, then provide a remote Mac rollout playbook that covers commit/push, `ssh mac`, fetch/pull or reset, dedicated Mac worktree/branch creation, doctor, dry-run, background start, and exact status/watch paths.",
+      "files": []
+    },
+    {
+      "id": 12,
+      "prompt": "autopilot 第 2 轮明明成功提交了，但因为 commands_run 里 git status --short 和 git diff --stat 超了预算，控制器把 HEAD reset 掉了。请修 scaffold 本体，成功提交不能因为这种诊断预算被误杀。",
+      "expected_output": "Assistant should treat this as a scaffold/controller design defect, change command-budget findings to warning/soft-fail by default, preserve a strict opt-in policy for repos that want hard enforcement, add regression tests proving successful commits are not failed by budget warnings, and document recovery/status semantics.",
+      "files": []
     }
   ]
 }

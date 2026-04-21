@@ -89,6 +89,8 @@ Useful overrides:
 
 ```bash
 --objective "custom objective"
+--seed-plan docs/superpowers/plans/approved-plan.md
+--seed-spec docs/superpowers/specs/approved-spec.md
 --lint-command "custom lint command"
 --typecheck-command "custom typecheck command"
 --full-test-command "custom full test command"
@@ -115,13 +117,29 @@ It also prints:
 - inferred validation commands and their sources
 - warnings when inference is weak
 - whether an older deployed scaffold was auto-upgraded
+- current scaffold version and source path
+- a reminder to create a dedicated `autopilot/...` branch/worktree before `doctor` / `start`
 - suggested `doctor` and `start --dry-run --single-round` commands
+- a remote Mac rollout template when the operator wants Windows-local scaffold + Mac unattended execution
+
+If the user has an approved implementation plan or spec, pass `--seed-plan` or `--seed-spec`. The script copies that file into `docs/status/`, adds a seeded queue override to lane roadmaps, and makes the approved plan/spec the queue authority before generic preset text. This avoids the common failure mode where `bugfix-backlog` or `maintainability` starts from broad placeholder backlog language instead of the user's approved plan.
 
 ## After scaffolding
 
 Commit the scaffold first, because the autopilot controller expects a clean worktree before unattended execution.
 
 If the target repo already has this scaffold and the deployed `scaffold_version` is older than the current skill version, the script should auto-upgrade shared controller assets plus preset `automation/*` files first. Treat that as a scaffold refresh, not as user intent to regenerate or reset the repo-specific lane docs.
+
+Before running `doctor` or `start`, create a dedicated branch or worktree. A fresh scaffold on `main` is allowed to install, but `doctor` / `start` should fail branch guard checks until the operator moves to a branch such as `autopilot/<topic>`, `quality/<topic>`, or `bugfix/<topic>`. Make this explicit in handoff text so “installed successfully, then doctor failed on main” is understood as expected safety behavior.
+
+When the target execution machine is a remote Mac, hand off a concrete playbook instead of leaving the operator to assemble it:
+
+1. Scaffold locally on Windows.
+2. Commit and push.
+3. `ssh mac` into the synced/remote repo.
+4. Fetch/reset or pull the scaffold commit.
+5. Create a dedicated Mac-side worktree/branch.
+6. Run `doctor`, `start --dry-run --single-round`, then the background wrapper.
 
 ### Commit prefix gate
 
@@ -140,6 +158,15 @@ The controller also validates `build_ran`, `build_id`, `deploy_ran`, and `deploy
 - If no trustworthy build identifier exists, the round should report `build_ran=false` rather than inventing one.
 - If `deploy_ran` is `true`, that deploy must actually have happened and must satisfy the configured verification checks.
 - The scaffolded controller injects these requirements into every rendered round prompt so custom prompts cannot silently omit them.
+
+### Command budget policy
+
+The controller records budget findings for repeated `git status --short` and `git diff --stat`, but scaffold version `1.0.3+` defaults those findings to warnings through `command_budget_policy: "warn"`.
+
+- Do not roll back an otherwise successful commit only because `commands_run` exceeded a diagnostic command budget.
+- If a repo really needs hard enforcement, set `command_budget_policy` to `hard`, `fail`, or `error` deliberately.
+- Treat budget warnings as operator feedback for future prompt/config tuning, not as proof the target repo code failed.
+- If a round looks “failed” after visible work succeeded, inspect runtime logs for controller budget/validation findings before chasing phantom app bugs.
 
 Then run a smoke test in the target repo:
 

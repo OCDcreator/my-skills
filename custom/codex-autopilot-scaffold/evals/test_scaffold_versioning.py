@@ -202,6 +202,99 @@ class ScaffoldVersioningTests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round", result.stdout)
+            self.assertIn("git switch -c autopilot/<topic>", result.stdout)
+            self.assertIn("remote mac rollout template", result.stdout)
+            self.assertIn("python automation/autopilot.py version", result.stdout)
+
+    def test_seed_plan_copies_source_and_overrides_lane_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            repo_root = create_target_repo(temp_root)
+            seed_plan = temp_root / "approved-plan.md"
+            seed_plan.write_text(
+                "# Approved implementation plan\n\n"
+                "- [ ] B1: Replace stale parser\n"
+                "- [ ] B2: Add regression tests\n",
+                encoding="utf-8",
+            )
+
+            result = run_scaffold(repo_root, "--seed-plan", str(seed_plan))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("seeded plan", result.stdout)
+            copied_seed = repo_root / "docs" / "status" / "autopilot-seed-plan.md"
+            self.assertTrue(copied_seed.exists())
+            self.assertIn("Approved implementation plan", copied_seed.read_text(encoding="utf-8"))
+            roadmap_text = (
+                repo_root / "docs" / "status" / "lanes" / "m1-hotspot-slice" / "autopilot-round-roadmap.md"
+            ).read_text(encoding="utf-8")
+            self.assertLess(
+                roadmap_text.index("### [NEXT] Execute the next approved plan slice"),
+                roadmap_text.index("### [NEXT] R1 - First maintainability / refactor slice"),
+            )
+
+    def test_command_budget_defaults_to_warning_not_success_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            phase_doc_path = repo_root / "docs" / "status" / "lanes" / "m1-hotspot-slice" / "autopilot-phase-1.md"
+            phase_doc_path.parent.mkdir(parents=True, exist_ok=True)
+            phase_doc_path.write_text("# phase 1\n", encoding="utf-8")
+            (repo_root / "src").mkdir()
+            (repo_root / "src" / "demo.py").write_text("print('ok')\n", encoding="utf-8")
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: round 1 - demo").returncode, 0)
+            commit_sha = run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
+            commit_message = run_git(repo_root, "log", "-1", "--pretty=%s", commit_sha).stdout
+
+            validation_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+                "_template_validation_under_test",
+            )
+            warnings: list[str] = []
+            support = validation_module.ValidationSupport(
+                clean_string=lambda value: "" if value is None else str(value).strip(),
+                resolve_repo_path=lambda value: repo_root / str(value),
+                run_git=lambda args: run_git(repo_root, *args),
+                info=warnings.append,
+            )
+            result = {
+                "status": "success",
+                "lane_id": "m1-hotspot-slice",
+                "phase_doc_path": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                "commit_sha": commit_sha,
+                "commit_message": commit_message,
+                "summary": "demo",
+                "next_focus": "",
+                "tests_run": [],
+                "commands_run": ["git status --short", "git status --short", "git diff --stat", "git diff --stat"],
+                "build_ran": False,
+                "build_id": "",
+                "deploy_ran": False,
+                "deploy_verified": False,
+            }
+            config = {
+                "commit_prefix": "autopilot",
+                "build_command": "",
+                "deploy_policy": "never",
+                "max_git_status_per_round": 1,
+                "max_git_diff_stat_per_round": 1,
+                "command_budget_policy": "warn",
+            }
+
+            failure_reason = validation_module.validate_round_result(
+                attempt_number=1,
+                result=result,
+                schema={},
+                phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                expected_lane_id="m1-hotspot-slice",
+                config=config,
+                ending_head=commit_sha,
+                working_tree_dirty=False,
+                support=support,
+            )
+
+            self.assertIsNone(failure_reason)
+            self.assertTrue(any("Command budget warning" in warning for warning in warnings))
 
     def test_older_scaffold_auto_upgrades_common_files_and_refreshes_preset_automation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

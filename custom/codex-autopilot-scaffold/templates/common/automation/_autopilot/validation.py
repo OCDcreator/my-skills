@@ -190,6 +190,20 @@ def test_command_budget_exceeded(commands_run: list[str], config: dict[str, Any]
     return errors
 
 
+def handle_command_budget_findings(commands_run: list[str], config: dict[str, Any], *, support: ValidationSupport) -> list[str]:
+    findings = test_command_budget_exceeded(commands_run, config)
+    if not findings:
+        return []
+
+    policy = support.clean_string(config.get("command_budget_policy")).lower() or "warn"
+    if policy in {"hard", "fail", "error"}:
+        return findings
+
+    for finding in findings:
+        support.info(f"Command budget warning: {finding}")
+    return []
+
+
 def command_matches_full_test(command: str, full_test_command: str, *, clean_string: Callable[..., str]) -> bool:
     return clean_string(command) == clean_string(full_test_command)
 
@@ -290,7 +304,7 @@ def validate_round_result(
             validation_errors.append(f"HEAD '{ending_head}' does not match commit_sha '{commit_sha}'.")
 
         if commit_sha:
-            actual_commit_message = support.run_git(["log", "-1", "--pretty=%s", commit_sha]).stdout
+            actual_commit_message = clean_string(support.run_git(["log", "-1", "--pretty=%s", commit_sha]).stdout)
             if actual_commit_message != commit_message:
                 validation_errors.append(
                     f"Actual commit message '{actual_commit_message}' does not match reported '{commit_message}'."
@@ -326,7 +340,11 @@ def validate_round_result(
                     )
 
             validation_errors.extend(
-                test_command_budget_exceeded([str(command) for command in result.get("commands_run", [])], config)
+                handle_command_budget_findings(
+                    [str(command) for command in result.get("commands_run", [])],
+                    config,
+                    support=support,
+                )
             )
 
         build_id = clean_string(result.get("build_id"))
