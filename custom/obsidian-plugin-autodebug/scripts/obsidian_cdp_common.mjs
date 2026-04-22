@@ -399,9 +399,9 @@ export async function reloadPluginViaApp(session, pluginId, waitMs = 800) {
 
 export async function writeTraceArtifacts({ outputPath, summaryPath, lines, summary }) {
   await ensureParentDirectory(outputPath);
-  await fs.writeFile(outputPath, `${lines.join('\n')}\n`, 'utf8');
+  await fsp.writeFile(outputPath, `${lines.join('\n')}\n`, 'utf8');
   if (summaryPath) {
     await ensureParentDirectory(summaryPath);
-    await fs.writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+    await fsp.writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
   }
 }
