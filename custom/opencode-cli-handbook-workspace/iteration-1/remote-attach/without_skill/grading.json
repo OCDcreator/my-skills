@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "remote-attach-baseline",
+  "prompt": "我有一个 opencode server 跑在 192.168.1.50:4096 上，密码是 mypass。我需要从我的 Windows 机器上远程让它在 /home/user/myproject 目录下检查代码质量。怎么用 opencode CLI 连上去执行？",
+  "assertions": [
+    {"text": "回答中包含 opencode run --attach 命令", "passed": false, "evidence": "使用了不存在的 'opencode attach --host' 语法，而非 'opencode run --attach http://...'"},
+    {"text": "使用了 --password 参数", "passed": false, "evidence": "使用了不存在的 '--password' 在 'opencode attach' 上，但格式错误"},
+    {"text": "使用了 --dir 参数指定远程目录", "passed": false, "evidence": "使用了不存在的 '--workspace' 参数，而非 '--dir'"},
+    {"text": "URL 格式正确 (http://192.168.1.50:4096)", "passed": false, "evidence": "使用了 '--host 192.168.1.50 --port 4096' 分离语法，而非 --attach URL 格式"},
+    {"text": "命令语法正确可执行", "passed": false, "evidence": "大量不存在的命令和标志：'opencode review work', 'opencode lint', 'opencode test', '--workspace', '--command'"}
+  ]
+}

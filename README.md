@@ -23,6 +23,8 @@ my-skills/
 │   ├── skill-router/                          # 任务先路由到 my-skills 中合适技能
 │   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
 │   ├── windows-mac-ssh/                       # Windows PowerShell 通过 SSH/SCP 操作 Mac
+│   ├── opencode-source-compass/               # OpenCode 源码架构导航与 SDK 版本兼容性诊断
+│   ├── opencode-cli-handbook/                 # OpenCode CLI 速查手册（agent 非交互调用）
 │   ├── design-reference-router/               # 品牌/产品风格参考路由技能
 │   ├── x-reader/                              # 内容转录与分析（含子技能）
 │   │   ├── video/                             #   视频/播客转录与结构化总结
@@ -59,6 +61,8 @@ my-skills/
 | [obsidian-plugin-release-manager](custom/obsidian-plugin-release-manager/) | Obsidian plugin 的 semver + codename、BUILD_ID、release build 自动 patch bump 与 test vault deploy |
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
+| [opencode-source-compass](custom/opencode-source-compass/) | OpenCode 源码架构导航与 SDK 版本兼容性诊断；66 个 SDK API 完整调用链映射、40+ 事件类型目录、Effect Service 依赖图、版本升级检测与迁移指引 |
+| [opencode-cli-handbook](custom/opencode-cli-handbook/) | OpenCode CLI 速查手册；覆盖 `opencode run` 非交互执行（代码审查/辅助/CI 自动化）、服务器模式、会话管理、模型切换、调试诊断等全部 CLI 命令与参数 |
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
 | [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |

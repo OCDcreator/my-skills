@@ -1,0 +1,23 @@
+{
+  "skill_name": "opencode-cli-handbook",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "我写了一个新的 TypeScript 函数放在 src/utils/validator.ts，想用 opencode 命令行来审查它的安全性和性能问题，然后把结果用 JSON 格式保存下来。我应该怎么跑这个命令？请给我完整的命令和说明。",
+      "expected_output": "应该给出 opencode run 命令，包含 -f 附加文件、--format json 输出格式、审查提示词",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "我有一个 opencode server 跑在 192.168.1.50:4096 上，密码是 mypass。我需要从我的 Windows 机器上远程让它在 /home/user/myproject 目录下检查代码质量。怎么用 opencode CLI 连上去执行？",
+      "expected_output": "应该展示 opencode run --attach http://192.168.1.50:4096 --password mypass --dir /home/user/myproject 的用法",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我在 CI 脚本里需要用 opencode 自动修复 lint 错误然后提交。我知道这需要跳过权限确认，但我不确定具体命令。另外我还想知道怎么查看上次的 token 消耗统计。",
+      "expected_output": "应该给出 opencode run --dangerously-skip-permissions 命令（带安全警告），以及 opencode stats 命令",
+      "files": []
+    }
+  ]
+}

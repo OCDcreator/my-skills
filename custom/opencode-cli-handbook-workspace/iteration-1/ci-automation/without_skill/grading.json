@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "ci-automation-baseline",
+  "prompt": "我在 CI 脚本里需要用 opencode 自动修复 lint 错误然后提交。我知道这需要跳过权限确认，但我不确定具体命令。另外我还想知道怎么查看上次的 token 消耗统计。",
+  "assertions": [
+    {"text": "回答中包含 --dangerously-skip-permissions 标志", "passed": false, "evidence": "使用了不存在的 '--yes' 和 '-y' 标志，以及 '--no-interactive', '--auto-fix'"},
+    {"text": "给出了 opencode stats 命令", "passed": false, "evidence": "使用了不存在的 'opencode stats --last', '--history', '--session' 标志"},
+    {"text": "对 --dangerously-skip-permissions 给出了安全警告", "passed": false, "evidence": "没有提到 --dangerously-skip-permissions，使用了不存在的 '--yes' 替代"},
+    {"text": "opencode run 命令语法正确", "passed": false, "evidence": "使用了不存在的 'opencode fix' 命令，而非 'opencode run'"},
+    {"text": "覆盖了用户两个需求（修复lint + 查看统计）", "passed": false, "evidence": "虽然覆盖了两个需求，但所有命令都是幻觉出来的不存在的命令"}
+  ]
+}

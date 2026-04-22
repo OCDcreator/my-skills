@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "remote-attach",
+  "prompt": "我有一个 opencode server 跑在 192.168.1.50:4096 上，密码是 mypass。我需要从我的 Windows 机器上远程让它在 /home/user/myproject 目录下检查代码质量。怎么用 opencode CLI 连上去执行？",
+  "assertions": [
+    {"text": "回答中包含 opencode run --attach 命令", "passed": false, "evidence": ""},
+    {"text": "使用了 --password 参数", "passed": false, "evidence": ""},
+    {"text": "使用了 --dir 参数指定远程目录", "passed": false, "evidence": ""},
+    {"text": "URL 格式正确 (http://192.168.1.50:4096)", "passed": false, "evidence": ""},
+    {"text": "命令语法正确可执行", "passed": false, "evidence": ""}
+  ]
+}
