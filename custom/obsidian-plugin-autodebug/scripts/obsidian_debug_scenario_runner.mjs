@@ -12,6 +12,8 @@ import {
   nowIso,
   parseArgs,
   printHelpAndExit,
+  resolveObsidianCliCommand,
+  withRefreshedWindowsPath,
 } from './obsidian_cdp_common.mjs';
 import {
   buildSettingsTabOpenExpression,
@@ -54,7 +56,7 @@ const scenarioName = getStringOption(options, 'scenario-name', '').trim();
 const explicitScenarioPath = getStringOption(options, 'scenario-path', '').trim();
 const pluginId = getStringOption(options, 'plugin-id', '').trim();
 const vaultName = getStringOption(options, 'vault-name', '').trim();
-const obsidianCommand = getStringOption(options, 'obsidian-command', '').trim();
+const obsidianCommand = resolveObsidianCliCommand(getStringOption(options, 'obsidian-command', '').trim());
 const scenarioCommandId = getStringOption(options, 'scenario-command-id', '').trim();
 const scenarioSleepMs = getNumberOption(options, 'scenario-sleep-ms', 2000);
 const surfaceProfilePath = getStringOption(options, 'surface-profile', '').trim();
@@ -218,6 +220,7 @@ function runObsidianCli(command, args) {
   const startedAt = nowIso();
   const result = spawnSync(obsidianCommand, cliArgs, {
     encoding: 'utf8',
+    env: withRefreshedWindowsPath(),
     windowsHide: true,
   });
   const finishedAt = nowIso();

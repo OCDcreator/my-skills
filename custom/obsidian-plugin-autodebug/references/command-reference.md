@@ -97,6 +97,14 @@ node scripts/obsidian_debug_cdp_restart_fallback_smoke.mjs
 
 This compiles a temporary fake Obsidian executable with `csc.exe`, verifies that `scripts/obsidian_debug_launch_app.mjs` records `cdpRestartFallback.attempted|ok|readyAfterRestart`, and then cleans up the synthetic process. It is meant for regression-proofing the fallback path without restarting a real Obsidian session.
 
+Synthetic Windows smoke for stale agent/session `PATH` recovery:
+
+```bash
+node scripts/obsidian_debug_windows_cli_resolution_smoke.mjs
+```
+
+This strips the current process `PATH` of Obsidian entries, then verifies that the launch helper and doctor still recover the CLI from the Windows user/machine `Path` scopes.
+
 ## Optional Agentic Surface Probes
 
 Use these only when needed; default loop remains CLI/CDP-first.
@@ -263,6 +271,7 @@ Keep the split explicit:
 ## Troubleshooting
 
 - `obsidian help` cannot find Obsidian: run `node scripts/obsidian_debug_launch_app.mjs --mode cli ...`, then retry.
+- Windows note: the Node helpers now merge the current process `PATH` with the Windows user/machine `Path` scopes before probing `obsidian`, so stale long-lived agent sessions no longer misclassify the CLI just because they inherited an old `PATH`.
 - CDP fetch fails: let `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` perform its restart fallback, or run `scripts/obsidian_windows_restart_cdp.ps1` / `scripts/obsidian_mac_restart_cdp.sh` directly and then probe `http://127.0.0.1:9222/json/list`.
 - Logs show Hot Reload churn: use controlled mode for deterministic timing or coexist mode when intentionally letting Hot Reload drive reload.
 - UI selectors are flaky: add a surface profile, then assert stable root selectors/text instead of screenshot-only evidence.

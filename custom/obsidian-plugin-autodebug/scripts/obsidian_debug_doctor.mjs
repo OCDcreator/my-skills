@@ -6,6 +6,7 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getNumberOption,
+  resolveObsidianCliCommand,
   getStringOption,
   getWebSocketSupportDetail,
   hasGlobalWebSocket,
@@ -14,6 +15,7 @@ import {
   parseArgs,
   printHelpAndExit,
   resolveTarget,
+  withRefreshedWindowsPath,
 } from './obsidian_cdp_common.mjs';
 import {
   buildCommandScript,
@@ -67,7 +69,9 @@ Common options:
 const repoDir = path.resolve(getStringOption(options, 'repo-dir', process.cwd()));
 const testVaultPluginDir = getStringOption(options, 'test-vault-plugin-dir', '').trim();
 const expectedPluginId = getStringOption(options, 'plugin-id', '').trim();
-const obsidianCommand = getStringOption(options, 'obsidian-command', 'obsidian').trim();
+const obsidianCommand = resolveObsidianCliCommand(
+  getStringOption(options, 'obsidian-command', 'obsidian').trim() || 'obsidian',
+);
 const vaultName = getStringOption(options, 'vault-name', '').trim();
 const appPath = getStringOption(options, 'app-path', '').trim();
 const vaultUri = getStringOption(options, 'vault-uri', '').trim();
@@ -194,6 +198,7 @@ function commandFixSpec({ id, label, summary, safety, commandEntry }) {
 function runProcess(command, args, timeoutMs = 5000) {
   return new Promise((resolve) => {
     const child = spawn(command, args, {
+      env: withRefreshedWindowsPath(),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

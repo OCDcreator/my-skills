@@ -1,5 +1,7 @@
-import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 export function parseArgs(argv) {
   const options = new Map();
@@ -65,7 +67,7 @@ export function printHelpAndExit(text) {
 }
 
 export async function ensureParentDirectory(filePath) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
 }
 
 export function formatRemoteObject(value) {
@@ -90,6 +92,115 @@ export function formatRemoteObject(value) {
 
 export function nowIso() {
   return new Date().toISOString();
+}
+
+function splitPathEntries(value) {
+  return String(value || '')
+    .split(path.delimiter)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+const mergedWindowsPathCache = new Map();
+
+function getWindowsPowerShellPath() {
+  return path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+}
+
+function readWindowsPathScope(scope) {
+  const powershellPath = getWindowsPowerShellPath();
+  if (!existsSync(powershellPath)) {
+    return '';
+  }
+
+  const result = spawnSync(
+    powershellPath,
+    [
+      '-NoProfile',
+      '-Command',
+      `[Environment]::GetEnvironmentVariable('Path','${scope}')`,
+    ],
+    {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  );
+
+  if (result.error || result.status !== 0) {
+    return '';
+  }
+
+  return typeof result.stdout === 'string' ? result.stdout.trim() : '';
+}
+
+function mergeWindowsPathEntries(baseEnv = process.env) {
+  const pathKeys = Object.keys(baseEnv).filter((key) => key.toLowerCase() === 'path');
+  const currentPath = pathKeys.length > 0 ? baseEnv[pathKeys[0]] : process.env.PATH ?? '';
+  if (mergedWindowsPathCache.has(currentPath)) {
+    return mergedWindowsPathCache.get(currentPath);
+  }
+
+  const entries = [
+    ...splitPathEntries(currentPath),
+    ...splitPathEntries(readWindowsPathScope('User')),
+    ...splitPathEntries(readWindowsPathScope('Machine')),
+  ];
+  const seen = new Set();
+  const merged = [];
+
+  for (const entry of entries) {
+    const normalized = path.normalize(entry).toLowerCase();
+    if (seen.has(normalized)) {
+      continue;
+    }
+    seen.add(normalized);
+    merged.push(entry);
+  }
+
+  const mergedPath = merged.join(path.delimiter);
+  mergedWindowsPathCache.set(currentPath, mergedPath);
+  return mergedPath;
+}
+
+export function withRefreshedWindowsPath(baseEnv = process.env) {
+  if (process.platform !== 'win32') {
+    return baseEnv;
+  }
+
+  const mergedPath = mergeWindowsPathEntries(baseEnv);
+  if (!mergedPath) {
+    return baseEnv;
+  }
+
+  const env = { ...baseEnv };
+  const pathKeys = Object.keys(env).filter((key) => key.toLowerCase() === 'path');
+  if (pathKeys.length === 0) {
+    env.PATH = mergedPath;
+    return env;
+  }
+
+  for (const key of pathKeys) {
+    env[key] = mergedPath;
+  }
+
+  return env;
+}
+
+export function resolveObsidianCliCommand(command, { platform = process.platform } = {}) {
+  const trimmed = String(command || '').trim() || 'obsidian';
+  if (platform !== 'win32') {
+    return trimmed;
+  }
+
+  if (/\.exe$/i.test(trimmed)) {
+    const comCandidate = trimmed.replace(/\.exe$/i, '.com');
+    if (existsSync(comCandidate)) {
+      return comCandidate;
+    }
+  }
+
+  return trimmed;
 }
 
 export async function resolveTarget({

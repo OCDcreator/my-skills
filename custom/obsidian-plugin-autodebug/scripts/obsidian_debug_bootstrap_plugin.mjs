@@ -5,11 +5,13 @@ import {
   ensureParentDirectory,
   getBooleanOption,
   getNumberOption,
+  resolveObsidianCliCommand,
   getStringOption,
   hasHelpOption,
   nowIso,
   parseArgs,
   printHelpAndExit,
+  withRefreshedWindowsPath,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
@@ -36,7 +38,9 @@ if (!pluginId) {
   throw new Error('--plugin-id is required');
 }
 
-const obsidianCommand = getStringOption(options, 'obsidian-command', 'obsidian').trim();
+const obsidianCommand = resolveObsidianCliCommand(
+  getStringOption(options, 'obsidian-command', 'obsidian').trim() || 'obsidian',
+);
 const vaultName = getStringOption(options, 'vault-name', '').trim();
 const testVaultPluginDir = getStringOption(options, 'test-vault-plugin-dir', '').trim();
 const outputPath = getStringOption(options, 'output', '').trim();
@@ -129,6 +133,7 @@ function runCli(command, args = [], timeoutMs = 15000) {
 
   return new Promise((resolve) => {
     const child = spawn(obsidianCommand, resolvedArgs, {
+      env: withRefreshedWindowsPath(),
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });

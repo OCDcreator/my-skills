@@ -12,6 +12,8 @@ import {
   nowIso,
   parseArgs,
   printHelpAndExit,
+  resolveObsidianCliCommand,
+  withRefreshedWindowsPath,
 } from './obsidian_cdp_common.mjs';
 
 const options = parseArgs(process.argv.slice(2));
@@ -39,7 +41,9 @@ if (!['auto', 'cli', 'cdp'].includes(mode)) {
   throw new Error('--mode must be auto, cli, or cdp');
 }
 
-const obsidianCommand = getStringOption(options, 'obsidian-command', 'obsidian').trim() || 'obsidian';
+const obsidianCommand = resolveObsidianCliCommand(
+  getStringOption(options, 'obsidian-command', 'obsidian').trim() || 'obsidian',
+);
 const appPath = getStringOption(options, 'app-path', '').trim();
 const vaultName = getStringOption(options, 'vault-name', '').trim();
 const vaultPath = getStringOption(options, 'vault-path', '').trim();
@@ -81,6 +85,7 @@ function runProcess(command, args = [], timeoutMs = 5000) {
 
     try {
       child = spawn(command, args, {
+        env: withRefreshedWindowsPath(),
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -133,6 +138,7 @@ function spawnAndForget(command, args = [], { detached = true } = {}) {
     try {
       child = spawn(command, args, {
         detached,
+        env: withRefreshedWindowsPath(),
         windowsHide: true,
         stdio: 'ignore',
       });
