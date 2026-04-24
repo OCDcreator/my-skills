@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.1.1"
+SCAFFOLD_VERSION = "1.1.2"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
 SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
@@ -247,6 +247,26 @@ def resolve_git_root(target_repo: Path) -> Path:
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def package_declares_dependencies(repo_root: Path) -> bool:
+    package_json = repo_root / "package.json"
+    if not package_json.exists():
+        return False
+    package = json.loads(read_text(package_json))
+    for key in (
+        "dependencies",
+        "devDependencies",
+        "peerDependencies",
+        "optionalDependencies",
+        "bundledDependencies",
+    ):
+        value = package.get(key)
+        if isinstance(value, dict) and value:
+            return True
+        if isinstance(value, list) and value:
+            return True
+    return False
 
 
 def write_text(path: Path, content: str) -> None:
@@ -762,7 +782,7 @@ def build_review_command_paths(preset: str) -> list[str]:
 
 def build_prerequisite_paths(repo_root: Path, preset: str) -> list[str]:
     paths: list[str] = []
-    if (repo_root / "package.json").exists():
+    if package_declares_dependencies(repo_root):
         paths.append("node_modules")
     paths.extend(build_review_command_paths(preset))
     deduped: list[str] = []

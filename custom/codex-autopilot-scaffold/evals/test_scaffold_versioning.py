@@ -420,6 +420,69 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertIn("automation/Invoke-OpencodeReview.ps1", config["prerequisite_paths"])
             self.assertIn(".opencode/commands/review-plan.md", config["prerequisite_paths"])
 
+    def test_round_result_schema_requires_every_property_for_codex_output(self) -> None:
+        schema = json.loads(
+            (SKILL_ROOT / "templates" / "common" / "automation" / "round-result.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        property_names = set(schema.get("properties", {}).keys())
+        required_names = set(schema.get("required", []))
+
+        self.assertEqual(set(), property_names - required_names)
+
+    def test_review_gated_dry_run_writes_prompt_with_schema_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+
+            scaffold_result = run_scaffold(repo_root, preset="review-gated")
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            autopilot_path = repo_root / "automation" / "autopilot.py"
+            prompt_path = repo_root / "automation" / "runtime" / "round-001" / "prompt.md"
+            dry_run_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(autopilot_path),
+                    "start",
+                    "--profile",
+                    "windows",
+                    "--dry-run",
+                    "--single-round",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(dry_run_result.returncode, 0, dry_run_result.stderr)
+            self.assertTrue(prompt_path.exists())
+            prompt_text = prompt_path.read_text(encoding="utf-8")
+            self.assertIn("plan_review_verdict", prompt_text)
+            self.assertIn("code_review_verdict", prompt_text)
+
+    def test_review_gated_python_test_script_does_not_require_node_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_repo_with_files(
+                Path(temp_dir),
+                {"package.json": '{"scripts":{"test":"python -m unittest"}}\n'},
+            )
+            self.assertEqual(run_git(repo_root, "init").returncode, 0)
+            self.assertEqual(run_git(repo_root, "checkout", "-b", "autopilot/python-smoke").returncode, 0)
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "seed").returncode, 0)
+
+            result = run_scaffold(repo_root, preset="review-gated")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = json.loads((repo_root / "automation" / "autopilot-config.json").read_text(encoding="utf-8"))
+            self.assertNotIn("node_modules", config["prerequisite_paths"])
+
     def test_health_runtime_flags_active_state_without_live_pid(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))

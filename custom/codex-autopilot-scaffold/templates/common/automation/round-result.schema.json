@@ -18,6 +18,8 @@
     "commit_message",
     "next_focus",
     "blocking_reason",
+    "plan_review_verdict",
+    "code_review_verdict",
     "changed_files"
   ],
   "properties": {
