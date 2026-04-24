@@ -38,7 +38,8 @@ def load_module_from_path(path: Path, module_name: str):
     spec = importlib.util.spec_from_file_location(module_name, path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    module_parent = str(path.parent)
+    module_parent_path = path.parent.parent if path.parent.name == "_autopilot" else path.parent
+    module_parent = str(module_parent_path)
     inserted_path = False
     stale_package_modules = [name for name in sys.modules if name == "_autopilot" or name.startswith("_autopilot.")]
     for stale_module_name in stale_package_modules:
@@ -90,7 +91,7 @@ def create_target_repo(tmp_path: Path) -> Path:
     return repo_root
 
 
-def run_scaffold(repo_root: Path, *extra_args: str) -> subprocess.CompletedProcess[str]:
+def run_scaffold(repo_root: Path, *extra_args: str, preset: str = "maintainability") -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [
             sys.executable,
@@ -98,7 +99,7 @@ def run_scaffold(repo_root: Path, *extra_args: str) -> subprocess.CompletedProce
             "--target-repo",
             str(repo_root),
             "--preset",
-            "maintainability",
+            preset,
             *extra_args,
         ],
         text=True,
@@ -132,7 +133,9 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "cli_parser.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "controller_builders.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "controller_runtime.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "bootstrap_runtime.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "doctor.py").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "health_runtime.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "lanes.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "locking.py").exists())
                 self.assertTrue((repo_root / "automation" / "_autopilot" / "process_control.py").exists())
@@ -173,7 +176,9 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         str(repo_root / "automation" / "_autopilot" / "cli_parser.py"),
                         str(repo_root / "automation" / "_autopilot" / "controller_builders.py"),
                         str(repo_root / "automation" / "_autopilot" / "controller_runtime.py"),
+                        str(repo_root / "automation" / "_autopilot" / "bootstrap_runtime.py"),
                         str(repo_root / "automation" / "_autopilot" / "doctor.py"),
+                        str(repo_root / "automation" / "_autopilot" / "health_runtime.py"),
                         str(repo_root / "automation" / "_autopilot" / "lanes.py"),
                         str(repo_root / "automation" / "_autopilot" / "locking.py"),
                         str(repo_root / "automation" / "_autopilot" / "process_control.py"),
@@ -205,6 +210,8 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertIn("git switch -c autopilot/<topic>", result.stdout)
             self.assertIn("remote mac rollout template", result.stdout)
             self.assertIn("python automation/autopilot.py version", result.stdout)
+            self.assertIn("python automation/autopilot.py health", result.stdout)
+            self.assertIn("bootstrap-and-daemonize", result.stdout)
 
     def test_seed_plan_copies_source_and_overrides_lane_queue(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -232,6 +239,102 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 roadmap_text.index("### [NEXT] Execute the next approved plan slice"),
                 roadmap_text.index("### [NEXT] R1 - First maintainability / refactor slice"),
             )
+
+    def test_dry_run_marks_preview_state_instead_of_dead_runner(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            autopilot_path = repo_root / "automation" / "autopilot.py"
+            state_path = repo_root / "automation" / "runtime" / "autopilot-state.json"
+            prompt_path = repo_root / "automation" / "runtime" / "round-001" / "prompt.md"
+
+            first_dry_run = subprocess.run(
+                [
+                    sys.executable,
+                    str(autopilot_path),
+                    "start",
+                    "--profile",
+                    "windows",
+                    "--dry-run",
+                    "--single-round",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(first_dry_run.returncode, 0, first_dry_run.stderr)
+            self.assertIn("Dry run complete. Prompt written to", first_dry_run.stdout)
+            self.assertTrue(prompt_path.exists())
+            preview_state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(preview_state["status"], "stopped_dry_run")
+
+            status_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(autopilot_path),
+                    "status",
+                    "--state-path",
+                    "automation/runtime/autopilot-state.json",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            self.assertEqual(status_result.returncode, 0, status_result.stderr)
+            self.assertIn("status=stopped_dry_run", status_result.stdout)
+            self.assertIn("health: terminal", status_result.stdout)
+            self.assertNotIn("dead-runner", status_result.stdout)
+
+            health_result = subprocess.run(
+                [
+                    sys.executable,
+                    str(autopilot_path),
+                    "health",
+                    "--state-path",
+                    "automation/runtime/autopilot-state.json",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            self.assertEqual(health_result.returncode, 0, health_result.stderr)
+            self.assertIn("verdict=terminal", health_result.stdout)
+            self.assertIn("state=stopped_dry_run", health_result.stdout)
+
+            second_dry_run = subprocess.run(
+                [
+                    sys.executable,
+                    str(autopilot_path),
+                    "start",
+                    "--profile",
+                    "windows",
+                    "--dry-run",
+                    "--single-round",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+            self.assertEqual(second_dry_run.returncode, 0, second_dry_run.stderr)
+            self.assertIn("Dry run complete. Prompt written to", second_dry_run.stdout)
+            self.assertNotIn("State status is 'stopped_dry_run'; stopping.", second_dry_run.stdout)
 
     def test_command_budget_defaults_to_warning_not_success_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -295,6 +398,209 @@ class ScaffoldVersioningTests(unittest.TestCase):
 
             self.assertIsNone(failure_reason)
             self.assertTrue(any("Command budget warning" in warning for warning in warnings))
+
+    def test_review_gated_preset_scaffolds_cross_platform_review_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+
+            result = run_scaffold(repo_root, preset="review-gated")
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertTrue((repo_root / "automation" / "opencode-review.sh").exists())
+            self.assertTrue((repo_root / "automation" / "Invoke-OpencodeReview.ps1").exists())
+            self.assertTrue((repo_root / ".opencode" / "commands" / "review-plan.md").exists())
+            self.assertTrue((repo_root / ".opencode" / "commands" / "review-code.md").exists())
+            gitignore_text = (repo_root / ".gitignore").read_text(encoding="utf-8")
+            self.assertIn("!.opencode/", gitignore_text)
+            self.assertIn("!.opencode/commands/review-plan.md", gitignore_text)
+            config = json.loads((repo_root / "automation" / "autopilot-config.json").read_text(encoding="utf-8"))
+            self.assertEqual(config["review_poll_seconds"], 60)
+            self.assertEqual(config["review_timeout_seconds"], 1800)
+            self.assertIn("automation/opencode-review.sh", config["prerequisite_paths"])
+            self.assertIn("automation/Invoke-OpencodeReview.ps1", config["prerequisite_paths"])
+            self.assertIn(".opencode/commands/review-plan.md", config["prerequisite_paths"])
+
+    def test_health_runtime_flags_active_state_without_live_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+
+            runtime_directory = repo_root / "automation" / "runtime"
+            runtime_directory.mkdir(parents=True, exist_ok=True)
+            state_path = runtime_directory / "autopilot-state.json"
+            state = {
+                "status": "active",
+                "current_round": 3,
+                "active_lane_id": "m1-hotspot-slice",
+                "last_commit_sha": "abc123",
+                "last_phase_doc": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-2.md",
+                "last_blocking_reason": "",
+                "last_plan_review_verdict": "APPROVED",
+                "last_code_review_verdict": "APPROVED",
+            }
+            state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+            (runtime_directory / "autopilot.lock.json").write_text(
+                json.dumps({"pid": 999999, "hostname": "test-host"}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            health_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "health_runtime.py",
+                "_template_health_runtime_under_test",
+            )
+            status_views_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+                "_template_status_views_under_test",
+            )
+            report = health_module.build_health_report(
+                runtime_directory=runtime_directory,
+                explicit_state_path=str(state_path),
+                stale_seconds=600,
+                support=health_module.HealthRuntimeSupport(
+                    resolve_repo_path=lambda value: Path(value).resolve() if Path(value).is_absolute() else (repo_root / str(value)),
+                    read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+                    read_lock=lambda lock_path: json.loads(Path(lock_path).read_text(encoding="utf-8")),
+                    pid_exists=lambda pid: False,
+                ),
+                status_view_support=status_views_module.StatusViewSupport(
+                    repo_root=repo_root,
+                    default_state_path="automation/runtime/autopilot-state.json",
+                    lock_filename="autopilot.lock.json",
+                    round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+                ),
+            )
+
+            self.assertEqual(report["verdict"], "dead-runner")
+            self.assertIn("no live autopilot pid", report["reason"])
+
+    def test_health_runtime_requires_exec_confirmation_before_claiming_round_is_running(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+
+            runtime_directory = repo_root / "automation" / "runtime"
+            round_directory = runtime_directory / "round-004"
+            round_directory.mkdir(parents=True, exist_ok=True)
+            state_path = runtime_directory / "autopilot-state.json"
+            state = {
+                "status": "active",
+                "current_round": 3,
+                "active_lane_id": "m1-hotspot-slice",
+                "last_commit_sha": "abc123",
+            }
+            state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+            (runtime_directory / "autopilot.lock.json").write_text(
+                json.dumps({"pid": 12345, "hostname": "test-host"}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (round_directory / "runner-status.json").write_text(
+                json.dumps(
+                    {
+                        "pid": 67890,
+                        "status": "spawned",
+                        "started_at": "2026-04-24T10:00:00",
+                        "exec_confirmed_at": None,
+                        "last_output_at": None,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            health_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "health_runtime.py",
+                "_template_health_runtime_exec_gate_test",
+            )
+            status_views_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+                "_template_status_views_exec_gate_test",
+            )
+            report = health_module.build_health_report(
+                runtime_directory=runtime_directory,
+                explicit_state_path=str(state_path),
+                stale_seconds=600,
+                support=health_module.HealthRuntimeSupport(
+                    resolve_repo_path=lambda value: Path(value).resolve() if Path(value).is_absolute() else (repo_root / str(value)),
+                    read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+                    read_lock=lambda lock_path: json.loads(Path(lock_path).read_text(encoding="utf-8")),
+                    pid_exists=lambda pid: pid in {12345, 67890},
+                ),
+                status_view_support=status_views_module.StatusViewSupport(
+                    repo_root=repo_root,
+                    default_state_path="automation/runtime/autopilot-state.json",
+                    lock_filename="autopilot.lock.json",
+                    round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+                ),
+            )
+
+            self.assertEqual(report["verdict"], "starting")
+            self.assertFalse(report["runner_exec_confirmed"])
+            self.assertIn("has not emitted its first execution event", report["reason"])
+
+    def test_health_runtime_requires_progress_log_updates_even_after_exec_confirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+
+            runtime_directory = repo_root / "automation" / "runtime"
+            round_directory = runtime_directory / "round-005"
+            round_directory.mkdir(parents=True, exist_ok=True)
+            state_path = runtime_directory / "autopilot-state.json"
+            state_path.write_text(
+                json.dumps({"status": "active", "current_round": 4, "active_lane_id": "m1-hotspot-slice"}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (runtime_directory / "autopilot.lock.json").write_text(
+                json.dumps({"pid": 12345, "hostname": "test-host"}, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            (round_directory / "runner-status.json").write_text(
+                json.dumps(
+                    {
+                        "pid": 67890,
+                        "status": "running",
+                        "started_at": "2026-04-24T10:00:00",
+                        "exec_confirmed_at": "2026-04-24T10:00:05",
+                        "last_output_at": "2026-04-24T10:00:05",
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            health_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "health_runtime.py",
+                "_template_health_runtime_progress_gate_test",
+            )
+            status_views_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+                "_template_status_views_progress_gate_test",
+            )
+            report = health_module.build_health_report(
+                runtime_directory=runtime_directory,
+                explicit_state_path=str(state_path),
+                stale_seconds=600,
+                support=health_module.HealthRuntimeSupport(
+                    resolve_repo_path=lambda value: Path(value).resolve() if Path(value).is_absolute() else (repo_root / str(value)),
+                    read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+                    read_lock=lambda lock_path: json.loads(Path(lock_path).read_text(encoding="utf-8")),
+                    pid_exists=lambda pid: pid in {12345, 67890},
+                ),
+                status_view_support=status_views_module.StatusViewSupport(
+                    repo_root=repo_root,
+                    default_state_path="automation/runtime/autopilot-state.json",
+                    lock_filename="autopilot.lock.json",
+                    round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+                ),
+            )
+
+            self.assertEqual(report["verdict"], "stalled")
+            self.assertIn("progress.log has not started updating", report["reason"])
 
     def test_older_scaffold_auto_upgrades_common_files_and_refreshes_preset_automation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

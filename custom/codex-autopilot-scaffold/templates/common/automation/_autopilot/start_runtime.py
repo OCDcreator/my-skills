@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from _autopilot.round_flow import RoundFlowSupport, evaluate_round_execution, prepare_round_context
 from _autopilot.runner import RunnerSupport, invoke_runner_round, resolve_runner_executable
+from _autopilot.state_runtime import DRY_RUN_STOP_STATUS
 from _autopilot.validation import ValidationSupport
 
 
@@ -196,6 +197,8 @@ def record_successful_round(
 
     if support.clean_string(result.get("next_focus")):
         state["last_next_focus"] = result["next_focus"]
+    state["last_plan_review_verdict"] = result.get("plan_review_verdict")
+    state["last_code_review_verdict"] = result.get("code_review_verdict")
     if support.clean_string(result.get("phase_doc_path")):
         state["lane_progress"][current_lane_id]["last_phase_doc"] = result["phase_doc_path"]
     if support.clean_string(result.get("commit_sha")):
@@ -290,6 +293,10 @@ def run_start(
             )
 
             if args.dry_run:
+                state["status"] = DRY_RUN_STOP_STATUS
+                state["last_result"] = "dry_run"
+                state["last_blocking_reason"] = None
+                support.save_state(state, state_path)
                 support.info(f"Dry run complete. Prompt written to {round_context.prompt_path}")
                 break
 

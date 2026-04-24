@@ -9,6 +9,7 @@ from typing import Any, Callable
 from _autopilot.status_views import (
     StatusViewSupport,
     build_watch_state_signature,
+    clean_string,
     print_watch_detail_lines,
     print_watch_snapshot,
     resolve_watch_state_path,
@@ -20,6 +21,7 @@ from _autopilot.status_views import (
 class WatchRuntimeSupport:
     resolve_repo_path: Callable[..., Path]
     read_json: Callable[..., Any]
+    build_health_report: Callable[..., dict[str, Any]]
 
 
 def run_watch(args: argparse.Namespace, *, support: WatchRuntimeSupport, status_view_support: StatusViewSupport) -> int:
@@ -41,15 +43,24 @@ def run_watch(args: argparse.Namespace, *, support: WatchRuntimeSupport, status_
 
         round_directory = watched_round_directory(runtime_directory, state, status_view_support)
         progress_path = round_directory / "progress.log" if round_directory is not None else None
+        health_report = support.build_health_report(
+            runtime_directory=runtime_directory,
+            explicit_state_path=getattr(args, "state_path", ""),
+            stale_seconds=max(1, int(getattr(args, "stale_seconds", 600))),
+            status_view_support=status_view_support,
+        )
 
-        if state_signature != last_state_signature or progress_path != last_progress_path:
+        health_verdict = clean_string(health_report.get("verdict"))
+        combined_signature = (*state_signature, health_verdict)
+        if combined_signature != last_state_signature or progress_path != last_progress_path:
             print_watch_snapshot(
                 state=state,
                 state_path=state_path,
                 progress_path=progress_path,
+                health_report=health_report,
                 support=status_view_support,
             )
-            last_state_signature = state_signature
+            last_state_signature = combined_signature
 
         if progress_path is not None:
             if progress_path != last_progress_path:

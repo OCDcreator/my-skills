@@ -88,6 +88,39 @@ def run_doctor(args: argparse.Namespace, *, support: DoctorSupport) -> int:
     else:
         print("[doctor] info vulture command: <not configured>")
 
+    prerequisite_paths = [support.clean_string(path) for path in config.get("prerequisite_paths", [])]
+    if prerequisite_paths:
+        for prerequisite_path in prerequisite_paths:
+            if not prerequisite_path:
+                continue
+            try:
+                support.ensure_path_within_repo(prerequisite_path, label="prerequisite path", must_exist=True)
+                print(f"[doctor] ok   prerequisite path: {prerequisite_path}")
+            except support.error_type as exc:
+                print(f"[doctor] fail prerequisite path: {prerequisite_path} ({exc})")
+                failures += 1
+    else:
+        print("[doctor] info prerequisite paths: <not configured>")
+
+    plan_review_command = support.clean_string(config.get("plan_review_command"))
+    code_review_command = support.clean_string(config.get("code_review_command"))
+    if plan_review_command or code_review_command:
+        opencode_path = shutil.which("opencode")
+        if opencode_path:
+            print(f"[doctor] ok   command opencode: {opencode_path}")
+        else:
+            print("[doctor] fail command opencode: not found in PATH")
+            failures += 1
+
+        available_review_hosts = [name for name in ("bash", "pwsh", "powershell") if shutil.which(name)]
+        if available_review_hosts:
+            print(f"[doctor] ok   review shell host: {', '.join(available_review_hosts)}")
+        else:
+            print("[doctor] fail review shell host: expected bash or PowerShell in PATH")
+            failures += 1
+    else:
+        print("[doctor] info review commands: <not configured>")
+
     print(f"[doctor] info lanes: {len(config.get('lanes', []))}")
     for lane in config.get("lanes", []):
         lane_id = lane["id"]

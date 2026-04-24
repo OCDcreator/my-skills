@@ -72,6 +72,30 @@
       "prompt": "autopilot 第 2 轮明明成功提交了，但因为 commands_run 里 git status --short 和 git diff --stat 超了预算，控制器把 HEAD reset 掉了。请修 scaffold 本体，成功提交不能因为这种诊断预算被误杀。",
       "expected_output": "Assistant should treat this as a scaffold/controller design defect, change command-budget findings to warning/soft-fail by default, preserve a strict opt-in policy for repos that want hard enforcement, add regression tests proving successful commits are not failed by budget warnings, and document recovery/status semantics.",
       "files": []
+    },
+    {
+      "id": 13,
+      "prompt": "我要一个官方 review-gated autopilot：每轮先写方案，跑 opencode 审方案，再实现，再审代码，最后全量验证并提交。请把 repo-local scaffold、.opencode review commands、Windows/macOS review wrappers 都一起生成。",
+      "expected_output": "Assistant should choose the review-gated preset, scaffold repo-local .opencode review commands plus cross-platform review wrappers, explain the plan-review then code-review gate, and keep the output repo-local instead of suggesting ad-hoc manual review prompts.",
+      "files": []
+    },
+    {
+      "id": 14,
+      "prompt": "我想先前台盯住首轮，确认第一次成功提交后再自动切后台持续跑。不要让我自己写 restart-after-next-commit 的首轮 workaround。",
+      "expected_output": "Assistant should use or scaffold the bootstrap-and-daemonize path, explain why restart-after-next-commit cannot watch before the first successful commit exists, and hand off an explicit bootstrap -> daemon continuation command.",
+      "files": []
+    },
+    {
+      "id": 15,
+      "prompt": "autopilot state 里还写着 active，但我怀疑 runner 早就死了。不要只给我 status，我要一个真正检查 state、lock、pid、最新 progress 是否还在更新的健康结论。",
+      "expected_output": "Assistant should use or scaffold the health command, explain that status=active alone is insufficient, and report a unified health verdict that checks state, lock, pid liveness, and progress artifact freshness.",
+      "files": []
+    },
+    {
+      "id": 16,
+      "prompt": "不要再因为 state 还写着 active 就告诉我“第二轮已经在跑”。只有当 parent PID 活着、round-002/progress.log 持续写入、而且 codex exec 子进程已经真正进入执行时，才能这么汇报。",
+      "expected_output": "Assistant should treat this as a scaffold-level operator-visibility bug, strengthen the health/watch contract so active state alone is not enough, and require explicit child-runner evidence such as a live runner pid plus confirmed execution events before claiming the round is running.",
+      "files": []
     }
   ]
 }

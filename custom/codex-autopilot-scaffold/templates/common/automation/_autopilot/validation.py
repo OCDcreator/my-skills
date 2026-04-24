@@ -300,6 +300,14 @@ def validate_round_result(
         if not commit_message:
             validation_errors.append("success result is missing commit_message.")
 
+        plan_review_command = clean_string(config.get("plan_review_command"))
+        if plan_review_command and not clean_string(result.get("plan_review_verdict")):
+            validation_errors.append("success result is missing plan_review_verdict for a review-gated round.")
+
+        code_review_command = clean_string(config.get("code_review_command"))
+        if code_review_command and not clean_string(result.get("code_review_verdict")):
+            validation_errors.append("success result is missing code_review_verdict for a review-gated round.")
+
         if commit_sha and ending_head != commit_sha:
             validation_errors.append(f"HEAD '{ending_head}' does not match commit_sha '{commit_sha}'.")
 

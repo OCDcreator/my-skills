@@ -16,6 +16,8 @@ class RunnerSupport:
     compact_text: Callable[..., str]
     progress: Callable[..., None]
     get_codex_event_summary: Callable[..., str | None]
+    now_timestamp: Callable[..., str]
+    write_json: Callable[..., None]
     windows_hidden_process_kwargs: Callable[..., dict[str, Any]]
 
 
@@ -97,11 +99,38 @@ def invoke_runner_round(
     codex_args.append("-")
 
     stderr_log_path = events_log_path.with_suffix(".stderr.log")
+    runner_status_path = events_log_path.with_name("runner-status.json")
     for log_path in (events_log_path, progress_log_path, stderr_log_path):
         if log_path.exists():
             log_path.unlink()
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("", encoding="utf-8")
+
+    runner_status: dict[str, Any] = {
+        "runner_kind": runner_kind,
+        "command": codex_args[:-1],
+        "status": "launching",
+        "pid": None,
+        "started_at": None,
+        "exec_confirmed_at": None,
+        "last_output_at": None,
+        "last_stdout_at": None,
+        "last_stderr_at": None,
+        "stdout_event_count": 0,
+        "stderr_event_count": 0,
+        "exit_code": None,
+        "finished_at": None,
+    }
+    runner_status_lock = threading.Lock()
+
+    def save_runner_status() -> None:
+        with runner_status_lock:
+            support.write_json(runner_status_path, dict(runner_status))
+
+    def update_runner_status(**fields: Any) -> None:
+        with runner_status_lock:
+            runner_status.update(fields)
+            support.write_json(runner_status_path, dict(runner_status))
 
     process = subprocess.Popen(
         codex_args,
@@ -115,6 +144,13 @@ def invoke_runner_round(
 
     if not process.stdin or not process.stdout or not process.stderr:
         raise support.error_type("Failed to start codex subprocess with redirected pipes.")
+    update_runner_status(
+        status="spawned",
+        pid=int(process.pid),
+        started_at=support.now_timestamp(),
+    )
+    support.progress(progress_log_path, f"Spawned codex exec subprocess pid={process.pid}", channel="runner")
+
     stdin_pipe = cast(BinaryIO, process.stdin)
     stdout_pipe = cast(BinaryIO, process.stdout)
     stderr_pipe = cast(BinaryIO, process.stderr)
@@ -128,6 +164,17 @@ def invoke_runner_round(
                 decoded_line = stdout_line.decode("utf-8", errors="replace").rstrip("\r\n")
                 events_handle.write(decoded_line + "\n")
                 events_handle.flush()
+                current_timestamp = support.now_timestamp()
+                next_fields: dict[str, Any] = {
+                    "stdout_event_count": int(runner_status.get("stdout_event_count") or 0) + 1,
+                    "last_stdout_at": current_timestamp,
+                    "last_output_at": current_timestamp,
+                }
+                if not runner_status.get("exec_confirmed_at"):
+                    next_fields["exec_confirmed_at"] = current_timestamp
+                    next_fields["status"] = "running"
+                    support.progress(progress_log_path, "codex exec emitted first execution event", channel="runner")
+                update_runner_status(**next_fields)
                 summary = support.get_codex_event_summary(decoded_line)
                 if summary:
                     support.progress(progress_log_path, summary)
@@ -141,6 +188,14 @@ def invoke_runner_round(
                 decoded_line = stderr_line.decode("utf-8", errors="replace").rstrip("\r\n")
                 stderr_handle.write(decoded_line + "\n")
                 stderr_handle.flush()
+                current_timestamp = support.now_timestamp()
+                next_fields = {
+                    "stderr_event_count": int(runner_status.get("stderr_event_count") or 0) + 1,
+                    "last_stderr_at": current_timestamp,
+                    "last_output_at": current_timestamp,
+                    "status": "spawned" if runner_status.get("status") == "launching" else runner_status.get("status"),
+                }
+                update_runner_status(**next_fields)
                 if decoded_line.strip():
                     support.progress(
                         progress_log_path,
@@ -160,4 +215,9 @@ def invoke_runner_round(
     return_code = process.wait()
     stdout_thread.join()
     stderr_thread.join()
+    update_runner_status(
+        exit_code=int(return_code),
+        finished_at=support.now_timestamp(),
+        status="exited",
+    )
     return return_code

@@ -95,6 +95,7 @@ def prepare_round_context(
             "current_lane_id": lane_id,
             "current_lane_label": current_lane["label"],
             "current_lane_roadmap": current_lane["roadmap_path"],
+            "current_round_directory": round_directory.relative_to(support.resolve_repo_path(".")).as_posix(),
         },
     )
     rendered_prompt = support.append_controller_requirements(rendered_prompt, round_config)

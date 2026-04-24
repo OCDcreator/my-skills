@@ -8,9 +8,12 @@ from typing import TYPE_CHECKING, Any, cast
 sys.dont_write_bytecode = True
 
 from _autopilot.cli_parser import build_parser as build_parser_command
+from _autopilot.bootstrap_runtime import run_bootstrap_and_daemonize as run_bootstrap_and_daemonize_command
 from _autopilot.controller_builders import (
+    build_bootstrap_runtime_support,
     build_cli_parser_support as build_cli_parser_support_command,
     build_doctor_support,
+    build_health_runtime_support,
     build_lane_support,
     build_locking_support,
     build_process_control_support,
@@ -72,6 +75,7 @@ from _autopilot.controller_runtime import (
     write_json,
 )
 from _autopilot.doctor import run_doctor as run_doctor_command
+from _autopilot.health_runtime import build_health_report, run_health as run_health_command
 from _autopilot.locking import (
     acquire_lock as acquire_lock_command,
     autopilot_lock as autopilot_lock_command,
@@ -179,10 +183,21 @@ def run_status(args: argparse.Namespace) -> int:
     print_state_summary(
         state,
         runtime_directory=state_path.parent,
+        health_report=build_health_report(
+            runtime_directory=state_path.parent,
+            explicit_state_path=args.state_path,
+            stale_seconds=600,
+            support=build_health_runtime_support(),
+            status_view_support=build_status_view_support(),
+        ),
         support=build_status_view_support(),
         read_lock=read_lock,
     )
     return 0
+
+
+def run_health(args: argparse.Namespace) -> int:
+    return run_health_command(args, support=build_health_runtime_support(), status_view_support=build_status_view_support())
 
 
 def run_watch(args: argparse.Namespace) -> int:
@@ -191,6 +206,10 @@ def run_watch(args: argparse.Namespace) -> int:
 
 def run_restart_after_next_commit(args: argparse.Namespace) -> int:
     return run_restart_after_next_commit_command(args, support=build_process_control_support())
+
+
+def run_bootstrap_and_daemonize(args: argparse.Namespace) -> int:
+    return run_bootstrap_and_daemonize_command(args, support=build_bootstrap_runtime_support(run_start=run_start))
 
 
 def run_doctor(args: argparse.Namespace) -> int:
@@ -207,9 +226,11 @@ def build_cli_parser_support():
         run_start=run_start,
         run_watch=run_watch,
         run_status=run_status,
+        run_health=run_health,
         run_doctor=run_doctor,
         run_version=run_version,
         run_restart_after_next_commit=run_restart_after_next_commit,
+        run_bootstrap_and_daemonize=run_bootstrap_and_daemonize,
     )
 
 

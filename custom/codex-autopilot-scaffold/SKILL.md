@@ -1,16 +1,23 @@
 ---
 name: codex-autopilot-scaffold
-description: Use this skill when the user wants to inject a Codex-style repo-local unattended autopilot into an existing project, port a proven `codex exec` automation loop into another repository, or scaffold persistent `automation/autopilot.py` + queue docs + state/lock/history files that other models can run without hand-holding. Trigger for requests about repo-owned autopilot setup, round-by-round unattended Codex workflows, queue-driven refactor/quality-gate/bugfix scaffolds, or Windows/macOS autopilot bootstrapping. Do not use this skill for one-shot debugging or for merely running an existing OpenCode Loop setup.
+description: Use this skill when the user wants to scaffold or safely refresh a repo-local unattended Codex autopilot inside a repository, including queue-driven presets, review-gated autopilot assets, or Windows/macOS bootstrap and health workflows. Trigger for requests about repo-owned autopilot setup, scaffold upgrades that must preserve lane docs, or adding multi-round unattended controller files to a project. Do not use this skill for one-shot debugging or for merely running an existing OpenCode Loop setup.
 ---
 
 # Codex Autopilot Scaffold
 
 Use this skill to install a **repo-local Codex autopilot scaffold** into a target repository. The output is not an external loop service. It is a set of files committed into the target repo so future agents can run:
 
-- `python automation/autopilot.py doctor|start|watch|status|restart-after-next-commit`
+- `python automation/autopilot.py doctor|start|watch|status|health|bootstrap-and-daemonize|restart-after-next-commit`
 - `automation/Arm-AutopilotCutover.ps1` and `automation/arm-autopilot-cutover.sh` for reusable post-commit cutovers
 - root status overview docs plus lane-local `docs/status/lanes/<lane-id>/autopilot-*.md`
 - machine-readable runtime state in `automation/runtime/`
+
+This is **not** a one-command “立即开跑” skill. Treat it as **scaffold + controller + repo assets**:
+
+- install or refresh the controller/wrappers
+- seed the queue with a preset, approved plan, or approved spec
+- hand off exact `doctor` / `bootstrap-and-daemonize` / `watch` / `health` commands
+- when the user wants review-gated unattended work, scaffold the repo-local `.opencode/commands/*` review commands and review wrappers too
 
 ## When this skill wins
 
@@ -42,19 +49,31 @@ Do not refactor the target app itself while scaffolding.
 
 The scaffold now records its deployed version in `automation/autopilot-scaffold-version.json`. When you invoke this skill against a repo that already has an older autopilot scaffold, prefer rerunning `scripts/scaffold_repo.py` without `--force`: it should auto-refresh the shared controller/wrapper assets and preset `automation/*` files to the current scaffold version while preserving repo-specific lane queue docs under `docs/status/`.
 
+## First decide install mode
+
+Before you pick a preset, decide whether the target repo needs a **fresh install** or a **shared-controller refresh**:
+
+- **Fresh install**: no existing `automation/autopilot-scaffold-version.json` and no legacy `automation/autopilot.py`
+- **Shared-controller refresh**: existing scaffold detected, and the user wants newer controller/runtime/wrapper behavior without resetting repo-local lane queue docs
+- **Intentional regeneration**: only use `--force` when the user explicitly wants generated repo-local files overwritten
+
+If the repo already has queue docs, say out loud whether you are refreshing shared assets or replacing project-local queue assets. Do not leave that ambiguous.
+
 ## First decide the preset
 
 Choose the narrowest preset that matches the user's intent:
 
 - `maintainability`: queue-driven ownership reduction and refactor slices
+- `review-gated`: each round must write a short plan, pass a plan review, implement, pass a code review, then validate before committing
 - `quality-gate`: restore lint/typecheck/test/build gates and close the most justified validation hotspots
 - `bugfix-backlog`: execute one reproducible bugfix or backlog slice at a time
 
 If the user does not specify, prefer:
 
 1. `maintainability` for “可维护性 / 重构 / 降复杂度”
-2. `quality-gate` for “lint/typecheck/test/build 红了”
-3. `bugfix-backlog` for “按 backlog / bug 队列一轮轮修”
+2. `review-gated` for “每轮先审方案再审代码 / 方案 gate / code review gate / opencode review”
+3. `quality-gate` for “lint/typecheck/test/build 红了”
+4. `bugfix-backlog` for “按 backlog / bug 队列一轮轮修”
 
 ## Minimal inputs
 
@@ -111,6 +130,7 @@ It deterministically writes:
 - preset-specific config/prompt/docs from `templates/presets/<preset>/`
 - `automation/autopilot-scaffold-version.json` with the deployed scaffold version
 - `.gitignore` entry for `automation/runtime/`
+- when `review-gated` is selected: `.opencode/commands/review-plan.md`, `.opencode/commands/review-code.md`, `automation/opencode-review.sh`, and `automation/Invoke-OpencodeReview.ps1`
 
 It also prints:
 
@@ -119,7 +139,7 @@ It also prints:
 - whether an older deployed scaffold was auto-upgraded
 - current scaffold version and source path
 - a reminder to create a dedicated `autopilot/...` branch/worktree before `doctor` / `start`
-- suggested `doctor` and `start --dry-run --single-round` commands
+- suggested `doctor`, `health`, `start --dry-run --single-round`, and `bootstrap-and-daemonize` commands
 - a remote Mac rollout template when the operator wants Windows-local scaffold + Mac unattended execution
 
 If the user has an approved implementation plan or spec, pass `--seed-plan` or `--seed-spec`. The script copies that file into `docs/status/`, adds a seeded queue override to lane roadmaps, and makes the approved plan/spec the queue authority before generic preset text. This avoids the common failure mode where `bugfix-backlog` or `maintainability` starts from broad placeholder backlog language instead of the user's approved plan.
@@ -132,6 +152,8 @@ If the target repo already has this scaffold and the deployed `scaffold_version`
 
 Before running `doctor` or `start`, create a dedicated branch or worktree. A fresh scaffold on `main` is allowed to install, but `doctor` / `start` should fail branch guard checks until the operator moves to a branch such as `autopilot/<topic>`, `quality/<topic>`, or `bugfix/<topic>`. Make this explicit in handoff text so “installed successfully, then doctor failed on main” is understood as expected safety behavior.
 
+When the operator wants “先前台确认首轮跑通，再切后台常驻”, prefer `bootstrap-and-daemonize` over hand-written sentinels. That command exists specifically because `restart-after-next-commit` cannot watch a commit that does not exist yet.
+
 When the target execution machine is a remote Mac, hand off a concrete playbook instead of leaving the operator to assemble it:
 
 1. Scaffold locally on Windows.
@@ -139,7 +161,19 @@ When the target execution machine is a remote Mac, hand off a concrete playbook 
 3. `ssh mac` into the synced/remote repo.
 4. Fetch/reset or pull the scaffold commit.
 5. Create a dedicated Mac-side worktree/branch.
-6. Run `doctor`, `start --dry-run --single-round`, then the background wrapper.
+6. Run `doctor`, `health`, `start --dry-run --single-round`, then `bootstrap-and-daemonize` or the background wrapper.
+
+### Review-gated preset rules
+
+If the user wants “每轮先审方案，再审代码”, use `review-gated` instead of telling them to bolt reviews on manually.
+
+- The preset scaffolds repo-local `.opencode/commands/` review assets as committed files, not machine-local notes
+- It also adds cross-platform wrappers:
+  - Windows: `pwsh -File .\automation\Invoke-OpencodeReview.ps1 ...`
+  - macOS/Linux: `bash ./automation/opencode-review.sh ...`
+- The generated `.gitignore` should unignore those `.opencode/commands/*.md` files so repo-local review flows survive commit/push/pull
+- Review wrappers are allowed to take minutes; slow polling is expected, not evidence of a stuck run
+- Useful round-level artifacts usually live in `automation/runtime/round-XXX/`, especially `progress.log`, `events.jsonl`, `assistant-output.json`, and `runner-status.json`
 
 ### Commit prefix gate
 
@@ -230,6 +264,7 @@ Preferred commands after scaffolding:
 
 ```powershell
 python .\automation\autopilot.py status --state-path automation\runtime\<state-file>.json
+python .\automation\autopilot.py health --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json
 python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80
 Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 ```
@@ -238,6 +273,7 @@ Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 
 ```bash
 python3 ./automation/autopilot.py status --state-path automation/runtime/<state-file>.json
+python3 ./automation/autopilot.py health --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json
 python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80
 tail -n 80 -F automation/runtime/round-XYZ/progress.log
 ```
@@ -245,6 +281,12 @@ tail -n 80 -F automation/runtime/round-XYZ/progress.log
 Operational guidance:
 
 - The scaffolded `watch` command now prints `round`, `phase`, `lane`, `queue progress`, `status`, `failures`, `phase doc`, `focus`, and the exact `progress.log` path it is following.
+- `watch` and `status` should also surface the latest review verdicts and last blocker when the run recorded them.
+- `health` is the source of truth for “state says active, but is the runner really alive?” because it checks state, lock, pid, and artifact freshness together.
+- Do **not** report “下一轮已经在跑” unless all three are true at the same time:
+  - the autopilot parent PID from the runtime lock is alive
+  - the watched round `progress.log` is still updating
+  - the watched round `runner-status.json` shows the `codex exec` child PID alive **and** `exec_confirmed_at` is present
 - When `vulture_command` is configured, `status` and `watch` also report the latest finding count and delta from the previous successful snapshot.
 - Every streamed detail line from `progress.log` is also prefixed with a live state tag that includes lane and queue counts, defaulting to the long form `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]` so the current lane/queue/round/phase/status stays visible after the header scrolls away.
 - Operators who prefer denser output can run `watch --prefix-format short` to switch detail lines to `[b1-backlog-slice q1/3 r006 p005 active f0]`.
@@ -327,6 +369,7 @@ python3 ./automation/autopilot.py restart-after-next-commit \
 Sentinel guidance:
 
 - Prefer `restart-after-next-commit` first; only write a custom local shell script when the cutover includes non-committed machine-local behavior that cannot live on a git ref.
+- If there is no successful commit yet for the current state line, do **not** reach for `restart-after-next-commit`; use `bootstrap-and-daemonize` or stay foreground until the first commit exists.
 - Keep custom sentinels local and uncommitted under a user config path such as `~/.config/<project>/`.
 - When a repo has multiple concurrent state lines, always pass the exact `--state-path` for the run you are handing off.
 - If the user asks for a future unattended cutover, explicitly report the sentinel command, output log path, pid path, and watched state path.

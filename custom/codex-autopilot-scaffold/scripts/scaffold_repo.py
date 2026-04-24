@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.0.3"
+SCAFFOLD_VERSION = "1.1.1"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
 SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
@@ -73,6 +73,12 @@ PRESET_METADATA: dict[str, dict[str, Any]] = {
         "focus_hint": "R1 - First maintainability / refactor slice",
         "max_rounds": 200,
     },
+    "review-gated": {
+        "label": "Review-Gated Delivery",
+        "objective": "Execute one queued slice at a time, but gate each round through a written implementation plan review, code review, and full validation before the next unattended round advances.",
+        "focus_hint": "RG1 - First review-gated delivery slice",
+        "max_rounds": 120,
+    },
     "quality-gate": {
         "label": "Quality-Gate Recovery",
         "objective": "Recover configured validation gates to green, close the most justified warning/error hotspots, and keep the gates green while the queue advances.",
@@ -88,6 +94,23 @@ PRESET_METADATA: dict[str, dict[str, Any]] = {
 }
 
 PRESET_LANES: dict[str, list[dict[str, str]]] = {
+    "review-gated": [
+        {
+            "id": "rg1-reviewed-slice",
+            "label": "RG1 - First review-gated delivery slice",
+            "focus_hint": "RG1 - First review-gated delivery slice",
+        },
+        {
+            "id": "rg2-reviewed-followup",
+            "label": "RG2 - Next review-gated delivery slice",
+            "focus_hint": "RG2 - Next review-gated delivery slice",
+        },
+        {
+            "id": "rg3-reviewed-checkpoint",
+            "label": "RG3 - Checkpoint after first review-gated batch",
+            "focus_hint": "RG3 - Checkpoint after first review-gated batch",
+        },
+    ],
     "bugfix-backlog": [
         {
             "id": "b1-backlog-slice",
@@ -726,6 +749,33 @@ def build_validation_bullets(detection: DetectionResult) -> str:
     return "\n".join(lines)
 
 
+def build_review_command_paths(preset: str) -> list[str]:
+    if preset != "review-gated":
+        return []
+    return [
+        "automation/opencode-review.sh",
+        "automation/Invoke-OpencodeReview.ps1",
+        ".opencode/commands/review-plan.md",
+        ".opencode/commands/review-code.md",
+    ]
+
+
+def build_prerequisite_paths(repo_root: Path, preset: str) -> list[str]:
+    paths: list[str] = []
+    if (repo_root / "package.json").exists():
+        paths.append("node_modules")
+    paths.extend(build_review_command_paths(preset))
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        normalized = path.replace("\\", "/").rstrip("/")
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
 def apply_cli_overrides(detection: DetectionResult, args: argparse.Namespace) -> DetectionResult:
     updated = replace(
         detection,
@@ -802,6 +852,48 @@ def render_template_tree(
     return results
 
 
+def render_preset_templates(
+    preset_root: Path,
+    destination_root: Path,
+    tokens: dict[str, str],
+    *,
+    force: bool,
+    auto_upgrade: bool,
+) -> dict[str, str]:
+    if not auto_upgrade:
+        return render_template_tree(
+            preset_root,
+            destination_root,
+            tokens,
+            force=force,
+            on_conflict="error",
+        )
+
+    result_maps: list[dict[str, str]] = []
+    for source_path in sorted(preset_root.iterdir(), key=lambda path: path.name):
+        if source_path.name == "__pycache__":
+            continue
+        destination_path = destination_root / source_path.name
+        if source_path.is_dir():
+            on_conflict = "preserve" if source_path.name == "docs" else "overwrite"
+            result_maps.append(
+                render_template_tree(
+                    source_path,
+                    destination_path,
+                    tokens,
+                    force=force,
+                    on_conflict=on_conflict,
+                )
+            )
+            continue
+
+        rendered = render_tokens(read_text(source_path), tokens)
+        on_conflict = "overwrite"
+        status = write_if_changed(destination_path, rendered, force=force, on_conflict=on_conflict)
+        result_maps.append({normalize_repo_path(destination_path, destination_root): status})
+    return merge_render_results(*result_maps)
+
+
 def merge_render_results(*result_maps: dict[str, str]) -> dict[str, str]:
     merged: dict[str, str] = {}
     for result_map in result_maps:
@@ -832,6 +924,8 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
     lanes = build_preset_lanes(preset)
     path_list = build_path_list(detection.repo_root, detection)
     entrypoints = build_entrypoints(detection, preset)
+    prerequisite_paths = build_prerequisite_paths(detection.repo_root, preset)
+    review_enabled = preset == "review-gated"
 
     lint_command = detection.lint_command
     typecheck_command = detection.typecheck_command
@@ -887,6 +981,21 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "RUNNER_EXTRA_ARGS_JSON": "[]",
         "RUNNER_ADDITIONAL_DIRS_JSON": "[]",
         "BUILD_VERIFY_PATH_JSON": json.dumps("", ensure_ascii=False),
+        "PLAN_REVIEW_COMMAND_JSON": json.dumps(
+            "Use Invoke-OpencodeReview.ps1 on Windows or opencode-review.sh on macOS/Linux for plan review.",
+            ensure_ascii=False,
+        )
+        if review_enabled
+        else json.dumps("", ensure_ascii=False),
+        "CODE_REVIEW_COMMAND_JSON": json.dumps(
+            "Use Invoke-OpencodeReview.ps1 on Windows or opencode-review.sh on macOS/Linux for code review.",
+            ensure_ascii=False,
+        )
+        if review_enabled
+        else json.dumps("", ensure_ascii=False),
+        "REVIEW_POLL_SECONDS_JSON": "60" if review_enabled else "0",
+        "REVIEW_TIMEOUT_SECONDS_JSON": "1800" if review_enabled else "0",
+        "PREREQUISITE_PATHS_JSON": json_token(prerequisite_paths),
         "SCAFFOLD_NAME_JSON": json.dumps(SCAFFOLD_NAME, ensure_ascii=False),
         "SCAFFOLD_VERSION_JSON": json.dumps(SCAFFOLD_VERSION, ensure_ascii=False),
     }
@@ -967,39 +1076,31 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         force=args.force,
         on_conflict=common_conflict_policy,
     )
-    if existing_scaffold.needs_auto_upgrade:
-        preset_results = merge_render_results(
-            render_template_tree(
-                preset_root / "automation",
-                repo_root / "automation",
-                tokens,
-                force=args.force,
-                on_conflict="overwrite",
-            ),
-            render_template_tree(
-                preset_root / "docs",
-                repo_root / "docs",
-                tokens,
-                force=args.force,
-                on_conflict="preserve",
-            ),
-        )
-    else:
-        preset_results = render_template_tree(
-            preset_root,
-            repo_root,
-            tokens,
-            force=args.force,
-            on_conflict="error",
+    preset_results = render_preset_templates(
+        preset_root,
+        repo_root,
+        tokens,
+        force=args.force,
+        auto_upgrade=existing_scaffold.needs_auto_upgrade,
+    )
+    gitignore_entries = [
+        "automation/runtime/",
+        "automation/**/__pycache__/",
+        "automation/**/*.pyc",
+    ]
+    if args.preset == "review-gated":
+        gitignore_entries.extend(
+            [
+                "!.opencode/",
+                "!.opencode/commands/",
+                "!.opencode/commands/review-plan.md",
+                "!.opencode/commands/review-code.md",
+            ]
         )
     seed_results = apply_seed_to_generated_docs(repo_root, seed_artifact, force=args.force) if seed_artifact else {}
     gitignore_result = ensure_gitignore_entries(
         repo_root,
-        [
-            "automation/runtime/",
-            "automation/**/__pycache__/",
-            "automation/**/*.pyc",
-        ],
+        gitignore_entries,
         force=args.force,
     )
 
@@ -1045,15 +1146,20 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("  git switch -c autopilot/<topic>")
         print("  python automation/autopilot.py version")
         print("  python automation/autopilot.py doctor --profile windows")
+        print("  python automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
         print("  python automation/autopilot.py start --profile windows --dry-run --single-round")
+        print("  python automation/autopilot.py bootstrap-and-daemonize --profile windows")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
+        print("  python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
         print("  python3 ./automation/autopilot.py start --profile mac --dry-run --single-round")
+        print("  python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac")
         print("  bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round")
         print("[scaffold] remote mac rollout template:")
         print("  git push")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git fetch --all --prune'")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git worktree add ../<repo>-autopilot autopilot/<topic>'")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py doctor --profile mac'")
+        print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac'")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'")
 
     return 0

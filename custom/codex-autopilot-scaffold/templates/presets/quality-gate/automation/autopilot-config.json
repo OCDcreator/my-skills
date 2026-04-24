@@ -30,5 +30,10 @@
   "runner_command": [[RUNNER_COMMAND_JSON]],
   "runner_model": [[RUNNER_MODEL_JSON]],
   "runner_extra_args": [[RUNNER_EXTRA_ARGS_JSON]],
+  "plan_review_command": [[PLAN_REVIEW_COMMAND_JSON]],
+  "code_review_command": [[CODE_REVIEW_COMMAND_JSON]],
+  "review_poll_seconds": [[REVIEW_POLL_SECONDS_JSON]],
+  "review_timeout_seconds": [[REVIEW_TIMEOUT_SECONDS_JSON]],
+  "prerequisite_paths": [[PREREQUISITE_PATHS_JSON]],
   "lanes": [[LANES_JSON]]
 }

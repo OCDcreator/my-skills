@@ -163,6 +163,9 @@ def build_watch_state_signature(state: dict[str, Any] | None, *, state_path_exis
         clean_string(state.get("last_phase_doc")),
         clean_string(state.get("last_next_focus")),
         clean_string(state.get("last_commit_sha")),
+        clean_string(state.get("last_blocking_reason")),
+        clean_string(state.get("last_plan_review_verdict")),
+        clean_string(state.get("last_code_review_verdict")),
     )
 
 
@@ -171,6 +174,7 @@ def print_watch_snapshot(
     state: dict[str, Any] | None,
     state_path: Path,
     progress_path: Path | None,
+    health_report: dict[str, Any] | None,
     support: StatusViewSupport,
 ) -> None:
     state_round = clean_string(state.get("current_round")) if state else ""
@@ -199,6 +203,15 @@ def print_watch_snapshot(
         heading_parts.append(f"vulture={state.get('vulture_current_count')}")
     if state and state.get("vulture_delta") is not None:
         heading_parts.append(f"vdelta={format_metric_delta(state.get('vulture_delta'))}")
+    if health_report and clean_string(health_report.get("verdict")):
+        heading_parts.append(f"health={health_report.get('verdict')}")
+        runner_state = clean_string(health_report.get("runner_status"))
+        if runner_state:
+            heading_parts.append(f"runner={runner_state}")
+        if health_report.get("runner_exec_confirmed") is not None:
+            heading_parts.append(
+                "exec=confirmed" if bool(health_report.get("runner_exec_confirmed")) else "exec=waiting"
+            )
     heading_parts.append(f"status={status_value or 'unknown'}")
     heading_parts.append(f"failures={failures_value or '0'}")
 
@@ -215,6 +228,12 @@ def print_watch_snapshot(
             print(f"[watch] focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=220)}")
         if state.get("last_commit_sha"):
             print(f"[watch] last commit: {state.get('last_commit_sha')}")
+        if state.get("last_plan_review_verdict"):
+            print(f"[watch] plan review: {state.get('last_plan_review_verdict')}")
+        if state.get("last_code_review_verdict"):
+            print(f"[watch] code review: {state.get('last_code_review_verdict')}")
+        if state.get("last_blocking_reason"):
+            print(f"[watch] blocker: {compact_text(clean_string(state.get('last_blocking_reason')), max_length=220)}")
         if clean_string(state.get("vulture_command")):
             if clean_string(state.get("vulture_last_error")):
                 print(f"[watch] vulture error: {compact_text(clean_string(state.get('vulture_last_error')), max_length=220)}")
@@ -230,6 +249,24 @@ def print_watch_snapshot(
                 f"{queue_progress['done_count']}/{queue_progress['total_count']} done "
                 f"({queue_progress['remaining_count']} remaining)"
             )
+    if health_report:
+        freshest_path = clean_string(health_report.get("freshest_artifact_path"))
+        freshest_age = health_report.get("freshest_artifact_age_seconds")
+        if health_report.get("autopilot_pid") is not None:
+            print(
+                "[watch] autopilot pid: "
+                f"{health_report.get('autopilot_pid')} alive={health_report.get('autopilot_pid_alive')}"
+            )
+        if health_report.get("runner_pid") is not None:
+            print(
+                "[watch] runner pid: "
+                f"{health_report.get('runner_pid')} alive={health_report.get('runner_pid_alive')} "
+                f"exec_confirmed={health_report.get('runner_exec_confirmed')}"
+            )
+        if freshest_path and freshest_age is not None:
+            print(f"[watch] health: {health_report.get('verdict')} via {freshest_path} ({int(freshest_age)}s old)")
+        else:
+            print(f"[watch] health: {health_report.get('verdict')} ({health_report.get('reason')})")
     if progress_path is not None:
         print(f"[watch] progress log: {progress_path}")
     print("[watch] " + "=" * 72)
@@ -324,6 +361,7 @@ def print_state_summary(
     state: dict[str, Any],
     *,
     runtime_directory: Path | None = None,
+    health_report: dict[str, Any] | None = None,
     support: StatusViewSupport,
     read_lock: Callable[[Path], dict[str, Any] | None],
 ) -> None:
@@ -342,6 +380,25 @@ def print_state_summary(
         print(f"[status] next focus: {state.get('last_next_focus')}")
     if state.get("last_commit_sha"):
         print(f"[status] last commit: {state.get('last_commit_sha')}")
+    if state.get("last_plan_review_verdict"):
+        print(f"[status] plan review: {state.get('last_plan_review_verdict')}")
+    if state.get("last_code_review_verdict"):
+        print(f"[status] code review: {state.get('last_code_review_verdict')}")
+    if state.get("last_blocking_reason"):
+        print(f"[status] blocker: {compact_text(clean_string(state.get('last_blocking_reason')), max_length=220)}")
+    if health_report:
+        print(f"[status] health: {health_report.get('verdict')} ({health_report.get('reason')})")
+        if health_report.get("autopilot_pid") is not None:
+            print(
+                "[status] autopilot pid: "
+                f"{health_report.get('autopilot_pid')} alive={health_report.get('autopilot_pid_alive')}"
+            )
+        if health_report.get("runner_pid") is not None:
+            print(
+                "[status] runner pid: "
+                f"{health_report.get('runner_pid')} alive={health_report.get('runner_pid_alive')} "
+                f"exec_confirmed={health_report.get('runner_exec_confirmed')}"
+            )
     if clean_string(state.get("vulture_command")):
         if clean_string(state.get("vulture_last_error")):
             print(f"[status] vulture: error={compact_text(clean_string(state.get('vulture_last_error')), max_length=220)}")

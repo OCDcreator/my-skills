@@ -94,6 +94,18 @@
         "null"
       ]
     },
+    "plan_review_verdict": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "code_review_verdict": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "changed_files": {
       "type": "array",
       "items": {

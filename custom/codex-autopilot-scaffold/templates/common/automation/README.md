@@ -13,6 +13,8 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - `automation/watch-autopilot.sh`: macOS watch wrapper
 - `automation/launchd/com.example.codex-autopilot.plist`: launchd example for repo-local background launches
 - `automation/autopilot-config.json`: repo-specific objective, queue, validation, and runner settings
+- `automation/opencode-review.sh`: review wrapper for macOS/Linux when the `review-gated` preset is installed
+- `automation/Invoke-OpencodeReview.ps1`: review wrapper for Windows when the `review-gated` preset is installed
 - `automation/profiles/windows.json`: machine-neutral Windows defaults
 - `automation/profiles/mac.json`: machine-neutral macOS defaults
 - `automation/round-prompt.md`: per-round runner prompt template
@@ -31,6 +33,7 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - Queue routing is driven by explicit `lanes` in `automation/autopilot-config.json`
 - Failed rounds preserve the pre-reset `HEAD` under `refs/autopilot/safety/*`, stash dirty work, then reset to the round's starting `HEAD`
 - Diagnostic command budget findings default to warnings, so repeated `git status --short` or `git diff --stat` reports do not roll back otherwise successful commits
+- `health` is the truth source for runner liveness because it checks state, lock, pid, and progress-artifact freshness together
 - Successful rounds must write a phase doc and create a commit
 - A runtime lock prevents two machines from driving the same branch simultaneously
 
@@ -86,7 +89,9 @@ If the scaffold was created with `--seed-plan` or `--seed-spec`, the source is c
 
 ```powershell
 python .\automation\autopilot.py doctor --profile windows
+python .\automation\autopilot.py health --state-path automation\runtime\autopilot-state.json
 python .\automation\autopilot.py start --profile windows
+python .\automation\autopilot.py bootstrap-and-daemonize --profile windows
 ```
 
 For a true no-window unattended launch on Windows, prefer the wrapper's background mode instead of starting `py.exe` in a new visible console. The wrapper should run through a hidden PowerShell host that launches `py` / `python` without depending on `pythonw` / `pyw` shims:
@@ -99,7 +104,9 @@ For a true no-window unattended launch on Windows, prefer the wrapper's backgrou
 
 ```bash
 python3 ./automation/autopilot.py doctor --profile mac
+python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json
 python3 ./automation/autopilot.py start --profile mac
+python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac
 ```
 
 For a repo-local macOS wrapper flow, prefer `bash ./...` so Windows-authored commits do not depend on POSIX executable bits surviving the sync path:
@@ -118,6 +125,8 @@ git push
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git fetch --all --prune'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo> && git worktree add ../<repo>-autopilot autopilot/<topic>'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py doctor --profile mac'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'
 ```
 
@@ -128,12 +137,43 @@ Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep ru
 ```text
 python automation/autopilot.py version
 python automation/autopilot.py status
+python automation/autopilot.py health
 python automation/autopilot.py watch
 python automation/autopilot.py start --profile windows --dry-run --single-round
 python automation/autopilot.py start --profile windows --single-round
+python automation/autopilot.py bootstrap-and-daemonize --profile windows
 python automation/autopilot.py restart-after-next-commit --profile windows
 bash ./automation/start-autopilot.sh --background -- --profile mac
 ```
+
+`start --dry-run --single-round` only renders the next prompt. It leaves the state in `stopped_dry_run` so `status` / `health` do not pretend a live unattended runner exists, and a later real `start` automatically resumes from that preview state.
+
+## Review-gated preset
+
+If this repo was scaffolded with the `review-gated` preset, the scaffold also commits repo-local review assets:
+
+- `.opencode/commands/review-plan.md`
+- `.opencode/commands/review-code.md`
+- `automation/opencode-review.sh`
+- `automation/Invoke-OpencodeReview.ps1`
+
+Those review wrappers are intentionally slow-friendly. They emit periodic “still running” heartbeats because reviewer runs can take minutes.
+
+### Windows review wrapper
+
+```powershell
+pwsh -File .\automation\Invoke-OpencodeReview.ps1 -Mode plan -PlanPath automation\runtime\round-001\implementation-plan.md -OutputPath automation\runtime\round-001\plan-review.txt
+pwsh -File .\automation\Invoke-OpencodeReview.ps1 -Mode code -OutputPath automation\runtime\round-001\code-review.txt
+```
+
+### macOS/Linux review wrapper
+
+```bash
+bash ./automation/opencode-review.sh plan automation/runtime/round-001/implementation-plan.md automation/runtime/round-001/plan-review.txt
+bash ./automation/opencode-review.sh code automation/runtime/round-001/code-review.txt
+```
+
+The generated `.gitignore` should explicitly unignore the committed `.opencode/commands/*.md` review assets so repo-local review flows survive commit/push/pull.
 
 ## Deploy policy
 
@@ -160,6 +200,7 @@ If this repo ever accumulates multiple autopilot runs or old `round-*` directori
 
 ```powershell
 python .\automation\autopilot.py status --state-path automation\runtime\<state-file>.json
+python .\automation\autopilot.py health --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json
 python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80
 Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 ```
@@ -168,6 +209,7 @@ Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 
 ```bash
 python3 ./automation/autopilot.py status --state-path automation/runtime/<state-file>.json
+python3 ./automation/autopilot.py health --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json
 python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80
 tail -n 80 -F automation/runtime/round-XYZ/progress.log
 ```
@@ -179,22 +221,41 @@ The scaffolded `watch` output shows:
 - `lane`
 - `queue progress`
 - `status`
+- `health`
 - `failures`
 - `phase doc`
 - `focus`
 - the exact `progress.log` path being followed
 - a default long prefix on every streamed detail line, for example `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]`
 - Vulture count and delta when `vulture_command` is configured
+- latest plan/code review verdicts and last blocker when the round recorded them
 
 Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[b1-backlog-slice q1/3 r006 p005 active f0]`.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
+
+Use `health` when `status=active` looks suspicious. It exists specifically for the case where the JSON state still says active but the runner process already exited.
+
+Do not tell an operator “the next round is running” until `health` confirms all of these:
+
+- the autopilot parent PID from the runtime lock is alive
+- the watched round `progress.log` is still updating
+- the watched round `runner-status.json` shows a live `codex exec` child PID and a non-empty `exec_confirmed_at`
+
+Useful per-round runtime artifacts usually live together under `automation/runtime/round-XYZ/`:
+
+- `progress.log`
+- `events.jsonl`
+- `assistant-output.json`
+- `runner-status.json`
 
 For queue-driven presets, a round result of `goal_complete` means the current lane's `[NEXT]` slice was already done. If the active lane roadmap still has another `[NEXT]` or any `[QUEUED]` work, the controller keeps the same lane active and advances `next_phase_number`; if the lane is clear, it immediately switches to the next configured lane or marks the overall objective complete.
 
 ## Sentinel cutovers
 
 Use `restart-after-next-commit` when you want the current unattended run to finish its next successful round, stop cleanly, and relaunch with replacement settings.
+
+If there is not yet a successful commit for the watched state line, `restart-after-next-commit` has nothing to watch. In that first-round bootstrap window, use `bootstrap-and-daemonize` instead.
 
 For routine operator handoffs, prefer the scaffolded wrappers:
 

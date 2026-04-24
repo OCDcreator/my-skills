@@ -17,6 +17,8 @@ from _autopilot.lanes import (
     sync_active_lane_mirror_fields,
 )
 
+DRY_RUN_STOP_STATUS = "stopped_dry_run"
+
 
 @dataclass(frozen=True)
 class StateRuntimeSupport:
@@ -49,6 +51,8 @@ def new_state(config: dict[str, Any], *, support: StateRuntimeSupport) -> dict[s
         )["focus_hint"],
         "last_result": None,
         "last_blocking_reason": None,
+        "last_plan_review_verdict": None,
+        "last_code_review_verdict": None,
         "vulture_command": support.clean_string(config.get("vulture_command")),
         "vulture_current_count": None,
         "vulture_previous_count": None,
@@ -86,6 +90,8 @@ def resume_state_if_threshold_allows(
         should_resume = int(state["current_round"]) < int(config["max_rounds"])
     elif previous_status == "stopped_failures":
         should_resume = int(state["consecutive_failures"]) < int(config["max_consecutive_failures"])
+    elif previous_status == DRY_RUN_STOP_STATUS:
+        should_resume = True
     elif previous_status == "complete" and has_any_unfinished_lane_work(config, state, support=support.lane_support):
         current_lane_id = active_lane_id_for_state(state, config, support=support.lane_support)
         if not has_remaining_lane_work(config, state, current_lane_id, support=support.lane_support):

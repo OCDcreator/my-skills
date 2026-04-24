@@ -4,7 +4,9 @@ from typing import Any, Callable
 
 from _autopilot import controller_runtime as runtime
 from _autopilot.cli_parser import CliParserSupport
+from _autopilot.bootstrap_runtime import BootstrapRuntimeSupport
 from _autopilot.doctor import DoctorSupport
+from _autopilot.health_runtime import HealthRuntimeSupport, build_health_report
 from _autopilot.lanes import (
     LaneSupport,
     active_lane_config,
@@ -21,7 +23,7 @@ from _autopilot.lanes import (
     sync_active_lane_mirror_fields,
 )
 from _autopilot.locking import LockingSupport, autopilot_lock as autopilot_lock_command, read_lock as read_lock_command
-from _autopilot.process_control import ProcessControlSupport
+from _autopilot.process_control import ProcessControlSupport, spawn_background_autopilot
 from _autopilot.round_flow import RoundFlowSupport
 from _autopilot.runner import RunnerSupport, resolve_runner_executable
 from _autopilot.start_runtime import StartRuntimeSupport
@@ -101,6 +103,8 @@ def build_runner_support() -> RunnerSupport:
         compact_text=runtime.compact_text,
         progress=runtime.progress,
         get_codex_event_summary=runtime.get_codex_event_summary,
+        now_timestamp=runtime.now_timestamp,
+        write_json=runtime.write_json,
         windows_hidden_process_kwargs=runtime.windows_hidden_process_kwargs,
     )
 
@@ -127,6 +131,15 @@ def build_process_control_support() -> ProcessControlSupport:
     )
 
 
+def build_health_runtime_support() -> HealthRuntimeSupport:
+    return HealthRuntimeSupport(
+        resolve_repo_path=runtime.resolve_repo_path,
+        read_json=runtime.read_json,
+        read_lock=lambda lock_path: read_lock_command(lock_path, support=build_locking_support()),
+        pid_exists=runtime.pid_exists,
+    )
+
+
 def build_doctor_support() -> DoctorSupport:
     return DoctorSupport(
         repo_root=runtime.REPO_ROOT,
@@ -144,6 +157,23 @@ def build_doctor_support() -> DoctorSupport:
         is_working_tree_dirty=runtime.is_working_tree_dirty,
         resolve_repo_path=runtime.resolve_repo_path,
         read_lock=lambda lock_path: read_lock_command(lock_path, support=build_locking_support()),
+    )
+
+
+def build_bootstrap_runtime_support(*, run_start: Callable[..., int]) -> BootstrapRuntimeSupport:
+    return BootstrapRuntimeSupport(
+        error_type=runtime.AutopilotError,
+        clean_string=runtime.clean_string,
+        info=runtime.info,
+        read_json=runtime.read_json,
+        resolve_repo_path=runtime.resolve_repo_path,
+        run_start=run_start,
+        spawn_background_autopilot=lambda command_args, output_path, pid_path=None: spawn_background_autopilot(
+            command_args,
+            output_path=output_path,
+            pid_path=pid_path,
+            support=build_process_control_support(),
+        ),
     )
 
 
@@ -239,9 +269,11 @@ def build_cli_parser_support(
     run_start: Callable[..., int],
     run_watch: Callable[..., int],
     run_status: Callable[..., int],
+    run_health: Callable[..., int],
     run_doctor: Callable[..., int],
     run_version: Callable[..., int],
     run_restart_after_next_commit: Callable[..., int],
+    run_bootstrap_and_daemonize: Callable[..., int],
 ) -> CliParserSupport:
     return CliParserSupport(
         default_profile_name=runtime.DEFAULT_PROFILE_NAME,
@@ -251,9 +283,11 @@ def build_cli_parser_support(
         run_start=run_start,
         run_watch=run_watch,
         run_status=run_status,
+        run_health=run_health,
         run_doctor=run_doctor,
         run_version=run_version,
         run_restart_after_next_commit=run_restart_after_next_commit,
+        run_bootstrap_and_daemonize=run_bootstrap_and_daemonize,
     )
 
 
@@ -261,4 +295,11 @@ def build_watch_runtime_support() -> WatchRuntimeSupport:
     return WatchRuntimeSupport(
         resolve_repo_path=runtime.resolve_repo_path,
         read_json=runtime.read_json,
+        build_health_report=lambda *, runtime_directory, explicit_state_path, stale_seconds, status_view_support: build_health_report(
+            runtime_directory=runtime_directory,
+            explicit_state_path=explicit_state_path,
+            stale_seconds=stale_seconds,
+            support=build_health_runtime_support(),
+            status_view_support=status_view_support,
+        ),
     )
