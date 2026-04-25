@@ -297,11 +297,14 @@ The scaffolded `watch` output shows:
 - the long form `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]` when you need the fully spelled-out header
 - Vulture count and delta when `vulture_command` is configured
 - latest plan/code review verdicts and last blocker when the round recorded them
+- a human-friendly default detail stream that summarizes docs/spec reading, phase-doc writing, OpenCode implementation, waiting-on-wrapper, targeted tests, verify, deploy/BUILD_ID checks, and failures
+- raw `progress.log` detail on demand via `watch --view raw`
 
 Default operator handoff should use `watch ... --prefix-format short` so every streamed line stays attributable even after copy/paste into another terminal or log collector.
 For Windows-to-Mac monitoring, make that the full `ssh mac 'cd ... && python3 -u ./automation/autopilot.py watch ...'` command so remote Python stdout stays unbuffered and the prefixed lines appear immediately.
 
-Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without autopilot metadata prefixes.
+Use `watch --view raw` when you want the exact underlying `progress.log` lines with autopilot prefixes intact.
+Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without any autopilot metadata or summary layer.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 

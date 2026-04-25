@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from _autopilot.status_views import (
     StatusViewSupport,
+    build_watch_activity_summary,
     build_watch_state_signature,
     clean_string,
     print_watch_detail_lines,
@@ -51,7 +52,8 @@ def run_watch(args: argparse.Namespace, *, support: WatchRuntimeSupport, status_
         )
 
         health_verdict = clean_string(health_report.get("verdict"))
-        combined_signature = (*state_signature, health_verdict)
+        activity_summary = build_watch_activity_summary(state=state, progress_path=progress_path)
+        combined_signature = (*state_signature, health_verdict, activity_summary)
         if combined_signature != last_state_signature or progress_path != last_progress_path:
             print_watch_snapshot(
                 state=state,
@@ -75,6 +77,7 @@ def run_watch(args: argparse.Namespace, *, support: WatchRuntimeSupport, status_
                             state=state,
                             progress_path=progress_path,
                             prefix_format=args.prefix_format,
+                            view=getattr(args, "view", "human"),
                             support=status_view_support,
                         )
                         last_line_count = len(existing_lines)
@@ -87,6 +90,7 @@ def run_watch(args: argparse.Namespace, *, support: WatchRuntimeSupport, status_
                         state=state,
                         progress_path=last_progress_path,
                         prefix_format=args.prefix_format,
+                        view=getattr(args, "view", "human"),
                         support=status_view_support,
                     )
                     last_line_count = len(current_lines)

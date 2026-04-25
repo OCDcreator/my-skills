@@ -188,7 +188,7 @@ When execution target is `ssh mac`, keep runtime proof remote-only:
 
 Windows-local runtime files do not prove the Mac runner is alive.
 Use Mac-side `health` with the same three-point proof from the keep-running contract before reporting that the remote runner is alive.
-Unless the user explicitly asks for a raw file tail, operator handoff should also include one exact Windows-to-Mac `ssh mac 'cd "<remote repo>" && python3 -u ./automation/autopilot.py watch ... --prefix-format short'` command bound to the intended `--state-path`.
+Unless the user explicitly asks for a raw file tail, operator handoff should also include one exact Windows-to-Mac `ssh mac 'cd "<remote repo>" && python3 -u ./automation/autopilot.py watch ... --prefix-format short'` command bound to the intended `--state-path`. The scaffolded `watch` view is human-friendly by default; reserve `--view raw` for the exact underlying `progress.log` lines.
 
 ## Preset-Specific Rules
 
@@ -243,7 +243,8 @@ Use `python3` and `--profile mac` on macOS. Use scaffolded wrappers for Windows 
 For CI or an outer wrapper that needs shell-level failure semantics, add `--fail-on-round-failure` to `start`. Windows and macOS both receive the same Python process return code; PowerShell reads it via `$LASTEXITCODE`, while bash/zsh reads it via `$?`.
 
 When multiple state files or old `round-*` directories exist, always bind `status`, `health`, and `watch` to the intended `--state-path`.
-When a user asks to look at logs, default to the scaffolded `watch` command above instead of a raw `tail`/`Get-Content`, because the prefixed stream keeps lane/queue/round context visible on every line.
+When a user asks to look at logs, default to the scaffolded `watch` command above instead of a raw `tail`/`Get-Content`, because the prefixed stream keeps lane/queue/round context visible on every line and the default human view folds noisy `Command finished (exit 0)` lines into higher-level progress.
+When the operator explicitly wants the literal `progress.log` stream, add `--view raw`.
 When the operator is on Windows and the unattended runner is on `ssh mac`, default to the full remote command with `python3 -u` so the stream is unbuffered:
 `ssh mac 'cd "<remote repo>" && python3 -u ./automation/autopilot.py watch --runtime-path automation/runtime --state-path <state-path> --tail 80 --prefix-format short'`
 
@@ -266,5 +267,5 @@ Report:
 - files added/refreshed
 - smoke commands run and result
 - if continuous execution was requested: launch command, state path, health verdict, progress log path, PID evidence, and `exec_confirmed_at` from `runner-status.json`
-- if log-following is relevant: one exact copy-paste `watch` command with explicit `--state-path`, explicit `--runtime-path`, and `--prefix-format short`; on Windows→Mac handoff this should be the full `ssh mac ... python3 -u ... watch ...` command
+- if log-following is relevant: one exact copy-paste `watch` command with explicit `--state-path`, explicit `--runtime-path`, and `--prefix-format short`; mention `--view raw` only when the operator asked for the literal raw log; on Windows→Mac handoff this should be the full `ssh mac ... python3 -u ... watch ...` command
 - if not verified: exact blocker and next recovery command

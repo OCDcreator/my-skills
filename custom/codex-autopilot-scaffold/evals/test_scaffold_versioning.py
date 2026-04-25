@@ -8,6 +8,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 
@@ -990,6 +992,126 @@ class ScaffoldVersioningTests(unittest.TestCase):
 
             self.assertEqual(report["verdict"], "stalled")
             self.assertIn("progress.log has not started updating", report["reason"])
+
+    def test_watch_detail_lines_default_to_human_friendly_summary_and_preserve_raw_view(self) -> None:
+        status_views_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+            "_template_status_views_human_watch_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            progress_path = repo_root / "automation" / "runtime" / "round-013" / "progress.log"
+            progress_path.parent.mkdir(parents=True, exist_ok=True)
+            state = {
+                "active_lane_id": "a2-mcp-settings",
+                "current_round": 12,
+                "next_phase_number": 2,
+                "status": "active",
+                "consecutive_failures": 0,
+            }
+            support = status_views_module.StatusViewSupport(
+                repo_root=repo_root,
+                default_state_path="automation/runtime/autopilot-state.json",
+                lock_filename="autopilot.lock.json",
+                round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+            )
+            lines = [
+                "[15:49:23] [codex] Running command: /bin/zsh -lc \"printf 'Using superpowers + planning skills, then reading the queued lane docs.\\\\n' && sed -n '1,220p' foo\"",
+                "[15:49:23] [codex] Command finished (exit 0): /bin/zsh -lc \"printf 'Using superpowers + planning skills, then reading the queued lane docs.\\\\n' && sed -n '1,220p' foo\"",
+                "[15:50:34] [codex] Command finished (exit 1): /bin/zsh -lc \"printf 'I’ve got the current owner. Now pulling the remaining spec bits and MCP type details.\\\\n' && sed -n '317,420p' bar\"",
+                "[15:52:25] [codex] Running command: /bin/zsh -lc 'python3 automation/run_opencode_implementation.py --timeout-seconds 3600 --dir . --agent build'",
+                "[15:53:42] [codex] Running command: /bin/zsh -lc \"printf 'Still waiting on OpenCode. I’m peeking at the newest log lines and current worktree diff.\\\\n' && tail -n 60 baz\"",
+            ]
+
+            human_stdout = StringIO()
+            with redirect_stdout(human_stdout):
+                status_views_module.print_watch_detail_lines(
+                    lines,
+                    state=state,
+                    progress_path=progress_path,
+                    prefix_format="short",
+                    view="human",
+                    support=support,
+                )
+            human_output = human_stdout.getvalue()
+            self.assertIn("docs: Using superpowers + planning skills, then reading the queued lane docs.", human_output)
+            self.assertIn("fail: I’ve got the current owner. Now pulling the remaining spec bits and MCP type details. failed (exit 1)", human_output)
+            self.assertIn("impl: Starting OpenCode implementation pass", human_output)
+            self.assertIn("wait: Waiting on OpenCode implementation wrapper", human_output)
+            self.assertNotIn("Command finished (exit 0)", human_output)
+            self.assertNotIn("run_opencode_implementation.py --timeout-seconds 3600", human_output)
+
+            raw_stdout = StringIO()
+            with redirect_stdout(raw_stdout):
+                status_views_module.print_watch_detail_lines(
+                    lines,
+                    state=state,
+                    progress_path=progress_path,
+                    prefix_format="short",
+                    view="raw",
+                    support=support,
+                )
+            raw_output = raw_stdout.getvalue()
+            self.assertIn("Command finished (exit 0)", raw_output)
+            self.assertIn("run_opencode_implementation.py --timeout-seconds 3600", raw_output)
+
+    def test_status_summary_surfaces_activity_and_healthy_but_quiet_note(self) -> None:
+        status_views_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+            "_template_status_views_activity_summary_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            round_dir = repo_root / "automation" / "runtime" / "round-013"
+            round_dir.mkdir(parents=True, exist_ok=True)
+            (round_dir / "progress.log").write_text(
+                "\n".join(
+                    [
+                        "[15:52:25] [codex] Running command: /bin/zsh -lc 'python3 automation/run_opencode_implementation.py --timeout-seconds 3600 --dir . --agent build'",
+                        "[15:56:16] [codex] Running command: /bin/zsh -lc \"printf 'I’m parking on the live OpenCode wrapper until it exits, rather than interrupting it mid-pass.\\\\n' && while ps -p 13122 >/dev/null 2>&1; do sleep 30; done\"",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            state = {
+                "status": "active",
+                "current_round": 12,
+                "active_lane_id": "a2-mcp-settings",
+                "next_phase_number": 2,
+                "consecutive_failures": 0,
+                "last_phase_doc": "docs/status/lanes/a2-mcp-settings/autopilot-phase-1.md",
+                "last_next_focus": "M2 - Implement MCP server operations and add-server forms",
+            }
+            health_report = {
+                "verdict": "healthy",
+                "reason": "active run has a live autopilot pid, a live codex exec child pid, confirmed execution, and a fresh progress.log (190s old)",
+                "freshest_artifact_age_seconds": 190,
+                "autopilot_pid": 7745,
+                "autopilot_pid_alive": True,
+                "runner_pid": 10346,
+                "runner_pid_alive": True,
+                "runner_exec_confirmed": True,
+            }
+            support = status_views_module.StatusViewSupport(
+                repo_root=repo_root,
+                default_state_path="automation/runtime/autopilot-state.json",
+                lock_filename="autopilot.lock.json",
+                round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+            )
+
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                status_views_module.print_state_summary(
+                    state,
+                    runtime_directory=repo_root / "automation" / "runtime",
+                    health_report=health_report,
+                    support=support,
+                    read_lock=lambda _path: None,
+                )
+            output = stdout.getvalue()
+            self.assertIn("[status] activity: waiting on OpenCode implementation wrapper", output)
+            self.assertIn("[status] note: quiet for 190s", output)
 
     def test_older_scaffold_auto_upgrades_common_files_and_refreshes_preset_automation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

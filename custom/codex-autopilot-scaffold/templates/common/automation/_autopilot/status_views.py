@@ -14,6 +14,13 @@ class StatusViewSupport:
     round_directory_re: re.Pattern[str]
 
 
+@dataclass(frozen=True)
+class HumanWatchEvent:
+    category: str
+    message: str
+    signature: str
+
+
 def clean_string(value: Any) -> str:
     if value is None:
         return ""
@@ -31,6 +38,15 @@ def compact_text(text: str | None, max_length: int = 180) -> str:
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def normalize_log_text(text: str | None, *, max_length: int = 180) -> str:
+    if not text:
+        return ""
+    normalized = re.sub(r"\\+[nrt]", " ", text)
+    normalized = normalized.replace('\\"', '"').replace("\\'", "'")
+    normalized = re.sub(r"\\+$", "", normalized)
+    return compact_text(normalized, max_length=max_length)
 
 
 def resolve_repo_path(path_value: str, support: StatusViewSupport) -> Path:
@@ -59,6 +75,210 @@ def parse_round_directory_number(path: Path | None, support: StatusViewSupport) 
     if not match:
         return None
     return int(match.group(1))
+
+
+def parse_progress_log_line(raw_line: str) -> tuple[str, str, str]:
+    match = re.match(r"^\[(?P<timestamp>[^\]]+)\]\s+\[(?P<channel>[^\]]+)\]\s*(?P<message>.*)$", raw_line.strip())
+    if not match:
+        return "", "", normalize_log_text(raw_line, max_length=220)
+    return match.group("timestamp"), match.group("channel"), match.group("message").strip()
+
+
+def extract_command_title(command_text: str) -> str:
+    for pattern in (r"printf '([^']+)'", r'printf "([^"]+)"'):
+        match = re.search(pattern, command_text)
+        if match:
+            title = normalize_log_text(match.group(1), max_length=140)
+            if title:
+                return title
+
+    normalized_command = normalize_log_text(command_text, max_length=140)
+    if "automation/run_opencode_implementation.py" in command_text:
+        return "Starting OpenCode implementation pass"
+    return normalized_command
+
+
+def build_human_command_event(command_text: str) -> HumanWatchEvent:
+    title = extract_command_title(command_text) or "Running command"
+    lowered = f"{command_text}\n{title}".lower()
+
+    if "automation/run_opencode_implementation.py" in lowered:
+        return HumanWatchEvent("impl", "Starting OpenCode implementation pass", "impl:opencode")
+    if (
+        "opencode" in lowered
+        and any(
+            token in lowered
+            for token in (
+                "still running",
+                "still chewing",
+                "still waiting",
+                "parking on the live opencode wrapper",
+                "wrapper state",
+                "wait loop",
+                "without interrupting",
+                "log is still advancing",
+            )
+        )
+    ) or ("wrapper" in lowered and " ps " in f" {lowered} "):
+        return HumanWatchEvent("wait", "Waiting on OpenCode implementation wrapper", "wait:opencode")
+    if any(token in lowered for token in ("phase doc", "write phase", "write the phase", "phase-")) and any(
+        token in lowered for token in ("write", "writing")
+    ):
+        return HumanWatchEvent("phase", title, f"phase:{title.lower()}")
+    if any(
+        token in lowered
+        for token in ("vitest", "jest", "pytest", "cargo test", "npm test", "pnpm test", "yarn test", "targeted tests")
+    ):
+        return HumanWatchEvent("test", title, f"test:{title.lower()}")
+    if any(
+        token in lowered
+        for token in (
+            "npm run verify",
+            " verify",
+            "lint",
+            "typecheck",
+            "pyright",
+            "tsc",
+            "check:module-docs",
+            "module-docs",
+            "cargo check",
+            "cargo clippy",
+            "ruff",
+        )
+    ):
+        return HumanWatchEvent("verify", title, f"verify:{title.lower()}")
+    if any(
+        token in lowered
+        for token in ("build_id", "build id", "deploy", "test vault", "plugin:reload", "manifest.json", "styles.css")
+    ):
+        return HumanWatchEvent("deploy", title, f"deploy:{title.lower()}")
+    if any(
+        token in lowered
+        for token in (
+            "reading",
+            "checking",
+            "read ",
+            "check ",
+            " spec",
+            "docs/",
+            "module docs",
+            "roadmap",
+            "reference",
+            "graph snapshot",
+            "phase doc",
+        )
+    ):
+        return HumanWatchEvent("docs", title, f"docs:{title.lower()}")
+    return HumanWatchEvent("cmd", title, f"cmd:{title.lower()}")
+
+
+def build_human_watch_event(raw_line: str) -> HumanWatchEvent | None:
+    _, channel, message = parse_progress_log_line(raw_line)
+    if not message:
+        return None
+
+    if channel == "runner":
+        if message.startswith("Spawned codex exec subprocess pid="):
+            pid_text = clean_string(message.split("pid=", 1)[1])
+            return HumanWatchEvent("runner", f"Codex exec started (pid {pid_text})", f"runner:pid:{pid_text}")
+        if "first execution event" in message:
+            return HumanWatchEvent("runner", "Codex exec began producing events", "runner:exec-confirmed")
+        return HumanWatchEvent("runner", normalize_log_text(message, max_length=140), f"runner:{message.lower()}")
+
+    if message.startswith("Session started:"):
+        return HumanWatchEvent("session", "Codex session started", "session:started")
+    if message == "Turn started":
+        return HumanWatchEvent("turn", "Turn started", "turn:started")
+    if message.startswith("Turn completed"):
+        return HumanWatchEvent("turn", normalize_log_text(message, max_length=140), f"turn:{message.lower()}")
+    if message.startswith("Agent: "):
+        return HumanWatchEvent("agent", normalize_log_text(message[7:], max_length=160), f"agent:{message.lower()}")
+    if message.startswith("Running command: "):
+        return build_human_command_event(message.split("Running command: ", 1)[1])
+    if message.startswith("Command finished (exit "):
+        match = re.match(r"^Command finished \(exit (?P<code>[^)]+)\):\s*(?P<command>.*)$", message)
+        if not match:
+            return HumanWatchEvent("fail", normalize_log_text(message, max_length=160), f"finish:{message.lower()}")
+        exit_code = clean_string(match.group("code"))
+        if exit_code in {"0", ""}:
+            return None
+        title = extract_command_title(match.group("command")) or "Command"
+        return HumanWatchEvent("fail", f"{title} failed (exit {exit_code})", f"fail:{title.lower()}:{exit_code}")
+    if message.startswith("item.started: todo_list"):
+        return HumanWatchEvent("plan", "Updating todo list", "plan:todo")
+    if message.startswith("item.started: file_change"):
+        return HumanWatchEvent("edit", "Applying file changes", "edit:file-change")
+    if message.startswith("item.completed: file_change"):
+        return HumanWatchEvent("edit", "File changes recorded", "edit:file-change-complete")
+    if message.startswith("Event: item.updated"):
+        return None
+    return HumanWatchEvent("note", normalize_log_text(message, max_length=160), f"note:{message.lower()}")
+
+
+def render_human_watch_event(event: HumanWatchEvent) -> str:
+    return f"{event.category}: {event.message}"
+
+
+def build_watch_activity_summary(
+    *,
+    state: dict[str, Any] | None,
+    progress_path: Path | None,
+) -> str:
+    if progress_path is None or not progress_path.exists():
+        if state and clean_string(state.get("last_next_focus")):
+            return f"queued focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=120)}"
+        return ""
+
+    try:
+        recent_lines = read_text(progress_path).splitlines()[-80:]
+    except OSError:
+        return ""
+
+    recent_events = [event for event in (build_human_watch_event(line) for line in recent_lines) if event is not None]
+    for event in reversed(recent_events):
+        if event.category == "wait":
+            return "waiting on OpenCode implementation wrapper"
+        if event.category == "impl":
+            return "running OpenCode implementation"
+        if event.category == "phase":
+            return "writing phase doc"
+        if event.category == "docs":
+            return "reading docs / spec"
+        if event.category == "test":
+            return "running targeted tests"
+        if event.category == "verify":
+            return "running verify / validation"
+        if event.category == "deploy":
+            return "deploying / checking BUILD_ID"
+        if event.category == "edit":
+            return "writing files"
+        if event.category == "fail":
+            return event.message
+    if state and clean_string(state.get("last_next_focus")):
+        return f"queued focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=120)}"
+    return ""
+
+
+def build_watch_liveness_note(
+    *,
+    health_report: dict[str, Any] | None,
+    activity_summary: str,
+) -> str:
+    if not health_report or clean_string(health_report.get("verdict")) != "healthy":
+        return ""
+    age_seconds = health_report.get("freshest_artifact_age_seconds")
+    try:
+        age_value = int(float(age_seconds))
+    except (TypeError, ValueError):
+        return ""
+    if age_value < 90:
+        return ""
+    if "waiting on opencode implementation wrapper" in activity_summary.lower():
+        return (
+            f"quiet for {age_value}s, but the parent/runner pids and progress freshness still look healthy; "
+            "this usually means a long-running external wrapper is still busy."
+        )
+    return f"quiet for {age_value}s, but the run still looks alive."
 
 
 def resolve_watch_state_path(
@@ -184,6 +404,8 @@ def print_watch_snapshot(
     status_value = clean_string(state.get("status")) if state else ""
     failures_value = clean_string(state.get("consecutive_failures")) if state else ""
     queue_progress = read_watch_queue_progress(state, support=support)
+    activity_summary = build_watch_activity_summary(state=state, progress_path=progress_path)
+    liveness_note = build_watch_liveness_note(health_report=health_report, activity_summary=activity_summary)
     heading_parts: list[str] = []
 
     if watched_round_number is not None and state_round and state_round == str(watched_round_number):
@@ -226,6 +448,8 @@ def print_watch_snapshot(
             print(f"[watch] phase doc: {state.get('last_phase_doc')}")
         if state.get("last_next_focus"):
             print(f"[watch] focus: {compact_text(clean_string(state.get('last_next_focus')), max_length=220)}")
+        if activity_summary:
+            print(f"[watch] activity: {activity_summary}")
         if state.get("last_commit_sha"):
             print(f"[watch] last commit: {state.get('last_commit_sha')}")
         if state.get("last_plan_review_verdict"):
@@ -267,6 +491,8 @@ def print_watch_snapshot(
             print(f"[watch] health: {health_report.get('verdict')} via {freshest_path} ({int(freshest_age)}s old)")
         else:
             print(f"[watch] health: {health_report.get('verdict')} ({health_report.get('reason')})")
+        if liveness_note:
+            print(f"[watch] note: {liveness_note}")
     if progress_path is not None:
         print(f"[watch] progress log: {progress_path}")
     print("[watch] " + "=" * 72)
@@ -340,6 +566,7 @@ def print_watch_detail_lines(
     state: dict[str, Any] | None,
     progress_path: Path | None,
     prefix_format: str = "long",
+    view: str = "human",
     support: StatusViewSupport,
 ) -> None:
     if not lines:
@@ -350,11 +577,24 @@ def print_watch_detail_lines(
         prefix_format=prefix_format,
         support=support,
     )
+    view_mode = clean_string(view).lower() or "human"
+    if view_mode == "raw":
+        for line in lines:
+            if line:
+                print(f"{prefix} {line}")
+            else:
+                print(prefix)
+        return
+
+    last_rendered_signature = ""
     for line in lines:
-        if line:
-            print(f"{prefix} {line}")
-        else:
-            print(prefix)
+        event = build_human_watch_event(line)
+        if event is None:
+            continue
+        if event.signature == last_rendered_signature:
+            continue
+        print(f"{prefix} {render_human_watch_event(event)}")
+        last_rendered_signature = event.signature
 
 
 def print_state_summary(
@@ -367,6 +607,12 @@ def print_state_summary(
 ) -> None:
     queue_progress = read_watch_queue_progress(state, support=support)
     lane_id = clean_string(state.get("active_lane_id")) or "legacy"
+    progress_path = None
+    if runtime_directory is not None:
+        round_directory = watched_round_directory(runtime_directory, state, support)
+        progress_path = round_directory / "progress.log" if round_directory is not None else None
+    activity_summary = build_watch_activity_summary(state=state, progress_path=progress_path)
+    liveness_note = build_watch_liveness_note(health_report=health_report, activity_summary=activity_summary)
     print(
         "[status] "
         f"status={state.get('status')} round={state.get('current_round')} "
@@ -378,6 +624,8 @@ def print_state_summary(
         print(f"[status] last phase doc: {state.get('last_phase_doc')}")
     if state.get("last_next_focus"):
         print(f"[status] next focus: {state.get('last_next_focus')}")
+    if activity_summary:
+        print(f"[status] activity: {activity_summary}")
     if state.get("last_commit_sha"):
         print(f"[status] last commit: {state.get('last_commit_sha')}")
     if state.get("last_plan_review_verdict"):
@@ -388,6 +636,8 @@ def print_state_summary(
         print(f"[status] blocker: {compact_text(clean_string(state.get('last_blocking_reason')), max_length=220)}")
     if health_report:
         print(f"[status] health: {health_report.get('verdict')} ({health_report.get('reason')})")
+        if liveness_note:
+            print(f"[status] note: {liveness_note}")
         if health_report.get("autopilot_pid") is not None:
             print(
                 "[status] autopilot pid: "

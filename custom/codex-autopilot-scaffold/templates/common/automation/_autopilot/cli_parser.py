@@ -59,6 +59,12 @@ def add_watch_subcommand(subparsers: argparse._SubParsersAction[argparse.Argumen
         default="long",
         help="Prefix style for streamed progress.log lines.",
     )
+    watch_parser.add_argument(
+        "--view",
+        choices=["human", "raw"],
+        default="human",
+        help="Render a human-friendly summary stream or the raw progress.log lines.",
+    )
     watch_parser.add_argument("--once", action="store_true", help="Print current status once and exit.")
     watch_parser.set_defaults(handler=support.run_watch)
 
