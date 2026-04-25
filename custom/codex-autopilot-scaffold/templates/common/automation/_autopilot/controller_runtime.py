@@ -176,6 +176,10 @@ def append_controller_requirements(prompt_text: str, config: dict[str, Any]) -> 
         "- If `deploy_ran` is `true`, only report it when this round actually performed a deploy step required by config.",
         "- If `deploy_ran` is `true`, also set `deploy_verified` to `true` only after the configured deploy verification step really passed.",
         "- Include every real command in `commands_run`; repeated diagnostic Git commands may be reported as controller warnings, but do not hide them.",
+        "- If implementation uses background tasks, detached sub-work, or an OpenCode helper that can spawn background work, the main pass exit is not completion.",
+        "- Before returning `success`, wait for those background tasks to finish, confirm their repo-visible work has landed, and confirm final round artifacts are written.",
+        "- Set `background_tasks_used` to `true` only when such background work was used; otherwise set it to `false`.",
+        "- Set `background_tasks_completed`, `repo_visible_work_landed`, and `final_artifacts_written` truthfully; `success` with any of those false will fail validation.",
     ]
     if commit_prefix:
         lines.append(

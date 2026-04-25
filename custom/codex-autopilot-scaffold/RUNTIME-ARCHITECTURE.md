@@ -92,6 +92,7 @@ sequenceDiagram
     RoundFlow->>Runner: launch codex exec for one round
     Runner->>Runtime: append progress.log
     Runner->>Runtime: update runner-status.json
+    Runner->>Runner: drain owned background tasks if any
     Runner->>Runtime: write assistant-output.json
     Runner-->>Controller: exit code + structured result
     Controller->>Controller: validate result and git/runtime constraints
@@ -103,6 +104,21 @@ sequenceDiagram
 - `round_flow` is where the controller turns repo intent into a concrete per-round prompt and runtime directory.
 - The runner writes artifacts during execution so observers can inspect the live state before the round fully ends.
 - Validation is where the scaffold enforces its contract: schema, build/deploy reporting, commit prefix rules, dirty-worktree expectations, and similar safety checks.
+
+## Background-task-aware completion
+
+The round boundary is deliberately later than a main helper response. A worker or repo-specific implementation helper may start background tasks, but the round is not complete until that background work is drained, repo-visible changes have landed, and the final artifacts are written.
+
+The generated schema requires the worker to report:
+
+- `background_tasks_used`
+- `background_tasks_completed`
+- `repo_visible_work_landed`
+- `final_artifacts_written`
+
+Controller validation rejects a `success` result when background tasks were used but not completed, when repo-visible work has not landed, or when final artifacts were not written. If `assistant-output.json` is missing after the runner exits, interpret that as a completion-lifecycle failure, not as evidence that background work is impossible.
+
+This scaffold-level contract is a baseline. A target repo that already has a custom OpenCode wrapper or controller still needs a repo-local phase to refresh the scaffold and wire any helper-specific background-task drain logic.
 
 ## Key runtime artifacts
 

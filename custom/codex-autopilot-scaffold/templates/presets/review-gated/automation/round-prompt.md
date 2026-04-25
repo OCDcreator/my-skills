@@ -79,3 +79,4 @@ Response contract:
 - On `failure`, `blocking_reason` must explain why the round stopped.
 - Include every command you ran in `commands_run`, and list the validation commands in `tests_run`.
 - Set `plan_review_verdict` and `code_review_verdict` to the actual reviewer verdicts when you invoked those review wrappers.
+- Report `background_tasks_used`, `background_tasks_completed`, `repo_visible_work_landed`, and `final_artifacts_written` truthfully; `success` is invalid if background work is still running, repo-visible work has not landed, or final artifacts are missing.

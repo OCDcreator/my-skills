@@ -150,7 +150,12 @@ def evaluate_round_execution(
             failure_reason = f"runner exited with code {codex_exit_code}."
     elif result is None:
         failure_reason = (
-            f"Could not parse agent output JSON: {parse_error}" if parse_error else "Agent output JSON was not created."
+            f"Could not parse agent output JSON: {parse_error}"
+            if parse_error
+            else (
+                "Agent output JSON was not created. Treat this as a background-task-aware completion contract failure: "
+                "the round cannot succeed until background tasks finish and final artifacts are written."
+            )
         )
 
     if not failure_reason and result is not None:

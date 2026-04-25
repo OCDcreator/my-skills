@@ -308,6 +308,22 @@ def validate_round_result(
         if code_review_command and not clean_string(result.get("code_review_verdict")):
             validation_errors.append("success result is missing code_review_verdict for a review-gated round.")
 
+        if bool(result.get("background_tasks_used")) and not bool(result.get("background_tasks_completed")):
+            validation_errors.append(
+                "background tasks were used but background_tasks_completed=false; "
+                "do not treat the main pass exit as round completion."
+            )
+
+        if not bool(result.get("repo_visible_work_landed")):
+            validation_errors.append(
+                "repo_visible_work_landed=false; wait until implementation-owned repo-visible work has landed before success."
+            )
+
+        if not bool(result.get("final_artifacts_written")):
+            validation_errors.append(
+                "final_artifacts_written=false; wait until the final round output artifacts are written before success."
+            )
+
         if commit_sha and ending_head != commit_sha:
             validation_errors.append(f"HEAD '{ending_head}' does not match commit_sha '{commit_sha}'.")
 

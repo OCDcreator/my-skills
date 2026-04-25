@@ -50,11 +50,13 @@ Required workflow:
 7. Run targeted tests first when relevant and then every configured validation command that is present.
 8. When a validation command is blank, do not invent one; record the gap in the phase doc.
 9. When Vulture is configured, use it as the dead-code observability command when unused-code cleanup is relevant; record the finding count or any gap in the phase doc.
-10. Update `{{current_lane_roadmap}}` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
-11. Write the round summary to `{{next_phase_doc}}`. Include the recovered gate, changed files, validation results, Vulture findings when configured, and the next recommended slice.
-12. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
-13. If validation still fails after one focused repair, revert the round, do not commit, and return `failure`.
-14. If the queued objective is already complete, avoid unnecessary edits, update the lane roadmap accordingly, and return `goal_complete`.
+10. If the implementation path uses background tasks or detached sub-work, the main pass exit is not completion. Wait until those background tasks finish, the repo-visible work they own has landed, and the final round artifacts required by this scaffold exist.
+11. A clean main pass exit is not enough when background tasks were used. Before moving on, confirm there are no still-running background tasks tied to the implementation pass and that the final round artifacts have actually been written.
+12. Update `{{current_lane_roadmap}}` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
+13. Write the round summary to `{{next_phase_doc}}`. Include the recovered gate, changed files, validation results, Vulture findings when configured, and the next recommended slice.
+14. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
+15. If validation still fails after one focused repair, revert the round, do not commit, and return `failure`.
+16. If the queued objective is already complete, avoid unnecessary edits, update the lane roadmap accordingly, and return `goal_complete`.
 
 Response contract:
 - Your final response must be valid JSON matching the provided output schema.
@@ -64,3 +66,4 @@ Response contract:
 - On `success`, `commit_sha` and `commit_message` must be non-null.
 - On `failure`, `blocking_reason` must explain why the round stopped.
 - Include every command you ran in `commands_run`, and list the validation commands in `tests_run`.
+- Report `background_tasks_used`, `background_tasks_completed`, `repo_visible_work_landed`, and `final_artifacts_written` truthfully; `success` is invalid if background work is still running, repo-visible work has not landed, or final artifacts are missing.

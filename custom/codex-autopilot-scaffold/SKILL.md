@@ -139,6 +139,34 @@ Only say “it is running” when `health` proves all three:
 
 If that proof is missing, report the blocker, state path, log path, saved artifacts, and next single recovery command. Do not end with a generic command list.
 
+## Background-Task-Aware Round Contract
+
+Some target repos layer an implementation helper on top of the scaffold, including OpenCode passes that may start background tasks. That is allowed. The completion boundary is not the main helper response or main process exit.
+
+For generated scaffolds, a round may close successfully only after all of these are true:
+
+- background tasks owned by the implementation pass have finished, or no such tasks were used
+- repo-visible work owned by those tasks has landed
+- `assistant-output.json` and other final round artifacts are actually written
+- the final JSON passes `round-result.schema.json` and controller validation
+
+The scaffold template now requires final JSON fields:
+
+- `background_tasks_used`
+- `background_tasks_completed`
+- `repo_visible_work_landed`
+- `final_artifacts_written`
+
+On `success`, controller validation rejects `background_tasks_used=true` with `background_tasks_completed=false`, rejects `repo_visible_work_landed=false`, and rejects `final_artifacts_written=false`.
+
+When `Agent output JSON was not created.` appears after a main pass exit, treat it as a completion-lifecycle failure: the round ended before the background-task-aware contract produced the final artifact. Do not misreport it as proof that OpenCode cannot run background work or as a target-code quality failure.
+
+Phase boundary:
+
+- This skill can fix scaffold rules, templates, schemas, and generated controller baselines.
+- It cannot retroactively fix a target repo's already-deployed wrapper/controller until that repo refreshes the scaffold and implements any repo-specific background task drain logic.
+- Do not claim a target repo is fully fixed from a skill-only edit.
+
 ## Dedicated Branch Rule
 
 A fresh scaffold may be installed on `main`, but `doctor` / `start` should fail branch guard checks there. This is expected safety behavior. Use prefixes such as:
@@ -203,6 +231,7 @@ Core checks:
 python automation/autopilot.py version
 python automation/autopilot.py doctor --profile windows
 python automation/autopilot.py start --profile windows --dry-run --single-round
+python automation/autopilot.py start --profile windows --single-round --fail-on-round-failure
 python automation/autopilot.py bootstrap-and-daemonize --profile windows
 python automation/autopilot.py health --state-path automation/runtime/autopilot-state.json
 python automation/autopilot.py status --state-path automation/runtime/autopilot-state.json
@@ -210,6 +239,8 @@ python automation/autopilot.py watch --runtime-path automation/runtime --state-p
 ```
 
 Use `python3` and `--profile mac` on macOS. Use scaffolded wrappers for Windows no-window launches and macOS background/watch convenience.
+
+For CI or an outer wrapper that needs shell-level failure semantics, add `--fail-on-round-failure` to `start`. Windows and macOS both receive the same Python process return code; PowerShell reads it via `$LASTEXITCODE`, while bash/zsh reads it via `$?`.
 
 When multiple state files or old `round-*` directories exist, always bind `status`, `health`, and `watch` to the intended `--state-path`.
 When a user asks to look at logs, default to the scaffolded `watch` command above instead of a raw `tail`/`Get-Content`, because the prefixed stream keeps lane/queue/round context visible on every line.

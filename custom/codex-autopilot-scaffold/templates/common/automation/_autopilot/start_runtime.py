@@ -260,6 +260,7 @@ def run_start(
         raise support.error_type("Working tree must be clean before unattended execution.")
 
     rounds_executed = 0
+    saw_round_failure = False
     head_sha = support.get_head_sha()
 
     with support.autopilot_lock(
@@ -331,6 +332,7 @@ def run_start(
             )
 
             if round_evaluation.failure_reason:
+                saw_round_failure = True
                 should_stop = record_failed_round(
                     state=state,
                     state_path=state_path,
@@ -345,6 +347,9 @@ def run_start(
                     support=support,
                 )
                 if should_stop:
+                    break
+                if args.fail_on_round_failure:
+                    support.info("Round failure encountered; exiting non-zero because --fail-on-round-failure is set.")
                     break
                 continue
 
@@ -361,4 +366,4 @@ def run_start(
                 support=support,
             )
 
-    return 0
+    return 1 if saw_round_failure and args.fail_on_round_failure else 0

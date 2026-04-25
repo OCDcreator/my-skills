@@ -29,6 +29,11 @@ def add_start_subcommand(subparsers: argparse._SubParsersAction[argparse.Argumen
     start_parser.add_argument("--state-path", default=support.default_state_path, help="State JSON path.")
     start_parser.add_argument("--max-rounds-this-run", type=int, default=0, help="Limit rounds for this process only.")
     start_parser.add_argument("--single-round", action="store_true", help="Run exactly one unattended round.")
+    start_parser.add_argument(
+        "--fail-on-round-failure",
+        action="store_true",
+        help="Return exit code 1 when a round records failure, useful for CI or wrapper supervision.",
+    )
     start_parser.add_argument("--dry-run", action="store_true", help="Render the next prompt only.")
     start_parser.add_argument("--no-branch-guard", action="store_true", help="Skip allowed-branch validation.")
     start_parser.add_argument("--allow-dirty-worktree", action="store_true", help="Skip clean-worktree validation.")

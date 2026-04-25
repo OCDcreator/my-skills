@@ -20,7 +20,11 @@
     "blocking_reason",
     "plan_review_verdict",
     "code_review_verdict",
-    "changed_files"
+    "changed_files",
+    "background_tasks_used",
+    "background_tasks_completed",
+    "repo_visible_work_landed",
+    "final_artifacts_written"
   ],
   "properties": {
     "status": {
@@ -113,6 +117,18 @@
       "items": {
         "type": "string"
       }
+    },
+    "background_tasks_used": {
+      "type": "boolean"
+    },
+    "background_tasks_completed": {
+      "type": "boolean"
+    },
+    "repo_visible_work_landed": {
+      "type": "boolean"
+    },
+    "final_artifacts_written": {
+      "type": "boolean"
     }
   }
 }

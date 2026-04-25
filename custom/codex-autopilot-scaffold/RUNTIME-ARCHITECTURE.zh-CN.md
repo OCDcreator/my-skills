@@ -94,6 +94,7 @@ sequenceDiagram
     RoundFlow->>Runner: 启动本轮 codex exec
     Runner->>Runtime: 追加 progress.log
     Runner->>Runtime: 更新 runner-status.json
+    Runner->>Runner: 如有本轮拥有的后台任务，先等待它们收完
     Runner->>Runtime: 写入 assistant-output.json
     Runner-->>Controller: 返回退出码与结构化结果
     Controller->>Controller: 校验结果与 git / runtime 约束
@@ -105,6 +106,21 @@ sequenceDiagram
 - `round_flow` 负责把“仓库当前意图”转成一轮可执行的 prompt 和 runtime 目录。
 - runner 在执行过程中就会持续写产物，所以观察命令不必等整轮结束才有东西看。
 - `validation` 是脚手架真正执行契约的地方：schema、build/deploy 上报、commit prefix、dirty worktree 之类的安全规则都在这里落实。
+
+## 对后台任务敏感的完成契约
+
+round 的边界故意晚于“主 helper 响应结束”。worker 或目标仓库自己的 implementation helper 可以启动后台任务，但 round 不能因此提前收口；必须等后台任务收完、它们负责的 repo-visible 改动落地、最终产物写完之后，才能进入成功校验。
+
+生成的 schema 要求 worker 上报：
+
+- `background_tasks_used`
+- `background_tasks_completed`
+- `repo_visible_work_landed`
+- `final_artifacts_written`
+
+如果后台任务被使用但没有完成、repo-visible work 没落地、或者 final artifacts 没写完，controller validation 会拒绝 `success`。如果 runner 退出后缺少 `assistant-output.json`，应把它理解为 completion lifecycle failure，而不是理解成“后台任务不可能跑”或目标代码质量失败。
+
+这只是 scaffold 层的基线契约。已经有自定义 OpenCode wrapper / controller 的目标仓库，第二阶段仍然需要刷新 scaffold，并把 helper 自己的后台任务 drain 逻辑接进去。
 
 ## 关键运行时产物
 

@@ -35,6 +35,7 @@ This folder contains a repo-local unattended Codex autopilot scaffold.
 - Diagnostic command budget findings default to warnings, so repeated `git status --short` or `git diff --stat` reports do not roll back otherwise successful commits
 - `health` is the truth source for runner liveness because it checks state, lock, pid, and progress-artifact freshness together
 - Successful rounds must write a phase doc and create a commit
+- Successful rounds must satisfy the background-task-aware completion contract before final JSON is accepted
 - A runtime lock prevents two machines from driving the same branch simultaneously
 
 ## Main commands
@@ -98,6 +99,25 @@ The controller also validates build/deploy result fields in the final JSON:
 - If the round did not produce a trustworthy build marker, report `build_ran=false` instead of fabricating a `build_id`.
 - `deploy_ran=true` is only valid when the round actually performed a deploy required by config.
 - `deploy_ran=true` also requires `deploy_verified=true`, and deploy verification may additionally check that the configured artifact contains the reported `build_id`.
+
+## Background Task Completion Gate
+
+Background tasks are allowed, including repo-specific implementation helpers that spawn detached work. The round completion boundary is not the main helper response or main process exit.
+
+The final JSON must include:
+
+- `background_tasks_used`
+- `background_tasks_completed`
+- `repo_visible_work_landed`
+- `final_artifacts_written`
+
+For `success`, validation rejects:
+
+- `background_tasks_used=true` with `background_tasks_completed=false`
+- `repo_visible_work_landed=false`
+- `final_artifacts_written=false`
+
+If `Agent output JSON was not created.` appears after a main pass exit, treat it as a completion-lifecycle failure: the round ended before all background work drained and before the final output artifact was written. It does not prove that the target code failed, and it does not prove that background tasks are forbidden.
 
 ## Command Budget Policy
 
@@ -177,12 +197,15 @@ python automation/autopilot.py health
 python automation/autopilot.py watch
 python automation/autopilot.py start --profile windows --dry-run --single-round
 python automation/autopilot.py start --profile windows --single-round
+python automation/autopilot.py start --profile windows --single-round --fail-on-round-failure
 python automation/autopilot.py bootstrap-and-daemonize --profile windows
 python automation/autopilot.py restart-after-next-commit --profile windows
 bash ./automation/start-autopilot.sh --background -- --profile mac
 ```
 
 `start --dry-run --single-round` only renders the next prompt. It leaves the state in `stopped_dry_run` so `status` / `health` do not pretend a live unattended runner exists, and a later real `start` automatically resumes from that preview state.
+
+Use `--fail-on-round-failure` when a CI job or outer wrapper must receive a non-zero shell return code for a validation or completion-contract failure. The controller still writes state/history first, then returns `1` for that process. Windows and macOS expose the same Python return code; PowerShell reads `$LASTEXITCODE`, while bash/zsh reads `$?`.
 
 ## Review-gated preset
 

@@ -108,6 +108,12 @@
       "prompt": "Windows 本地生成 scaffold，但真正要在 ssh mac 上持续无人值守。不要本地说完就结束：请 push 到 Mac、在 Mac worktree 上启动，并用 Mac 侧 health/status 证明它还在跑。",
       "expected_output": "Assistant should keep the execution target remote-only after local scaffolding, commit/push, update the Mac checkout or worktree, run doctor and bootstrap/background start on the Mac, then report Mac-side state path, health verdict, progress log path, and runner evidence instead of using Windows-local artifacts as proof.",
       "files": []
+    },
+    {
+      "id": 19,
+      "prompt": "真实问题不是 OpenCode 不能开后台任务，而是 implementation pass 主响应结束后后台任务还没收完，外层 autopilot 就因为 `Agent output JSON was not created.` 或 `write_stdin failed: Unknown process id` 判整轮失败。第一阶段只能修本地 codex-autopilot-scaffold skill，不要动目标仓库。",
+      "expected_output": "Assistant should first communicate the root cause, distinguish scaffold contract improvements from target-repo controller/wrapper fixes, then update only the local codex-autopilot-scaffold rules/templates/docs/tests. It should add a background-task-aware completion contract requiring tasks drained, repo-visible work landed, and final output artifacts written before round success, while explicitly saying target-repo runtime fixes remain phase two.",
+      "files": []
     }
   ]
 }

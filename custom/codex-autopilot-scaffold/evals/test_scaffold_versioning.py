@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -112,6 +113,37 @@ def run_scaffold(repo_root: Path, *extra_args: str, preset: str = "maintainabili
 
 def read_version_marker(repo_root: Path) -> dict[str, str]:
     return json.loads((repo_root / "automation" / "autopilot-scaffold-version.json").read_text(encoding="utf-8"))
+
+
+def write_missing_output_runner(repo_root: Path) -> Path:
+    runner_dir = repo_root / ".fake-runner"
+    runner_dir.mkdir(parents=True, exist_ok=True)
+    runner_script = runner_dir / "fake_codex_missing_output.py"
+    runner_script.write_text(
+        "from __future__ import annotations\n"
+        "import sys\n"
+        "sys.stdin.buffer.read()\n"
+        "print('{\"type\":\"session.started\"}', flush=True)\n"
+        "print('{\"type\":\"agent.finished\"}', flush=True)\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    if os.name == "nt":
+        runner_command = runner_dir / "fake-codex.cmd"
+        runner_command.write_text(
+            f'@echo off\r\n"{sys.executable}" "{runner_script}" %*\r\n',
+            encoding="utf-8",
+        )
+        return runner_command
+
+    runner_command = runner_dir / "fake-codex"
+    runner_command.write_text(
+        f"#!/usr/bin/env sh\nexec \"{sys.executable}\" \"{runner_script}\" \"$@\"\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    runner_command.chmod(0o755)
+    return runner_command
 
 
 class ScaffoldVersioningTests(unittest.TestCase):
@@ -418,6 +450,10 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 "build_id": "",
                 "deploy_ran": False,
                 "deploy_verified": False,
+                "background_tasks_used": False,
+                "background_tasks_completed": True,
+                "repo_visible_work_landed": True,
+                "final_artifacts_written": True,
             }
             config = {
                 "commit_prefix": "autopilot",
@@ -483,6 +519,230 @@ class ScaffoldVersioningTests(unittest.TestCase):
         required_names = set(schema.get("required", []))
 
         self.assertEqual(set(), property_names - required_names)
+
+    def test_schema_requires_background_completion_contract_fields(self) -> None:
+        schema = json.loads(
+            (SKILL_ROOT / "templates" / "common" / "automation" / "round-result.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        required_names = set(schema.get("required", []))
+
+        self.assertIn("background_tasks_used", required_names)
+        self.assertIn("background_tasks_completed", required_names)
+        self.assertIn("repo_visible_work_landed", required_names)
+        self.assertIn("final_artifacts_written", required_names)
+        self.assertEqual(schema["properties"]["background_tasks_used"]["type"], "boolean")
+        self.assertEqual(schema["properties"]["background_tasks_completed"]["type"], "boolean")
+        self.assertEqual(schema["properties"]["repo_visible_work_landed"]["type"], "boolean")
+        self.assertEqual(schema["properties"]["final_artifacts_written"]["type"], "boolean")
+
+    def test_success_result_fails_when_background_tasks_have_not_completed(self) -> None:
+        validation_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+            "_template_validation_background_completion_test",
+        )
+        result = {
+            "status": "success",
+            "lane_id": "m1-hotspot-slice",
+            "summary": "main pass exited early",
+            "phase_doc_path": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+            "tests_run": [],
+            "commands_run": [],
+            "build_ran": False,
+            "deploy_ran": False,
+            "deploy_verified": False,
+            "build_id": "",
+            "commit_sha": "abc123",
+            "commit_message": "autopilot: round 1 - demo",
+            "next_focus": "",
+            "blocking_reason": "",
+            "plan_review_verdict": "",
+            "code_review_verdict": "",
+            "changed_files": ["src/demo.py"],
+            "background_tasks_used": True,
+            "background_tasks_completed": False,
+            "repo_visible_work_landed": True,
+            "final_artifacts_written": True,
+        }
+
+        failure_reason = validation_module.validate_round_result(
+            attempt_number=1,
+            result=result,
+            schema=json.loads(
+                (SKILL_ROOT / "templates" / "common" / "automation" / "round-result.schema.json").read_text(
+                    encoding="utf-8"
+                )
+            ),
+            phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+            expected_lane_id="m1-hotspot-slice",
+            config={"commit_prefix": "autopilot", "build_command": "", "deploy_policy": "never"},
+            ending_head="abc123",
+            working_tree_dirty=False,
+            support=validation_module.ValidationSupport(
+                clean_string=lambda value: "" if value is None else str(value).strip(),
+                resolve_repo_path=lambda value: Path("unused") / str(value),
+                run_git=lambda args: run_git(SKILL_ROOT, *args),
+                info=lambda message: None,
+            ),
+        )
+
+        self.assertIsNotNone(failure_reason)
+        self.assertIn("background tasks were used but background_tasks_completed=false", failure_reason)
+
+    def test_success_result_requires_repo_visible_work_and_final_artifacts(self) -> None:
+        validation_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+            "_template_validation_final_artifacts_test",
+        )
+        result = {
+            "status": "success",
+            "lane_id": "m1-hotspot-slice",
+            "summary": "claimed success before artifacts landed",
+            "phase_doc_path": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+            "tests_run": [],
+            "commands_run": [],
+            "build_ran": False,
+            "deploy_ran": False,
+            "deploy_verified": False,
+            "build_id": "",
+            "commit_sha": "abc123",
+            "commit_message": "autopilot: round 1 - demo",
+            "next_focus": "",
+            "blocking_reason": "",
+            "plan_review_verdict": "",
+            "code_review_verdict": "",
+            "changed_files": ["src/demo.py"],
+            "background_tasks_used": True,
+            "background_tasks_completed": True,
+            "repo_visible_work_landed": False,
+            "final_artifacts_written": False,
+        }
+
+        failure_reason = validation_module.validate_round_result(
+            attempt_number=1,
+            result=result,
+            schema=json.loads(
+                (SKILL_ROOT / "templates" / "common" / "automation" / "round-result.schema.json").read_text(
+                    encoding="utf-8"
+                )
+            ),
+            phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+            expected_lane_id="m1-hotspot-slice",
+            config={"commit_prefix": "autopilot", "build_command": "", "deploy_policy": "never"},
+            ending_head="abc123",
+            working_tree_dirty=False,
+            support=validation_module.ValidationSupport(
+                clean_string=lambda value: "" if value is None else str(value).strip(),
+                resolve_repo_path=lambda value: Path("unused") / str(value),
+                run_git=lambda args: run_git(SKILL_ROOT, *args),
+                info=lambda message: None,
+            ),
+        )
+
+        self.assertIsNotNone(failure_reason)
+        self.assertIn("repo_visible_work_landed=false", failure_reason)
+        self.assertIn("final_artifacts_written=false", failure_reason)
+
+    def test_missing_agent_output_is_reported_as_background_aware_completion_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            round_dir = Path(temp_dir) / "round-001"
+            round_dir.mkdir()
+            round_flow_module = load_module_from_path(
+                SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "round_flow.py",
+                "_template_round_flow_missing_output_test",
+            )
+            context = round_flow_module.RoundContext(
+                attempt_number=1,
+                lane_id="m1-hotspot-slice",
+                lane_label="R1",
+                round_config={},
+                phase_number=1,
+                phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                round_directory=round_dir,
+                prompt_path=round_dir / "prompt.md",
+                assistant_output_path=round_dir / "assistant-output.json",
+                events_log_path=round_dir / "events.jsonl",
+                progress_log_path=round_dir / "progress.log",
+            )
+
+            evaluation = round_flow_module.evaluate_round_execution(
+                round_context=context,
+                codex_exit_code=0,
+                schema={},
+                validation_support=None,
+                support=round_flow_module.RoundFlowSupport(
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    parse_int=lambda value, default: default,
+                    resolve_repo_path=lambda value: Path(value),
+                    read_text=lambda path: Path(path).read_text(encoding="utf-8"),
+                    read_json=lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+                    render_template=lambda text, tokens: text,
+                    append_controller_requirements=lambda text, config: text,
+                    active_lane_config=lambda state, config: {},
+                    active_lane_progress=lambda state, config: {},
+                    lane_runtime_config=lambda config, lane: {},
+                    get_head_sha=lambda: "abc123",
+                    is_working_tree_dirty=lambda: False,
+                    validate_round_result=lambda **kwargs: None,
+                ),
+            )
+
+            self.assertIsNotNone(evaluation.failure_reason)
+            self.assertIn("Agent output JSON was not created.", evaluation.failure_reason)
+            self.assertIn("background-task-aware completion contract", evaluation.failure_reason)
+
+    def test_start_can_return_nonzero_when_round_failure_flag_is_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["runner_command"] = str(write_missing_output_runner(repo_root))
+            config["lint_command"] = ""
+            config["typecheck_command"] = ""
+            config["full_test_command"] = ""
+            config["build_command"] = ""
+            config["targeted_test_required"] = False
+            config["full_test_cadence_rounds"] = 0
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "automation" / "autopilot.py"),
+                    "start",
+                    "--profile",
+                    "windows",
+                    "--single-round",
+                    "--fail-on-round-failure",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("Agent output JSON was not created.", result.stdout)
+            state = json.loads((repo_root / "automation" / "runtime" / "autopilot-state.json").read_text(encoding="utf-8"))
+            self.assertEqual(state["last_result"], "failure")
+            self.assertIn("background-task-aware completion contract", state["last_blocking_reason"])
+
+    def test_all_preset_prompts_include_background_completion_contract(self) -> None:
+        for prompt_path in sorted((SKILL_ROOT / "templates" / "presets").glob("*/automation/round-prompt.md")):
+            with self.subTest(prompt_path=prompt_path):
+                prompt_text = prompt_path.read_text(encoding="utf-8")
+                self.assertIn("background tasks", prompt_text)
+                self.assertIn("main pass", prompt_text)
+                self.assertIn("final round artifacts", prompt_text)
 
     def test_review_gated_dry_run_writes_prompt_with_schema_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
