@@ -1023,37 +1023,45 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 "[15:53:42] [codex] Running command: /bin/zsh -lc \"printf 'Still waiting on OpenCode. I’m peeking at the newest log lines and current worktree diff.\\\\n' && tail -n 60 baz\"",
             ]
 
-            human_stdout = StringIO()
-            with redirect_stdout(human_stdout):
-                status_views_module.print_watch_detail_lines(
-                    lines,
-                    state=state,
-                    progress_path=progress_path,
-                    prefix_format="short",
-                    view="human",
-                    support=support,
+            original_terminal_width = status_views_module.shutil.get_terminal_size
+            status_views_module.shutil.get_terminal_size = lambda fallback=(120, 24): os.terminal_size((220, 24))
+            try:
+                human_stdout = StringIO()
+                with redirect_stdout(human_stdout):
+                    status_views_module.print_watch_detail_lines(
+                        lines,
+                        state=state,
+                        progress_path=progress_path,
+                        prefix_format="short",
+                        view="human",
+                        support=support,
+                    )
+                human_output = human_stdout.getvalue()
+                self.assertIn("docs: Using superpowers + planning skills, then reading the queued lane docs.", human_output)
+                self.assertIn(
+                    "fail: I’ve got the current owner. Now pulling the remaining spec bits and MCP type details. failed (exit 1)",
+                    human_output,
                 )
-            human_output = human_stdout.getvalue()
-            self.assertIn("docs: Using superpowers + planning skills, then reading the queued lane docs.", human_output)
-            self.assertIn("fail: I’ve got the current owner. Now pulling the remaining spec bits and MCP type details. failed (exit 1)", human_output)
-            self.assertIn("impl: Starting OpenCode implementation pass", human_output)
-            self.assertIn("wait: Waiting on OpenCode implementation wrapper", human_output)
-            self.assertNotIn("Command finished (exit 0)", human_output)
-            self.assertNotIn("run_opencode_implementation.py --timeout-seconds 3600", human_output)
+                self.assertIn("impl: Starting OpenCode implementation pass", human_output)
+                self.assertIn("wait: Waiting on OpenCode implementation wrapper", human_output)
+                self.assertNotIn("Command finished (exit 0)", human_output)
+                self.assertNotIn("run_opencode_implementation.py --timeout-seconds 3600", human_output)
 
-            raw_stdout = StringIO()
-            with redirect_stdout(raw_stdout):
-                status_views_module.print_watch_detail_lines(
-                    lines,
-                    state=state,
-                    progress_path=progress_path,
-                    prefix_format="short",
-                    view="raw",
-                    support=support,
-                )
-            raw_output = raw_stdout.getvalue()
-            self.assertIn("Command finished (exit 0)", raw_output)
-            self.assertIn("run_opencode_implementation.py --timeout-seconds 3600", raw_output)
+                raw_stdout = StringIO()
+                with redirect_stdout(raw_stdout):
+                    status_views_module.print_watch_detail_lines(
+                        lines,
+                        state=state,
+                        progress_path=progress_path,
+                        prefix_format="short",
+                        view="raw",
+                        support=support,
+                    )
+                raw_output = raw_stdout.getvalue()
+                self.assertIn("Command finished (exit 0)", raw_output)
+                self.assertIn("run_opencode_implementation.py --timeout-seconds 3600", raw_output)
+            finally:
+                status_views_module.shutil.get_terminal_size = original_terminal_width
 
     def test_status_summary_surfaces_activity_and_healthy_but_quiet_note(self) -> None:
         status_views_module = load_module_from_path(
@@ -1112,6 +1120,111 @@ class ScaffoldVersioningTests(unittest.TestCase):
             output = stdout.getvalue()
             self.assertIn("[status] activity: waiting on OpenCode implementation wrapper", output)
             self.assertIn("[status] note: quiet for 190s", output)
+
+    def test_human_watch_detail_lines_wrap_with_hanging_indent(self) -> None:
+        status_views_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+            "_template_status_views_hanging_indent_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            progress_path = repo_root / "automation" / "runtime" / "round-013" / "progress.log"
+            progress_path.parent.mkdir(parents=True, exist_ok=True)
+            state = {
+                "active_lane_id": "a2-mcp-settings",
+                "current_round": 12,
+                "next_phase_number": 2,
+                "status": "active",
+                "consecutive_failures": 0,
+            }
+            support = status_views_module.StatusViewSupport(
+                repo_root=repo_root,
+                default_state_path="automation/runtime/autopilot-state.json",
+                lock_filename="autopilot.lock.json",
+                round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+            )
+            raw_line = (
+                "[16:21:09] [codex] Running command: /bin/zsh -lc "
+                "\"printf 'Second Codex review: reopening the repaired MCP settings diff with the blocker areas in focus.'\""
+            )
+            prefix = status_views_module.build_watch_detail_prefix(
+                state=state,
+                progress_path=progress_path,
+                prefix_format="short",
+                support=support,
+            )
+            continuation_indent = " " * (len(prefix) + 1)
+
+            original_terminal_width = status_views_module.shutil.get_terminal_size
+            status_views_module.shutil.get_terminal_size = lambda fallback=(120, 24): os.terminal_size((78, 24))
+            try:
+                stdout = StringIO()
+                with redirect_stdout(stdout):
+                    status_views_module.print_watch_detail_lines(
+                        [raw_line],
+                        state=state,
+                        progress_path=progress_path,
+                        prefix_format="short",
+                        view="human",
+                        support=support,
+                    )
+            finally:
+                status_views_module.shutil.get_terminal_size = original_terminal_width
+
+            rendered_lines = [line for line in stdout.getvalue().splitlines() if line.strip()]
+            self.assertGreaterEqual(len(rendered_lines), 2)
+            self.assertTrue(rendered_lines[0].startswith(prefix + " "))
+            self.assertTrue(rendered_lines[1].startswith(continuation_indent))
+            self.assertIn("Second Codex review:", rendered_lines[0])
+
+    def test_raw_watch_detail_lines_do_not_wrap(self) -> None:
+        status_views_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "status_views.py",
+            "_template_status_views_raw_wrap_regression_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            progress_path = repo_root / "automation" / "runtime" / "round-013" / "progress.log"
+            progress_path.parent.mkdir(parents=True, exist_ok=True)
+            state = {
+                "active_lane_id": "a2-mcp-settings",
+                "current_round": 12,
+                "next_phase_number": 2,
+                "status": "active",
+                "consecutive_failures": 0,
+            }
+            support = status_views_module.StatusViewSupport(
+                repo_root=repo_root,
+                default_state_path="automation/runtime/autopilot-state.json",
+                lock_filename="autopilot.lock.json",
+                round_directory_re=status_views_module.re.compile(r"round-(\d+)$"),
+            )
+            raw_line = (
+                "[16:15:08] [codex] Running command: /bin/zsh -lc "
+                "'python3 automation/run_opencode_implementation.py --timeout-seconds 3600 --dir . --agent build --message-file "
+                "\"automation/runtime/round-013/opencode-implementation-brief.md\" --log-path "
+                "\"automation/runtime/round-013/opencode-implementation.log\"'"
+            )
+
+            original_terminal_width = status_views_module.shutil.get_terminal_size
+            status_views_module.shutil.get_terminal_size = lambda fallback=(120, 24): os.terminal_size((78, 24))
+            try:
+                stdout = StringIO()
+                with redirect_stdout(stdout):
+                    status_views_module.print_watch_detail_lines(
+                        [raw_line],
+                        state=state,
+                        progress_path=progress_path,
+                        prefix_format="short",
+                        view="raw",
+                        support=support,
+                    )
+            finally:
+                status_views_module.shutil.get_terminal_size = original_terminal_width
+
+            rendered_lines = [line for line in stdout.getvalue().splitlines() if line.strip()]
+            self.assertEqual(len(rendered_lines), 1)
+            self.assertIn("run_opencode_implementation.py --timeout-seconds 3600", rendered_lines[0])
 
     def test_older_scaffold_auto_upgrades_common_files_and_refreshes_preset_automation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

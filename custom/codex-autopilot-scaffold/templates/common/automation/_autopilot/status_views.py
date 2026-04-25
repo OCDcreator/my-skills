@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import shutil
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
@@ -217,6 +219,39 @@ def build_human_watch_event(raw_line: str) -> HumanWatchEvent | None:
 
 def render_human_watch_event(event: HumanWatchEvent) -> str:
     return f"{event.category}: {event.message}"
+
+
+def get_watch_terminal_width(default_columns: int = 120) -> int:
+    try:
+        columns = shutil.get_terminal_size((default_columns, 24)).columns
+    except OSError:
+        columns = default_columns
+    return max(40, int(columns))
+
+
+def format_human_watch_render_lines(prefix: str, message: str) -> list[str]:
+    indent = " " * (len(prefix) + 1)
+    terminal_width = get_watch_terminal_width()
+    content_width = max(20, terminal_width - len(prefix) - 1)
+    logical_lines = message.splitlines() or [""]
+    rendered_lines: list[str] = []
+
+    for logical_line in logical_lines:
+        wrapped_parts = textwrap.wrap(
+            logical_line,
+            width=content_width,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        if not wrapped_parts:
+            wrapped_parts = [""]
+        for index, wrapped_part in enumerate(wrapped_parts):
+            if not rendered_lines and index == 0:
+                rendered_lines.append(f"{prefix} {wrapped_part}".rstrip())
+            else:
+                rendered_lines.append(f"{indent}{wrapped_part}".rstrip())
+
+    return rendered_lines or [prefix]
 
 
 def build_watch_activity_summary(
@@ -593,7 +628,8 @@ def print_watch_detail_lines(
             continue
         if event.signature == last_rendered_signature:
             continue
-        print(f"{prefix} {render_human_watch_event(event)}")
+        for rendered_line in format_human_watch_render_lines(prefix, render_human_watch_event(event)):
+            print(rendered_line)
         last_rendered_signature = event.signature
 
 
