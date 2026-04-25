@@ -67,6 +67,27 @@ Do not change target application code as part of this skill.
 6. **Commit scaffold before execution.** The controller expects a clean worktree for unattended rounds.
 7. **Create/use a dedicated branch or worktree** before `doctor`, `start`, or background launch.
 
+## Startup Intent Confirmation Layer
+
+Resolve startup intent once before choosing preview, single-round execution, daemonizing, or remote handoff.
+
+Required intent fields:
+
+- `execution_goal`: `scaffold_only` / `preview_only` / `single_real_round` / `keep_running`
+- `execution_target`: `local_windows` / `local_mac` / `remote_mac`
+- `work_mode`: `maintainability` / `review_gated` / `quality_gate` / `bugfix_backlog`
+- `queue_authority`: `seed_plan` / `seed_spec` / `preset_backlog`
+- `smoke_policy`: `none` / `dry_run_preview` / `foreground_real_round`
+
+Hard constraint:
+
+- If any required field is still ambiguous, ask once before proceeding.
+- Do not silently guess preview-only vs one real round vs keep-running.
+- Do not silently guess local execution vs `ssh mac`.
+- Do not silently guess preset backlog when an approved plan/spec may be the real queue authority.
+
+Keep low-level operator controls out of this layer. Options such as `runner_model`, `vulture_command`, `force-lock`, `no-branch-guard`, `restart-after-next-commit`, and watch-formatting details are not first-class intent fields.
+
 ## Script Options
 
 Common overrides:
@@ -102,6 +123,13 @@ Required flow:
 5. Run a first-round smoke: usually `start --dry-run --single-round`; use one real foreground round when the user wants proof before daemonizing.
 6. Launch the durable background path: `bootstrap-and-daemonize` before the first successful commit exists, or the platform background wrapper for no-window/background operation.
 7. Run `health` against the exact intended `--state-path`.
+
+If `execution_goal=keep_running`, smoke is an intermediate checkpoint only:
+
+- `start --dry-run --single-round` cannot count as success.
+- One foreground real round cannot count as success by itself.
+- The run is incomplete until the durable background path is launched.
+- The run is still incomplete until `health` proves the exact intended state line is live.
 
 Only say “it is running” when `health` proves all three:
 

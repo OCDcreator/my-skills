@@ -47,6 +47,17 @@ Before starting unattended rounds:
 
 Running `doctor` on `main` right after scaffold may fail the branch guard by design. That is a safety signal, not an installation failure.
 
+## Startup intent confirmation
+
+Before launch, resolve:
+
+- whether the operator wants preview-only, one real round, or keep-running,
+- whether execution is local Windows, local macOS, or remote Mac,
+- which preset/work mode is intended,
+- whether queue authority comes from a seed plan/spec or the preset backlog.
+
+If those fields are still ambiguous, ask once before launch instead of guessing.
+
 ## Keep-running startup contract
 
 Do not confuse "scaffold installed" with "autopilot is running." A chat agent or terminal session can stop; this repo-local controller is the durable runner.
@@ -59,6 +70,14 @@ When the operator asks for continuous unattended work:
 4. Run a dry-run or foreground first-round smoke if requested.
 5. Start the durable path with `bootstrap-and-daemonize` or the platform background wrapper.
 6. Verify with `health` bound to the intended state file before reporting success.
+
+If the operator intent is keep-running:
+
+- A dry-run preview cannot count as success.
+- A single foreground round cannot count as success by itself.
+- Smoke is only a checkpoint before durable launch.
+- The run is incomplete until durable background launch happens.
+- the run is incomplete until `health` proves the target state line is live.
 
 Only claim the next round is running when `health` shows the autopilot parent PID alive, a fresh `progress.log`, and a live `codex exec` child recorded in `automation/runtime/round-XYZ/runner-status.json` with `exec_confirmed_at`.
 
@@ -147,6 +166,7 @@ ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot 
 ```
 
 Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch, and use Mac-side `health` with the same parent-PID / fresh-log / runner-status proof before reporting that the remote runner is alive.
+If the execution target is remote Mac, local Windows artifacts are not valid proof that the unattended runner is alive.
 
 ### Helpful modes
 

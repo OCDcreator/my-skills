@@ -229,6 +229,34 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_scaffold_next_steps_distinguish_preview_single_round_and_keep_running(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+
+            result = run_scaffold(repo_root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("choose exactly one startup intent before launch", result.stdout)
+            self.assertIn("preview-only", result.stdout)
+            self.assertIn("single real round", result.stdout)
+            self.assertIn("keep-running", result.stdout)
+            self.assertIn("smoke is an intermediate checkpoint for keep-running", result.stdout)
+            self.assertIn("do not report success for keep-running until health passes", result.stdout)
+
+    def test_generated_readme_states_that_keep_running_cannot_end_at_smoke(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+
+            result = run_scaffold(repo_root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            readme_text = (repo_root / "automation" / "README.md").read_text(encoding="utf-8")
+            self.assertIn("Startup intent confirmation", readme_text)
+            self.assertIn("If the operator intent is keep-running", readme_text)
+            self.assertIn("A dry-run preview cannot count as success", readme_text)
+            self.assertIn("A single foreground round cannot count as success by itself", readme_text)
+            self.assertIn("the run is incomplete until `health` proves the target state line is live", readme_text)
+
     def test_seed_plan_copies_source_and_overrides_lane_queue(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
