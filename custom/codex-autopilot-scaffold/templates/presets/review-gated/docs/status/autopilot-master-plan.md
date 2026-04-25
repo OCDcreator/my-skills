@@ -12,6 +12,7 @@
 - Each round must pass a code review before final validation and commit
 - Prefer `bootstrap-and-daemonize` over ad-hoc first-round shell gymnastics when the operator wants “首轮成功后继续后台跑”
 - Do not abort an OpenCode pass early only because it is still reading references or the repo diff is empty; as long as the implementation log is still growing or the child PID is alive, that counts as active work until timeout or a concrete blocker
+- If an implementation helper uses background tasks or detached sub-work, the round is not complete until those tasks finish, their repo-visible changes have landed, and the scaffold's required output artifacts are present
 
 ## Lane order
 

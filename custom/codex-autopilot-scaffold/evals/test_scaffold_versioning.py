@@ -440,6 +440,10 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 "Do not abort an OpenCode pass early only because it is still reading references or the repo diff is empty",
                 master_plan_text,
             )
+            self.assertIn(
+                "If an implementation helper uses background tasks or detached sub-work, the round is not complete until those tasks finish",
+                master_plan_text,
+            )
 
     def test_round_result_schema_requires_every_property_for_codex_output(self) -> None:
         schema = json.loads(
@@ -490,6 +494,10 @@ class ScaffoldVersioningTests(unittest.TestCase):
             )
             self.assertIn(
                 "Treat a still-growing implementation log or a still-live child PID as proof that the pass is still working",
+                prompt_text,
+            )
+            self.assertIn(
+                "If the implementation path uses background tasks, do not treat the main pass as complete until those background tasks finish",
                 prompt_text,
             )
             prompt_text = prompt_path.read_text(encoding="utf-8")

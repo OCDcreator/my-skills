@@ -140,6 +140,7 @@ Unless the user explicitly asks for a raw file tail, operator handoff should als
 - Use `review-gated` for “先审方案，再审代码”.
 - Generated assets include `.opencode/commands/review-plan.md`, `.opencode/commands/review-code.md`, `automation/opencode-review.sh`, and `automation/Invoke-OpencodeReview.ps1`.
 - Review wrappers may take minutes; slow polling is not a stuck run.
+- If a repo layers an OpenCode implementation helper on top of this scaffold, require a background-task-aware completion contract: background tasks are allowed, but the round must not advance until those tasks finish and the final output artifacts are actually written.
 - Do not invoke `opencode` unless the user explicitly requested OpenCode review behavior or the selected preset requires the repo-local review wrapper.
 
 **Commit prefix**
