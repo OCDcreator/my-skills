@@ -148,6 +148,68 @@ def write_missing_output_runner(repo_root: Path) -> Path:
     return runner_command
 
 
+def write_validation_command(
+    repo_root: Path,
+    name: str,
+    *,
+    exit_code: int = 0,
+    marker_relative_path: str = "automation/runtime/baseline-command-log.txt",
+) -> str:
+    scripts_dir = repo_root / "automation" / "test-commands"
+    scripts_dir.mkdir(parents=True, exist_ok=True)
+    marker_path_text = marker_relative_path.replace("/", "\\") if os.name == "nt" else marker_relative_path
+    if os.name == "nt":
+        script_path = scripts_dir / f"{name}.cmd"
+        script_path.write_text(
+            "\r\n".join(
+                [
+                    "@echo off",
+                    "if not exist automation\\runtime mkdir automation\\runtime",
+                    f'>> "{marker_path_text}" echo {name}',
+                    f"exit /b {exit_code}",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        return f".\\automation\\test-commands\\{name}.cmd"
+
+    script_path = scripts_dir / f"{name}.sh"
+    script_path.write_text(
+        "\n".join(
+            [
+                "#!/usr/bin/env sh",
+                "mkdir -p automation/runtime",
+                f"printf '%s\\n' '{name}' >> {marker_relative_path}",
+                f"exit {exit_code}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    script_path.chmod(0o755)
+    return f"./automation/test-commands/{name}.sh"
+
+
+def read_baseline_command_log(repo_root: Path, *, marker_relative_path: str = "automation/runtime/baseline-command-log.txt") -> str:
+    marker_path = repo_root / marker_relative_path
+    if not marker_path.exists():
+        return ""
+    return marker_path.read_text(encoding="utf-8")
+
+
+def prepare_scaffold_repo_for_baseline_checks(repo_root: Path) -> None:
+    config_path = repo_root / "automation" / "autopilot-config.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["runner_command"] = str(write_missing_output_runner(repo_root))
+    config["prerequisite_paths"] = []
+    config["vulture_command"] = ""
+    config["plan_review_command"] = ""
+    config["code_review_command"] = ""
+    config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 class ScaffoldVersioningTests(unittest.TestCase):
     def test_fresh_scaffold_records_current_scaffold_version(self) -> None:
         with self.subTest("fresh scaffold"):
@@ -193,6 +255,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertIn(marker["scaffold_version"], version_result.stdout)
                 self.assertFalse((repo_root / "automation" / "__pycache__").exists())
                 self.assertFalse((repo_root / "automation" / "_autopilot" / "__pycache__").exists())
+                self.assertTrue((repo_root / "automation" / "_autopilot" / "baseline.py").exists())
                 gitignore_text = (repo_root / ".gitignore").read_text(encoding="utf-8")
                 self.assertIn("automation/runtime/", gitignore_text)
                 self.assertIn("automation/**/__pycache__/", gitignore_text)
@@ -211,6 +274,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                         "py_compile",
                         str(repo_root / "automation" / "autopilot.py"),
                         str(repo_root / "automation" / "_autopilot" / "__init__.py"),
+                        str(repo_root / "automation" / "_autopilot" / "baseline.py"),
                         str(repo_root / "automation" / "_autopilot" / "cli_parser.py"),
                         str(repo_root / "automation" / "_autopilot" / "controller_builders.py"),
                         str(repo_root / "automation" / "_autopilot" / "controller_runtime.py"),
@@ -694,6 +758,117 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertIn("Agent output JSON was not created.", evaluation.failure_reason)
             self.assertIn("background-task-aware completion contract", evaluation.failure_reason)
 
+    def test_doctor_does_not_run_validation_baseline_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            prepare_scaffold_repo_for_baseline_checks(repo_root)
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["lint_command"] = write_validation_command(repo_root, "lint-default")
+            config["typecheck_command"] = write_validation_command(repo_root, "typecheck-default")
+            config["full_test_command"] = write_validation_command(repo_root, "test-default")
+            config["build_command"] = write_validation_command(repo_root, "build-default")
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            result = subprocess.run(
+                [sys.executable, str(repo_root / "automation" / "autopilot.py"), "doctor", "--profile", "windows"],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("validation baseline", result.stdout.lower())
+            self.assertEqual(read_baseline_command_log(repo_root), "")
+
+    def test_doctor_can_execute_configured_validation_commands_when_requested(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            prepare_scaffold_repo_for_baseline_checks(repo_root)
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["lint_command"] = write_validation_command(repo_root, "lint-ok")
+            config["typecheck_command"] = ""
+            config["full_test_command"] = write_validation_command(repo_root, "test-ok")
+            config["build_command"] = write_validation_command(repo_root, "build-ok")
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "automation" / "autopilot.py"),
+                    "doctor",
+                    "--profile",
+                    "windows",
+                    "--check-validation-commands",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("validation baseline lint_command", result.stdout)
+            self.assertIn("validation baseline typecheck_command: <not configured>", result.stdout)
+            self.assertIn("validation baseline build_command", result.stdout)
+            self.assertEqual(read_baseline_command_log(repo_root).splitlines(), ["lint-ok", "test-ok", "build-ok"])
+
+    def test_doctor_returns_nonzero_when_validation_baseline_command_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            prepare_scaffold_repo_for_baseline_checks(repo_root)
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["lint_command"] = write_validation_command(repo_root, "lint-fail", exit_code=7)
+            config["typecheck_command"] = ""
+            config["full_test_command"] = ""
+            config["build_command"] = ""
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "automation" / "autopilot.py"),
+                    "doctor",
+                    "--profile",
+                    "windows",
+                    "--check-validation-commands",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("fail validation baseline lint_command", result.stdout)
+
     def test_start_can_return_nonzero_when_round_failure_flag_is_set(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))
@@ -737,6 +912,90 @@ class ScaffoldVersioningTests(unittest.TestCase):
             state = json.loads((repo_root / "automation" / "runtime" / "autopilot-state.json").read_text(encoding="utf-8"))
             self.assertEqual(state["last_result"], "failure")
             self.assertIn("background-task-aware completion contract", state["last_blocking_reason"])
+
+    def test_start_does_not_require_green_baseline_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            prepare_scaffold_repo_for_baseline_checks(repo_root)
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["lint_command"] = write_validation_command(repo_root, "lint-start-default-fail", exit_code=9)
+            config["typecheck_command"] = ""
+            config["full_test_command"] = ""
+            config["build_command"] = ""
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            prompt_path = repo_root / "automation" / "runtime" / "round-001" / "prompt.md"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "automation" / "autopilot.py"),
+                    "start",
+                    "--profile",
+                    "windows",
+                    "--dry-run",
+                    "--single-round",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(prompt_path.exists())
+            self.assertEqual(read_baseline_command_log(repo_root), "")
+
+    def test_start_can_require_green_baseline_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            scaffold_result = run_scaffold(repo_root)
+            self.assertEqual(scaffold_result.returncode, 0, scaffold_result.stderr)
+            prepare_scaffold_repo_for_baseline_checks(repo_root)
+
+            config_path = repo_root / "automation" / "autopilot-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["lint_command"] = write_validation_command(repo_root, "lint-start-required", exit_code=11)
+            config["typecheck_command"] = ""
+            config["full_test_command"] = ""
+            config["build_command"] = ""
+            config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: scaffold").returncode, 0)
+
+            prompt_path = repo_root / "automation" / "runtime" / "round-001" / "prompt.md"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "automation" / "autopilot.py"),
+                    "start",
+                    "--profile",
+                    "windows",
+                    "--dry-run",
+                    "--single-round",
+                    "--require-green-baseline",
+                ],
+                cwd=repo_root,
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace",
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("Configured validation baseline failed before start", result.stdout)
+            self.assertFalse(prompt_path.exists())
+            self.assertEqual(read_baseline_command_log(repo_root).splitlines(), ["lint-start-required"])
 
     def test_all_preset_prompts_include_background_completion_contract(self) -> None:
         for prompt_path in sorted((SKILL_ROOT / "templates" / "presets").glob("*/automation/round-prompt.md")):

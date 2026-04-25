@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from _autopilot import controller_runtime as runtime
+from _autopilot.baseline import BaselineSupport
 from _autopilot.cli_parser import CliParserSupport
 from _autopilot.bootstrap_runtime import BootstrapRuntimeSupport
 from _autopilot.doctor import DoctorSupport
@@ -43,6 +44,14 @@ def build_validation_support() -> ValidationSupport:
         resolve_repo_path=runtime.resolve_repo_path,
         run_git=runtime.run_git,
         info=runtime.info,
+    )
+
+
+def build_baseline_support() -> BaselineSupport:
+    return BaselineSupport(
+        clean_string=runtime.clean_string,
+        compact_text=runtime.compact_text,
+        run_shell_command=runtime.run_shell_command,
     )
 
 
@@ -157,6 +166,7 @@ def build_doctor_support() -> DoctorSupport:
         is_working_tree_dirty=runtime.is_working_tree_dirty,
         resolve_repo_path=runtime.resolve_repo_path,
         read_lock=lambda lock_path: read_lock_command(lock_path, support=build_locking_support()),
+        baseline_support=build_baseline_support(),
     )
 
 
@@ -202,6 +212,7 @@ def build_start_runtime_support() -> StartRuntimeSupport:
     return StartRuntimeSupport(
         error_type=runtime.AutopilotError,
         clean_string=runtime.clean_string,
+        compact_text=runtime.compact_text,
         info=runtime.info,
         load_config=runtime.load_config,
         resolve_repo_path=runtime.resolve_repo_path,
@@ -261,6 +272,7 @@ def build_start_runtime_support() -> StartRuntimeSupport:
             config,
             support=lane_support,
         ),
+        baseline_support=build_baseline_support(),
     )
 
 

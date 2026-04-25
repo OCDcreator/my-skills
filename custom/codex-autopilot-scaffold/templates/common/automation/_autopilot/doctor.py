@@ -6,6 +6,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from _autopilot.baseline import (
+    BaselineSupport,
+    baseline_failures,
+    format_baseline_result,
+    run_validation_baseline,
+)
+
 
 @dataclass(frozen=True)
 class DoctorSupport:
@@ -24,6 +31,7 @@ class DoctorSupport:
     is_working_tree_dirty: Callable[..., bool]
     resolve_repo_path: Callable[..., Path]
     read_lock: Callable[..., dict[str, Any] | None]
+    baseline_support: BaselineSupport
 
 
 def run_doctor(args: argparse.Namespace, *, support: DoctorSupport) -> int:
@@ -171,5 +179,17 @@ def run_doctor(args: argparse.Namespace, *, support: DoctorSupport) -> int:
         )
     else:
         print("[doctor] ok   no autopilot lock present")
+
+    if args.check_validation_commands:
+        baseline_results = run_validation_baseline(config, support=support.baseline_support)
+        for result in baseline_results:
+            rendered = format_baseline_result(result, support=support.baseline_support)
+            if result.status == "not_configured":
+                print(f"[doctor] info validation baseline {result.command_key}: {rendered}")
+            elif result.status == "success":
+                print(f"[doctor] ok   validation baseline {result.command_key}: {rendered}")
+            else:
+                print(f"[doctor] fail validation baseline {result.command_key}: {rendered}")
+        failures += len(baseline_failures(baseline_results))
 
     return 1 if failures else 0

@@ -103,6 +103,7 @@ sequenceDiagram
 
 - `round_flow` is where the controller turns repo intent into a concrete per-round prompt and runtime directory.
 - The runner writes artifacts during execution so observers can inspect the live state before the round fully ends.
+- `start` can optionally run a green-baseline preflight before round 1 via `--require-green-baseline`; it executes the configured lint/typecheck/test/build commands but remains opt-in.
 - Validation is where the scaffold enforces its contract: schema, build/deploy reporting, commit prefix rules, dirty-worktree expectations, and similar safety checks.
 
 ## Background-task-aware completion

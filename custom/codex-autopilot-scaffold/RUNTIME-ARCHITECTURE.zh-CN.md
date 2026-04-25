@@ -105,6 +105,7 @@ sequenceDiagram
 
 - `round_flow` 负责把“仓库当前意图”转成一轮可执行的 prompt 和 runtime 目录。
 - runner 在执行过程中就会持续写产物，所以观察命令不必等整轮结束才有东西看。
+- `start` 现在可以通过 `--require-green-baseline` 在第 1 轮前可选执行一次 green baseline 预检；它会跑当前配置的 lint/typecheck/test/build 命令，但默认仍不强制。
 - `validation` 是脚手架真正执行契约的地方：schema、build/deploy 上报、commit prefix、dirty worktree 之类的安全规则都在这里落实。
 
 ## 对后台任务敏感的完成契约

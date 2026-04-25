@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.1.8"
+SCAFFOLD_VERSION = "1.1.9"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
 SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
@@ -1183,9 +1183,11 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("  python automation/autopilot.py version")
         print("[scaffold] windows preview-only path:")
         print("  python automation/autopilot.py doctor --profile windows")
+        print("  # Optional: add --check-validation-commands to prove the repo is already green before launch.")
         print("  python automation/autopilot.py start --profile windows --dry-run --single-round")
         print("[scaffold] windows single real round path:")
         print("  python automation/autopilot.py doctor --profile windows")
+        print("  # Optional: add --check-validation-commands / --require-green-baseline for a startup green gate.")
         print("  python automation/autopilot.py start --profile windows --single-round")
         print("[scaffold] windows keep-running path:")
         print("  python automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
@@ -1199,9 +1201,11 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         )
         print("[scaffold] mac preview-only path:")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
+        print("  # Optional: add --check-validation-commands to prove the repo is already green before launch.")
         print("  python3 ./automation/autopilot.py start --profile mac --dry-run --single-round")
         print("[scaffold] mac single real round path:")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
+        print("  # Optional: add --check-validation-commands / --require-green-baseline for a startup green gate.")
         print("  python3 ./automation/autopilot.py start --profile mac --single-round")
         print("[scaffold] mac keep-running path:")
         print("  python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")

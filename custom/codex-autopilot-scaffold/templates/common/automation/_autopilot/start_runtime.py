@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from _autopilot.baseline import (
+    BaselineSupport,
+    baseline_failures,
+    format_baseline_result,
+    run_validation_baseline,
+)
 from _autopilot.round_flow import RoundFlowSupport, evaluate_round_execution, prepare_round_context
 from _autopilot.runner import RunnerSupport, invoke_runner_round, resolve_runner_executable
 from _autopilot.state_runtime import DRY_RUN_STOP_STATUS
@@ -16,6 +22,7 @@ from _autopilot.validation import ValidationSupport
 class StartRuntimeSupport:
     error_type: type[Exception]
     clean_string: Callable[..., str]
+    compact_text: Callable[..., str]
     info: Callable[..., None]
     load_config: Callable[..., tuple[dict[str, Any], Path, Path]]
     resolve_repo_path: Callable[..., Path]
@@ -41,6 +48,7 @@ class StartRuntimeSupport:
     active_lane_id_for_state: Callable[..., str]
     active_lane_config: Callable[..., dict[str, Any]]
     sync_active_lane_mirror_fields: Callable[..., None]
+    baseline_support: BaselineSupport
 
 
 def ensure_required_commands(config: dict[str, Any], runner_support: RunnerSupport, *, support: StartRuntimeSupport) -> None:
@@ -56,6 +64,28 @@ def ensure_required_commands(config: dict[str, Any], runner_support: RunnerSuppo
     missing = [command_name for command_name in command_names if shutil.which(command_name) is None]
     if missing:
         raise support.error_type(f"Required command(s) not found in PATH: {', '.join(missing)}")
+
+
+def require_green_baseline_before_start(config: dict[str, Any], *, support: StartRuntimeSupport) -> bool:
+    baseline_results = run_validation_baseline(config, support=support.baseline_support)
+    for result in baseline_results:
+        rendered = format_baseline_result(result, support=support.baseline_support)
+        if result.status == "not_configured":
+            support.info(f"Validation baseline {result.command_key}: {rendered}")
+        elif result.status == "success":
+            support.info(f"Validation baseline {result.command_key}: {rendered}")
+        else:
+            support.info(f"Validation baseline {result.command_key} failed: {rendered}")
+
+    failures = baseline_failures(baseline_results)
+    if failures:
+        failed_names = ", ".join(result.command_key for result in failures)
+        support.info(
+            "Configured validation baseline failed before start "
+            f"({failed_names}). Fix the repo first or rerun without --require-green-baseline."
+        )
+        return False
+    return True
 
 
 def build_history_entry(
@@ -258,6 +288,9 @@ def run_start(
 
     if not args.allow_dirty_worktree and support.is_working_tree_dirty():
         raise support.error_type("Working tree must be clean before unattended execution.")
+
+    if getattr(args, "require_green_baseline", False) and not require_green_baseline_before_start(config, support=support):
+        return 1
 
     rounds_executed = 0
     saw_round_failure = False

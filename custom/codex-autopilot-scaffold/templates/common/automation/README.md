@@ -143,8 +143,10 @@ If the scaffold was created with `--seed-plan` or `--seed-spec`, the source is c
 
 ```powershell
 python .\automation\autopilot.py doctor --profile windows
+python .\automation\autopilot.py doctor --profile windows --check-validation-commands
 python .\automation\autopilot.py health --state-path automation\runtime\autopilot-state.json
 python .\automation\autopilot.py start --profile windows
+python .\automation\autopilot.py start --profile windows --require-green-baseline
 python .\automation\autopilot.py bootstrap-and-daemonize --profile windows
 ```
 
@@ -158,8 +160,10 @@ For a true no-window unattended launch on Windows, prefer the wrapper's backgrou
 
 ```bash
 python3 ./automation/autopilot.py doctor --profile mac
+python3 ./automation/autopilot.py doctor --profile mac --check-validation-commands
 python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json
 python3 ./automation/autopilot.py start --profile mac
+python3 ./automation/autopilot.py start --profile mac --require-green-baseline
 python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac
 ```
 
@@ -195,7 +199,9 @@ python automation/autopilot.py version
 python automation/autopilot.py status
 python automation/autopilot.py health
 python automation/autopilot.py watch
+python automation/autopilot.py doctor --profile windows --check-validation-commands
 python automation/autopilot.py start --profile windows --dry-run --single-round
+python automation/autopilot.py start --profile windows --dry-run --single-round --require-green-baseline
 python automation/autopilot.py start --profile windows --single-round
 python automation/autopilot.py start --profile windows --single-round --fail-on-round-failure
 python automation/autopilot.py bootstrap-and-daemonize --profile windows
@@ -204,6 +210,10 @@ bash ./automation/start-autopilot.sh --background -- --profile mac
 ```
 
 `start --dry-run --single-round` only renders the next prompt. It leaves the state in `stopped_dry_run` so `status` / `health` do not pretend a live unattended runner exists, and a later real `start` automatically resumes from that preview state.
+
+`doctor --check-validation-commands` is an optional preflight. It executes the currently configured `lint_command`, `typecheck_command`, `full_test_command`, and `build_command`, prints which ones are missing versus green versus failing, and returns non-zero only when a configured command fails.
+
+`start --require-green-baseline` runs the same preflight before the first round and refuses to launch when a configured validation command is already red. It is intentionally opt-in, so existing workflows continue to behave the same unless you request the extra gate.
 
 Use `--fail-on-round-failure` when a CI job or outer wrapper must receive a non-zero shell return code for a validation or completion-contract failure. The controller still writes state/history first, then returns `1` for that process. Windows and macOS expose the same Python return code; PowerShell reads `$LASTEXITCODE`, while bash/zsh reads `$?`.
 

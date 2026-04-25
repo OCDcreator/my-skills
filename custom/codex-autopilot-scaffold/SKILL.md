@@ -230,7 +230,9 @@ Core checks:
 ```bash
 python automation/autopilot.py version
 python automation/autopilot.py doctor --profile windows
+python automation/autopilot.py doctor --profile windows --check-validation-commands
 python automation/autopilot.py start --profile windows --dry-run --single-round
+python automation/autopilot.py start --profile windows --dry-run --single-round --require-green-baseline
 python automation/autopilot.py start --profile windows --single-round --fail-on-round-failure
 python automation/autopilot.py bootstrap-and-daemonize --profile windows
 python automation/autopilot.py health --state-path automation/runtime/autopilot-state.json
@@ -239,6 +241,11 @@ python automation/autopilot.py watch --runtime-path automation/runtime --state-p
 ```
 
 Use `python3` and `--profile mac` on macOS. Use scaffolded wrappers for Windows no-window launches and macOS background/watch convenience.
+
+Optional preflight:
+
+- `doctor --check-validation-commands` executes the currently configured `lint_command`, `typecheck_command`, `full_test_command`, and `build_command` before launch planning. Missing commands are reported as `<not configured>` and skipped; any configured command failure makes `doctor` return non-zero.
+- `start --require-green-baseline` runs the same optional baseline before the first round. It blocks startup only when at least one configured command fails; it is not enabled by default.
 
 For CI or an outer wrapper that needs shell-level failure semantics, add `--fail-on-round-failure` to `start`. Windows and macOS both receive the same Python process return code; PowerShell reads it via `$LASTEXITCODE`, while bash/zsh reads it via `$?`.
 
