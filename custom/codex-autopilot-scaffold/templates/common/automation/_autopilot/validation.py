@@ -220,6 +220,37 @@ def command_matches_targeted_test(
     return any(normalized_command.startswith(clean_string(prefix)) for prefix in targeted_prefixes if clean_string(prefix))
 
 
+def command_has_targeted_test_shape(command: str, *, clean_string: Callable[..., str]) -> bool:
+    normalized_command = clean_string(command).lower()
+    if not normalized_command:
+        return False
+
+    runner_markers = (
+        "jest",
+        "vitest",
+        "pytest",
+        "python -m pytest",
+        "cargo test",
+        "go test",
+        "bun test",
+    )
+    target_markers = (
+        "tests/",
+        "test/",
+        "__tests__/",
+        ".test.",
+        ".spec.",
+        "--runtestsbypath",
+        "--testpathpattern",
+        "--grep",
+        " -t ",
+        "::",
+    )
+    return any(marker in normalized_command for marker in runner_markers) and any(
+        marker in normalized_command for marker in target_markers
+    )
+
+
 def tests_run_include_exact(tests_run: list[str], command: str, *, clean_string: Callable[..., str]) -> bool:
     normalized_command = clean_string(command)
     if not normalized_command:
@@ -235,6 +266,17 @@ def test_runs_include_targeted_tests(
 ) -> bool:
     targeted_prefixes = [str(prefix) for prefix in config.get("targeted_test_prefixes", [])]
     return any(command_matches_targeted_test(str(command), targeted_prefixes, clean_string=clean_string) for command in tests_run)
+
+
+def test_runs_show_soft_targeted_test_evidence(
+    tests_run: list[str],
+    config: dict[str, Any],
+    *,
+    clean_string: Callable[..., str],
+) -> bool:
+    if test_runs_include_targeted_tests(tests_run, config, clean_string=clean_string):
+        return True
+    return any(command_has_targeted_test_shape(str(command), clean_string=clean_string) for command in tests_run)
 
 
 def test_runs_include_full_test(
@@ -355,7 +397,13 @@ def validate_round_result(
 
             if bool(config.get("targeted_test_required")) and test_targeted_tests_required(validated_commit_files, config):
                 if not test_runs_include_targeted_tests(tests_run, config, clean_string=clean_string):
-                    validation_errors.append("This round changed code/test files but did not report targeted tests.")
+                    if test_runs_show_soft_targeted_test_evidence(tests_run, config, clean_string=clean_string):
+                        support.info(
+                            "Targeted test warning: this round appears to have run targeted tests, "
+                            "but the command did not match configured targeted_test_prefixes exactly."
+                        )
+                    else:
+                        validation_errors.append("This round changed code/test files but did not report targeted tests.")
 
             if test_full_test_required(validated_commit_files, attempt_number, config):
                 if not test_runs_include_full_test(tests_run, config, clean_string=clean_string):

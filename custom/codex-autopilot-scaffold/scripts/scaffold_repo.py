@@ -65,6 +65,18 @@ SKIP_DIRECTORIES = {
 }
 
 COMMON_ROOT_DIRS = ["src", "app", "lib", "pkg", "internal", "cmd", "crates", "server", "client", "tests", "docs"]
+NODE_TARGETED_TEST_PREFIXES = [
+    "npm test --",
+    "npm run test --",
+    "npx jest ",
+    "npx vitest ",
+    "pnpm test --",
+    "pnpm exec jest ",
+    "pnpm exec vitest ",
+    "yarn test ",
+    "yarn jest ",
+    "yarn vitest ",
+]
 
 PRESET_METADATA: dict[str, dict[str, Any]] = {
     "maintainability": {
@@ -559,7 +571,7 @@ def detect_commands(repo_root: Path) -> DetectionResult:
             if "test" in scripts:
                 result.full_test_command = "npm test"
                 result.command_sources["full_test_command"] = "package.json:scripts.test"
-                result.targeted_test_prefixes = ["npm test --", "npm run test --"]
+                result.targeted_test_prefixes = list(NODE_TARGETED_TEST_PREFIXES)
 
             value, source = first_non_empty(
                 [

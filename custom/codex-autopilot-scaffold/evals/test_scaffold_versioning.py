@@ -1074,7 +1074,21 @@ class ScaffoldVersioningTests(unittest.TestCase):
 
             refreshed_config = json.loads(config_path.read_text(encoding="utf-8"))
             self.assertEqual(refreshed_config["focus_hint"], "R1 - First maintainability / refactor slice")
-            self.assertEqual(refreshed_config["targeted_test_prefixes"], ["npm test --", "npm run test --"])
+            self.assertEqual(
+                refreshed_config["targeted_test_prefixes"],
+                [
+                    "npm test --",
+                    "npm run test --",
+                    "npx jest ",
+                    "npx vitest ",
+                    "pnpm test --",
+                    "pnpm exec jest ",
+                    "pnpm exec vitest ",
+                    "yarn test ",
+                    "yarn jest ",
+                    "yarn vitest ",
+                ],
+            )
 
             preserved_lane_text = lane_roadmap_path.read_text(encoding="utf-8")
             self.assertTrue(preserved_lane_text.startswith(preserved_lane_marker))
@@ -1199,12 +1213,233 @@ class ScaffoldVersioningTests(unittest.TestCase):
         self.assertEqual(result.full_test_command, "npm test")
         self.assertEqual(result.build_command, "npm run build")
         self.assertEqual(result.vulture_command, "npm run vulture")
-        self.assertEqual(result.targeted_test_prefixes, ["npm test --", "npm run test --"])
+        self.assertEqual(
+            result.targeted_test_prefixes,
+            [
+                "npm test --",
+                "npm run test --",
+                "npx jest ",
+                "npx vitest ",
+                "pnpm test --",
+                "pnpm exec jest ",
+                "pnpm exec vitest ",
+                "yarn test ",
+                "yarn jest ",
+                "yarn vitest ",
+            ],
+        )
         self.assertEqual(result.command_sources["lint_command"], "package.json:scripts.lint")
         self.assertEqual(result.command_sources["typecheck_command"], "package.json:scripts.typecheck")
         self.assertEqual(result.command_sources["full_test_command"], "package.json:scripts.test")
         self.assertEqual(result.command_sources["build_command"], "package.json:scripts.build")
         self.assertEqual(result.command_sources["vulture_command"], "package.json:scripts.vulture")
+
+    def test_success_result_with_npx_jest_targeted_tests_is_not_misclassified(self) -> None:
+        validation_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+            "_template_validation_targeted_jest_success_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            phase_doc_path = repo_root / "docs" / "status" / "lanes" / "m1-hotspot-slice" / "autopilot-phase-1.md"
+            phase_doc_path.parent.mkdir(parents=True, exist_ok=True)
+            phase_doc_path.write_text("# phase 1\n", encoding="utf-8")
+            (repo_root / "src").mkdir(exist_ok=True)
+            (repo_root / "src" / "demo.ts").write_text("export const demo = 1;\n", encoding="utf-8")
+            (repo_root / "tests").mkdir(exist_ok=True)
+            (repo_root / "tests" / "demo.test.ts").write_text("export {};\n", encoding="utf-8")
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: round 1 - demo").returncode, 0)
+            commit_sha = run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
+            commit_message = run_git(repo_root, "log", "-1", "--pretty=%s", commit_sha).stdout.strip()
+
+            warnings: list[str] = []
+            result = {
+                "status": "success",
+                "lane_id": "m1-hotspot-slice",
+                "phase_doc_path": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                "commit_sha": commit_sha,
+                "commit_message": commit_message,
+                "summary": "demo",
+                "next_focus": "",
+                "tests_run": ["npx jest --runInBand tests/demo.test.ts"],
+                "commands_run": [],
+                "build_ran": False,
+                "build_id": "",
+                "deploy_ran": False,
+                "deploy_verified": False,
+                "background_tasks_used": False,
+                "background_tasks_completed": True,
+                "repo_visible_work_landed": True,
+                "final_artifacts_written": True,
+            }
+            config = {
+                "commit_prefix": "autopilot",
+                "build_command": "",
+                "deploy_policy": "never",
+                "targeted_test_required": True,
+                "targeted_test_required_paths": ["src/", "tests/"],
+                "targeted_test_prefixes": ["npm test --", "npm run test --"],
+                "full_test_cadence_rounds": 0,
+                "full_test_required_paths": [],
+            }
+
+            failure_reason = validation_module.validate_round_result(
+                attempt_number=1,
+                result=result,
+                schema={},
+                phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                expected_lane_id="m1-hotspot-slice",
+                config=config,
+                ending_head=commit_sha,
+                working_tree_dirty=False,
+                support=validation_module.ValidationSupport(
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    resolve_repo_path=lambda value: repo_root / str(value),
+                    run_git=lambda args: run_git(repo_root, *args),
+                    info=warnings.append,
+                ),
+            )
+
+            self.assertIsNone(failure_reason)
+            self.assertTrue(any("targeted test warning" in warning.lower() for warning in warnings))
+
+    def test_success_result_still_fails_when_targeted_tests_are_truly_missing(self) -> None:
+        validation_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+            "_template_validation_targeted_missing_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            phase_doc_path = repo_root / "docs" / "status" / "lanes" / "m1-hotspot-slice" / "autopilot-phase-1.md"
+            phase_doc_path.parent.mkdir(parents=True, exist_ok=True)
+            phase_doc_path.write_text("# phase 1\n", encoding="utf-8")
+            (repo_root / "src").mkdir(exist_ok=True)
+            (repo_root / "src" / "demo.ts").write_text("export const demo = 1;\n", encoding="utf-8")
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: round 1 - demo").returncode, 0)
+            commit_sha = run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
+            commit_message = run_git(repo_root, "log", "-1", "--pretty=%s", commit_sha).stdout.strip()
+
+            result = {
+                "status": "success",
+                "lane_id": "m1-hotspot-slice",
+                "phase_doc_path": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                "commit_sha": commit_sha,
+                "commit_message": commit_message,
+                "summary": "demo",
+                "next_focus": "",
+                "tests_run": [],
+                "commands_run": [],
+                "build_ran": False,
+                "build_id": "",
+                "deploy_ran": False,
+                "deploy_verified": False,
+                "background_tasks_used": False,
+                "background_tasks_completed": True,
+                "repo_visible_work_landed": True,
+                "final_artifacts_written": True,
+            }
+            config = {
+                "commit_prefix": "autopilot",
+                "build_command": "",
+                "deploy_policy": "never",
+                "targeted_test_required": True,
+                "targeted_test_required_paths": ["src/", "tests/"],
+                "targeted_test_prefixes": ["npm test --", "npm run test --"],
+                "full_test_cadence_rounds": 0,
+                "full_test_required_paths": [],
+            }
+
+            failure_reason = validation_module.validate_round_result(
+                attempt_number=1,
+                result=result,
+                schema={},
+                phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                expected_lane_id="m1-hotspot-slice",
+                config=config,
+                ending_head=commit_sha,
+                working_tree_dirty=False,
+                support=validation_module.ValidationSupport(
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    resolve_repo_path=lambda value: repo_root / str(value),
+                    run_git=lambda args: run_git(repo_root, *args),
+                    info=lambda message: None,
+                ),
+            )
+
+            self.assertIsNotNone(failure_reason)
+            self.assertIn("did not report targeted tests", failure_reason)
+
+    def test_success_result_with_pnpm_vitest_targeted_tests_is_not_misclassified(self) -> None:
+        validation_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+            "_template_validation_targeted_pnpm_vitest_success_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            phase_doc_path = repo_root / "docs" / "status" / "lanes" / "m1-hotspot-slice" / "autopilot-phase-1.md"
+            phase_doc_path.parent.mkdir(parents=True, exist_ok=True)
+            phase_doc_path.write_text("# phase 1\n", encoding="utf-8")
+            (repo_root / "src").mkdir(exist_ok=True)
+            (repo_root / "src" / "demo.ts").write_text("export const demo = 1;\n", encoding="utf-8")
+            (repo_root / "tests").mkdir(exist_ok=True)
+            (repo_root / "tests" / "demo.test.ts").write_text("export {};\n", encoding="utf-8")
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: round 1 - demo").returncode, 0)
+            commit_sha = run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
+            commit_message = run_git(repo_root, "log", "-1", "--pretty=%s", commit_sha).stdout.strip()
+
+            warnings: list[str] = []
+            result = {
+                "status": "success",
+                "lane_id": "m1-hotspot-slice",
+                "phase_doc_path": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                "commit_sha": commit_sha,
+                "commit_message": commit_message,
+                "summary": "demo",
+                "next_focus": "",
+                "tests_run": ["pnpm exec vitest run tests/demo.test.ts"],
+                "commands_run": [],
+                "build_ran": False,
+                "build_id": "",
+                "deploy_ran": False,
+                "deploy_verified": False,
+                "background_tasks_used": False,
+                "background_tasks_completed": True,
+                "repo_visible_work_landed": True,
+                "final_artifacts_written": True,
+            }
+            config = {
+                "commit_prefix": "autopilot",
+                "build_command": "",
+                "deploy_policy": "never",
+                "targeted_test_required": True,
+                "targeted_test_required_paths": ["src/", "tests/"],
+                "targeted_test_prefixes": ["npm test --", "npm run test --"],
+                "full_test_cadence_rounds": 0,
+                "full_test_required_paths": [],
+            }
+
+            failure_reason = validation_module.validate_round_result(
+                attempt_number=1,
+                result=result,
+                schema={},
+                phase_doc_relative_path="docs/status/lanes/m1-hotspot-slice/autopilot-phase-1.md",
+                expected_lane_id="m1-hotspot-slice",
+                config=config,
+                ending_head=commit_sha,
+                working_tree_dirty=False,
+                support=validation_module.ValidationSupport(
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    resolve_repo_path=lambda value: repo_root / str(value),
+                    run_git=lambda args: run_git(repo_root, *args),
+                    info=warnings.append,
+                ),
+            )
+
+            self.assertIsNone(failure_reason)
+            self.assertTrue(any("targeted test warning" in warning.lower() for warning in warnings))
 
     def test_detect_commands_from_pyproject_tooling(self) -> None:
         result = detect_commands_for_files(
