@@ -25,8 +25,9 @@
   "deploy_policy": "never",
   "deploy_required_paths": [],
   "deploy_verify_path": "",
-  "max_git_status_per_round": 10,
+  "max_git_status_per_round": 6,
   "max_git_diff_stat_per_round": 3,
+  "command_budget_policy": "warn",
   "allowed_branch_prefixes": [
   "autopilot/",
   "automation/",
@@ -40,36 +41,41 @@
   "runner_command": "",
   "runner_model": "",
   "runner_extra_args": [],
+  "plan_review_command": "",
+  "code_review_command": "",
+  "review_poll_seconds": 0,
+  "review_timeout_seconds": 0,
+  "prerequisite_paths": [],
   "lanes": [
-    {
-      "id": "b1-backlog-slice",
-      "label": "B18 - Preflight lint and plugin-entry validation gates",
-      "focus_hint": "B18 - Preflight lint and plugin-entry validation gates",
-      "phase_doc_prefix": "docs/status/lanes/b1-backlog-slice/autopilot-phase-",
-      "starting_phase_doc": "docs/status/lanes/b1-backlog-slice/autopilot-phase-0.md",
-      "roadmap_path": "docs/status/lanes/b1-backlog-slice/autopilot-round-roadmap.md",
-      "prompt_template": "automation/round-prompt.md",
-      "commit_prefix": "autopilot"
-    },
-    {
-      "id": "b2-backlog-slice",
-      "label": "B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring",
-      "focus_hint": "B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring",
-      "phase_doc_prefix": "docs/status/lanes/b2-backlog-slice/autopilot-phase-",
-      "starting_phase_doc": "docs/status/lanes/b2-backlog-slice/autopilot-phase-0.md",
-      "roadmap_path": "docs/status/lanes/b2-backlog-slice/autopilot-round-roadmap.md",
-      "prompt_template": "automation/round-prompt.md",
-      "commit_prefix": "autopilot"
-    },
-    {
-      "id": "b3-checkpoint",
-      "label": "Checkpoint - Review B18 and B19 outcome",
-      "focus_hint": "Checkpoint - Review B18 and B19 outcome",
-      "phase_doc_prefix": "docs/status/lanes/b3-checkpoint/autopilot-phase-",
-      "starting_phase_doc": "docs/status/lanes/b3-checkpoint/autopilot-phase-0.md",
-      "roadmap_path": "docs/status/lanes/b3-checkpoint/autopilot-round-roadmap.md",
-      "prompt_template": "automation/round-prompt.md",
-      "commit_prefix": "autopilot"
-    }
-  ]
+  {
+    "id": "b1-backlog-slice",
+    "label": "B18 - Preflight lint and plugin-entry validation gates",
+    "focus_hint": "B18 - Preflight lint and plugin-entry validation gates",
+    "phase_doc_prefix": "docs/status/lanes/b1-backlog-slice/autopilot-phase-",
+    "starting_phase_doc": "docs/status/lanes/b1-backlog-slice/autopilot-phase-0.md",
+    "roadmap_path": "docs/status/lanes/b1-backlog-slice/autopilot-round-roadmap.md",
+    "prompt_template": "automation/round-prompt.md",
+    "commit_prefix": "autopilot"
+  },
+  {
+    "id": "b2-backlog-slice",
+    "label": "B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring",
+    "focus_hint": "B19 - Repo-owned Obsidian E2E adapter fixtures and CI wiring",
+    "phase_doc_prefix": "docs/status/lanes/b2-backlog-slice/autopilot-phase-",
+    "starting_phase_doc": "docs/status/lanes/b2-backlog-slice/autopilot-phase-0.md",
+    "roadmap_path": "docs/status/lanes/b2-backlog-slice/autopilot-round-roadmap.md",
+    "prompt_template": "automation/round-prompt.md",
+    "commit_prefix": "autopilot"
+  },
+  {
+    "id": "b3-checkpoint",
+    "label": "Checkpoint - Review B18 and B19 outcome",
+    "focus_hint": "Checkpoint - Review B18 and B19 outcome",
+    "phase_doc_prefix": "docs/status/lanes/b3-checkpoint/autopilot-phase-",
+    "starting_phase_doc": "docs/status/lanes/b3-checkpoint/autopilot-phase-0.md",
+    "roadmap_path": "docs/status/lanes/b3-checkpoint/autopilot-round-roadmap.md",
+    "prompt_template": "automation/round-prompt.md",
+    "commit_prefix": "autopilot"
+  }
+]
 }

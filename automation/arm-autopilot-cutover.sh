@@ -19,7 +19,7 @@ STOP_IF_STATUS_CHANGES="0"
 
 usage() {
   cat <<'EOF'
-Usage: ./automation/arm-autopilot-cutover.sh [options]
+Usage: bash ./automation/arm-autopilot-cutover.sh [options]
 
 Options:
   --state-path <path>              Current state file to watch
@@ -75,6 +75,8 @@ else
   echo "[cutover] neither python3 nor python was found in PATH" >&2
   exit 1
 fi
+
+export PYTHONDONTWRITEBYTECODE=1
 
 if [[ -z "$RESTART_PROFILE" ]]; then
   RESTART_PROFILE="$PROFILE"

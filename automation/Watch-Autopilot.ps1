@@ -19,6 +19,7 @@ function Resolve-PythonCommand {
 
 $pythonCommand = Resolve-PythonCommand
 $scriptPath = Join-Path $PSScriptRoot "autopilot.py"
+$env:PYTHONDONTWRITEBYTECODE = "1"
 if ($pythonCommand.Length -eq 1) {
     & $pythonCommand[0] $scriptPath watch @Args
 }

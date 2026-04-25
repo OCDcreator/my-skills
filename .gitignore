@@ -15,3 +15,5 @@ custom/knowledge-to-print-html/.venv-print/
 *.sync-conflict-*
 .stfolder/
 .stversions/
+automation/**/__pycache__/
+automation/**/*.pyc

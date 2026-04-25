@@ -18,7 +18,13 @@
     "commit_message",
     "next_focus",
     "blocking_reason",
-    "changed_files"
+    "plan_review_verdict",
+    "code_review_verdict",
+    "changed_files",
+    "background_tasks_used",
+    "background_tasks_completed",
+    "repo_visible_work_landed",
+    "final_artifacts_written"
   ],
   "properties": {
     "status": {
@@ -94,11 +100,35 @@
         "null"
       ]
     },
+    "plan_review_verdict": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "code_review_verdict": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "changed_files": {
       "type": "array",
       "items": {
         "type": "string"
       }
+    },
+    "background_tasks_used": {
+      "type": "boolean"
+    },
+    "background_tasks_completed": {
+      "type": "boolean"
+    },
+    "repo_visible_work_landed": {
+      "type": "boolean"
+    },
+    "final_artifacts_written": {
+      "type": "boolean"
     }
   }
 }

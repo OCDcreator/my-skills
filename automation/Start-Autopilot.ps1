@@ -43,6 +43,7 @@ function Quote-PowerShellLiteral {
 
 $pythonCommand = Resolve-PythonCommand
 $scriptPath = Join-Path $PSScriptRoot "autopilot.py"
+$env:PYTHONDONTWRITEBYTECODE = "1"
 
 if ($Background) {
     $backgroundHost = Resolve-BackgroundHost

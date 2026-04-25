@@ -51,6 +51,7 @@ $resolvedRestartProfilePath = if ($RestartProfilePath) { $RestartProfilePath } e
 
 $scriptPath = Join-Path $PSScriptRoot "autopilot.py"
 $pythonCommand = Resolve-PythonCommand
+$env:PYTHONDONTWRITEBYTECODE = "1"
 $invocationArgs = @(
     $scriptPath,
     "restart-after-next-commit",
