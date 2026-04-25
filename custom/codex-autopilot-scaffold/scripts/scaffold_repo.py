@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.1.2"
+SCAFFOLD_VERSION = "1.1.3"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
 SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
@@ -1164,15 +1164,21 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("[scaffold] next commands:")
         print("  # 1) Commit scaffold, then create/switch to a dedicated autopilot branch or worktree.")
         print("  git switch -c autopilot/<topic>")
+        print("  # 2) If the operator asked for continuous unattended work, do not stop after printing commands.")
+        print("  #    Launch a durable runner, then verify health on the exact state file before reporting success.")
         print("  python automation/autopilot.py version")
         print("  python automation/autopilot.py doctor --profile windows")
         print("  python automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
         print("  python automation/autopilot.py start --profile windows --dry-run --single-round")
         print("  python automation/autopilot.py bootstrap-and-daemonize --profile windows")
+        print("  # Verify immediately after daemonizing.")
+        print("  python automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
         print("  python3 ./automation/autopilot.py doctor --profile mac")
         print("  python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
         print("  python3 ./automation/autopilot.py start --profile mac --dry-run --single-round")
         print("  python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac")
+        print("  # Verify immediately after daemonizing.")
+        print("  python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json")
         print("  bash ./automation/start-autopilot.sh -- --profile mac --dry-run --single-round")
         print("[scaffold] remote mac rollout template:")
         print("  git push")
@@ -1181,6 +1187,8 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py doctor --profile mac'")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac'")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'")
+        print("  # Verify Mac-side health immediately after remote daemonizing.")
+        print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'")
 
     return 0
 

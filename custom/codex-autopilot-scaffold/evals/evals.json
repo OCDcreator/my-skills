@@ -96,6 +96,18 @@
       "prompt": "不要再因为 state 还写着 active 就告诉我“第二轮已经在跑”。只有当 parent PID 活着、round-002/progress.log 持续写入、而且 codex exec 子进程已经真正进入执行时，才能这么汇报。",
       "expected_output": "Assistant should treat this as a scaffold-level operator-visibility bug, strengthen the health/watch contract so active state alone is not enough, and require explicit child-runner evidence such as a live runner pid plus confirmed execution events before claiming the round is running.",
       "files": []
+    },
+    {
+      "id": 17,
+      "prompt": "我用这个 Codex autopilot scaffold 技能总是铺完文件就停，模型给我一堆命令但没有真的持续跑。请改成装完以后直接启动后台 runner，并且只有 health 证明 parent pid、progress.log、runner-status 都活着时才能说完成。",
+      "expected_output": "Assistant should treat keep-running as part of the requested outcome, scaffold or refresh first, commit/switch to a dedicated branch as needed, run doctor and a smoke step, launch bootstrap-and-daemonize or the platform background wrapper, then verify the exact state path with health before reporting success. It should not end with only a generic command list.",
+      "files": []
+    },
+    {
+      "id": 18,
+      "prompt": "Windows 本地生成 scaffold，但真正要在 ssh mac 上持续无人值守。不要本地说完就结束：请 push 到 Mac、在 Mac worktree 上启动，并用 Mac 侧 health/status 证明它还在跑。",
+      "expected_output": "Assistant should keep the execution target remote-only after local scaffolding, commit/push, update the Mac checkout or worktree, run doctor and bootstrap/background start on the Mac, then report Mac-side state path, health verdict, progress log path, and runner evidence instead of using Windows-local artifacts as proof.",
+      "files": []
     }
   ]
 }

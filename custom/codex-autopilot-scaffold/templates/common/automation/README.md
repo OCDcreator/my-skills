@@ -47,6 +47,21 @@ Before starting unattended rounds:
 
 Running `doctor` on `main` right after scaffold may fail the branch guard by design. That is a safety signal, not an installation failure.
 
+## Keep-running startup contract
+
+Do not confuse "scaffold installed" with "autopilot is running." A chat agent or terminal session can stop; this repo-local controller is the durable runner.
+
+When the operator asks for continuous unattended work:
+
+1. Commit the scaffolded files.
+2. Switch to a dedicated branch/worktree.
+3. Run `doctor` for the target profile.
+4. Run a dry-run or foreground first-round smoke if requested.
+5. Start the durable path with `bootstrap-and-daemonize` or the platform background wrapper.
+6. Verify with `health` bound to the intended state file before reporting success.
+
+Only claim the next round is running when `health` shows the autopilot parent PID alive, a fresh `progress.log`, and a live `codex exec` child recorded in `automation/runtime/round-XYZ/runner-status.json` with `exec_confirmed_at`.
+
 ## Commit Prefix Gate
 
 `automation/autopilot.py` validates successful round commits against `commit_prefix` in `automation/autopilot-config.json`.
@@ -128,9 +143,10 @@ ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot 
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py bootstrap-and-daemonize --profile mac'
 ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && bash ./automation/start-autopilot.sh --background -- --profile mac'
+ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'
 ```
 
-Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch.
+Adjust `<repo>` and `<topic>` to the actual repository and branch names. Keep runtime state in the Mac worktree you intend to watch, and use Mac-side `health` with the same parent-PID / fresh-log / runner-status proof before reporting that the remote runner is alive.
 
 ### Helpful modes
 
