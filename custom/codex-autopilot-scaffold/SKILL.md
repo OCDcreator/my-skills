@@ -13,6 +13,10 @@ Primary entrypoint:
 python /path/to/skill/scripts/scaffold_repo.py --target-repo /path/to/repo --preset maintainability
 ```
 
+Generated runtime architecture overview:
+
+- See `RUNTIME-ARCHITECTURE.md` for a visual explanation of how the scaffolded target repo runs rounds, writes runtime artifacts, and exposes `status` / `watch` / `health`.
+
 Generated repos get `automation/autopilot.py`, platform wrappers, profiles, runtime-state support, lane docs under `docs/status/lanes/`, and `automation/README.md` with detailed operator commands.
 
 ## Use / Do Not Use
