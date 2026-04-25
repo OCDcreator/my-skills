@@ -15,7 +15,8 @@ python /path/to/skill/scripts/scaffold_repo.py --target-repo /path/to/repo --pre
 
 Generated runtime architecture overview:
 
-- See `RUNTIME-ARCHITECTURE.md` for a visual explanation of how the scaffolded target repo runs rounds, writes runtime artifacts, and exposes `status` / `watch` / `health`.
+- English: `RUNTIME-ARCHITECTURE.md`
+- 中文：`RUNTIME-ARCHITECTURE.zh-CN.md`
 
 Generated repos get `automation/autopilot.py`, platform wrappers, profiles, runtime-state support, lane docs under `docs/status/lanes/`, and `automation/README.md` with detailed operator commands.
 

@@ -4,6 +4,8 @@
 
 This document explains the generated target-repo runtime after the scaffold has already been installed. It focuses on how the repo-local Python controller drives unattended rounds, where the runtime artifacts live, and how `status`, `watch`, and `health` observe the run.
 
+Chinese version: `RUNTIME-ARCHITECTURE.zh-CN.md`
+
 The key mental model is:
 
 - the scaffold installs a durable Python control loop into the repo,
@@ -15,35 +17,35 @@ The key mental model is:
 
 ```mermaid
 flowchart TD
-    Operator["Operator<br/>CLI commands and wrappers<br/>start / bootstrap-and-daemonize / status / watch / health"]
+    Operator["Operator<br/>commands + wrappers"]
 
     subgraph Control["Control Plane"]
-        CLI["automation/autopilot.py<br/>thin CLI entrypoint"]
-        Parser["automation/_autopilot/cli_parser.py<br/>subcommand routing"]
-        StateLock["state + lock coordination<br/>state_runtime / locking / process_control"]
+        CLI["autopilot.py<br/>CLI entrypoint"]
+        Parser["cli_parser<br/>subcommands"]
+        StateLock["state + lock<br/>coordination"]
     end
 
     subgraph Execution["Execution Plane"]
-        Config["automation/autopilot-config.json<br/>profiles + lane docs + prompt template"]
-        Start["start_runtime<br/>load config, resume state, choose lane"]
-        Round["round_flow<br/>prepare round context + prompt"]
-        Runner["runner<br/>invoke codex exec"]
-        Validation["validation<br/>check structured result + git/runtime rules"]
-        Update["controller runtime updates<br/>state + phase docs + commit metadata"]
+        Config["config<br/>profiles + lanes + prompt"]
+        Start["start_runtime<br/>load + resume + choose lane"]
+        Round["round_flow<br/>prepare round"]
+        Runner["runner<br/>codex exec"]
+        Validation["validation<br/>result + repo rules"]
+        Update["runtime update<br/>state + docs + commit"]
     end
 
     subgraph Runtime["Runtime Artifacts"]
-        StateFile["automation/runtime/autopilot-state.json"]
-        Progress["automation/runtime/round-XXX/progress.log"]
-        RunnerStatus["automation/runtime/round-XXX/runner-status.json"]
-        Output["automation/runtime/round-XXX/assistant-output.json"]
-        LaneDocs["docs/status/lanes/...<br/>phase docs + roadmap"]
+        StateFile["state.json"]
+        Progress["progress.log"]
+        RunnerStatus["runner-status.json"]
+        Output["assistant-output.json"]
+        LaneDocs["lane docs<br/>phase + roadmap"]
     end
 
     subgraph Observability["Observability Plane"]
-        Status["status<br/>summary view"]
-        Watch["watch<br/>prefixed live stream"]
-        Health["health<br/>pid + fresh progress + runner-status truth check"]
+        Status["status<br/>summary"]
+        Watch["watch<br/>live stream"]
+        Health["health<br/>pid + log + runner"]
     end
 
     Operator --> CLI
@@ -77,16 +79,16 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant Operator
-    participant Controller as autopilot.py + start_runtime
+    participant Controller as autopilot.py + start
     participant RoundFlow as round_flow
     participant Runner as runner / codex exec
-    participant Runtime as automation/runtime + lane docs
+    participant Runtime as runtime + lane docs
 
-    Operator->>Controller: start --profile ...<br/>or bootstrap-and-daemonize
+    Operator->>Controller: start or bootstrap-and-daemonize
     Controller->>Controller: load profile, config, state, lock
     Controller->>Controller: select active lane + next phase
     Controller->>RoundFlow: prepare round context
-    RoundFlow->>Runtime: write round-XXX/prompt.md
+    RoundFlow->>Runtime: write prompt.md
     RoundFlow->>Runner: launch codex exec for one round
     Runner->>Runtime: append progress.log
     Runner->>Runtime: update runner-status.json
