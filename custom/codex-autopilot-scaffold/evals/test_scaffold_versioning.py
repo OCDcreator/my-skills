@@ -166,6 +166,8 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 readme_text = (repo_root / "automation" / "README.md").read_text(encoding="utf-8")
                 self.assertIn("bash ./automation/start-autopilot.sh", readme_text)
                 self.assertIn("bash ./automation/watch-autopilot.sh", readme_text)
+                self.assertIn("--prefix-format short", readme_text)
+                self.assertIn("Default operator handoff should use `watch ... --prefix-format short`", readme_text)
                 compile_result = subprocess.run(
                     [
                         sys.executable,
@@ -212,6 +214,18 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertIn("python automation/autopilot.py version", result.stdout)
             self.assertIn("python automation/autopilot.py health", result.stdout)
             self.assertIn("bootstrap-and-daemonize", result.stdout)
+            self.assertIn(
+                "python automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short",
+                result.stdout,
+            )
+            self.assertIn(
+                "python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short",
+                result.stdout,
+            )
+            self.assertIn(
+                "ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short'",
+                result.stdout,
+            )
 
     def test_seed_plan_copies_source_and_overrides_lane_queue(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

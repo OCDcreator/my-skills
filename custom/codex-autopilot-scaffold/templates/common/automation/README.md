@@ -217,7 +217,7 @@ If this repo ever accumulates multiple autopilot runs or old `round-*` directori
 ```powershell
 python .\automation\autopilot.py status --state-path automation\runtime\<state-file>.json
 python .\automation\autopilot.py health --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json
-python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80
+python .\automation\autopilot.py watch --runtime-path automation\runtime --state-path automation\runtime\<state-file>.json --tail 80 --prefix-format short
 Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 ```
 
@@ -226,7 +226,7 @@ Get-Content automation\runtime\round-XYZ\progress.log -Wait -Tail 80
 ```bash
 python3 ./automation/autopilot.py status --state-path automation/runtime/<state-file>.json
 python3 ./automation/autopilot.py health --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json
-python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80
+python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80 --prefix-format short
 tail -n 80 -F automation/runtime/round-XYZ/progress.log
 ```
 
@@ -242,11 +242,14 @@ The scaffolded `watch` output shows:
 - `phase doc`
 - `focus`
 - the exact `progress.log` path being followed
-- a default long prefix on every streamed detail line, for example `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]`
+- a per-line prefix on every streamed detail line, with `--prefix-format short` recommended for operator handoff by default
+- the long form `[lane=b1-backlog-slice queue=1/3 round=006 phase=005 status=active failures=0]` when you need the fully spelled-out header
 - Vulture count and delta when `vulture_command` is configured
 - latest plan/code review verdicts and last blocker when the round recorded them
 
-Use `python automation/autopilot.py watch --prefix-format short` if you prefer the compact form `[b1-backlog-slice q1/3 r006 p005 active f0]`.
+Default operator handoff should use `watch ... --prefix-format short` so every streamed line stays attributable even after copy/paste into another terminal or log collector.
+
+Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without autopilot metadata prefixes.
 
 When the watched state is `active`, the live progress log is usually `current_round + 1`. When the watched state is terminal, it is usually `current_round`.
 
