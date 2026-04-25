@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.1.4"
+SCAFFOLD_VERSION = "1.1.5"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
 SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
@@ -1196,7 +1196,7 @@ def scaffold_repo(args: argparse.Namespace) -> int:
         print("  # Verify Mac-side health immediately after remote daemonizing.")
         print("  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py health --state-path automation/runtime/autopilot-state.json'")
         print(
-            "  ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short'"
+            "  ssh mac 'cd \"/Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot\" && python3 -u ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short'"
         )
 
     return 0

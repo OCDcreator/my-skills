@@ -127,7 +127,7 @@ When execution target is `ssh mac`, keep runtime proof remote-only:
 
 Windows-local runtime files do not prove the Mac runner is alive.
 Use Mac-side `health` with the same three-point proof from the keep-running contract before reporting that the remote runner is alive.
-Unless the user explicitly asks for a raw file tail, operator handoff should also include one exact Mac-side `watch` command bound to the intended `--state-path` and using `--prefix-format short`.
+Unless the user explicitly asks for a raw file tail, operator handoff should also include one exact Windows-to-Mac `ssh mac 'cd "<remote repo>" && python3 -u ./automation/autopilot.py watch ... --prefix-format short'` command bound to the intended `--state-path`.
 
 ## Preset-Specific Rules
 
@@ -179,6 +179,8 @@ Use `python3` and `--profile mac` on macOS. Use scaffolded wrappers for Windows 
 
 When multiple state files or old `round-*` directories exist, always bind `status`, `health`, and `watch` to the intended `--state-path`.
 When a user asks to look at logs, default to the scaffolded `watch` command above instead of a raw `tail`/`Get-Content`, because the prefixed stream keeps lane/queue/round context visible on every line.
+When the operator is on Windows and the unattended runner is on `ssh mac`, default to the full remote command with `python3 -u` so the stream is unbuffered:
+`ssh mac 'cd "<remote repo>" && python3 -u ./automation/autopilot.py watch --runtime-path automation/runtime --state-path <state-path> --tail 80 --prefix-format short'`
 
 ## Cutovers
 
@@ -199,5 +201,5 @@ Report:
 - files added/refreshed
 - smoke commands run and result
 - if continuous execution was requested: launch command, state path, health verdict, progress log path, PID evidence, and `exec_confirmed_at` from `runner-status.json`
-- if log-following is relevant: one exact copy-paste `watch` command with explicit `--state-path`, explicit `--runtime-path`, and `--prefix-format short`
+- if log-following is relevant: one exact copy-paste `watch` command with explicit `--state-path`, explicit `--runtime-path`, and `--prefix-format short`; on Windows→Mac handoff this should be the full `ssh mac ... python3 -u ... watch ...` command
 - if not verified: exact blocker and next recovery command

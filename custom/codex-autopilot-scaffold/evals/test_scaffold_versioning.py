@@ -168,6 +168,8 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertIn("bash ./automation/watch-autopilot.sh", readme_text)
                 self.assertIn("--prefix-format short", readme_text)
                 self.assertIn("Default operator handoff should use `watch ... --prefix-format short`", readme_text)
+                self.assertIn("ssh mac 'cd \"/Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot\"", readme_text)
+                self.assertIn("python3 -u ./automation/autopilot.py watch", readme_text)
                 compile_result = subprocess.run(
                     [
                         sys.executable,
@@ -223,7 +225,7 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 result.stdout,
             )
             self.assertIn(
-                "ssh mac 'cd /Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot && python3 ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short'",
+                "ssh mac 'cd \"/Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot\" && python3 -u ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/autopilot-state.json --tail 80 --prefix-format short'",
                 result.stdout,
             )
 

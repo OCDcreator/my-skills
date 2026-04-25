@@ -230,6 +230,14 @@ python3 ./automation/autopilot.py watch --runtime-path automation/runtime --stat
 tail -n 80 -F automation/runtime/round-XYZ/progress.log
 ```
 
+### Windows -> `ssh mac`
+
+When the operator is on Windows but the live unattended runner is on the Mac, the default handoff should be the remote scaffold watch command, not a local `python ... watch` and not a raw `tail`:
+
+```powershell
+ssh mac 'cd "/Volumes/SDD2T/obsidian-vault-write/custom-project/<repo>-autopilot" && python3 -u ./automation/autopilot.py watch --runtime-path automation/runtime --state-path automation/runtime/<state-file>.json --tail 80 --prefix-format short'
+```
+
 The scaffolded `watch` output shows:
 
 - `round`
@@ -248,6 +256,7 @@ The scaffolded `watch` output shows:
 - latest plan/code review verdicts and last blocker when the round recorded them
 
 Default operator handoff should use `watch ... --prefix-format short` so every streamed line stays attributable even after copy/paste into another terminal or log collector.
+For Windows-to-Mac monitoring, make that the full `ssh mac 'cd ... && python3 -u ./automation/autopilot.py watch ...'` command so remote Python stdout stays unbuffered and the prefixed lines appear immediately.
 
 Use raw `Get-Content` / `tail -F` only when you explicitly want the underlying `progress.log` without autopilot metadata prefixes.
 
