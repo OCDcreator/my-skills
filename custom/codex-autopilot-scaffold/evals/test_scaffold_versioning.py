@@ -435,6 +435,11 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertIn("automation/opencode-review.sh", config["prerequisite_paths"])
             self.assertIn("automation/Invoke-OpencodeReview.ps1", config["prerequisite_paths"])
             self.assertIn(".opencode/commands/review-plan.md", config["prerequisite_paths"])
+            master_plan_text = (repo_root / "docs" / "status" / "autopilot-master-plan.md").read_text(encoding="utf-8")
+            self.assertIn(
+                "Do not abort an OpenCode pass early only because it is still reading references or the repo diff is empty",
+                master_plan_text,
+            )
 
     def test_round_result_schema_requires_every_property_for_codex_output(self) -> None:
         schema = json.loads(
@@ -478,6 +483,15 @@ class ScaffoldVersioningTests(unittest.TestCase):
 
             self.assertEqual(dry_run_result.returncode, 0, dry_run_result.stderr)
             self.assertTrue(prompt_path.exists())
+            prompt_text = prompt_path.read_text(encoding="utf-8")
+            self.assertIn(
+                "do not kill it early just because the repo diff is still empty or the pass is still reading files",
+                prompt_text,
+            )
+            self.assertIn(
+                "Treat a still-growing implementation log or a still-live child PID as proof that the pass is still working",
+                prompt_text,
+            )
             prompt_text = prompt_path.read_text(encoding="utf-8")
             self.assertIn("plan_review_verdict", prompt_text)
             self.assertIn("code_review_verdict", prompt_text)

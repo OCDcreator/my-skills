@@ -11,6 +11,7 @@
 - Each round must pass an implementation-plan review before coding
 - Each round must pass a code review before final validation and commit
 - Prefer `bootstrap-and-daemonize` over ad-hoc first-round shell gymnastics when the operator wants “首轮成功后继续后台跑”
+- Do not abort an OpenCode pass early only because it is still reading references or the repo diff is empty; as long as the implementation log is still growing or the child PID is alive, that counts as active work until timeout or a concrete blocker
 
 ## Lane order
 

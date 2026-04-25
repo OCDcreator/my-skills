@@ -51,19 +51,22 @@ Required workflow:
 5. Record the plan review verdict in the phase doc and final JSON field `plan_review_verdict`.
 6. If the plan review verdict is `REVISE`, either repair the plan and re-run the review once, or stop the round with `failure`.
 7. Only after plan approval, implement the smallest change set that satisfies the queued slice.
-8. After implementation and before final validation/commit, run a code review and wait for the verdict:
+8. Once the implementation pass starts, do not kill it early just because the repo diff is still empty or the pass is still reading files. Discovery, reference-reading, and long planning can be the real work for the first several minutes.
+9. Treat a still-growing implementation log or a still-live child PID as proof that the pass is still working, even if no repo edits have landed yet.
+10. Only interrupt or retry an implementation pass early when there is a hard failure signal: the wrapper exits non-zero, the log proves a concrete blocker, or the human explicitly asks to stop. Lack of edits alone is not a blocker.
+11. After implementation and before final validation/commit, run a code review and wait for the verdict:
    - Windows: `pwsh -File .\automation\Invoke-OpencodeReview.ps1 -Mode code -OutputPath "{{current_round_directory}}\code-review.txt"`
    - macOS/Linux: `bash ./automation/opencode-review.sh code "{{current_round_directory}}/code-review.txt"`
-9. Record the code review verdict in the phase doc and final JSON field `code_review_verdict`.
-10. If the code review verdict is `REVISE`, attempt one focused repair, then re-run the code review once. If it still fails, revert the round, do not commit, and return `failure`.
-11. Run targeted tests first when code or tests change and a targeted test command pattern is configured.
-12. `[[VALIDATION_REQUIREMENT]]`
-13. When a validation command is blank, do not invent a substitute; record the gap in the phase doc instead.
-14. When Vulture is configured, use it as the dead-code observability command when cleanup or unused-code risk is relevant; record the finding count or any gap in the phase doc.
-15. Update `{{current_lane_roadmap}}` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
-16. Write the round summary to `{{next_phase_doc}}`. Include the queued slice, the implementation plan path, plan/code review verdicts, changed files, validation commands, Vulture findings when configured, and the next recommended slice.
-17. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
-18. If the queued objective is already complete, avoid unnecessary edits, update the lane roadmap accordingly, and return `goal_complete`.
+12. Record the code review verdict in the phase doc and final JSON field `code_review_verdict`.
+13. If the code review verdict is `REVISE`, attempt one focused repair, then re-run the code review once. If it still fails, revert the round, do not commit, and return `failure`.
+14. Run targeted tests first when code or tests change and a targeted test command pattern is configured.
+15. `[[VALIDATION_REQUIREMENT]]`
+16. When a validation command is blank, do not invent a substitute; record the gap in the phase doc instead.
+17. When Vulture is configured, use it as the dead-code observability command when cleanup or unused-code risk is relevant; record the finding count or any gap in the phase doc.
+18. Update `{{current_lane_roadmap}}` on success: mark the executed `[NEXT]` item as `[DONE]`, promote the next `[QUEUED]` item to `[NEXT]`, and keep later items `[QUEUED]`.
+19. Write the round summary to `{{next_phase_doc}}`. Include the queued slice, the implementation plan path, plan/code review verdicts, changed files, validation commands, Vulture findings when configured, and the next recommended slice.
+20. Commit successful rounds as `{{commit_prefix}}: round {{round_attempt}} - <short subject>`.
+21. If the queued objective is already complete, avoid unnecessary edits, update the lane roadmap accordingly, and return `goal_complete`.
 
 Response contract:
 - Your final response must be valid JSON matching the provided output schema.
