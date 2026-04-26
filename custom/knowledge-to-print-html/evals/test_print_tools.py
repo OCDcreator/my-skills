@@ -13,6 +13,7 @@ import struct
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 VALIDATOR = SKILL_DIR / "scripts" / "validate_print_layout.py"
+CHECK_RUNTIME = SKILL_DIR / "scripts" / "check_runtime.py"
 ROOT_VALIDATOR_WRAPPER = SKILL_DIR / "validate_print_layout.py"
 ROOT_REVIEW_WRAPPER = SKILL_DIR / "review_print_pages.py"
 if str(SKILL_DIR) not in sys.path:
@@ -483,6 +484,7 @@ class PrintToolTests(unittest.TestCase):
     def test_canonical_scripts_directory_and_root_wrappers_exist(self) -> None:
         self.assertTrue((SKILL_DIR / "scripts" / "validate_print_layout.py").exists())
         self.assertTrue((SKILL_DIR / "scripts" / "review_print_pages.py").exists())
+        self.assertTrue(CHECK_RUNTIME.exists())
         self.assertTrue(ROOT_VALIDATOR_WRAPPER.exists())
         self.assertTrue(ROOT_REVIEW_WRAPPER.exists())
 
@@ -628,6 +630,18 @@ class PrintToolTests(unittest.TestCase):
         self.assertIn("--device-scale-factor 3.125", validate_result.stdout)
         self.assertIn("Examples:", review_result.stdout)
         self.assertIn("--review-language zh", review_result.stdout)
+        self.assertIn("--no-auto-install", review_result.stdout)
+
+        runtime_result = subprocess.run(
+            [sys.executable, str(CHECK_RUNTIME), "--help"],
+            cwd=SKILL_DIR,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(runtime_result.returncode, 0, runtime_result.stdout + runtime_result.stderr)
+        self.assertIn("Check the local runtime", runtime_result.stdout)
 
     def test_review_loop_requires_container_level_text_overflow_check(self) -> None:
         review_text = (SKILL_DIR / "references" / "review-loop.md").read_text(encoding="utf-8")
@@ -1195,12 +1209,41 @@ class PrintToolTests(unittest.TestCase):
             args = Namespace(
                 out_dir=str(out_dir),
                 browser_path=None,
+                no_auto_install=False,
             )
             error = subprocess.CalledProcessError(1, ["validator"])
             with mock.patch("subprocess.run", side_effect=error):
                 result = run_validation(args, html_path, "handout")
 
             self.assertEqual(result, report_path)
+
+    def test_review_validation_passes_no_auto_install_to_validator(self) -> None:
+        from argparse import Namespace
+        from scripts.review_print_pages import run_validation
+
+        with tempfile.TemporaryDirectory() as temp_name:
+            temp_dir = Path(temp_name)
+            html_path = temp_dir / "handout.html"
+            out_dir = temp_dir / "screens"
+            html_path.write_text(MINIMAL_HANDOUT, encoding="utf-8")
+
+            args = Namespace(
+                out_dir=str(out_dir),
+                browser_path=None,
+                no_auto_install=True,
+            )
+
+            with mock.patch("subprocess.run") as run_mock:
+                run_validation(args, html_path, "handout")
+
+            command = run_mock.call_args.args[0]
+            self.assertIn("--no-auto-install", command)
+
+    def test_review_page_number_falls_back_to_report_order(self) -> None:
+        from scripts.review_print_pages import resolve_report_page_number
+
+        self.assertEqual(resolve_report_page_number({"page": None}, 3), 3)
+        self.assertEqual(resolve_report_page_number({"page": "5"}, 3), 5)
 
     def test_validate_print_layout_reports_card_grid_antipattern(self) -> None:
         with tempfile.TemporaryDirectory() as temp_name:

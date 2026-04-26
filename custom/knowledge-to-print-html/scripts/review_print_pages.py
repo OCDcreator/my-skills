@@ -47,6 +47,11 @@ def parse_args() -> argparse.Namespace:
         help="Optional browser executable path to pass through to validate_print_layout.py.",
     )
     parser.add_argument(
+        "--no-auto-install",
+        action="store_true",
+        help="Pass through to validate_print_layout.py so missing runtime dependencies fail immediately.",
+    )
+    parser.add_argument(
         "--review-language",
         choices=("auto", "en", "zh"),
         default="auto",
@@ -128,6 +133,8 @@ def run_validation(args: argparse.Namespace, html_path: Path, prefix: str) -> Pa
         command.extend(["--out-dir", args.out_dir])
     if args.browser_path:
         command.extend(["--browser-path", args.browser_path])
+    if args.no_auto_install:
+        command.append("--no-auto-install")
 
     output_dir = Path(args.out_dir).expanduser().resolve() if args.out_dir else html_path.parent / "screens" / "py-latest"
     report_path = output_dir / f"{prefix}-validation-report.json"
@@ -464,6 +471,18 @@ def write_subagent_prompt_file(
     return prompt_path
 
 
+def resolve_report_page_number(page: dict[str, Any], fallback_index: int) -> int:
+    raw_page = page.get("page")
+    if raw_page is None or raw_page == "":
+        return fallback_index
+    try:
+        return int(raw_page)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError(
+            f"Invalid page identifier in validation report: {raw_page!r}"
+        ) from exc
+
+
 def write_review_packets(
     report: dict[str, Any],
     report_path: Path,
@@ -484,8 +503,8 @@ def write_review_packets(
     }
 
     pages: list[dict[str, Any]] = []
-    for page in report["analysis"]["sheets"]:
-        page_number = int(page["page"])
+    for page_index, page in enumerate(report["analysis"]["sheets"], start=1):
+        page_number = resolve_report_page_number(page, page_index)
         screenshot = screenshot_index[page_number]
         pdf_screenshot = pdf_screenshot_index.get(page_number)
         parity = parity_index.get(page_number)

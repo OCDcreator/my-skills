@@ -17,6 +17,61 @@ Default behavior:
 - permission to install Python packages and browser/runtime dependencies
 - enough disk space for browser artifacts, screenshots, and exported PDFs
 
+## Runtime health check
+
+Before a large handout run, check the runtime without installing anything:
+
+```bash
+python scripts/check_runtime.py
+```
+
+For machine-readable diagnostics:
+
+```bash
+python scripts/check_runtime.py --json
+```
+
+The check verifies:
+
+- Python version and executable
+- `playwright` import
+- `pymupdf` / `fitz` import
+- headless Chromium/browser launch
+- `qpdf` discovery for fast-view PDF optimization
+
+Treat a failed health check as an environment setup task, not a handout-layout failure.
+
+## Windows setup commands
+
+Use these when the default `python` is the Windows runtime:
+
+```powershell
+python -m pip install playwright pymupdf
+python -m playwright install chromium
+winget install -e --id QPDF.QPDF
+```
+
+If PyPI fails with an SSL EOF or proxy-like handshake error, retry with a reachable mirror:
+
+```powershell
+python -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple playwright pymupdf
+```
+
+After installing `qpdf`, open a new terminal if `where qpdf` does not immediately find it. The validator can also discover common `C:\Program Files\qpdf*\bin\qpdf.exe` installs even before PATH refreshes.
+
+## WSL / Linux setup commands
+
+Use these when running the scripts through WSL/Linux:
+
+```bash
+python3 -m pip install --user playwright pymupdf
+python3 -m playwright install chromium
+python3 -m playwright install-deps chromium
+sudo apt-get install -y qpdf
+```
+
+The repository may contain `.local-libs/` and `.local-qpdf/` from older local runs, but prefer real system packages or a configured Python environment over relying on those cache directories.
+
 ## Auto-created local runtime directories
 
 This skill intentionally creates a few local working directories when validation or review runs execute:
@@ -49,7 +104,9 @@ If network/package-manager access is unavailable:
 4. run:
 
 ```bash
+python scripts/check_runtime.py
 python scripts/validate_print_layout.py --html <path> --no-auto-install
+python scripts/review_print_pages.py --html <path> --no-auto-install
 ```
 
 Use `--no-auto-install` in locked-down environments so failure is immediate and explicit instead of partially attempting installs.
@@ -73,6 +130,7 @@ Even when the review prompt is Chinese, the JSON schema keys remain:
 
 Prefer:
 
+- `python scripts/check_runtime.py`
 - `python scripts/validate_print_layout.py ...`
 - `python scripts/review_print_pages.py ...`
 

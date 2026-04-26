@@ -66,6 +66,7 @@ Standard pipeline files:
 
 Canonical validation scripts in this repo:
 
+- `scripts/check_runtime.py`
 - `scripts/validate_print_layout.py`
 - `scripts/review_print_pages.py`
 
@@ -260,6 +261,12 @@ Full page-density and chrome rules live in `references/layout-guardrails.md`.
 
 Use the bundled scripts, not ad-hoc screenshots.
 
+Runtime dependency check:
+
+```bash
+python scripts/check_runtime.py
+```
+
 Smoke validation:
 
 ```bash
@@ -334,9 +341,12 @@ Read `references/runtime-requirements.md`.
 
 Important defaults:
 
+- `scripts/check_runtime.py` checks Python package imports, browser launch, and `qpdf` availability without installing anything.
 - `scripts/validate_print_layout.py` will try to auto-install missing runtime dependencies unless `--no-auto-install` is used.
+- `scripts/review_print_pages.py` passes validation options through, including `--no-auto-install`, so locked-down checks can fail fast in the same way as direct validation.
 - In offline or restricted environments, preinstall dependencies first and run with `--no-auto-install` so failure is immediate and explicit.
 - `scripts/review_print_pages.py` uses `--review-language auto` by default so the generated subagent prompt matches the handout language when possible.
+- On Windows, if direct PyPI access fails with SSL EOF, retry package installation with a known reachable mirror before assuming the package is unavailable.
 
 ## Content And Visual Rules
 
