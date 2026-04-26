@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "我想从零开始做一个小型 FastAPI 项目，让 OpenCode Loop 无人值守地先跑 3 轮，把项目骨架、README、基础测试都建起来。你帮我准备并直接用命令行跑。",
-      "expected_output": "Assistant should trigger the skill, confirm/prepare target project details, choose command-line mode, initialize with bin/setup.sh, run opencode-loop.sh with conservative iterations/timeout, and report monitoring paths.",
+      "expected_output": "Assistant should trigger the skill, confirm/prepare target project details, choose command-line mode, prefer opencode-loop init/start with a quick profile or next-command preview, fall back to bin/setup.sh/opencode-loop.sh only if the global wrapper is unavailable, and report monitoring paths.",
       "files": []
     },
     {
@@ -16,7 +16,7 @@
     {
       "id": 3,
       "prompt": "帮我用 open loop 跑一下当前项目的优化，不要无限跑，先限制几轮，目标是减少 lint 报错并修掉 obvious bugs。",
-      "expected_output": "Assistant should recognize open loop/OpenCode Loop intent, set a bounded CLI plan with small iteration cap, prepare acceptance criteria, run setup if needed, and start/monitor the loop safely.",
+      "expected_output": "Assistant should recognize open loop/OpenCode Loop intent, set a bounded CLI plan with small iteration cap, prepare acceptance criteria, prefer opencode-loop init/start or next-command, and start/monitor the loop safely without hand-building long commands when the wrapper is available.",
       "files": []
     },
     {
@@ -24,7 +24,18 @@
       "prompt": "我只是想让你手动看一下 Python 报错，别启动任何无人值守 agent。",
       "expected_output": "Assistant should not use OpenCode Loop despite related debugging language because the user explicitly asks for manual debugging and no unattended agent.",
       "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "我已经安装了全局 opencode-loop 命令。帮我确认版本、检查远端是否最新，然后给出一个长任务 supervisor 的推荐启动命令，但不要真的启动。",
+      "expected_output": "Assistant should use opencode-loop --version, opencode-loop update-check --json, and opencode-loop next-command --kind supervisor --profile long; it should explain that update-check is explicit and normal startup does not auto-fetch.",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "我要给一个项目配置每轮前跑 Kimi UI、每轮后跑 Codex review 的 opencode-loop hooks，并让大模型以后优先读机器可读状态。",
+      "expected_output": "Assistant should use opencode-loop hooks add/list/test rather than hand-editing hooks.json, prefer status --json and doctor --json for machine-readable state, and keep hook failures as retry/warn rather than stopping the loop.",
+      "files": []
     }
   ]
 }
-

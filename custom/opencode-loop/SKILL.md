@@ -1,6 +1,6 @@
 ---
 name: opencode-loop
-description: "Use OpenCode Loop for unattended autonomous coding over a target project. Trigger aggressively when the user wants a self-running multi-iteration agent to create a project from scratch, optimize/refactor a repo, fix bugs/test failures/lint/type errors/warnings, run build→verify→fix/report cycles, or configure/launch/monitor OpenCode Loop through CLI or TUI. Also trigger on Chinese/English phrases such as OpenCode Loop, opencode-loop, OpenCodeLoop, open loop, 无人值守, 自动循环, 自动修 bug, 让大模型自己跑, TUI, iterations, timeout, circuit breaker, setup, program. Do not trigger for one-shot manual debugging, generic programming loops, UI work on the TUI itself, or requests that explicitly say not to use OpenCode Loop/unattended agents."
+description: "Use when the user wants OpenCode Loop/opencode-loop unattended or self-running multi-iteration coding over a target project: create projects, optimize/refactor repos, fix test/lint/type failures, run build→verify→fix/report cycles, configure CLI/TUI/supervisor/hooks, inspect status/logs, or asks about opencode-loop commands, version, update-check, doctor/status JSON, next-command. Trigger on Chinese/English phrases like 无人值守, 自动循环, 自动修 bug, 让大模型自己跑. Do not trigger for one-shot manual debugging, generic programming loops, TUI UI implementation, or explicit requests not to use unattended agents."
 ---
 
 # OpenCode Loop Skill
@@ -32,6 +32,7 @@ Before starting either route, clarify only the details that are risky to assume:
 
 When working from inside the OpenCode Loop repository, use the current repo root. Otherwise locate it before giving commands:
 
+- If the global `opencode-loop` command is installed, prefer it over manually calling repo scripts.
 - Ask the user for the local `opencode-loop` path if it is unknown.
 - On macOS, use the native repo path directly.
 - On Windows, prefer running Bash-facing workflows through WSL.
@@ -42,6 +43,26 @@ When working from inside the OpenCode Loop repository, use the current repo root
   - WSL execution path should be derived with `wslpath`.
 
 Do not run `lib/*.sh` files directly. They are sourced modules used by `opencode-loop.sh`.
+
+## Prefer The AI-Friendly CLI
+
+The global `opencode-loop` wrapper delegates to the current repo checkout. Prefer it for repeatable agent work because it exposes stable commands and machine-readable JSON:
+
+```bash
+opencode-loop --version
+opencode-loop doctor --dir /path/to/target --json
+opencode-loop status --dir /path/to/target --json
+opencode-loop next-command --dir /path/to/target --kind supervisor --profile long
+```
+
+Use `opencode-loop update-check --json` only when the user asks whether the tool itself is current. Normal `start` and `supervisor` launches do not contact the remote, which keeps unattended runs from failing because of network or GitHub problems.
+
+If the wrapper is missing, install it from the repo checkout:
+
+```bash
+bash bin/install-cli.sh                         # macOS / Linux / WSL
+PowerShell -ExecutionPolicy Bypass -File .\bin\install-cli.ps1  # Windows host
+```
 
 ## Prepare The Target Project
 
@@ -62,6 +83,13 @@ Use this workflow when the assistant will run OpenCode Loop directly.
 ### 1. Preflight
 
 Check the basics before starting the loop:
+
+```bash
+opencode-loop --version
+opencode-loop doctor --dir /path/to/target --json
+```
+
+If the global wrapper is not installed yet, fall back to repo-local checks:
 
 ```bash
 bash -n opencode-loop.sh
@@ -90,7 +118,13 @@ wsl -d Ubuntu -- bash -lic 'cd /mnt/.../opencode-loop && bash bin/test.sh'
 
 ### 2. Initialize The Target Project
 
-Run setup from the OpenCode Loop repo root:
+Initialize from the global CLI when available:
+
+```bash
+opencode-loop init --dir /path/to/target --mode dev
+```
+
+Fallback from the OpenCode Loop repo root:
 
 ```bash
 bash bin/setup.sh --dir /path/to/target --mode dev
@@ -109,16 +143,18 @@ Setup creates target-side orchestration files including:
 
 ### 3. Start The Loop
 
-Use conservative limits first, then expand after the first run looks healthy:
+Use conservative limits first, then expand after the first run looks healthy. Preview the exact command before starting when the user asks for safety:
 
 ```bash
-bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 3 --timeout 15
+opencode-loop next-command --dir /path/to/target --kind start --profile quick
+opencode-loop start --dir /path/to/target --profile quick
 ```
 
-For longer tasks where context growth is a concern, enable multi-session mode:
+For longer tasks, prefer the supervisor profile rather than wrapping `opencode-loop.sh` yourself:
 
 ```bash
-bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 30 --session-mode multi --session-rotate 10
+opencode-loop next-command --dir /path/to/target --kind supervisor --profile long
+opencode-loop supervisor --dir /path/to/target --profile long
 ```
 
 Useful flags:
@@ -141,7 +177,14 @@ Useful flags:
 
 ### 4. Monitor And Report
 
-Watch target-side loop state rather than inventing a second state store:
+Prefer machine-readable CLI state for agents:
+
+```bash
+opencode-loop status --dir /path/to/target --json
+opencode-loop logs --dir /path/to/target --file progress --tail 80
+```
+
+Target-side loop state remains under:
 
 - `.opencode-loop/progress.txt`
 - `.opencode-loop/state.json`
@@ -156,6 +199,19 @@ Report back with:
 - Exact command used.
 - Current loop state or final result.
 - Any user action needed, such as installing `opencode`, `jq`, or `bats`.
+
+### 5. Optional External Hooks
+
+Use the CLI to configure Kimi/Codex or other external tools around each iteration instead of hand-editing JSON:
+
+```bash
+opencode-loop hooks add --dir /path/to/target --event pre_iteration --name kimi-ui --command 'kimi-code --dir "$OPENCODE_LOOP_TARGET_DIR" "Review UI before this iteration"' --attempts 3
+opencode-loop hooks add --dir /path/to/target --event post_iteration --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Review this iteration"' --attempts 3
+opencode-loop hooks list --dir /path/to/target --json
+opencode-loop hooks test --dir /path/to/target --event post_iteration --iteration 0
+```
+
+Hook failures retry, warn, and continue unless the project intentionally changes that policy.
 
 ## TUI Workflow
 
