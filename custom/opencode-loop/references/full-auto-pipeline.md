@@ -65,7 +65,18 @@ openspec init /path/to/target
 openspec new change my-feature --description "Short description of what we're building"
 ```
 
-After `openspec new change`, write `openspec/changes/my-feature/proposal.md` before running `task-master parse-prd`.
+After `openspec new change`, the CLI creates the change directory and `.openspec.yaml` and `README.md`, but NOT `proposal.md`, `design.md`, `tasks.md`, or `specs/`. You must generate these artifacts explicitly:
+
+```bash
+openspec instructions proposal --change my-feature
+openspec instructions design --change my-feature
+openspec instructions specs --change my-feature
+openspec instructions tasks --change my-feature
+```
+
+Then write each artifact file. Start with `proposal.md`:
+
+After generating artifact instructions, write the proposal content in `openspec/changes/my-feature/proposal.md` before running `task-master parse-prd`.
 
 Minimal proposal template:
 
@@ -127,6 +138,33 @@ EOF
 
 Use the OpenSpec proposal as the PRD input for Task Master.
 
+### Provider Preflight (MANDATORY)
+
+Before running `parse-prd`, you MUST detect available API keys and configure the provider. Skip this only if the user has already configured Task Master.
+
+```bash
+# Detect available API keys
+if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
+  task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
+  # If no fallback key, use same:
+  task-master models --set-research deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
+elif [[ -n "${OPENAI_COMPATIBLE_API_KEY:-}" ]]; then
+  export OPENAI_API_KEY="$OPENAI_COMPATIBLE_API_KEY"
+  task-master models --set-main openai-compatible
+elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  task-master models --set-main anthropic
+else
+  echo "BLOCKER: No AI provider key found. Set one of: DEEPSEEK_API_KEY, OPENAI_COMPATIBLE_API_KEY, ANTHROPIC_API_KEY"
+  exit 1
+fi
+```
+
+If only `DEEPSEEK_API_KEY` is available but Task Master expects `OPENAI_API_KEY`:
+
+```bash
+export OPENAI_API_KEY="$DEEPSEEK_API_KEY"
+```
+
 ```bash
 cd /path/to/target
 
@@ -139,6 +177,24 @@ task-master expand --id=1
 task-master expand --id=2
 task-master list
 ```
+
+### Task Normalization (MANDATORY after parse-prd)
+
+`parse-prd` often generates meta-automation tasks (scaffolding scripts, guardrails, template files) instead of real repo work. You MUST normalize:
+
+1. Read the generated task list:
+   ```bash
+   task-master list
+   ```
+2. Cross-reference with OpenSpec `tasks.md` (the authority).
+3. Remove or consolidate tasks that:
+   - Create automation scaffolding instead of implementing features
+   - Invent new script/tool layers not requested by the user
+   - Duplicate the same work across multiple tasks
+4. Keep only tasks that directly modify the target repo's source code, tests, or configuration.
+5. If tasks are too granular or too vague, restructure them to match the OpenSpec task boundaries.
+
+⚠️ Task Master output is NOT authoritative. OpenSpec `tasks.md` is the contract authority. Task Master is a decomposition tool, not a design authority.
 
 Notes:
 
@@ -241,6 +297,10 @@ cd "$TARGET"
 # === Layer 1: OpenSpec ===
 openspec init "$TARGET"
 openspec new change my-feature --description "See proposal.md"
+openspec instructions proposal --change my-feature
+openspec instructions design --change my-feature
+openspec instructions specs --change my-feature
+openspec instructions tasks --change my-feature
 
 # Write proposal.md content here before running parse-prd
 cat > openspec/changes/my-feature/proposal.md << 'EOF'
