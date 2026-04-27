@@ -13,6 +13,7 @@ import argparse
 import subprocess
 import sys
 import os
+from pathlib import Path
 
 
 REVIEW_PROMPTS = {
@@ -60,19 +61,18 @@ def build_command(args: argparse.Namespace) -> list[str]:
     prompt = args.prompt or REVIEW_PROMPTS.get(args.type, REVIEW_PROMPTS["general"])
 
     if args.file:
-        file_path = args.file
-        if args.work_dir and not os.path.isabs(file_path):
-            file_path = os.path.join(args.work_dir, file_path)
+        file_path = Path(args.file)
+        if args.work_dir and not file_path.is_absolute():
+            file_path = Path(args.work_dir) / file_path
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                code = f.read()
+            code = file_path.read_text(encoding="utf-8")
         except FileNotFoundError:
             print(f"Error: file not found: {file_path}", file=sys.stderr)
             sys.exit(1)
         except OSError as e:
             print(f"Error reading file: {e}", file=sys.stderr)
             sys.exit(1)
-        ext = os.path.splitext(file_path)[1][1:] or "text"
+        ext = file_path.suffix[1:] or "text"
         prompt = (
             f"{prompt}\n\n"
             f"Review the following code from file `{file_path}`:\n\n"
@@ -93,6 +93,67 @@ def build_command(args: argparse.Namespace) -> list[str]:
 
     cmd.extend(["-p", prompt])
     return cmd
+
+
+def run_kimi(cmd: list[str], timeout: int | None) -> int:
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except FileNotFoundError:
+        print(
+            "Error: 'kimi' command not found. "
+            "Ensure Kimi Code CLI is installed and on PATH.",
+            file=sys.stderr,
+        )
+        return 1
+    except subprocess.TimeoutExpired:
+        print(
+            f"Error: Kimi Code CLI timed out after {timeout}s. "
+            "Consider increasing --timeout or reviewing a smaller scope.",
+            file=sys.stderr,
+        )
+        return 1
+    except Exception as e:
+        print(f"Error invoking Kimi Code CLI: {e}", file=sys.stderr)
+        return 1
+
+    # Print stdout first (the actual review result)
+    if result.stdout:
+        print(result.stdout, end="")
+
+    # Print stderr lines that are not just Kimi internal debug noise.
+    # Kimi prints MCP connection logs, TurnBegin markers, etc. to stderr.
+    # We filter out the noisiest internal structures to keep output clean
+    # in both PowerShell (Windows) and bash/zsh (macOS/Linux).
+    if result.stderr:
+        noisy_prefixes = (
+            "TurnBegin(",
+            "StatusUpdate(",
+            "MCPLoading",
+            "StepBegin(",
+            "ThinkPart(",
+            "ToolCall(",
+            "ToolResult(",
+            "ToolCallPart(",
+            "TextPart(",
+            "TurnEnd()",
+            "To resume this session:",
+        )
+        for line in result.stderr.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if any(stripped.startswith(p) for p in noisy_prefixes):
+                continue
+            # Keep genuine errors or concise status lines
+            print(line, file=sys.stderr)
+
+    return result.returncode
 
 
 def main() -> int:
@@ -116,6 +177,12 @@ def main() -> int:
         "--add-dir", action="append", help="Additional directories to include"
     )
     parser.add_argument("--model", help="Model to use")
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Timeout in seconds for the Kimi CLI call (default: 300)",
+    )
 
     args = parser.parse_args()
 
@@ -123,26 +190,7 @@ def main() -> int:
         parser.error("Must specify --file, --code, or --work-dir")
 
     cmd = build_command(args)
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        print(
-            "Error: 'kimi' command not found. "
-            "Ensure Kimi Code CLI is installed and on PATH.",
-            file=sys.stderr,
-        )
-        return 1
-    except Exception as e:
-        print(f"Error invoking Kimi Code CLI: {e}", file=sys.stderr)
-        return 1
-
-    if result.stdout:
-        print(result.stdout, end="")
-    if result.stderr:
-        print(result.stderr, file=sys.stderr)
-
-    return result.returncode
+    return run_kimi(cmd, args.timeout)
 
 
 if __name__ == "__main__":

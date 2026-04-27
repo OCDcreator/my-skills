@@ -57,11 +57,20 @@ echo '<code>' | kimi --print --yolo --input-format text -p "Review this code"
 Use `scripts/review.py` for a convenient wrapper with built-in prompt templates:
 
 ```bash
+# POSIX (macOS / Linux / WSL / Git Bash)
 python scripts/review.py \
   --file <path> \
   --type [general|security|performance|architecture|style] \
   [--work-dir <dir>] \
-  [--model <model>]
+  [--model <model>] \
+  [--timeout <seconds>]
+
+# PowerShell (Windows)
+python scripts\review.py `
+  --file <path> `
+  --type security `
+  --work-dir <dir> `
+  --timeout 300
 ```
 
 Review project instead of single file (omit `--file` and `--code`):
@@ -72,15 +81,27 @@ python scripts/review.py --work-dir . --type general
 
 > **Note on `--file` behavior**: this script reads the file and inlines its full contents into the prompt. For large, generated, or minified files this can waste context window or exceed limits. For large files or whole-repo reviews, prefer Method 1 (direct shell) so Kimi reads the file from disk itself.
 
+> **Cross-platform stderr**: Kimi prints MCP connection logs and internal step markers to stderr. The wrapper filters noisy internal structures so you get clean output on both PowerShell and bash/zsh. If you need full debug logs, use Method 1 directly.
+
 ### Method 3: ACP Server (Recommended for Persistent Integration)
 
 Start Kimi Code CLI as an ACP server for other agents to connect over stdio or wire:
 
 ```bash
+# Foreground (testing)
 kimi acp
+
+# Background — POSIX (macOS / Linux)
+nohup kimi acp > /tmp/kimi-acp.log 2>&1 &
+
+# Background — PowerShell (Windows)
+$proc = Start-Process -FilePath "kimi" -ArgumentList "acp" -PassThru -WindowStyle Hidden
+# Stop later: Stop-Process -Id $proc.Id
 ```
 
 Other agents can then dispatch review tasks via the Agent Communication Protocol. See Kimi Code CLI docs for ACP protocol details and connection options.
+
+> **Platform note**: On macOS, `kimi acp` may print an `authlib.jose` deprecation warning and exit if run without stdio attached. Use `nohup` or `launchd` for persistent background operation. On Windows, use `Start-Process` or run inside WSL.
 
 ## Prompt Templates
 
@@ -145,6 +166,15 @@ kimi --print --yolo -p "Review src/ for security issues" | grep -i "CRITICAL"
 kimi --print --yolo -p "Review src/ for security issues" | Select-String -Pattern "CRITICAL" -CaseSensitive:$false
 ```
 
+### Timeouts
+
+Project-wide reviews or large files may take longer on slower machines. The wrapper defaults to **300 seconds**; override with `--timeout`:
+
+```bash
+# Large project — allow 10 minutes
+python scripts/review.py --work-dir . --type architecture --timeout 600
+```
+
 ## Best Practices
 
 1. Always set `--work-dir` to the project root so Kimi resolves imports, configs, and dependencies correctly.
@@ -152,3 +182,6 @@ kimi --print --yolo -p "Review src/ for security issues" | Select-String -Patter
 3. Include specific focus areas in the prompt to reduce noise and improve relevance.
 4. Use `--add-dir` to include related packages or shared libraries outside `--work-dir`.
 5. Combine review types in a single prompt when context allows (e.g., "security and performance").
+6. **Cross-platform**: Use `pathlib.Path` (already used by the wrapper) for path handling so `/` and `\` separators work correctly on both Windows and macOS/Linux.
+7. **Timeouts**: macOS and lower-powered machines may need `--timeout 600` or more for project-wide reviews.
+8. **Stderr noise**: If using the wrapper, noisy Kimi internal logs are filtered. If you need raw stderr for debugging, use Method 1 (direct shell) directly.
