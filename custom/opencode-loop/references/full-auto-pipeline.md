@@ -142,8 +142,13 @@ Use the OpenSpec proposal as the PRD input for Task Master.
 
 Before running `parse-prd`, you MUST detect available API keys and configure the provider. Skip this only if the user has already configured Task Master.
 
+If the target project has a `.env` file, source it first so the detection sees those keys:
+
 ```bash
-# Detect available API keys
+[[ -f .env ]] && set -a && source .env && set +a
+```
+
+Then detect keys:
 if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
   task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
   # If no fallback key, use same:
@@ -318,8 +323,19 @@ Describe the solution.
 EOF
 
 # === Layer 2: Task Master ===
+# Provider preflight — detect available API keys
+if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
+  task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
+elif [[ -n "${OPENAI_COMPATIBLE_API_KEY:-}" ]]; then
+  export OPENAI_API_KEY="$OPENAI_COMPATIBLE_API_KEY"
+  task-master models --set-main openai-compatible
+elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+  task-master models --set-main anthropic
+fi
+
 task-master init --yes
 task-master parse-prd openspec/changes/my-feature/proposal.md
+# Task normalization: review and remove meta-automation tasks before import
 
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir "$TARGET" --from-taskmaster --tag tm
@@ -334,6 +350,11 @@ opencode-loop queue validate --dir "$TARGET"
 for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' "$QUEUE"); do
   opencode-loop queue promote --dir "$TARGET" --task "$id"
 done
+
+# Commit bootstrap assets before starting execute (dirty tree blocks new tasks)
+git add openspec/ .taskmaster/ opencode.json
+git add .claude/ .gemini/ .opencode/ 2>/dev/null || true
+git commit -m "chore: bootstrap opencode-loop pipeline artifacts"
 
 opencode-loop init --dir "$TARGET" --mode execute
 opencode-loop start --dir "$TARGET" --profile execute
@@ -352,6 +373,10 @@ Set-Location $Target
 # === Layer 1: OpenSpec ===
 openspec init $Target
 openspec new change my-feature --description "See proposal.md"
+openspec instructions proposal --change my-feature
+openspec instructions design --change my-feature
+openspec instructions specs --change my-feature
+openspec instructions tasks --change my-feature
 
 $proposal = @"
 # Proposal: My Feature
@@ -372,12 +397,29 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($proposalPath, $proposal, $utf8)
 
 # === Layer 2: Task Master ===
+# Provider preflight — detect available API keys
+if ($env:DEEPSEEK_API_KEY) {
+  task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
+} elseif ($env:OPENAI_COMPATIBLE_API_KEY) {
+  $env:OPENAI_API_KEY = $env:OPENAI_COMPATIBLE_API_KEY
+  task-master models --set-main openai-compatible
+} elseif ($env:ANTHROPIC_API_KEY) {
+  task-master models --set-main anthropic
+}
+
 task-master init --yes
 task-master parse-prd openspec/changes/my-feature/proposal.md
+# Task normalization: review and remove meta-automation tasks before import
 
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir $Target --from-taskmaster --tag tm
 opencode-loop queue validate --dir $Target
+
+# Commit bootstrap assets before starting execute
+git add openspec/ .taskmaster/ opencode.json
+git add .claude/ .gemini/ .opencode/ 2>$null; if ($LASTEXITCODE -ne 0) { $null }
+git commit -m "chore: bootstrap opencode-loop pipeline artifacts"
+
 opencode-loop init --dir $Target --mode execute
 opencode-loop start --dir $Target --profile execute
 ```

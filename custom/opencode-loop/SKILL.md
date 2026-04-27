@@ -475,7 +475,7 @@ When running the Full Auto Pipeline, the following files WILL be created in the 
 | `openspec init` | `.claude/`, `.gemini/`, `.opencode/` | Yes, if they contain project instructions |
 | `openspec new change` | `openspec/changes/<name>/` | Yes |
 | `task-master init` | `.taskmaster/`, `.env.example` | Yes |
-| `opencode-loop init` | `opencode.json`, `.opencode-loop/program.md` | Yes for `opencode.json` and `program.md` |
+| `opencode-loop init` | `opencode.json`, `.opencode-loop/program.md` | Yes for `opencode.json` only (`program.md` is gitignored) |
 | Runtime (first start) | `.opencode-loop/` (state, runtime, logs, queue) | No — gitignored local runtime |
 
 - Start with a small iteration cap before long unattended runs.
