@@ -30,7 +30,6 @@ my-skills/
 │   ├── x-reader/                              # 内容转录与分析（含子技能）
 │   │   ├── video/                             #   视频/播客转录与结构化总结
 │   │   └── analyzer/                          #   多维内容分析与 actionable insights
-│   └── fork-upstream-workflow-workspace/      # fork-upstream-workflow 评估工作区（非技能）
 ├── external/                                  # 外部来源（技能 + 设计参考）
 │   ├── anthropics-skills/                     # Anthropic 官方技能
 │   ├── awesome-claude-skills/                 # ComposioHQ 社区技能
