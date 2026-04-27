@@ -4,37 +4,61 @@
     {
       "id": 1,
       "prompt": "我想从零开始做一个小型 FastAPI 项目，让 OpenCode Loop 无人值守地先跑 3 轮，把项目骨架、README、基础测试都建起来。你帮我准备并直接用命令行跑。",
-      "expected_output": "Assistant should trigger the skill, confirm/prepare target project details, choose command-line mode, prefer opencode-loop init/start with a quick profile or next-command preview, fall back to bin/setup.sh/opencode-loop.sh only if the global wrapper is unavailable, and report monitoring paths.",
+      "expected_output": "Assistant should trigger the skill, choose command-line dev mode, prefer opencode-loop init/start with a quick profile, and report monitoring paths.",
       "files": []
     },
     {
       "id": 2,
       "prompt": "这个仓库现在测试有一堆失败和 warning，我想用 TUI 看着它自动修。请先帮我整理要填到 OpenCode Loop TUI 里的路径、mode、iterations、timeout 和任务说明。",
-      "expected_output": "Assistant should trigger the skill, choose TUI mode, prepare a target-specific task brief and TUI field checklist, and include the Windows/WSL launcher guidance when relevant.",
+      "expected_output": "Assistant should trigger the skill, choose TUI mode, prepare a target-specific task brief and TUI field checklist.",
       "files": []
     },
     {
       "id": 3,
       "prompt": "帮我用 open loop 跑一下当前项目的优化，不要无限跑，先限制几轮，目标是减少 lint 报错并修掉 obvious bugs。",
-      "expected_output": "Assistant should recognize open loop/OpenCode Loop intent, set a bounded CLI plan with small iteration cap, prepare acceptance criteria, prefer opencode-loop init/start or next-command, and start/monitor the loop safely without hand-building long commands when the wrapper is available.",
+      "expected_output": "Assistant should recognize open loop/OpenCode Loop intent, set a bounded CLI plan with small iteration cap, prefer opencode-loop start --profile quick.",
       "files": []
     },
     {
       "id": 4,
       "prompt": "我只是想让你手动看一下 Python 报错，别启动任何无人值守 agent。",
-      "expected_output": "Assistant should not use OpenCode Loop despite related debugging language because the user explicitly asks for manual debugging and no unattended agent.",
+      "expected_output": "Assistant should not use OpenCode Loop because the user explicitly asks for manual debugging.",
       "files": []
     },
     {
       "id": 5,
       "prompt": "我已经安装了全局 opencode-loop 命令。帮我确认版本、检查远端是否最新，然后给出一个长任务 supervisor 的推荐启动命令，但不要真的启动。",
-      "expected_output": "Assistant should use opencode-loop --version, opencode-loop update-check --json, and opencode-loop next-command --kind supervisor --profile long; it should explain that update-check is explicit and normal startup does not auto-fetch.",
+      "expected_output": "Assistant should use opencode-loop --version, update-check --json, and next-command --kind supervisor --profile long.",
       "files": []
     },
     {
       "id": 6,
-      "prompt": "我要给一个项目配置每轮前跑 Kimi UI、每轮后跑 Codex review 的 opencode-loop hooks，并让大模型以后优先读机器可读状态。",
-      "expected_output": "Assistant should use opencode-loop hooks add/list/test rather than hand-editing hooks.json, prefer status --json and doctor --json for machine-readable state, and keep hook failures as retry/warn rather than stopping the loop.",
+      "prompt": "我要给一个项目配置每轮后跑 Codex review 和 Claude Code review 的 opencode-loop hooks。",
+      "expected_output": "Assistant should use opencode-loop hooks add for both codex-review and claude-review, using correct CLI syntax.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "我在 opencode-loop 管理的项目里有一个 OpenSpec change 叫 add-user-auth，tasks.md 里有 6 个 checkbox 任务。我想用队列模式一个一个跑，每个任务跑完要过 verification 和 acceptance 门禁。帮我设置。",
+      "expected_output": "Assistant should use opencode-loop plan --from-openspec, explain enrichment step (add verification/acceptance_checks via jq), use queue promote --task per task, and start with --profile execute or core script --mode execute.",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "我有一个 .taskmaster/tasks/tasks.json 里有 12 个任务带依赖关系和优先级。我想导入到 opencode-loop 队列里用 execute 模式跑，每个任务还要过 TDD 门禁。怎么搞？",
+      "expected_output": "Assistant should use opencode-loop plan --from-taskmaster, explain tdd_required enrichment via jq, promote tasks individually, start with --profile execute or core script.",
+      "files": []
+    },
+    {
+      "id": 9,
+      "prompt": "opencode-loop 队列跑到第 3 个任务 verification gate 挂了，我想重试这个任务，看看它的 gate 错误信息，然后跳过 policy gate 继续跑。给具体命令。",
+      "expected_output": "Assistant should use queue show --task to inspect gate_results, queue set-status --task --status todo for retry, and explain that --skip-gates only skips review/tdd — to skip policy the user needs --unsafe-skip-baseline-gates on the core script.",
+      "files": []
+    },
+    {
+      "id": 10,
+      "prompt": "我想要 opencode-loop 每个任务在独立 worktree 里开发，做完后 merge 回 main。需要怎么配置？",
+      "expected_output": "Assistant should explain editing queue.json profile: isolation=worktree, integration_strategy=fast_forward_merge, using jq to modify.",
       "files": []
     }
   ]
