@@ -5,30 +5,33 @@ description: "Use when the user wants opencode-loop unattended or self-running m
 
 # OpenCode Loop Skill
 
-Use this skill to help the user run the local `opencode-loop` project as an unattended orchestrator over a target project. It fits repeated model iterations: bootstrapping, backlog execution, refactoring, bug fixing, test repair, lint/type cleanup, or ML experiment loops.
+Use this skill to turn a natural language requirement into an autonomously executed project. The default workflow is the **Full Auto Pipeline**: you receive a requirement, structure it with OpenSpec, decompose it with Task Master, then execute each task through opencode-loop's gated queue — without asking the user to choose modes or run individual commands.
 
-OpenCode Loop has three routes:
+## How This Skill Works
 
-- **Command-line `dev` / `ml`** — open-ended unattended work.
-- **Queue-gated `execute`** — task-by-task execution with mandatory gates.
-- **TUI** — visual control plane for setup, monitoring, and multi-project supervision.
+When the user gives you a requirement (e.g., "帮我写一个计算器库", "build a REST API", "add auth to my app"), you do this automatically:
 
-## First Decide The Route
+1. **Read `references/full-auto-pipeline.md`** — it contains the complete three-layer workflow. Load it now and follow it end-to-end.
+2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
+3. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
+4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, promote, `init --mode execute`, start.
+5. **Hand off** the running loop to the user with monitoring instructions.
 
-Choose a route early:
+Do NOT ask "which mode?" or "which route?" when the user gives a requirement. Just start the pipeline. Only ask for clarification if the target project path is unclear or the requirement is genuinely ambiguous.
 
-- **Command-line `dev` / `ml`** when the user wants the loop to run directly from a broad goal.
-- **Queue-gated `execute`** when the user has structured tasks and wants every task verified before the next one starts.
-- **TUI** when the user wants a visual workflow or to supervise multiple targets.
-- If the user does not choose, default to command-line `dev` and mention `execute` and TUI as alternatives.
+The three routes exist for users who explicitly request them:
+- **`dev` / `ml`** — user says "run opencode-loop in dev mode" or wants open-ended iteration without structured tasks.
+- **Queue-gated `execute`** — user already has a tasks file and wants to skip OpenSpec/Task Master.
+- **TUI** — user explicitly asks for the visual control plane.
 
-Clarify before starting:
+## Before Starting
 
-- Target project path, or whether a new project should be created.
-- Goal statement: what should be built, improved, fixed, or investigated.
-- Mode: `dev`, `ml`, or `execute`.
-- Stop condition: iteration cap, tests to pass, acceptance criteria, or explicit completion signal.
-- Safety boundary: files or directories the loop must not modify, and secrets to avoid.
+Clarify if unclear:
+
+- Target project path (required).
+- Safety boundary: files or directories the loop must not modify.
+
+Everything else (proposal, tasks, gates) you handle autonomously.
 
 ## Locate The Repo
 
