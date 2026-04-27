@@ -44,6 +44,9 @@ task-master models --set-main deepseek-chat \
 ```text
 User requirement
     ↓
+Layer 0: Create feature branch — NEVER work on main
+    git checkout -b feat/my-feature
+    ↓
 Layer 1: OpenSpec — create a change proposal
     openspec init → openspec new change → write proposal.md
     ↓
@@ -51,7 +54,7 @@ Layer 2: Task Master — generate structured tasks
     task-master init --yes → task-master parse-prd → optional expand
     ↓
 Layer 3: opencode-loop — import, enrich, promote, execute
-    plan --from-taskmaster → enrich → queue promote → start execute
+    plan --from-taskmaster → enrich → set isolation → queue promote → start execute
 ```
 
 ## Layer 1: OpenSpec
@@ -297,7 +300,11 @@ bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 30 --aut
 #!/bin/bash
 set -euo pipefail
 TARGET="${1:?Usage: $0 /path/to/target}"
+CHANGE="${2:-my-feature}"
 cd "$TARGET"
+
+# === Layer 0: Feature branch ===
+git checkout -b "feat/$CHANGE"
 
 # === Layer 1: OpenSpec ===
 openspec init "$TARGET"
@@ -351,6 +358,10 @@ for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' "$QUEUE"); do
   opencode-loop queue promote --dir "$TARGET" --task "$id"
 done
 
+# Set branch isolation so tasks don't all land on the same branch
+jq '.profile.isolation = "branch" | .profile.integration_strategy = "branch_chain"' \
+  "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
+
 # Commit bootstrap assets before starting execute (dirty tree blocks new tasks)
 git add openspec/ .taskmaster/ opencode.json
 git add .claude/ .gemini/ .opencode/ 2>/dev/null || true
@@ -365,10 +376,14 @@ opencode-loop start --dir "$TARGET" --profile execute
 ```powershell
 param(
   [Parameter(Mandatory = $true)]
-  [string]$Target
+  [string]$Target,
+  [string]$ChangeName = "my-feature"
 )
 
 Set-Location $Target
+
+# === Layer 0: Feature branch ===
+git checkout -b "feat/$ChangeName"
 
 # === Layer 1: OpenSpec ===
 openspec init $Target
@@ -414,6 +429,14 @@ task-master parse-prd openspec/changes/my-feature/proposal.md
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir $Target --from-taskmaster --tag tm
 opencode-loop queue validate --dir $Target
+
+# Set branch isolation
+$queueFile = Join-Path $Target ".opencode-loop/queue.json"
+$tmp = Join-Path $env:TEMP "q.tmp"
+$utf8 = [System.Text.UTF8Encoding]::new($false)
+$result = jq '.profile.isolation = "branch" | .profile.integration_strategy = "branch_chain"' $queueFile
+[System.IO.File]::WriteAllText($tmp, $result, $utf8)
+Move-Item -Force $tmp $queueFile
 
 # Commit bootstrap assets before starting execute
 git add openspec/ .taskmaster/ opencode.json

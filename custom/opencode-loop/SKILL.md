@@ -11,13 +11,16 @@ Use this skill to turn a natural language requirement into an autonomously execu
 
 When the user gives you a requirement (e.g., "帮我写一个计算器库", "build a REST API", "add auth to my app"), you do this automatically:
 
-⚠️ HARD CONSTRAINT: When this skill triggers, the Full Auto Pipeline overrides any generic brainstorming, design Q&A, or route-selection flow. Do NOT ask "which mode?" or start a design conversation. Read `references/full-auto-pipeline.md` and begin executing Layer 1 immediately. Only ask for clarification if the target project path is missing or the requirement is genuinely ambiguous.
+⚠️ HARD CONSTRAINT: When this skill triggers, the Full Auto Pipeline overrides any generic brainstorming, design Q&A, or route-selection flow. Do NOT ask "which mode?" or start a design conversation. Read `references/full-auto-pipeline.md` and begin executing Layer 0 (feature branch) immediately. Only ask for clarification if the target project path is missing or the requirement is genuinely ambiguous.
+
+**NEVER run the pipeline on the main/master branch.** Always create a feature branch first (`git checkout -b feat/<name>`). All pipeline work — bootstrap, execute, commits — must stay on a dedicated branch. Main must remain clean.
 
 1. **Read `references/full-auto-pipeline.md`** — it contains the complete three-layer workflow. Load it now and follow it end-to-end.
-2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
-3. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
-4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, promote, `init --mode execute`, start.
-5. **Hand off** the running loop to the user with monitoring instructions.
+2. **Execute Layer 0** — `git checkout -b feat/<name>` on the target project.
+3. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
+4. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
+5. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, set `profile.isolation = "branch"`, promote, `init --mode execute`, start.
+6. **Hand off** the running loop to the user with monitoring instructions.
 
 Do NOT ask "which mode?" or "which route?" when the user gives a requirement. Just start the pipeline. Only ask for clarification if the target project path is unclear or the requirement is genuinely ambiguous.
 
@@ -32,6 +35,7 @@ Clarify if unclear:
 
 - Target project path (required).
 - Safety boundary: files or directories the loop must not modify.
+- Feature branch name (required for Full Auto Pipeline — the pipeline must NEVER run on main).
 
 Everything else (proposal, tasks, gates) you handle autonomously.
 
@@ -414,8 +418,23 @@ The Windows TUI frontend runs natively while setup and loop actions still execut
 
 The Full Auto bootstrap creates files that make the working tree dirty. The execute loop will refuse to start new tasks on a dirty tree with no active task. This is the most counter-intuitive step. Follow this exact sequence:
 
-1. After `plan --from-taskmaster`, enrich tasks, and promote them.
-2. **Commit all bootstrap assets** before starting execute:
+1. **Create a feature branch first** — NEVER run the pipeline on main:
+    ```bash
+    cd /path/to/target
+    git checkout -b feat/my-feature
+    ```
+    All pipeline work (bootstrap, execute, commits) stays on this branch. Main remains clean. The user can review and merge when satisfied.
+
+2. After `plan --from-taskmaster`, enrich tasks, and promote them.
+
+3. **Set queue isolation** to prevent tasks from touching the same branch:
+    ```bash
+    QUEUE="/path/to/target/.opencode-loop/queue.json"
+    jq '.profile.isolation = "branch" | .profile.integration_strategy = "branch_chain"' \
+      "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
+    ```
+
+4. **Commit all bootstrap assets** before starting execute:
     ```bash
     cd /path/to/target
     git add openspec/ .taskmaster/ opencode.json
@@ -424,24 +443,26 @@ The Full Auto bootstrap creates files that make the working tree dirty. The exec
     git add .claude/ .gemini/ .opencode/ 2>/dev/null || true
     git commit -m "chore: bootstrap opencode-loop pipeline artifacts"
     ```
-3. Verify worktree is clean:
-   ```bash
-   git status --porcelain
-   ```
-4. Verify `control.json.desired_state == "running"`.
-5. **Now** start execute:
-   ```bash
-   opencode-loop init --dir /path/to/target --mode execute
-   opencode-loop start --dir /path/to/target --profile execute
-   ```
-6. **Immediately after start**, check if runtime wrote back config changes:
-   ```bash
-   git -C /path/to/target status --porcelain
-   ```
-   If only safe config normalization (e.g., `$schema` in opencode.json), do one more commit:
-   ```bash
-   git add -A && git commit -m "chore: runtime config normalization"
-   ```
+5. Verify worktree is clean:
+    ```bash
+    git status --porcelain
+    ```
+6. Verify `control.json.desired_state == "running"`.
+7. **Now** start execute:
+    ```bash
+    opencode-loop init --dir /path/to/target --mode execute
+    opencode-loop start --dir /path/to/target --profile execute
+    ```
+8. **Immediately after start**, check if runtime wrote back config changes:
+    ```bash
+    git -C /path/to/target status --porcelain
+    ```
+    If only safe config normalization (e.g., `$schema` in opencode.json), do one more commit:
+    ```bash
+    git add -A && git commit -m "chore: runtime config normalization"
+    ```
+
+When all tasks complete, the feature branch contains all pipeline commits. The user can review with `git log main..feat/my-feature --oneline` and merge with `git checkout main && git merge feat/my-feature`.
 
 ## Safety And Boundaries
 
