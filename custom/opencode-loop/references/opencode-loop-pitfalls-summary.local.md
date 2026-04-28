@@ -2,6 +2,156 @@
 
 这份总结基于一次在 macOS 上、面向 `opencodian` 仓库、完整走通 `opencode-loop` 技能的实战。重点不是功能缺失，而是 **技能文案、CLI 语义、运行时状态机、以及真实仓库工作流之间的断层**。
 
+## 最新新增痛点（待继续优化）
+
+下面这些是你完成上一轮技能和项目优化之后，我继续在“新 worktree + Kimi review gate + execute 续跑”阶段踩到的新增坑。它们依然属于 **技能和项目结合面** 的问题，而不是单纯的人为操作失误。
+
+### A. 新 worktree 创建被中断后，容易留下“半创建分支 + 无 worktree 目录”的状态
+
+现象：
+
+- `git worktree add ... -b autopilot/thick-owner-loop` 被旧的 `index.lock` 卡住。
+- 分支已经创建出来了，但 worktree 目录没真正落好。
+- 后续如果不先识别“分支已存在但 worktree 未绑定”，很容易继续乱建分支或误判失败。
+
+后果：
+
+- 自动化从主工作区切到新 worktree 的第一步就会进入半残状态。
+- 代理如果不做恢复，后续所有“新树继续跑”都会卡在错误前提上。
+
+建议：
+
+- 技能增加“worktree 创建恢复”小节：
+  1. 先查 `git worktree list`
+  2. 再查目标分支是否已创建
+  3. 若分支已存在但目录不存在，直接 `git worktree add <path> <branch>`
+  4. 若有 `index.lock`，先确认没有活跃 git 进程，再清理锁
+
+### B. 新 worktree 不会自动继承本地 `.opencode-loop` queue/runtime 语义
+
+现象：
+
+- 在新 worktree 里执行 `opencode-loop init --mode execute`，会先创建一份空的 manual queue。
+- 它不会自动继承上一棵工作树里已经调好的 `taskmaster -> queue -> master-7/master-8` 状态。
+
+后果：
+
+- 一旦切到新 worktree，不显式迁移 `.opencode-loop/queue.json`、`program.md`、hooks 配置，就会丢失“继续上一轮任务”的上下文。
+
+建议：
+
+- 技能明确区分：
+  - repo 资产可由 Git 带过去
+  - `.opencode-loop` 是本地运行态，不会自动跟过去
+- 增加“新 worktree 续跑”步骤：
+  1. `init --mode execute`
+  2. 从旧树迁移 `program.md` / `queue.json` / `hooks.json`
+  3. 重置当前 task 为可重跑状态
+
+### C. Kimi 审查命令在真实机器上可能不是 `kimi-code`
+
+现象：
+
+- 技能示例里长期沿用 `kimi-code`
+- 这台机器上实际可用命令是 `kimi`
+
+后果：
+
+- 直接照技能示例挂 hook，会在本机失效。
+
+建议：
+
+- 技能把 Kimi 命令前置探测写死：
+  - `command -v kimi-code || command -v kimi`
+- 文档示例不要只写一个命令名，应该写成“先探测，再注入 hook”
+
+### D. `gate-review` 命令本身可用，不代表 `hooks test` 路径稳定可用
+
+现象：
+
+- `kimi --print --final-message-only ...` 最小 JSON 输出是通的
+- 但 `opencode-loop hooks test --event post_iteration --iteration 0` 会长时间挂住
+
+后果：
+
+- 不能把 `hooks test` 当成唯一的 hook 健康检查
+- 否则会在“审查功能其实能用”的情况下，被测试命令本身拖住主任务
+
+建议：
+
+- 技能里把 hook 验证拆成两层：
+  1. 先验证 reviewer 命令最小 JSON 输出
+  2. 再把 `hooks test` 作为附加验证，而不是唯一准入门槛
+
+### E. 只挂 `gate-review` hook 还不够，queue 任务还必须显式 `review_required=true`
+
+现象：
+
+- 新 worktree 里虽然已经挂上 `gate-review`
+- 但如果 queue 任务本身还是 `review_required=false`，Kimi 审查不会真正参与 gate 判定
+
+后果：
+
+- 看起来“审查已经接上了”，实际上只是旁路 hook，不是硬 gate
+
+建议：
+
+- 技能在 queue enrichment 阶段直接写清楚：
+  - 哪些任务必须 `review_required=true`
+  - 不要等 loop 启动以后再补
+
+### F. 新 worktree 没有依赖环境，不能假设可以立即 execute
+
+现象：
+
+- 新树 checkout 完是干净的，但 `node_modules` 不在
+- 如果直接跑 execute，后续 verification 很容易因为依赖缺失失败
+
+后果：
+
+- “切到新树继续自动跑”会退化成“新树上重新踩依赖坑”
+
+建议：
+
+- 技能把 worktree continuation 明确成：
+  1. create/add worktree
+  2. 安装依赖
+  3. 校验 doctor / tests baseline
+  4. 再恢复 queue 和 execute
+
+### G. 任务已经提交，但 loop 收尾失败时，可能因为 repo-visible 脏改动再次掉回 blocked 自旋
+
+现象：
+
+- `master-8` 在新 worktree 里已经真实产出并提交了代码改动。
+- 但 loop 没把这轮完整收尾，随后工作树里留下了 `opencode.json` 的 repo-visible 脏改动。
+- 因为这时已经没有 active task 了，child loop 就开始疯狂重复：
+  `Dirty working tree with no active task. Cannot start new task.`
+
+后果：
+
+- 用户会误以为“它还在继续跑”，其实它已经退化成空转自旋。
+- 更糟的是，这种状态不是任务执行失败，而是 **任务已完成 + 收尾失败**，很容易把判断搞混。
+
+本质：
+
+- queue/loop 对“代码任务成功提交”与“repo-visible 运行时回写文件”之间缺少一致的收尾策略。
+- `opencode.json` 这种会被 runtime 轻微改写的文件，在没有 active task 时会立刻把 loop 推回 blocked。
+
+建议：
+
+- 技能里新增一个“任务提交后再看一次 worktree”检查：
+  1. 如果任务已 commit
+  2. 立刻 `git status --porcelain`
+  3. 如果只剩 `opencode.json` / 类似 runtime 配置回写，明确规定：
+     - 要么自动吸纳到当前任务收尾
+     - 要么自动停止 loop，要求人工确认
+- 不要让 loop 在“已无 active task + 仅剩 repo-visible runtime 改动”的状态下继续重试。
+
+## 已完成/已缓解的旧痛点
+
+下面第 1-15 条是上一轮总结里的痛点。你已经在新版 skill / 项目里对它们做了显式修补或明显缓解，因此这里保留为“归档 + 回归清单”，不再作为当前主矛盾。
+
 ## 结论先说
 
 - 这个技能现在已经能跑通，但更像是“熟悉日志和脚本的人可以救回来”的状态。
@@ -11,9 +161,9 @@
   - `dirty-tree handoff`
   - `control-state semantics`
 
-## 一、最高优先级痛点
+## [已缓解] 一、最高优先级痛点
 
-### 1. 技能入口和通用设计/澄清流程冲突
+### 1. [已完成] 技能入口和通用设计/澄清流程冲突
 
 现象：
 
@@ -35,7 +185,7 @@
   `opencode-loop` Full Auto Pipeline 覆盖通用 brainstorming / route-choice。
 - 只有在项目路径不清楚、需求本身严重歧义时才允许先问。
 
-### 2. OpenSpec 当前脚手架和技能参考漂移
+### 2. [已完成] OpenSpec 当前脚手架和技能参考漂移
 
 现象：
 
@@ -60,7 +210,7 @@
   4. 按 artifact 指令补齐各文件
 - 不要再把 `proposal.md` 当成天然存在的文件。
 
-### 3. Task Master provider bootstrap 是硬断点
+### 3. [已完成] Task Master provider bootstrap 是硬断点
 
 现象：
 
@@ -88,7 +238,7 @@
     - `task-master models --set-research ...`
   - 必要时临时桥接 `OPENAI_COMPATIBLE_API_KEY="$DEEPSEEK_API_KEY"`
 
-### 4. `parse-prd` 很容易产出“元自动化任务”
+### 4. [已完成] `parse-prd` 很容易产出“元自动化任务”
 
 现象：
 
@@ -117,9 +267,9 @@
   - 删除泛脚本/模板发明倾向
 - 明确写进技能：Task Master 输出不是权威，OpenSpec contract 才是权威。
 
-## 二、CLI / 运行时语义上的坑
+## [已缓解] 二、CLI / 运行时语义上的坑
 
-### 5. `opencode-loop plan` wrapper 健壮性不足
+### 5. [已完成] `opencode-loop plan` wrapper 健壮性不足
 
 现象：
 
@@ -142,7 +292,7 @@
   - 如果不可执行，自动 `chmod +x`
   - 或直接 fallback 到 `bash bin/opencode-loop-plan.sh ...`
 
-### 6. `start --profile execute` 的语义非常误导
+### 6. [已完成] `start --profile execute` 的语义非常误导
 
 现象：
 
@@ -168,7 +318,7 @@
   - `desired_state == running`
   - 如果不是，先改 control，再启动 supervisor
 
-### 7. `execute` profile 实际继承了 `quick` 的 15 分钟 timeout
+### 7. [已完成] `execute` profile 实际继承了 `quick` 的 15 分钟 timeout
 
 现象：
 
@@ -194,7 +344,7 @@
   - 长任务优先 `next-command --kind supervisor --profile execute`
   - 再把 timeout 显式改成 60 分钟或用户要求值
 
-### 8. 状态面板和真实执行流可能严重脱节
+### 8. [已缓解] 状态面板和真实执行流可能严重脱节
 
 现象：
 
@@ -225,9 +375,9 @@
   4. `state.json` / `runtime.json`
 - 不要只教用户看 `status --json`。
 
-## 三、工作树与本地状态管理的坑
+## [已缓解] 三、工作树与本地状态管理的坑
 
-### 9. dirty working tree 和 execute handoff 极易互相打架
+### 9. [已完成] dirty working tree 和 execute handoff 极易互相打架
 
 现象：
 
@@ -259,7 +409,7 @@
   - 再确保 worktree clean
   - 再启动第一轮 execute
 
-### 10. `.opencode-loop/` 是本地运行态，不是 repo 资产
+### 10. [已完成] `.opencode-loop/` 是本地运行态，不是 repo 资产
 
 现象：
 
@@ -290,7 +440,7 @@
     - `.opencode-loop/output-*.jsonl`
     - `.opencode-loop/logs/`
 
-### 11. 启动后 runtime 还可能回写 repo-visible 文件
+### 11. [已缓解] 启动后 runtime 还可能回写 repo-visible 文件
 
 现象：
 
@@ -310,9 +460,9 @@
   - 启动 execute 后，马上再看一次 `git status`
   - 如果只出现安全可接受的配置标准化写回，决定是否作为 bootstrap 尾声再补一笔提交
 
-## 四、文档层体验上的坑
+## [已缓解] 四、文档层体验上的坑
 
-### 12. Full Auto bootstrap 的改动量很吵
+### 12. [已缓解] Full Auto bootstrap 的改动量很吵
 
 现象：
 
@@ -333,7 +483,7 @@
   - 哪些需要 commit
   - 哪些只是本地辅助
 
-## 五、最值得直接写进技能的优化方案
+## [已完成] 五、最值得直接写进技能的优化方案
 
 ### 1. 入口硬约束
 
@@ -387,13 +537,13 @@
 8. 确认 worktree clean
 9. 再启动第一轮 execute
 
-## 六、最准确的最终判断
+## [已缓解] 六、最准确的最终判断
 
 - 这个技能不是“不能用”，而是“默认路径还不够抗真实环境噪声”。
 - 真正的痛点不在模型能力，而在 **技能文案没有把运行时语义讲透**。
 - 如果不修这些断层，代理每次都可能在不同位置重复踩同一类坑。
 
-## 七、本次实战额外新增的坑
+## [已归档] 七、本次实战额外新增的坑
 
 这是在第一版总结之后，继续实跑时新增确认的坑：
 
@@ -402,7 +552,7 @@
 - `queue next` 和当前 active task 的可见性可能不同步，不能只靠 `queue next` 判断是不是已经真正开跑。
 - 启动后即便外层 `progress.txt` / `supervisor-child.log` 暂时不刷新，`output-*.jsonl` 仍可能在持续写真实执行流；活性检查必须优先看 output。
 
-### 13. Queue policy gate 失败语义不清，容易让人误判“这轮到底算成功还是失败”
+### 13. [待继续优化] Queue policy gate 失败语义不清，容易让人误判“这轮到底算成功还是失败”
 
 现象：
 
@@ -432,7 +582,7 @@
   - 要么 gate fail 时不要记作成功交付
   - 要么显式标记为 “commit happened but task not accepted”
 
-### 14. 任务重试时可能触发非法状态迁移
+### 14. [待继续优化] 任务重试时可能触发非法状态迁移
 
 现象：
 
@@ -457,7 +607,7 @@
   - 再人工检查 queue 当前 task 的 status / gate_results / attempt_count
 - 如果未来优化工具本身，最好补一个明确 retry 状态或统一 retry 前回退逻辑。
 
-### 15. 停止后状态文件可能长期滞后，显示“还在 running”
+### 15. [待继续优化] 停止后状态文件可能长期滞后，显示“还在 running”
 
 现象：
 
