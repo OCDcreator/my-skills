@@ -1,4 +1,197 @@
+# opencode-loop 踩坑痛点总结
+
+> **阅读指南（2026-04-29 更新）**
+>
+> 本文件经过 8 轮复核。最准确的当前状态在"第八次"一节。
+> "第四次"及更早的轮次中，有若干结论已被第八次明确判定为过时——这些旧段落保留作历史审计记录，但**不代表当前项目状态**。
+>
+> 如果旧轮次与第八次冲突，以第八次为准。
+
+## 最新复核补充（2026-04-29，第八次）
+
+**这一节优先级高于下面所有旧轮记录。**  
+如果和下面“第四次 / 第三次 / 更早轮次”的结论冲突，以这一节为准。
+
+这次我做了三类核对：
+
+- 我本地直接跑关键 CLI 测试
+- 我本地直接抽查 skill / README / 项目脚本实现
+- 我额外起了一个 `gpt-5.5` 只读子代理做快速复核
+
+这轮最重要的结论不是“又发现了一批新缺陷”，而是：
+
+- **有几条之前反复出现的痛点，现在已经可以明确判定为“旧结论过时，需要纠偏”。**
+- **现在真正还值得继续优化的点，已经从“大流程跑不通”收敛成“少数文档语义和运行时边界仍需统一”。**
+
+### 这次确认已经解决，旧结论需要撤回或改写的点
+
+#### 1. `start --profile execute --dry-run` 有副作用，这条已经不成立
+
+我这次本地直接跑了：
+
+- `bats tests/test_cli.bats`
+
+结果：
+
+- 全部通过，`15/15`
+- 其中已经包含：
+  - `cli start --profile execute --dry-run does not modify control.json`
+  - `cli start --profile execute --dry-run does not create missing control.json`
+
+这意味着：
+
+- 之前“dry-run 仍会改 control.json / 仍会创建 control.json”的结论，现在应明确标记为**已解决**
+- 后面旧轮次里如果还保留这类说法，都应该视为历史记录，不再代表当前状态
+
+#### 2. `start --profile execute` 的 `desired_state=running` 自愈，现在是项目实现，不只是技能提醒
+
+现状：
+
+- CLI 里已经有 `ensure_execute_control_running()`
+- execute profile 真启动前会把 `desired_state` 拉回 `running`
+
+这意味着：
+
+- 这条不再属于“用户必须记住的手工避坑”
+- 它已经进入项目启动路径的显式保护
+
+#### 3. `DEEPSEEK_API_KEY` 检测缺失，这条现在也需要纠偏
+
+我这次本地用临时仓库实测：
+
+- `opencode.json` 里显式配置 `deepseek`
+- 环境里只给 `DEEPSEEK_API_KEY`
+- 跑 `preflight --json`
+
+结果：
+
+- `provider_keys.detected` 能看到 `DEEPSEEK_API_KEY`
+- `provider_keys.ok=true`
+
+这意味着：
+
+- “项目 CLI 只认 OpenAI / Anthropic / OpenAI-compatible，不认 DeepSeek”这个结论已经过时
+- 更准确的现状是：
+  **DeepSeek 已进入 provider catalog，但 pass/fail 语义仍取决于当前 repo 配置了哪些 provider**
+
+#### 4. Task Master 导入任务默认 `review_required:false / tdd_required:false`，这条也已经不成立
+
+我这次直接检查当前 `adapt_taskmaster()`：
+
+- `review_required: true`
+- `tdd_required: true`
+
+这意味着：
+
+- 之前把这条继续写成“默认仍然偏松”的说法，已经不准确
+- 现在更准确的问题不再是“默认没开”
+- 而是“默认虽然开了，但 review gate 的最终可用性仍依赖 `gate-review` hook 是否真的配置好”
+
+#### 5. README profile 表缺 `execute`，这条已经解决
+
+现状：
+
+- README 的 profile 表里已经明确列出 `execute`
+
+这意味着：
+
+- 这条不应再作为当前残留问题继续往下传
+
+#### 6. Kimi / kimi-code 的“主文案级不一致”已经基本关闭
+
+现状：
+
+- skill 主文案已经改成先探测：
+  `command -v kimi-code || command -v kimi`
+- README 也已经对齐这一思路
+
+这意味着：
+
+- 之前那种“技能主路径仍硬编码 kimi-code”的说法，现在至少不能再笼统保留
+- 如果后面还要继续优化，应该更精确地描述成：
+  **检查是否还有局部示例残留，而不是继续把它定性成主路径级断层**
+
+### 这次新收敛出来、最值得继续优化的点
+
+#### 1. `opencode.json` 的定位现在其实已经偏向“本地 runtime state”，但历史文案还有残余冲突
+
+现状：
+
+- `setup.sh` 会创建 `opencode.json`
+- `setup.sh` 同时把 `opencode.json` 写进 `.gitignore`
+- skill 当前也明确写了：
+  `opencode.json` 是 runtime-generated、默认不应提交
+
+这意味着：
+
+- 从**当前实现 + 当前技能文案**看，项目已经更接近一个统一结论：
+  **`opencode.json` 默认属于 repo 根目录里的本地运行态，而不是应提交的 repo asset**
+- 真正的问题已经不再是“项目不知道怎么处理它”
+- 而是这份痛点总结里仍保留了多轮历史说法，容易让下一轮优化者误以为这件事还没有定论
+
+如果你下一轮要优化，我建议把问题表述成：
+
+- **要么正式确认 `opencode.json` 默认就是 gitignored runtime file，并把所有旧文案统一删干净**
+- **要么反过来把项目实现改掉，不再默认 gitignore 它**
+
+现在最怕的不是“功能没做”，而是“文档仍同时保留两套世界观”。
+
+#### 2. `dirty working tree with no active task` 这条，旧文档大概率已经落后于当前代码
+
+现状：
+
+- 当前 `opencode-loop.sh` 代码路径里，dirty tree + no active task 已经是：
+  - `state_set_status "environment_blocked"`
+  - `return 6`
+- 也就是从实现语义上看，它已经更接近**阻断退出**
+- 但 skill 这段说明仍然沿用旧的“spin loop / 看起来还在忙”的表述
+
+这意味着：
+
+- 这里当前最值得优化的，不一定是项目代码本身
+- 而是**把技能和这份痛点总结里的旧表述改成和当前实现一致**
+
+更准确的写法应该是：
+
+- 旧问题是：runtime `opencode.json` 可能把 worktree 弄脏
+- 当前实现是：发现后直接进入 `environment_blocked` 路径，而不是继续假装正常推进
+- 当前仍需提醒的是：如何在长跑前避免 `opencode.json` 脏工作树，而不是继续把它描述成“还会空转”
+
+#### 3. 现在最需要继续优化的，已经不是 execute 主流程，而是“文档历史层累积的误导”
+
+这次回头看，最容易让下一轮优化继续打偏的，不是代码，而是这份总结文件里仍混着多轮旧结论，例如：
+
+- 还写着 DeepSeek 不被识别
+- 还写着 Task Master 默认 `review_required:false / tdd_required:false`
+- 还写着 README profile 表缺 `execute`
+- 还写着 dry-run 仍有副作用
+- 还写着 dirty-tree 仍会 spin
+
+这些说法如果不在文档层先纠偏，会直接误导下一轮优化方向。
+
+### 这轮之后，最准确的总判断
+
+- 现在已经不能把 `opencode-loop` 的主问题继续概括成“execute 主路径不稳”了。
+- 更准确的状态是：
+  **主路径关键坑大多已经修掉；剩下主要是 `opencode.json` 分层语义、dirty-tree 文案同步、以及历史痛点总结自身仍有过期结论。**
+
+### 我建议你下一轮优先优化的顺序
+
+1. 先统一 `opencode.json` 的官方定位：到底是 repo asset，还是默认 gitignored runtime state
+2. 把 skill 和这份痛点总结里关于 dirty-tree 的旧“spin loop”表述，改成和当前 `environment_blocked / return 6` 语义一致
+3. 把这份痛点总结里已经过时的旧问题统一标成“已解决 / 已纠偏”，不要继续让它们混在“当前残留问题”里
+4. 只有在以上三条统一后，再继续追更细的 provider / hook / review 体验问题
+
+---
+> **以下为历史复核记录。如果与上方第八次结论冲突，以上方为准。**
+---
+
 ## 最新复核补充（2026-04-28，第四次）
+
+> ⚠️ **部分结论已过时**。第八次复核确认以下条目已经不成立：
+> - §1 "dirty working tree + no active task 仍然会空转" → 现在是 `environment_blocked` + `return 6`（阻断退出，不空转）
+> - §3 "Task Master 导入后 review_required:false / tdd_required:false" → 现在默认 `true`
+> - §4 "skill 示例里仍残留 kimi-code 硬编码" → 现在已改为探测模式
 
 这部分基于你再次优化后的新一轮真实复核，结论需要对前一版做一个关键纠偏：
 
@@ -64,6 +257,8 @@
 
 #### 1. dirty working tree + no active task 仍然会空转
 
+> **⚠️ 第八次复核确认：本条已过时。** 当前实现直接 `environment_blocked` + `return 6`，不再空转。保留此段仅供历史对比。
+
 现象：
 
 - execute 模式下，如果 worktree 是 dirty 且当前没有 active task
@@ -101,6 +296,8 @@
 
 #### 3. provider / review / TDD 默认策略仍然是“部分补齐”
 
+> **⚠️ 第八次复核确认：本条部分过时。** `adapt_taskmaster()` 现在默认 `review_required: true, tdd_required: true`。残留问题只是 review gate 的最终可用性仍依赖 `gate-review` hook 是否真的配置好。
+
 现状：
 
 - provider preflight 比之前强很多，execute 真启动前已经会 fail-fast
@@ -118,6 +315,8 @@
 - 但还没有进步到“默认就是你偏好的强审查 / 强 TDD 路径”
 
 #### 4. skill 示例里仍残留 `kimi-code` 硬编码
+
+> **⚠️ 第八次复核确认：本条已基本关闭。** skill 主文案已改为 `command -v kimi-code || command -v kimi` 探测模式。仅剩局部示例可能残留，不再是主路径级问题。
 
 现状：
 
@@ -155,6 +354,8 @@
 4. skill 示例里的 Kimi 命令探测方式，和项目 README 完全对齐
 
 ## 最新复核补充（2026-04-28，第三次）
+
+> ⚠️ **本节多段结论已被后续轮次推翻。** 保留作审计记录，不代表当前状态。
 
 这部分是你再次优化技能和项目之后，我又做的一轮真实复核。相比前一版，这次最重要的新结论有两个：
 
@@ -244,6 +445,8 @@
 4. 之后再回头统一 skill 里仍残留的 `kimi-code` 硬编码示例
 
 ## 重新优化后的二次复核（2026-04-28，追加）
+
+> ⚠️ **本节为历史审计记录。** 多个结论已被后续轮次（特别是第四次和第八次）推翻。
 
 这部分基于你再次优化技能和项目之后，我重新做的一轮真实复核，包含：
 
@@ -395,6 +598,8 @@
 4. 统一 hook blocking timeout 和 gate command timeout 的默认口径
 
 ## 最新回归复核（2026-04-28）
+
+> ⚠️ **本节为最早一轮复核。** 大部分结论已被后续轮次推翻或明显改善。
 
 这部分是基于你完成上一轮技能和项目优化之后，我再次按“技能文案 + 项目实现 + 本地测试”做的一轮真实复核。结论不是“之前痛点都解决了”，而是：
 
@@ -838,6 +1043,8 @@
 
 ### G. 任务已经提交，但 loop 收尾失败时，可能因为 repo-visible 脏改动再次掉回 blocked 自旋
 
+> **⚠️ 状态更新：** 当前实现中，检测到 dirty working tree + no active task 后，loop 直接进入 `environment_blocked` 状态并退出（exit code 6），不再"自旋"或"空转"。本节保留的"后果"描述已不适用于当前代码，但预防建议（确保 `opencode.json` 在 `.gitignore` 中）仍然有效。
+
 现象：
 
 - `master-8` 在新 worktree 里已经真实产出并提交了代码改动。
@@ -864,9 +1071,9 @@
      - 要么自动吸纳到当前任务收尾
      - 要么自动停止 loop，要求人工确认
 - 不要让 loop 在“已无 active task + 仅剩 repo-visible runtime 改动”的状态下继续重试。
-## 已完成/已缓解的旧痛点
+## [已归档] 已完成/已缓解的旧痛点
 
-下面第 1-15 条是上一轮总结里的痛点。你已经在新版 skill / 项目里对它们做了显式修补或明显缓解，因此这里保留为“归档 + 回归清单”，不再作为当前主矛盾。
+> 以下第 1-15 条已确认解决或明显缓解。保留作回归检查清单，不作为当前主矛盾。
 
 ## 结论先说
 

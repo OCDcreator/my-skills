@@ -428,7 +428,7 @@ After creating a worktree for execution continuation:
 
 #### Post-Commit / Post-Task Repo Cleanliness
 
-After a task commits changes but before the loop finalizes the iteration, repo-visible runtime files (`opencode.json`) may show as uncommitted. (`.opencode-loop/` is already gitignored by `setup.sh` — it's `opencode.json` in the project root that causes the problem.) This can trigger a spin loop: "Dirty working tree with no active task. Cannot start new task."
+After a task commits changes but before the loop finalizes the iteration, repo-visible runtime files (`opencode.json`) may show as uncommitted. (`.opencode-loop/` is already gitignored by `setup.sh` — it's `opencode.json` in the project root that causes the problem.) When this is detected with no active task, the loop immediately exits with `environment_blocked` status (exit code 6) — it does NOT spin or retry.
 
 Resolution:
 
@@ -446,7 +446,7 @@ git add opencode.json && git commit --amend --no-edit
 git checkout -- opencode.json
 ```
 
-This is not a task-execution failure — the task's code changed successfully, but `opencode.json` was rewritten by runtime and left dirty. Option A is preferred; verify `.gitignore` has `opencode.json` before starting long unattended runs.
+This is not a task-execution failure — the task's code changed successfully, but `opencode.json` was rewritten by runtime and left dirty. The loop correctly detects this and exits cleanly rather than spinning. Option A is preferred; verify `.gitignore` has `opencode.json` before starting long unattended runs.
 
 ### Failure / Recovery
 
@@ -457,7 +457,7 @@ This is not a task-execution failure — the task's code changed successfully, b
 | Task stuck `rejected` | `queue show --task ID --json` | Fix gate failure, `queue set-status --task ID --status todo --reason "retry"` |
 | Stale `index.lock` blocks worktree ops | `.git/index.lock` exists, no git process | `rm -f .git/index.lock` |
 | Worktree: branch exists, path missing | `git branch` shows branch, `git worktree list` doesn't | `git worktree add <path> <branch>` (re-bind) |
-| "Dirty working tree with no active task" | Completed task, `opencode.json` dirty | Gitignore `opencode.json` or absorb into commit |
+| "Dirty working tree with no active task" | Completed task, `opencode.json` dirty | Loop exits `environment_blocked` (code 6). Gitignore `opencode.json` or absorb into commit |
 | Rate limit hit | 100 calls/hour | Wait, or check `rate_limit.json` |
 | Supervisor says stale | No activity for `--stale-minutes` | Check `supervisor.log` |
 | WSL hooks can't find CLI | CLIs not in WSL PATH | Symlink: `ln -s $(which claude.exe) /usr/local/bin/claude` |
