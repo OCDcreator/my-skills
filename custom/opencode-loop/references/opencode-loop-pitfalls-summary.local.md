@@ -144,7 +144,7 @@
   - `state_set_status "environment_blocked"`
   - `return 6`
 - 也就是从实现语义上看，它已经更接近**阻断退出**
-- 但 skill 这段说明仍然沿用旧的“spin loop / 看起来还在忙”的表述
+- skill 已经改成当前语义：dirty tree + no active task 会进入 `environment_blocked` / `return 6` 路径，不再描述成“spin loop / 看起来还在忙”
 
 这意味着：
 
@@ -165,7 +165,7 @@
 - 还写着 Task Master 默认 `review_required:false / tdd_required:false`
 - 还写着 README profile 表缺 `execute`
 - 还写着 dry-run 仍有副作用
-- 还写着 dirty-tree 仍会 spin
+- 旧轮次还保留 dirty-tree 曾会 spin 的历史说法；当前第八次结论是阻断退出，不能再当作现状
 
 这些说法如果不在文档层先纠偏，会直接误导下一轮优化方向。
 
@@ -178,7 +178,7 @@
 ### 我建议你下一轮优先优化的顺序
 
 1. 先统一 `opencode.json` 的官方定位：到底是 repo asset，还是默认 gitignored runtime state
-2. 把 skill 和这份痛点总结里关于 dirty-tree 的旧“spin loop”表述，改成和当前 `environment_blocked / return 6` 语义一致
+2. 后续若继续整理历史段落，只保留 dirty-tree 旧“spin loop”表述作为历史对比，并始终以当前 `environment_blocked / return 6` 语义为准
 3. 把这份痛点总结里已经过时的旧问题统一标成“已解决 / 已纠偏”，不要继续让它们混在“当前残留问题”里
 4. 只有在以上三条统一后，再继续追更细的 provider / hook / review 体验问题
 

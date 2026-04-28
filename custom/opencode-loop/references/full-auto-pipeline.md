@@ -24,6 +24,9 @@ Set the API key in the target project's `.env` file (ensure `.env` is in `.gitig
 
 - `OPENAI_COMPATIBLE_API_KEY=<your-key>` for `--openai-compatible` providers
 - `ANTHROPIC_API_KEY=<your-key>` for Anthropic
+- `DEEPSEEK_API_KEY=<your-key>` for native `deepseek`
+
+`opencode-loop doctor/preflight` detects `DEEPSEEK_API_KEY` natively. Its `provider_keys.ok` result is still narrowed by the providers detected in the target project's `opencode.json`: if `deepseek` is the only configured provider, `DEEPSEEK_API_KEY` can satisfy the provider-key check; if the config also names OpenAI, Anthropic, or OpenAI-compatible providers, those keys are still required. If no provider is configured, the current preflight treats the full catalog as required.
 
 Example provider setup:
 
@@ -36,6 +39,8 @@ task-master models --set-main deepseek-chat \
   --openai-compatible \
   --baseURL https://api.deepseek.com/v1/
 ```
+
+The Task Master example above uses its OpenAI-compatible adapter for DeepSeek. That is separate from opencode-loop's native `deepseek` provider-key detection, which looks for `DEEPSEEK_API_KEY` when the target `opencode.json` names `deepseek`.
 
 `task-master parse-prd` must run from inside the target project directory because the PRD path is resolved relative to that directory.
 
@@ -142,7 +147,7 @@ task-master list
 
 Notes:
 
-- `parse-prd` requires a configured AI provider and the correct API key in `.env`.
+- `parse-prd` requires a configured AI provider and the correct API key in `.env`; for DeepSeek, use the key expected by the adapter you configured for Task Master, and remember that opencode-loop preflight separately checks the target `opencode.json` provider set.
 - The Task Master adapter used by `opencode-loop plan --from-taskmaster` already handles `.master.tasks[]` automatically. Do not hand-roll your own JSON parser unless you are intentionally bypassing the adapter.
 
 ## Layer 3: Import Into `opencode-loop`

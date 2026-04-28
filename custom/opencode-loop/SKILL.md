@@ -88,7 +88,7 @@ opencode-loop doctor --dir /path/to/target --json
 
 `doctor --json` returns a comprehensive health check:
 - `commands` — availability of `opencode`, `jq`, `git`, `timeout`
-- `provider_keys` — detected API keys, missing keys, and `ok` boolean
+- `provider_keys` — detected API keys, configured providers, missing keys, and `ok` boolean. Native catalog keys are `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_COMPATIBLE_API_KEY`, and `DEEPSEEK_API_KEY`; `ok` is still narrowed by providers detected in the target `opencode.json`, so `DEEPSEEK_API_KEY` alone is sufficient only when the configured provider set requires `deepseek` and does not also require another missing provider key.
 - `taskmaster_normalization` — meta-task detection and suspicious task IDs in queue
 - `process_check` — PID liveness for loop, supervisor, and child processes
 - `version` — local version, commit, repo path
@@ -183,7 +183,7 @@ Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/sta
 
 ### 5. Optional Hooks
 
-Hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted.
+Normal hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted. Do not confuse these with execute mode's `gate-review` blocking gate hook: that hook is consumed by the review gate, and a missing or failing `gate-review` makes the gate unavailable/fail instead of merely warning.
 
 **Detect reviewer commands before adding hooks.** Commands vary across machines:
 
@@ -300,7 +300,7 @@ Promotion checks queue integrity and valid verification configuration.
 opencode-loop init --dir /path/to/target --mode execute
 opencode-loop start --dir /path/to/target --profile execute
 
-bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 20 --auto-reset
+bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 30 --timeout 60 --session-mode multi --session-rotate 5 --auto-reset
 ```
 
 Gate order stays fixed:
@@ -523,6 +523,8 @@ The Windows TUI frontend runs natively while setup and loop actions still execut
 - Set the API key in the target project's `.env` file (ensure `.env` is in `.gitignore`):
   - `OPENAI_COMPATIBLE_API_KEY=<your-key>` for `--openai-compatible` providers
   - `ANTHROPIC_API_KEY=<your-key>` for Anthropic
+  - `DEEPSEEK_API_KEY=<your-key>` for native `deepseek`
+- `provider_keys.ok` is evaluated against the configured provider set detected from the target `opencode.json`. If no provider is configured, all catalog keys are required; if providers are configured, only those providers' keys are required. Therefore `DEEPSEEK_API_KEY` being detected does not by itself make preflight pass when the target config also names OpenAI, Anthropic, or OpenAI-compatible without their keys.
 - In execute mode, imported tasks start as `draft` and require enrichment plus explicit promotion before execution.
 
 ## Final Response Pattern
