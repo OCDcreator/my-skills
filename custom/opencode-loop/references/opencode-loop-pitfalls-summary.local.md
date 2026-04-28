@@ -1,6 +1,723 @@
+## 最新复核补充（2026-04-28，第四次）
+
+这部分基于你再次优化后的新一轮真实复核，结论需要对前一版做一个关键纠偏：
+
+- **前一版里“macOS `plan / queue / gate` 仍失败”的结论，在当前工作树里已经不成立。**
+- **但并不等于全部痛点清零。现在剩下的主问题，已经收敛成更具体的运行时边界问题。**
+
+这一轮我做了两类核对：
+
+- 我本地直接复跑关键 Bats 测试
+- `gpt-5.5` 子代理做独立审计，再和我本地结果交叉验证
+
+### 这次确认已解决 / 需要纠偏的点
+
+#### 1. macOS `plan / queue / gate` 兼容问题，在当前工作树里已经跑通
+
+现状：
+
+- 我本地直接跑了：
+  - `tests/test_plan_adapters.bats`
+  - `tests/test_queue_manager.bats`
+  - `tests/test_gate_manager.bats`
+- 这三组这次在当前工作树里全部通过
+
+这意味着：
+
+- 上一版里把它定性为“仍未解决”，现在需要纠偏
+- 至少在**当前这份本地工作树**里，`queue_manager.sh` 那条最关键的 macOS 兼容链已经显著改善
+
+但要注意：
+
+- 这个结论是**基于当前工作树**，不是基于“已经提交后的历史版本”
+- 我这次同时看到项目仓库仍有未提交改动：`lib/queue_manager.sh`
+- 所以更准确的说法是：
+  **当前工作树里的实现已经把这条线跑绿了，但这份结果仍依赖当前未提交代码状态**
+
+#### 2. `start --profile execute` / 主循环 control state 语义现在可以算真修好了
+
+现状：
+
+- CLI execute profile 启动前会主动把 `desired_state` 拉回 `running`
+- 主循环启动时也会再次兜底 reset
+- integration 测试这轮继续通过
+
+这意味着：
+
+- 这块已经不是“靠技能文案提醒使用者绕坑”
+- 而是项目本身在启动路径上补了自愈
+
+#### 3. Full Auto 路由冲突、OpenSpec artifact drift、Task Master 元任务归一化，这三类老坑现在都可以归到“已明显改善”
+
+现状：
+
+- skill 已明确 Full Auto Pipeline 覆盖泛化 brainstorming / route selection
+- OpenSpec 那段已经写清楚：`openspec new change` 后必须显式补 proposal/design/specs/tasks
+- Task Master `parse-prd` 后，skill 要求 mandatory normalization；项目 adapter 也开始自动剔除可疑 meta tasks
+
+这意味着：
+
+- 这些不再是之前那种“代理极容易第一脚踩偏”的状态
+- 至少从 skill 文案和项目适配层看，都比最初稳定很多
+
+### 这次新确认仍未解决的点
+
+#### 1. dirty working tree + no active task 仍然会空转
+
+现象：
+
+- execute 模式下，如果 worktree 是 dirty 且当前没有 active task
+- 主循环会持续报：
+  `Dirty working tree with no active task. Cannot start new task.`
+- 但它不会立刻把这轮当成 fatal/blocking exit 收掉
+- 我本地用临时仓库直接复现后，`timeout 2s` 退出码是 `124`，日志里同一轮持续重复报错
+
+问题本质：
+
+- 这块虽然已经能**检测并标记 blocked**
+- 但还没有做到**检测后立即干净退出或停止推进 run_count**
+
+这意味着：
+
+- 对无人值守场景来说，这仍然是一个真实坑
+- 它会让 loop 看起来“还在忙”，实际上只是在空转
+
+#### 2. Full Auto one-script summary 里 `CHANGE` 和 `my-feature` 变量仍然漂移
+
+现象：
+
+- one-script summary 先定义了：
+  `CHANGE="${2:-my-feature}"`
+- 但后面 OpenSpec change 名、artifact 路径、proposal 路径仍然直接写死 `my-feature`
+
+问题本质：
+
+- 分支名和 OpenSpec change id 没有真正统一用同一个变量
+
+这意味着：
+
+- 用户一旦换 feature 名
+- 这段示例脚本就会出现“branch 名变了，但 OpenSpec 路径没跟着变”的文档性误导
+
+#### 3. provider / review / TDD 默认策略仍然是“部分补齐”
+
+现状：
+
+- provider preflight 比之前强很多，execute 真启动前已经会 fail-fast
+- 但 CLI provider catalog 仍主要识别：
+  - `OPENAI_API_KEY`
+  - `ANTHROPIC_API_KEY`
+  - `OPENAI_COMPATIBLE_API_KEY`
+- Task Master 导入后的任务默认仍是：
+  - `review_required: false`
+  - `tdd_required: false`
+
+这意味着：
+
+- 项目已经从“完全松散”进步到“具备能力”
+- 但还没有进步到“默认就是你偏好的强审查 / 强 TDD 路径”
+
+#### 4. skill 示例里仍残留 `kimi-code` 硬编码
+
+现状：
+
+- 项目 README 已经开始提示先探测 `kimi` / `kimi-code`
+- 但 skill 示例里仍然残留直接写死 `kimi-code` 的地方
+
+这意味着：
+
+- 项目侧认知已经更新
+- skill 侧示例还没有完全对齐
+
+### 对上一版结论的修正
+
+上一版里最核心的未解决项写成了：
+
+- `queue_manager.sh` 的 macOS Bash 兼容问题仍在拖累 `plan / queue / gate`
+
+这一条在**当前工作树复核结果**下应调整为：
+
+- **已在当前工作树里明显改善，并且关键测试已跑绿**
+- 但由于项目仓库当前仍有 `lib/queue_manager.sh` 未提交改动，所以更准确的状态是：
+  **“当前工作树已修通，是否算正式解决还取决于这部分实现是否最终沉淀提交”**
+
+### 当前最准确的结论
+
+- 现在已经不能再说“这套技能和项目还停留在靠熟手救火才能跑”的早期状态了。
+- execute 主路径、control state、status/doctor、OpenSpec/Task Master 文档衔接、queue/gate 主干能力，这些都已经明显进步。
+- 但如果标准是“之前所有痛点是不是都解决了”，答案仍然是：**还没有完全。**
+
+当前最值得优先继续优化的，已经收敛成下面 4 条：
+
+1. dirty tree + no active task 时，不要空转，应该立即停止或显式退出
+2. one-script summary 全量改成变量一致，不要再混用 `CHANGE` 和 `my-feature`
+3. 如果目标是强审查 / 强 TDD，无论 skill 还是 adapter 默认值都要继续前推
+4. skill 示例里的 Kimi 命令探测方式，和项目 README 完全对齐
+
+## 最新复核补充（2026-04-28，第三次）
+
+这部分是你再次优化技能和项目之后，我又做的一轮真实复核。相比前一版，这次最重要的新结论有两个：
+
+- **provider preflight 又往前走了一步**：`execute` 真启动前，缺 provider key 现在已经会 fail-fast，不再只是 warning。
+- **macOS Bash 兼容问题并没有彻底收掉**：`queue_manager.sh` 相关路径仍残留 `declare -A` 和空数组边界问题，导致 `plan adapters / queue / gate` 这条链在 macOS 上继续失败。
+
+### 这次确认已经继续变好的点
+
+#### 1. execute 的 provider preflight 已经从“提示”升级为“阻断”
+
+现状：
+
+- `cmd_start` 在 execute 且非 dry-run 时，会检查 `provider_keys.ok`
+- 如果缺 provider key，会直接报错退出
+
+这意味着：
+
+- 这块已经不再只是“看见风险但继续跑”
+- 对低经验代理来说，少了一种“明知没 provider 还硬启动”的误跑
+
+#### 2. integration 主路径这次依然是绿的
+
+现状：
+
+- 我本地直接跑 `tests/test_loop_integration.bats`
+- 这次整文件通过
+
+这意味着：
+
+- execute 主循环、session 延续、timeout、pause/resume 这些主路径至少没有重新退化
+
+### 这次重新确认的未解决项
+
+#### 1. `queue_manager.sh` 仍残留 Bash 4 专属写法
+
+现象：
+
+- 我本地跑 `tests/test_plan_adapters.bats` 时，多条失败直接报：
+  - `declare: -A: invalid option`
+  - `... unbound variable`
+- 我本地跑 `tests/test_queue_manager.bats` 时，也有多条同类失败
+- 我本地跑 `tests/test_gate_manager.bats` 时，仍能触发依赖数组相关失败
+
+问题本质：
+
+- 你前面确实修掉了一部分 `mapfile` 路径
+- 但 `queue_manager.sh` 里围绕 queue validate / next task / adapter output validate 的关键路径，仍然残留 Bash 4 依赖
+
+这意味着：
+
+- 现在不能再把“macOS Bash 兼容”归类为半坑
+- 它仍然是一个明确的、真实可复现的未解决项
+
+#### 2. `plan adapters` 这条线当前不能算稳定
+
+现象：
+
+- `tests/test_plan_adapters.bats` 中：
+  - OpenSpec adapter
+  - Task Master adapter
+  - manual adapter
+  - adapter output validate
+  这几类测试都还能被 `queue_manager.sh` 的兼容问题打断
+
+问题本质：
+
+- 不是技能文案问题
+- 是项目底层 queue/validate 逻辑在 macOS 环境仍不稳
+
+这意味着：
+
+- 即使 Full Auto 文档已经更完整
+- 真到 `plan --from-openspec` / `plan --from-taskmaster` 这一步，mac 上还是会继续踩坑
+
+### 这次最准确的结论
+
+- 当前版本已经比前几轮更强，尤其是 execute 主流程、provider preflight、status/doctor、review gate 这些方面都在继续进步。
+- 但如果标准是“之前的痛点是不是都解决了”，答案仍然是：**没有**。
+- 现在最核心的残留已经收敛到一条非常具体的线：
+  **`queue_manager.sh` 的 macOS Bash 兼容问题，仍在拖累 plan / queue / gate 相关路径。**
+
+### 当前最优先的剩余修复项
+
+1. 把 `queue_manager.sh` 里剩余的 `declare -A` 依赖全部清掉
+2. 修掉空依赖数组/空集合情况下的 `deps[@]` unbound variable 边界
+3. 先把 `tests/test_plan_adapters.bats`、`tests/test_queue_manager.bats`、`tests/test_gate_manager.bats` 跑回绿
+4. 之后再回头统一 skill 里仍残留的 `kimi-code` 硬编码示例
+
+## 重新优化后的二次复核（2026-04-28，追加）
+
+这部分基于你再次优化技能和项目之后，我重新做的一轮真实复核，包含：
+
+- `gpt-5.5` 子代理独立审计
+- 我本地直接抽查 skill / 项目实现
+- 我本地直接跑关键 Bats 测试
+
+这一轮和上一轮相比，结论已经明显变好了：
+
+- 之前一些“只在技能文案里提醒、项目本身不兜底”的坑，现在项目侧开始补控制逻辑和检测了。
+- `test_loop_integration.bats` 这类主路径回归，这次我本地已经整文件通过。
+- 但我本地仍看到一个剩余边界失败，所以结论依然不是“全部痛点都彻底解决”。
+
+### 这次已经明显关闭的点
+
+#### 1. `start --profile execute` 不再依赖旧的 `desired_state`
+
+现状：
+
+- CLI 在 execute profile 启动前，会主动初始化或重置 `control.json.desired_state=running`
+- 主循环启动时也会再次兜底重置
+
+这意味着：
+
+- 这个坑已经从“技能提醒但项目不自愈”，变成“项目和技能双保险”
+
+#### 2. health / status 不再只是读 JSON 文件
+
+现状：
+
+- `status --json` 现在已经带真实 PID liveness 检查和 stale running warning
+- `doctor --json` 也开始报告 loop / supervisor / child 的进程健康
+
+这意味着：
+
+- 这块已经不再只是技能层的“认知升级”
+- 项目 CLI 本身开始提供更接近 ground truth 的状态信息
+
+#### 3. `hooks test` 与真实 gate 路径的关系已经被正式产品化说明
+
+现状：
+
+- 普通 `hooks test` 现在会明确警告：这只是 normal hook path
+- `hooks test --gate` 才测试 blocking gate semantics
+- CLI 测试里也已经覆盖了 `--gate` 语义
+
+这意味着：
+
+- 这块虽然仍然是两条路径，但已经不再是“隐性断层”
+- 至少用户和代理能被明确告知“哪条才是真实 review gate 路径”
+
+#### 4. provider / normalization 终于开始进入 CLI 检测面
+
+现状：
+
+- CLI 新增了 `preflight`
+- `doctor --json` 和 `start --dry-run` 会报告 provider key 缺失
+- 也会检测 queue 中是否存在 suspicious meta tasks
+
+这意味着：
+
+- 它还不是硬阻断，但已经不再完全依赖技能文案
+- 项目侧开始具备“发现问题并显式告警”的能力
+
+#### 5. macOS `mapfile` 兼容问题这次已经部分被修掉
+
+现状：
+
+- 上一轮我在 `queue_manager.sh` 里看到的 `mapfile` 依赖，这次关键路径已经被改成兼容写法
+- `test_loop_integration.bats` 本地这次整文件通过
+
+这意味着：
+
+- 之前那种“主路径直接被 Bash 版本打断”的状态已经缓解很多
+
+### 这次仍然只是“部分解决”的点
+
+#### 1. provider preflight 现在能检测，但还不是 fail-fast
+
+现状：
+
+- CLI 会 warning
+- `init --mode execute` / `start` 会跑 preflight
+- 但 provider key 缺失当前仍不会直接阻断执行
+
+问题本质：
+
+- 这是“检测到了”，还不是“系统替你拦住了”
+
+#### 2. `parse-prd` 元自动化任务归一化现在能提示，但不会自动修
+
+现状：
+
+- CLI 会识别 suspicious meta task ids
+- 但不会自动删除、合并、重写这些任务
+
+问题本质：
+
+- 这依然需要模型或操作者手动做最后一跳
+
+#### 3. review / TDD 仍然不是 imported task 默认硬开启
+
+现状：
+
+- 执行路径已经支持 review gate 和 TDD gate
+- 但 imported tasks 默认仍是 `review_required:false`、`tdd_required:false`
+
+问题本质：
+
+- 这代表“能力已存在”，但“默认治理强度”还没彻底收口
+
+### 这次仍然保留的残余问题
+
+#### 1. 我本地仍看到一个 gate / queue 边界失败
+
+现象：
+
+- 我本地直接跑 `tests/test_gate_manager.bats` 时，仍看到：
+  `ed_validate_exit_request rejects when more tasks remain`
+  这条用例失败
+
+说明：
+
+- 主路径稳定性比上一轮好很多
+- 但 queue/gate 边界行为还没有完全打平
+
+#### 2. `hooks test --gate` 与 gate command checks 的默认 timeout 口径仍不完全一致
+
+现状：
+
+- blocking hook 默认 timeout 还是一套
+- gate command check 默认 timeout 还是另一套
+
+说明：
+
+- 这不一定会立刻炸，但仍然是一个值得继续统一的实现细节
+
+### 这次最准确的结论
+
+- 这轮重新优化之后，`opencode-loop` 已经比上一轮更接近“代理可稳定照着技能跑主流程”的状态
+- 以前几个最烦的坑里，`desired_state`、status/doctor、integration 主路径、`hooks test --gate` 语义说明，这次都属于明显进步
+- 但如果标准是“所有历史痛点都解决，可以完全放心长期无人值守”，那现在还不能这样下结论
+
+### 当前最高优先级剩余项
+
+1. 把 provider preflight 从 warning 继续推进到更硬的 execute 前约束
+2. 把 Task Master meta-task normalization 从“检测/提示”推进到更强的系统约束
+3. 修掉 `test_gate_manager.bats` 里剩余的 queue/gate 边界失败
+4. 统一 hook blocking timeout 和 gate command timeout 的默认口径
+
+## 最新回归复核（2026-04-28）
+
+这部分是基于你完成上一轮技能和项目优化之后，我再次按“技能文案 + 项目实现 + 本地测试”做的一轮真实复核。结论不是“之前痛点都解决了”，而是：
+
+- 技能侧已经明显收口，很多历史断层已补上。
+- 项目侧仍有几处真实回归和半修状态。
+- 当前版本已经比之前稳很多，但还不算“可以完全放心地长期无人值守”。
+
+### 本轮总体判断
+
+- **已明显解决**：Full Auto 与通用 brainstorming/route-choice 冲突、OpenSpec artifact drift、execute 默认 15 分钟超时过短、dirty-tree handoff 文案断层、review gate 没真正接入执行路径、`.opencode-loop/` 本地态与 repo 资产分层不清。
+- **部分解决**：Task Master provider preflight、`parse-prd` 后任务归一化、`start --profile execute` 与 `desired_state` 语义断层、Kimi 命令探测、health/status 判断路径。
+- **仍未解决**：`hooks test` 默认路径和真实 blocking gate 路径仍不一致；provider preflight 和任务归一化仍主要依赖技能纪律，不是项目强制能力。
+- **新增确认的新坑**：macOS Bash 兼容仍有真实问题；全量测试仍不绿；部分测试断言已落后于实现。
+
+### 已确认解决的点
+
+#### 1. Full Auto 不再容易被通用 brainstorming / route-choice 带偏
+
+现状：
+
+- 技能入口已经加了硬约束：触发后默认直接走 Full Auto Pipeline，不再先问 mode/route。
+
+意义：
+
+- 这是最关键的技能层修复之一。
+- 代理更不容易再在“先设计还是先执行”上原地打转。
+
+#### 2. OpenSpec artifact drift 已经补文档
+
+现状：
+
+- 技能现在明确写了：`openspec new change` 之后，还需要显式生成 `proposal/design/specs/tasks` 的 instructions，并自己写 `proposal.md` 等产物。
+
+意义：
+
+- 这已经把“CLI 真实行为”和“技能假设”对齐了。
+
+#### 3. execute 默认超时不再是 15 分钟
+
+现状：
+
+- 项目实现和 CLI execute profile 都已经是 60 分钟级别，而不是老的 15 分钟默认。
+
+意义：
+
+- 对你这种持续自动跑、验证成本高的场景，这是实打实的可用性提升。
+
+#### 4. dirty working tree handoff 已经被正面写透
+
+现状：
+
+- 项目 execute 模式仍会在“无 active task + worktree dirty”时阻断新任务。
+- 但技能现在已经把“bootstrap 之后先 commit，再启动 execute”写成明确步骤。
+
+意义：
+
+- 这不代表项目自动修好了，但至少技能不再把用户带进这个坑里。
+
+#### 5. review gate 已真正接入执行路径
+
+现状：
+
+- `review_required=true` 时，项目会查找名为 `gate-review` 的 `post_iteration` hook，并通过 blocking hook 解析最后一行 JSON 结果。
+
+意义：
+
+- 这块已经不再只是“文案承诺”，而是确实进了 gate path。
+
+### 仍然只是“部分解决”的点
+
+#### 1. Task Master provider preflight
+
+现状：
+
+- 技能已经强制要求在 `parse-prd` 前先做 provider key 检测和配置。
+- 但项目 CLI / adapter 本身不会替你强制做这件事。
+
+问题本质：
+
+- 这仍然是“技能约束”，不是“项目能力”。
+
+#### 2. `parse-prd` 元自动化任务归一化
+
+现状：
+
+- 技能已经明确要求 normalize。
+- 但项目 `plan --from-taskmaster` 仍主要是直接映射 Task Master 输出，不会自动识别和重写元任务。
+
+问题本质：
+
+- 只要代理漏做这一步，旧坑就会回潮。
+
+#### 3. `start --profile execute` 与 `control.json.desired_state`
+
+现状：
+
+- 核心脚本启动时会把 `desired_state` 拉回 `running`。
+- 但 CLI wrapper 自身只是 `exec` 底层命令，技能仍然要求额外检查。
+
+问题本质：
+
+- 实际体验比以前好一些了，但还没完全做到“用户无脑 start 就不踩状态坑”。
+
+#### 4. Kimi 命令探测
+
+现状：
+
+- 项目 README 已经开始提示 `kimi-code || kimi`。
+- 但技能示例仍有硬编码 `kimi-code` 的地方。
+
+问题本质：
+
+- 技能和项目没有完全统一。
+
+#### 5. health / status 判断路径
+
+现状：
+
+- 技能现在已经强调：`status --json` 不是 liveness ground truth，要结合 `ps`、output、`supervisor-child.log`。
+- 但 CLI `status` 本身仍只是聚合 JSON，并不主动做真实进程交叉验证。
+
+问题本质：
+
+- 技能层认知升级了，项目层还没完全产品化。
+
+### 仍未彻底解决的点
+
+#### 1. `hooks test` 默认路径和真实 gate 路径仍分叉
+
+现状：
+
+- 普通 `hooks test` 走的是普通 hook 执行路径。
+- 只有 `hooks test --gate` 才会走 blocking gate 路径。
+
+后果：
+
+- 用户很容易在“测试 hook”和“真实 gate 执行”之间得到不一致体验。
+
+这说明：
+
+- 这块还不能算彻底收口。
+
+#### 2. provider preflight / task normalization 仍依赖模型自觉
+
+现状：
+
+- 现在它们更像是“技能强制动作”。
+- 还不是项目自己兜底的强约束。
+
+后果：
+
+- 一旦代理偷懒、技能触发不完整，老问题还是会复发。
+
+### 本轮新增确认的新坑
+
+#### 1. macOS Bash 兼容仍有真实实现问题
+
+现象：
+
+- 本地跑 `tests/test_gate_manager.bats` 时，实际出现了 `mapfile: command not found`。
+- 说明项目实现里仍有依赖更高 Bash 能力的代码路径。
+
+意义：
+
+- 这不是文档问题，而是实打实的项目问题。
+- 对 mac 用户尤其关键。
+
+#### 2. 全量测试当前仍不绿
+
+现象：
+
+- 我本地跑聚焦测试时，`tests/test_gate_manager.bats` 和 `tests/test_loop_integration.bats` 都能看到真实失败。
+
+意义：
+
+- 当前状态不能称为“项目整体已完全回稳”。
+
+#### 3. 部分测试断言已经落后于实现
+
+现象：
+
+- `test_loop_integration.bats` 里至少有两处失败，核心原因不是主逻辑坏了，而是测试还在匹配旧的 continue prompt 文字。
+- 现在实现已经改成绝对路径版本，因此测试没同步。
+
+意义：
+
+- 这类问题虽然不像运行时 bug 那么危险，但会直接让回归不绿，影响你判断系统是否真正稳定。
+
+#### 4. README 里仍残留旧超时认知
+
+现象：
+
+- 项目实现和 execute profile 已经提升到 60 分钟级别，但 README 某些位置仍能看到 15 分钟旧描述。
+
+意义：
+
+- 这属于文档残留漂移，虽然没有旧版本那么致命，但仍会误导新使用者。
+
+### 目前最准确的结论
+
+- 这个新版本已经足够让一个严格代理“按技能大体跑起来”。
+- 但它还没有稳定到“完全不用盯、所有历史坑都已经收掉”的程度。
+- 现在剩余的最高优先级，不再是继续补技能文案，而是：
+  1. 修 macOS Bash 兼容
+  2. 统一 `hooks test` 和真实 gate 路径
+  3. 把 provider preflight / task normalization 下沉成项目能力
+  4. 修回归测试，让全量测试重新回绿
+
 # opencode-loop 踩坑痛点总结
 
 这份总结基于一次在 macOS 上、面向 `opencodian` 仓库、完整走通 `opencode-loop` 技能的实战。重点不是功能缺失，而是 **技能文案、CLI 语义、运行时状态机、以及真实仓库工作流之间的断层**。
+
+## 本轮回归审计新增痛点（待继续优化）
+
+下面这些不是“第一次跑流程时踩到的坑”，而是你完成上一轮技能/项目优化后，我又专门做了一轮 **技能文案 + 项目实现 + 测试行为** 回归审计，确认还没彻底闭环的点。
+
+### A. `hooks test` 仍然可能卡住，hook 健康检查和真实 gate 路径不一致
+
+现象：
+
+- review gate 真正执行时走的是 blocking hook，里面有 `timeout 300`。
+- 但 `opencode-loop hooks test` 走的是普通 `hm_run_hooks` 路径，不带同样的阻塞保护。
+- 这意味着“真实 review gate 可控”与“hooks test 可能长时间挂住”可以同时成立。
+
+后果：
+
+- 用户会误以为 hook 系统整体不稳定。
+- 技能如果仍把 `hooks test` 当成唯一健康检查，就会把一个“可用的 reviewer 命令”误判成“不可用的 reviewer 系统”。
+
+建议：
+
+- 项目层把 `hooks test` 和 blocking gate 的超时/重试语义尽量对齐。
+- 技能层继续保留两段式验证：
+  1. 先测 reviewer 命令最小 JSON 输出
+  2. 再测 `hooks test`
+
+### B. Kimi 命令名探测仍未真正产品化，示例还在硬编码 `kimi-code`
+
+现象：
+
+- 技能和项目 README 里的示例依然主要写 `kimi-code`。
+- 但真实机器上常见情况是只有 `kimi`，没有 `kimi-code`。
+
+后果：
+
+- 这类 hook 例子会继续“文档看起来正确，落地直接失效”。
+- 用户每次换机器、换环境，都会重复踩同一个命令名坑。
+
+建议：
+
+- 技能和项目文档统一改成：
+  - 先 `command -v kimi-code || command -v kimi`
+  - 再注入具体 hook
+- 不要再默认 `kimi-code` 是稳定命令名。
+
+### C. `start --profile execute` 仍未主动修正 `control.json.desired_state`
+
+现象：
+
+- `setup.sh` 确实默认把 `desired_state` 初始化成了 `running`。
+- 但如果某次旧运行把它留在 `paused` 或 `stopped`，后续再执行 `opencode-loop start --profile execute`，CLI 本身不会帮你纠正。
+- 也就是说，这个坑现在是“技能已提醒”，但“项目还没自愈”。
+
+后果：
+
+- 用户会看到“明明 start 了，但 loop 还是很快停掉”。
+- 代理如果只照 `start` 跑，不做额外检查，仍会被旧状态绊倒。
+
+建议：
+
+- 项目层让 `start` 在 execute 启动前显式校验或重置 `desired_state=running`。
+- 技能层继续保留这一步，但最好不再完全依赖模型记住。
+
+### D. provider preflight 和 `parse-prd` 归一化，目前更多还是“技能约束”，不是“项目能力”
+
+现象：
+
+- 技能已经明确要求：
+  - 先做 Task Master provider preflight
+  - `parse-prd` 后必须做任务归一化
+- 但项目 CLI 本身还不会强制探测 provider，也不会自动识别“元自动化任务并改写掉”。
+
+后果：
+
+- 这两件事仍然依赖代理是否严格按技能执行。
+- 一旦模型偷懒、漏做，旧坑就会回潮。
+
+建议：
+
+- 如果你希望“技能照着跑就稳定”，这两步最好继续往项目能力里下沉。
+- 至少要让 `plan --from-taskmaster` 或其上游 preflight 对这些风险给出显式告警。
+
+### E. `setup.sh` 生成的 execute 默认 queue profile 与 queue manager 默认 profile 仍有轻微漂移
+
+现象：
+
+- `queue_manager` 默认 profile 包含 `integration_strategy`。
+- 但 `setup.sh` 初始化 execute queue 时写进去的 profile 仍缺这个字段。
+
+后果：
+
+- 虽然当前多数路径还能跑，但这类 schema 轻微漂移以后很容易再演化成新的文档/实现错位。
+- 这种问题最烦的地方在于：它不会立刻炸，但会持续增加心智负担。
+
+建议：
+
+- 把 `setup.sh` 的 execute queue 默认 profile 和 `queue_manager` 默认 profile 做成同源，避免再漂。
+
+### F. 仍存在真实测试回归，说明“主路径变稳”不等于“整体完全收口”
+
+现象：
+
+- 这轮本地回归里，`tests/test_loop_integration.bats` 的 timeout 相关用例仍可复现失败。
+- 这说明项目里至少还有一部分边界路径没有完全跟上最新语义。
+
+后果：
+
+- 用户在真实长跑里遇到的“偶发怪行为”，很可能不是错觉，而是已有测试边界还没完全收敛。
+
+建议：
+
+- 下一轮优化不要只补技能文案。
+- 需要把这类测试失败一并视为“项目仍有残留坑”的证据，优先修到测试回绿。
 
 ## 最新新增痛点（待继续优化）
 

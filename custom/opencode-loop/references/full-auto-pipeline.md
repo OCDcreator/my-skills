@@ -308,14 +308,14 @@ git checkout -b "feat/$CHANGE"
 
 # === Layer 1: OpenSpec ===
 openspec init "$TARGET"
-openspec new change my-feature --description "See proposal.md"
-openspec instructions proposal --change my-feature
-openspec instructions design --change my-feature
-openspec instructions specs --change my-feature
-openspec instructions tasks --change my-feature
+openspec new change "$CHANGE" --description "See proposal.md"
+openspec instructions proposal --change "$CHANGE"
+openspec instructions design --change "$CHANGE"
+openspec instructions specs --change "$CHANGE"
+openspec instructions tasks --change "$CHANGE"
 
 # Write proposal.md content here before running parse-prd
-cat > openspec/changes/my-feature/proposal.md << 'EOF'
+cat > "openspec/changes/$CHANGE/proposal.md" << 'EOF'
 # Proposal: My Feature
 
 ## Problem
@@ -341,7 +341,7 @@ elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
 fi
 
 task-master init --yes
-task-master parse-prd openspec/changes/my-feature/proposal.md
+task-master parse-prd "openspec/changes/$CHANGE/proposal.md"
 # Task normalization: review and remove meta-automation tasks before import
 
 # === Layer 3: opencode-loop ===
@@ -387,11 +387,11 @@ git checkout -b "feat/$ChangeName"
 
 # === Layer 1: OpenSpec ===
 openspec init $Target
-openspec new change my-feature --description "See proposal.md"
-openspec instructions proposal --change my-feature
-openspec instructions design --change my-feature
-openspec instructions specs --change my-feature
-openspec instructions tasks --change my-feature
+openspec new change $ChangeName --description "See proposal.md"
+openspec instructions proposal --change $ChangeName
+openspec instructions design --change $ChangeName
+openspec instructions specs --change $ChangeName
+openspec instructions tasks --change $ChangeName
 
 $proposal = @"
 # Proposal: My Feature
@@ -407,7 +407,7 @@ Describe the solution.
 - Feature works end-to-end
 "@
 
-$proposalPath = Join-Path $Target "openspec/changes/my-feature/proposal.md"
+$proposalPath = Join-Path $Target "openspec/changes/$ChangeName/proposal.md"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($proposalPath, $proposal, $utf8)
 
@@ -423,7 +423,7 @@ if ($env:DEEPSEEK_API_KEY) {
 }
 
 task-master init --yes
-task-master parse-prd openspec/changes/my-feature/proposal.md
+task-master parse-prd "openspec/changes/$ChangeName/proposal.md"
 # Task normalization: review and remove meta-automation tasks before import
 
 # === Layer 3: opencode-loop ===
