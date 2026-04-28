@@ -11,16 +11,11 @@ Use this skill to turn a natural language requirement into an autonomously execu
 
 When the user gives you a requirement (e.g., "帮我写一个计算器库", "build a REST API", "add auth to my app"), you do this automatically:
 
-⚠️ HARD CONSTRAINT: When this skill triggers, the Full Auto Pipeline overrides any generic brainstorming, design Q&A, or route-selection flow. Do NOT ask "which mode?" or start a design conversation. Read `references/full-auto-pipeline.md` and begin executing Layer 0 (feature branch) immediately. Only ask for clarification if the target project path is missing or the requirement is genuinely ambiguous.
-
-**NEVER run the pipeline on the main/master branch.** Always create a feature branch first (`git checkout -b feat/<name>`). All pipeline work — bootstrap, execute, commits — must stay on a dedicated branch. Main must remain clean.
-
 1. **Read `references/full-auto-pipeline.md`** — it contains the complete three-layer workflow. Load it now and follow it end-to-end.
-2. **Execute Layer 0** — `git checkout -b feat/<name>` on the target project.
-3. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
-4. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
-5. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, set `profile.isolation = "branch"`, promote, `init --mode execute`, start.
-6. **Hand off** the running loop to the user with monitoring instructions.
+2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
+3. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
+4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, promote, `init --mode execute`, start.
+5. **Hand off** the running loop to the user with monitoring instructions.
 
 Do NOT ask "which mode?" or "which route?" when the user gives a requirement. Just start the pipeline. Only ask for clarification if the target project path is unclear or the requirement is genuinely ambiguous.
 
@@ -35,7 +30,6 @@ Clarify if unclear:
 
 - Target project path (required).
 - Safety boundary: files or directories the loop must not modify.
-- Feature branch name (required for Full Auto Pipeline — the pipeline must NEVER run on main).
 
 Everything else (proposal, tasks, gates) you handle autonomously.
 
@@ -79,7 +73,7 @@ Prepare enough context so the unattended loop has a clear objective:
 2. Ensure the project has Git when appropriate.
 3. Add a concise project brief if the repo lacks one.
 4. Record acceptance criteria in plain language.
-5. Keep secrets out of prompts, config checked into Git, logs, and `.opencode-loop/`.
+5. Keep secrets out of prompts, `.env`, logs, and `.opencode-loop/`. Note: `opencode.json` is runtime-generated and gitignored by `setup.sh`; do not attempt to commit it unless the target project explicitly requires it.
 
 ## Command-Line Workflow (`dev` / `ml`)
 
@@ -92,16 +86,14 @@ opencode-loop --version
 opencode-loop doctor --dir /path/to/target --json
 ```
 
-#### Script Permission Self-Check
-
-```bash
-# Before running any bin/*.sh wrapper, ensure it is executable:
-ls -l bin/opencode-loop-plan.sh 2>/dev/null || true
-# If not executable, fix:
-chmod +x bin/opencode-loop-plan.sh
-# Or fallback:
-bash bin/opencode-loop-plan.sh --dir /path/to/target --from-taskmaster --tag tm
-```
+`doctor --json` returns a comprehensive health check:
+- `commands` — availability of `opencode`, `jq`, `git`, `timeout`
+- `provider_keys` — detected API keys, missing keys, and `ok` boolean
+- `taskmaster_normalization` — meta-task detection and suspicious task IDs in queue
+- `process_check` — PID liveness for loop, supervisor, and child processes
+- `version` — local version, commit, repo path
+- `update_status` — ahead/behind metadata (local-only, no `git fetch`)
+- `ok` — composite boolean (all checks pass)
 
 Fallback from the repo root:
 
@@ -165,66 +157,66 @@ Key core-script flags:
 
 ### 4. Monitor
 
+Use `status --json` as the primary health check — it merges all runtime state into one JSON object:
+
 ```bash
 opencode-loop status --dir /path/to/target --json
+```
+
+The JSON output includes:
+- `state` — iteration count, status, session ID from `state.json`
+- `runtime` — PID, process state, active config, last exit reason from `runtime.json`
+- `control` — desired state (running/stopped) and pending config from `control.json`
+- `circuit_breaker` — breaker state (closed/open/half_open) from `circuit_breaker.json`
+- `process_check` — PID liveness for loop, supervisor, and child processes
+- `process_alive` — convenience boolean: is the loop process actually running?
+- `warning` — stale-running detection (state says running but process is dead)
+- `logs` — paths to `progress.txt`, `supervisor.log`, `supervisor-child.log`
+
+Use `ps` or log inspection only when `status --json` shows unexpected results.
+
+```bash
 opencode-loop logs --dir /path/to/target --file progress --tail 80
 ```
 
 Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/state.json`, `.opencode-loop/runtime.json`, `.opencode-loop/logs/`, `.opencode-loop/output-*.jsonl`, and `.opencode-loop/stderr-*.log`.
 
-## Monitoring And Health Checks
-
-### Health Check Priority Order
-
-When checking if the loop is alive and healthy, use this priority order:
-
-1. **Process check** (ground truth):
-   ```bash
-   ps aux | grep -E 'opencode|opencode-loop' | grep -v grep
-   ```
-2. **Output file activity** (real execution flow):
-   ```bash
-   ls -lt /path/to/target/.opencode-loop/output-*.jsonl | head -5
-   tail -20 /path/to/target/.opencode-loop/output-*.jsonl
-   ```
-3. **Supervisor child log** (loop boundary events):
-   ```bash
-   tail -50 /path/to/target/.opencode-loop/supervisor-child.log
-   ```
-4. **state.json / runtime.json** (high-level status — may be stale after forced stop):
-   ```bash
-   opencode-loop status --dir /path/to/target --json
-   ```
-
-⚠️ `status --json` is NOT the ground truth for liveness. After forced stop, state.json may still show `running`. Always cross-reference with `ps` and output file timestamps.
-
-### Stale State After Forced Stop
-
-If you killed processes manually, state.json and runtime.json may retain stale values (`status: running`, old PID). To reconcile:
-
-```bash
-# Check if process is truly dead
-ps -p "$(jq -r '.pid // 0' /path/to/target/.opencode-loop/runtime.json)" 2>/dev/null && echo "ALIVE" || echo "DEAD"
-
-# If dead, reset state manually
-jq '.status = "stopped" | .iteration = 0' /path/to/target/.opencode-loop/state.json > /tmp/s.tmp && mv /tmp/s.tmp /path/to/target/.opencode-loop/state.json
-jq '.process_state = "stopped" | .last_exit_reason = "killed"' /path/to/target/.opencode-loop/runtime.json > /tmp/r.tmp && mv /tmp/r.tmp /path/to/target/.opencode-loop/runtime.json
-```
-
 ### 5. Optional Hooks
 
 Hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted.
 
+**Detect reviewer commands before adding hooks.** Commands vary across machines:
+
+```bash
+# Detect Kimi CLI (may be `kimi` or `kimi-code`)
+KIMI_CMD=$(command -v kimi-code 2>/dev/null || command -v kimi 2>/dev/null || echo "")
+CLAUDE_CMD=$(command -v claude 2>/dev/null || echo "")
+CODEX_CMD=$(command -v codex 2>/dev/null || echo "")
+```
+
 ```bash
 opencode-loop hooks add --dir /path/to/target --event pre_iteration \
-  --name kimi-ui --command 'kimi-code --dir "$OPENCODE_LOOP_TARGET_DIR" "Review UI"' --attempts 3
+  --name kimi-ui --command "$KIMI_CMD --dir \"\$OPENCODE_LOOP_TARGET_DIR\" \"Review UI\"" --attempts 3
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Review"' --attempts 3
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name claude-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review code changes."' --attempts 3
 opencode-loop hooks list --dir /path/to/target --json
-opencode-loop hooks test --dir /path/to/target --event post_iteration --iteration 0
 ```
+
+**Validate hooks in two layers.** `hooks test` may hang on slow reviewers — validate the reviewer command directly first:
+
+```bash
+# Layer 1: Validate reviewer produces valid output independently
+$KIMI_CMD --print --final-message-only --cwd /path/to/target "Output ONLY JSON: {\"result\":\"pass\"}"
+# Expected: {"result":"pass"}
+
+# Layer 2 (supplementary): hooks test confirms wiring
+# Use a timeout — it can hang if the reviewer takes >30s
+timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --iteration 0
+```
+
+Do not treat `hooks test` as the sole gate-keper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook is still functional.
 
 For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
@@ -270,7 +262,13 @@ Add for each task:
 - `verification` — project-specific commands that must pass.
 - `acceptance_checks` — objective checks using `command`, `file_exists`, or `contains`.
 - `verification_optional: true` — only when an empty verification list is intentionally allowed.
-- `review_required: true` — to enable the review gate.
+- `review_required: true` — **MANDATORY for the review gate to participate in gate decisions.** The gate-review hook alone is NOT sufficient — if the task's `review_required` is false (and the queue profile's `reviewer_required` is also false), the review gate will be skipped even if the hook is attached and runs. Always verify both levels:
+  ```bash
+  # Task-level check
+  jq '.tasks[] | select(.id == "tm-1") | .review_required // "unset"' queue.json
+  # Profile-level fallback
+  jq '.profile.reviewer_required // false' queue.json
+  ```
 - `tdd_required: true` — to enable the TDD gate.
 
 Use project-neutral verification: discover the project's real test/lint/build command first, then assign per-task checks. Do not assume `npm test` exists.
@@ -297,17 +295,6 @@ opencode-loop queue promote --dir /path/to/target --task openspec-1-2
 Promotion checks queue integrity and valid verification configuration.
 
 ### 4. Initialize And Start
-
-⚠️ IMPORTANT: Before starting execute mode, verify TWO conditions:
-1. `control.json.desired_state` must be `"running"` — if not, set it:
-   ```bash
-   jq '.desired_state = "running"' /path/to/target/.opencode-loop/control.json > /tmp/c.tmp && mv /tmp/c.tmp /path/to/target/.opencode-loop/control.json
-   ```
-2. Git worktree must be clean, OR there must be an active task accepting the dirty changes:
-   ```bash
-   git -C /path/to/target status --porcelain
-   ```
-If the tree is dirty with no active task, commit bootstrap assets first.
 
 ```bash
 opencode-loop init --dir /path/to/target --mode execute
@@ -353,6 +340,114 @@ bash opencode-loop.sh --dir /path/to/target --mode execute --skip-gates review,t
 bash opencode-loop.sh --dir /path/to/target --mode execute --unsafe-skip-baseline-gates
 ```
 
+### Worktree Isolation Lifecycle
+
+When `profile.isolation` is `worktree`, each queue task runs in an isolated Git worktree. The loop's `isolation_manager.sh` handles creation, cleanup, and integration automatically — but when an agent needs to manually manage worktrees (for recovery, continuation, or inspection), follow this lifecycle.
+
+#### Recovery From Interrupted Worktree Creation
+
+If `git worktree add -b <branch>` was killed mid-operation (SIGKILL, timeout, `index.lock` blockage), the branch may exist but the worktree directory may be missing or unregistered. Recovery:
+
+```bash
+TASK_ID="tm-8"
+BRANCH="task/${TASK_ID}"
+WORKTREE_PATH="/path/to/target/.opencode-loop/worktrees/${TASK_ID}"
+
+# Step 1: Clear stale index.lock (use git rev-parse for worktree-safe path)
+LOCK=$(git -C /path/to/target rev-parse --git-path index.lock 2>/dev/null || true)
+if [[ -f "$LOCK" ]]; then
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "[g]it.*target" >/dev/null 2>&1 && echo "active lock" || rm -f "$LOCK"
+  else
+    PS_OUT=$(ps aux 2>/dev/null || true)
+    if [[ -z "$PS_OUT" ]] || echo "$PS_OUT" | grep -q "[g]it.*target"; then
+      echo "cannot confirm liveness — not removing lock"
+    else
+      rm -f "$LOCK"
+    fi
+  fi
+fi
+
+# Step 2: Inspect current state
+git -C /path/to/target worktree list
+git -C /path/to/target branch --list "$BRANCH"
+
+# Step 3: Re-bind existing branch OR create fresh (conditional)
+if git -C /path/to/target show-ref --verify "refs/heads/$BRANCH" 2>/dev/null &&
+   ! git -C /path/to/target worktree list | grep -qF "$WORKTREE_PATH"; then
+  git -C /path/to/target worktree add "$WORKTREE_PATH" "$BRANCH"
+else
+  git -C /path/to/target worktree add "$WORKTREE_PATH" -b "$BRANCH" HEAD
+fi
+```
+
+If the loop's `isolation_manager.sh` refuses to delete a branch with unique commits, you must manually decide: (a) integrate the commits into base with `git checkout main && git merge --ff-only task/<id>`, or (b) re-bind the branch to a worktree path with `git worktree add <path> task/<id>`. Do not force-delete branches with unmerged work.
+
+#### State Migration To New Worktree
+
+New worktrees carry only Git-tracked files — not the `.opencode-loop/` runtime state from the original tree. To continue a paused queue in a new worktree:
+
+```bash
+OLD="/path/to/original-target"
+NEW="/path/to/new-worktree"
+
+opencode-loop init --dir "$NEW" --mode execute
+
+cp "$OLD/.opencode-loop/queue.json"   "$NEW/.opencode-loop/"
+cp "$OLD/.opencode-loop/program.md"   "$NEW/.opencode-loop/"
+cp "$OLD/.opencode-loop/hooks.json"   "$NEW/.opencode-loop/"
+
+# Reset stuck tasks to retryable
+opencode-loop queue set-status --dir "$NEW" --task tm-8 --status todo --reason "continuing in new worktree"
+```
+
+#### Dependency Installation Before Execute
+
+New worktrees start with no runtime dependencies. Install them before starting the loop:
+
+```bash
+cd /path/to/new-worktree
+npm install          # Node.js
+# pip install -r requirements.txt   # Python
+# bundle install                     # Ruby
+opencode-loop doctor --dir . --json
+# Run project baseline tests
+```
+
+#### Full Continuation Checklist
+
+After creating a worktree for execution continuation:
+
+1. Create/add worktree with recovery checks (index.lock, branch state)
+2. Install project dependencies
+3. `opencode-loop doctor --dir <worktree> --json` to validate
+4. Run project baseline tests to verify environment health
+5. Migrate `.opencode-loop/` runtime state (`queue.json`, `program.md`, `hooks.json`)
+6. Reset tasks to appropriate statuses
+7. `opencode-loop start --dir <worktree> --profile execute`
+
+#### Post-Commit / Post-Task Repo Cleanliness
+
+After a task commits changes but before the loop finalizes the iteration, repo-visible runtime files (`opencode.json`) may show as uncommitted. (`.opencode-loop/` is already gitignored by `setup.sh` — it's `opencode.json` in the project root that causes the problem.) This can trigger a spin loop: "Dirty working tree with no active task. Cannot start new task."
+
+Resolution:
+
+```bash
+git status --porcelain
+# If the only dirty file is opencode.json (everything else is clean or under .gitignore):
+
+# Option A: Ensure opencode.json is in .gitignore (preferred, one-time fix)
+grep -q "^opencode.json$" .gitignore 2>/dev/null || echo "opencode.json" >> .gitignore
+
+# Option B: Absorb the runtime config change into the task's cleanup commit
+git add opencode.json && git commit --amend --no-edit
+
+# Option C: Discard the runtime noise
+git checkout -- opencode.json
+```
+
+This is not a task-execution failure — the task's code changed successfully, but `opencode.json` was rewritten by runtime and left dirty. Option A is preferred; verify `.gitignore` has `opencode.json` before starting long unattended runs.
+
 ### Failure / Recovery
 
 | Symptom | Check | Fix |
@@ -360,6 +455,9 @@ bash opencode-loop.sh --dir /path/to/target --mode execute --unsafe-skip-baselin
 | `doctor --json` shows `ok: false` | Missing `opencode`, `jq`, or `git` | Install missing dependency |
 | Circuit breaker OPEN | 3+ no-progress or 5+ errors | `--auto-reset` on next start, or wait 30min cooldown |
 | Task stuck `rejected` | `queue show --task ID --json` | Fix gate failure, `queue set-status --task ID --status todo --reason "retry"` |
+| Stale `index.lock` blocks worktree ops | `.git/index.lock` exists, no git process | `rm -f .git/index.lock` |
+| Worktree: branch exists, path missing | `git branch` shows branch, `git worktree list` doesn't | `git worktree add <path> <branch>` (re-bind) |
+| "Dirty working tree with no active task" | Completed task, `opencode.json` dirty | Gitignore `opencode.json` or absorb into commit |
 | Rate limit hit | 100 calls/hour | Wait, or check `rate_limit.json` |
 | Supervisor says stale | No activity for `--stale-minutes` | Check `supervisor.log` |
 | WSL hooks can't find CLI | CLIs not in WSL PATH | Symlink: `ln -s $(which claude.exe) /usr/local/bin/claude` |
@@ -414,90 +512,7 @@ The Windows TUI frontend runs natively while setup and loop actions still execut
 - Program: leave default unless a custom plan file is ready.
 - Controls: pause/resume/stop at iteration boundaries.
 
-## Bootstrap → First Execute Handoff
-
-The Full Auto bootstrap creates files that make the working tree dirty. The execute loop will refuse to start new tasks on a dirty tree with no active task. This is the most counter-intuitive step. Follow this exact sequence:
-
-1. **Create a feature branch first** — NEVER run the pipeline on main:
-    ```bash
-    cd /path/to/target
-    git checkout -b feat/my-feature
-    ```
-    All pipeline work (bootstrap, execute, commits) stays on this branch. Main remains clean. The user can review and merge when satisfied.
-
-2. After `plan --from-taskmaster`, enrich tasks, and promote them.
-
-3. **Set queue isolation** to prevent tasks from touching the same branch:
-    ```bash
-    QUEUE="/path/to/target/.opencode-loop/queue.json"
-    jq '.profile.isolation = "branch" | .profile.integration_strategy = "branch_chain"' \
-      "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
-    ```
-
-4. **Commit all bootstrap assets** before starting execute:
-    ```bash
-    cd /path/to/target
-    git add openspec/ .taskmaster/ opencode.json
-    # program.md lives inside .opencode-loop/ which is gitignored; skip it
-    # Also add any agent config files that were created:
-    git add .claude/ .gemini/ .opencode/ 2>/dev/null || true
-    git commit -m "chore: bootstrap opencode-loop pipeline artifacts"
-    ```
-5. Verify worktree is clean:
-    ```bash
-    git status --porcelain
-    ```
-6. Verify `control.json.desired_state == "running"`.
-7. **Now** start execute:
-    ```bash
-    opencode-loop init --dir /path/to/target --mode execute
-    opencode-loop start --dir /path/to/target --profile execute
-    ```
-8. **Immediately after start**, check if runtime wrote back config changes:
-    ```bash
-    git -C /path/to/target status --porcelain
-    ```
-    If only safe config normalization (e.g., `$schema` in opencode.json), do one more commit:
-    ```bash
-    git add -A && git commit -m "chore: runtime config normalization"
-    ```
-
-When all tasks complete, the feature branch contains all pipeline commits. The user can review with `git log main..feat/my-feature --oneline` and merge with `git checkout main && git merge feat/my-feature`.
-
 ## Safety And Boundaries
-
-### Repo Assets vs Local Runtime State
-
-**Repo assets** (survive across machines, safe to commit):
-- `openspec/` — change proposals and specifications
-- `.taskmaster/` — task database
-- `opencode.json` — OpenCode configuration
-- `.claude/`, `.gemini/`, `.opencode/` — agent instructions (if created)
-
-**Local runtime state** (machine-specific, gitignored, do NOT commit):
-- `.opencode-loop/queue.json` — execution queue
-- `.opencode-loop/control.json` — pause/resume/stop state
-- `.opencode-loop/runtime.json` — PID and process state
-- `.opencode-loop/state.json` — iteration tracking
-- `.opencode-loop/output-*.jsonl` — raw NDJSON output
-- `.opencode-loop/logs/` — execution logs
-- `.opencode-loop/circuit_breaker.json`, `rate_limit.json`
-
-### Runtime Config Writeback
-
-After starting execute mode, the OpenCode runtime may normalize `opencode.json` (e.g., adding `$schema`). This can make the tree dirty again even after a clean bootstrap commit. Always re-check `git status` immediately after first execute start and handle any safe writebacks.
-
-### Expected Bootstrap Artifacts
-
-When running the Full Auto Pipeline, the following files WILL be created in the target project. This is normal and expected:
-
-| Tool | Files Created | Commit? |
-|------|--------------|---------|
-| `openspec init` | `.claude/`, `.gemini/`, `.opencode/` | Yes, if they contain project instructions |
-| `openspec new change` | `openspec/changes/<name>/` | Yes |
-| `task-master init` | `.taskmaster/`, `.env.example` | Yes |
-| `opencode-loop init` | `opencode.json`, `.opencode-loop/program.md` | Yes for `opencode.json` only (`program.md` is gitignored) |
-| Runtime (first start) | `.opencode-loop/` (state, runtime, logs, queue) | No — gitignored local runtime |
 
 - Start with a small iteration cap before long unattended runs.
 - Avoid broad destructive requests unless the user clearly intends them.

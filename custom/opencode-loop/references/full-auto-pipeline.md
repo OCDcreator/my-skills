@@ -44,9 +44,6 @@ task-master models --set-main deepseek-chat \
 ```text
 User requirement
     ↓
-Layer 0: Create feature branch — NEVER work on main
-    git checkout -b feat/my-feature
-    ↓
 Layer 1: OpenSpec — create a change proposal
     openspec init → openspec new change → write proposal.md
     ↓
@@ -54,7 +51,7 @@ Layer 2: Task Master — generate structured tasks
     task-master init --yes → task-master parse-prd → optional expand
     ↓
 Layer 3: opencode-loop — import, enrich, promote, execute
-    plan --from-taskmaster → enrich → set isolation → queue promote → start execute
+    plan --from-taskmaster → enrich → queue promote → start execute
 ```
 
 ## Layer 1: OpenSpec
@@ -68,18 +65,7 @@ openspec init /path/to/target
 openspec new change my-feature --description "Short description of what we're building"
 ```
 
-After `openspec new change`, the CLI creates the change directory and `.openspec.yaml` and `README.md`, but NOT `proposal.md`, `design.md`, `tasks.md`, or `specs/`. You must generate these artifacts explicitly:
-
-```bash
-openspec instructions proposal --change my-feature
-openspec instructions design --change my-feature
-openspec instructions specs --change my-feature
-openspec instructions tasks --change my-feature
-```
-
-Then write each artifact file. Start with `proposal.md`:
-
-After generating artifact instructions, write the proposal content in `openspec/changes/my-feature/proposal.md` before running `task-master parse-prd`.
+After `openspec new change`, write `openspec/changes/my-feature/proposal.md` before running `task-master parse-prd`.
 
 Minimal proposal template:
 
@@ -141,38 +127,6 @@ EOF
 
 Use the OpenSpec proposal as the PRD input for Task Master.
 
-### Provider Preflight (MANDATORY)
-
-Before running `parse-prd`, you MUST detect available API keys and configure the provider. Skip this only if the user has already configured Task Master.
-
-If the target project has a `.env` file, source it first so the detection sees those keys:
-
-```bash
-[[ -f .env ]] && set -a && source .env && set +a
-```
-
-Then detect keys:
-if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
-  task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
-  # If no fallback key, use same:
-  task-master models --set-research deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
-elif [[ -n "${OPENAI_COMPATIBLE_API_KEY:-}" ]]; then
-  export OPENAI_API_KEY="$OPENAI_COMPATIBLE_API_KEY"
-  task-master models --set-main openai-compatible
-elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-  task-master models --set-main anthropic
-else
-  echo "BLOCKER: No AI provider key found. Set one of: DEEPSEEK_API_KEY, OPENAI_COMPATIBLE_API_KEY, ANTHROPIC_API_KEY"
-  exit 1
-fi
-```
-
-If only `DEEPSEEK_API_KEY` is available but Task Master expects `OPENAI_API_KEY`:
-
-```bash
-export OPENAI_API_KEY="$DEEPSEEK_API_KEY"
-```
-
 ```bash
 cd /path/to/target
 
@@ -185,24 +139,6 @@ task-master expand --id=1
 task-master expand --id=2
 task-master list
 ```
-
-### Task Normalization (MANDATORY after parse-prd)
-
-`parse-prd` often generates meta-automation tasks (scaffolding scripts, guardrails, template files) instead of real repo work. You MUST normalize:
-
-1. Read the generated task list:
-   ```bash
-   task-master list
-   ```
-2. Cross-reference with OpenSpec `tasks.md` (the authority).
-3. Remove or consolidate tasks that:
-   - Create automation scaffolding instead of implementing features
-   - Invent new script/tool layers not requested by the user
-   - Duplicate the same work across multiple tasks
-4. Keep only tasks that directly modify the target repo's source code, tests, or configuration.
-5. If tasks are too granular or too vague, restructure them to match the OpenSpec task boundaries.
-
-⚠️ Task Master output is NOT authoritative. OpenSpec `tasks.md` is the contract authority. Task Master is a decomposition tool, not a design authority.
 
 Notes:
 
@@ -256,13 +192,45 @@ Move-Item -Force $tmp $queue
 
 PowerShell guidance here is **PowerShell 5.1+**, not 7+.
 
-### Step 3: Optional Review Hook
+### Step 3: Review Gate (Hook + Queue Contract)
 
-The review gate only recognizes a `post_iteration` hook named exactly `gate-review`.
+The review gate only recognizes a `post_iteration` hook named exactly `gate-review`, AND the task must have `review_required: true` (or the profile must have `reviewer_required: true`). **Attaching the hook is not enough** — the task-level flag must be set.
+
+Detect the reviewer command first, then build the appropriate flags per CLI:
 
 ```bash
+if command -v kimi-code >/dev/null 2>&1; then
+  REVIEWER_CMD="kimi-code"
+elif command -v kimi >/dev/null 2>&1; then
+  REVIEWER_CMD="kimi"
+elif command -v claude >/dev/null 2>&1; then
+  REVIEWER_CMD="claude"
+else
+  echo "No reviewer CLI found — install kimi-code, kimi, or claude"
+  exit 1
+fi
+
+# Build flags per reviewer
+case "$(basename "$REVIEWER_CMD")" in
+  kimi|kimi-code)
+    REVIEWER_FLAGS="--print --final-message-only"
+    ;;
+  claude)
+    REVIEWER_FLAGS="-p"
+    ;;
+  *)
+    echo "Unknown reviewer: $REVIEWER_CMD"
+    exit 1
+    ;;
+esac
+```
+
+Add the gate-review hook:
+
+```bash
+REVIEW_MSG="Review changes. Output ONLY JSON: {\"result\":\"pass\"} or {\"result\":\"needs_changes\"} or {\"result\":\"reject\"}"
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
-  --name gate-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review changes. Output ONLY JSON: {\"result\":\"pass\"} or {\"result\":\"needs_changes\"} or {\"result\":\"reject\"}"' --attempts 3
+  --name gate-review --command "$REVIEWER_CMD $REVIEWER_FLAGS --cwd \"\$OPENCODE_LOOP_TARGET_DIR\" \"$REVIEW_MSG\"" --attempts 3
 ```
 
 The last line of stdout must be valid JSON:
@@ -270,6 +238,27 @@ The last line of stdout must be valid JSON:
 - `{"result":"pass"}`
 - `{"result":"needs_changes"}`
 - `{"result":"reject"}`
+
+Validate the reviewer independently before trusting `hooks test`:
+
+```bash
+$REVIEWER_CMD $REVIEWER_FLAGS --cwd /path/to/target "Output ONLY JSON: {\"result\":\"pass\"}"
+# Must return: {"result":"pass"}
+```
+
+Set `review_required: true` on each task that needs gated review:
+
+```bash
+jq '.tasks[].review_required = true' \
+  /path/to/target/.opencode-loop/queue.json > /tmp/q.tmp && mv /tmp/q.tmp /path/to/target/.opencode-loop/queue.json
+```
+
+Verify:
+
+```bash
+jq '.tasks[] | {id, review_required}' /path/to/target/.opencode-loop/queue.json
+jq '.profile.reviewer_required' /path/to/target/.opencode-loop/queue.json
+```
 
 ### Step 4: Promote
 
@@ -303,16 +292,9 @@ TARGET="${1:?Usage: $0 /path/to/target}"
 CHANGE="${2:-my-feature}"
 cd "$TARGET"
 
-# === Layer 0: Feature branch ===
-git checkout -b "feat/$CHANGE"
-
 # === Layer 1: OpenSpec ===
 openspec init "$TARGET"
 openspec new change "$CHANGE" --description "See proposal.md"
-openspec instructions proposal --change "$CHANGE"
-openspec instructions design --change "$CHANGE"
-openspec instructions specs --change "$CHANGE"
-openspec instructions tasks --change "$CHANGE"
 
 # Write proposal.md content here before running parse-prd
 cat > "openspec/changes/$CHANGE/proposal.md" << 'EOF'
@@ -330,19 +312,8 @@ Describe the solution.
 EOF
 
 # === Layer 2: Task Master ===
-# Provider preflight — detect available API keys
-if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
-  task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
-elif [[ -n "${OPENAI_COMPATIBLE_API_KEY:-}" ]]; then
-  export OPENAI_API_KEY="$OPENAI_COMPATIBLE_API_KEY"
-  task-master models --set-main openai-compatible
-elif [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
-  task-master models --set-main anthropic
-fi
-
 task-master init --yes
 task-master parse-prd "openspec/changes/$CHANGE/proposal.md"
-# Task normalization: review and remove meta-automation tasks before import
 
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir "$TARGET" --from-taskmaster --tag tm
@@ -357,15 +328,6 @@ opencode-loop queue validate --dir "$TARGET"
 for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' "$QUEUE"); do
   opencode-loop queue promote --dir "$TARGET" --task "$id"
 done
-
-# Set branch isolation so tasks don't all land on the same branch
-jq '.profile.isolation = "branch" | .profile.integration_strategy = "branch_chain"' \
-  "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
-
-# Commit bootstrap assets before starting execute (dirty tree blocks new tasks)
-git add openspec/ .taskmaster/ opencode.json
-git add .claude/ .gemini/ .opencode/ 2>/dev/null || true
-git commit -m "chore: bootstrap opencode-loop pipeline artifacts"
 
 opencode-loop init --dir "$TARGET" --mode execute
 opencode-loop start --dir "$TARGET" --profile execute
@@ -382,16 +344,9 @@ param(
 
 Set-Location $Target
 
-# === Layer 0: Feature branch ===
-git checkout -b "feat/$ChangeName"
-
 # === Layer 1: OpenSpec ===
 openspec init $Target
 openspec new change $ChangeName --description "See proposal.md"
-openspec instructions proposal --change $ChangeName
-openspec instructions design --change $ChangeName
-openspec instructions specs --change $ChangeName
-openspec instructions tasks --change $ChangeName
 
 $proposal = @"
 # Proposal: My Feature
@@ -412,37 +367,12 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($proposalPath, $proposal, $utf8)
 
 # === Layer 2: Task Master ===
-# Provider preflight — detect available API keys
-if ($env:DEEPSEEK_API_KEY) {
-  task-master models --set-main deepseek-chat --openai-compatible --baseURL https://api.deepseek.com/v1/
-} elseif ($env:OPENAI_COMPATIBLE_API_KEY) {
-  $env:OPENAI_API_KEY = $env:OPENAI_COMPATIBLE_API_KEY
-  task-master models --set-main openai-compatible
-} elseif ($env:ANTHROPIC_API_KEY) {
-  task-master models --set-main anthropic
-}
-
 task-master init --yes
 task-master parse-prd "openspec/changes/$ChangeName/proposal.md"
-# Task normalization: review and remove meta-automation tasks before import
 
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir $Target --from-taskmaster --tag tm
 opencode-loop queue validate --dir $Target
-
-# Set branch isolation
-$queueFile = Join-Path $Target ".opencode-loop/queue.json"
-$tmp = Join-Path $env:TEMP "q.tmp"
-$utf8 = [System.Text.UTF8Encoding]::new($false)
-$result = jq '.profile.isolation = "branch" | .profile.integration_strategy = "branch_chain"' $queueFile
-[System.IO.File]::WriteAllText($tmp, $result, $utf8)
-Move-Item -Force $tmp $queueFile
-
-# Commit bootstrap assets before starting execute
-git add openspec/ .taskmaster/ opencode.json
-git add .claude/ .gemini/ .opencode/ 2>$null; if ($LASTEXITCODE -ne 0) { $null }
-git commit -m "chore: bootstrap opencode-loop pipeline artifacts"
-
 opencode-loop init --dir $Target --mode execute
 opencode-loop start --dir $Target --profile execute
 ```
@@ -454,17 +384,21 @@ PowerShell guidance here is **PowerShell 5.1+**. Use `[System.IO.File]::WriteAll
 ### Review Gate Hook
 
 ```bash
+REVIEWER_CMD=$(command -v kimi-code 2>/dev/null || command -v kimi 2>/dev/null || command -v claude 2>/dev/null || echo "")
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
-  --name gate-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review changes. Output ONLY JSON: {\"result\":\"pass\"} or {\"result\":\"needs_changes\"} or {\"result\":\"reject\"}"' --attempts 3
+  --name gate-review --command "$REVIEWER_CMD --print --final-message-only --cwd \"\$OPENCODE_LOOP_TARGET_DIR\" \"Review changes. Output ONLY JSON: {\\\"result\\\":\\\"pass\\\"} or {\\\"result\\\":\\\"needs_changes\\\"} or {\\\"result\\\":\\\"reject\\\"}\"" --attempts 3
 ```
+
+**Important**: The `gate-review` hook must be paired with `review_required: true` on each task (or `reviewer_required: true` on the queue profile) for the review gate to participate in gate decisions. A hook without the queue flag is a no-op for gating.
 
 ### Extra Reviewer Hooks
 
 These run but do not satisfy the review gate on their own:
 
 ```bash
+KIMI_CMD=$(command -v kimi-code 2>/dev/null || command -v kimi 2>/dev/null || echo "")
 opencode-loop hooks add --dir /path/to/target --event pre_iteration \
-  --name kimi-check --command 'kimi-code --dir "$OPENCODE_LOOP_TARGET_DIR" "Check for issues"' --attempts 3
+  --name kimi-check --command "$KIMI_CMD --dir \"\$OPENCODE_LOOP_TARGET_DIR\" \"Check for issues\"" --attempts 3
 
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Architectural review"' --attempts 3
@@ -479,7 +413,7 @@ On Windows, `opencode-loop` delegates Bash-facing workflows through WSL.
 
 - Hook commands run in WSL via `bash -lc`.
 - External CLIs used by hooks must be available inside WSL.
-- Verify with `wsl -d Ubuntu -- which claude kimi-code codex`.
+- Verify with `wsl -d Ubuntu -- which claude kimi-code kimi codex`.
 - If needed, symlink Windows-installed CLIs into WSL PATH, for example: `ln -s $(which claude.exe) /usr/local/bin/claude`
 - `$OPENCODE_LOOP_TARGET_DIR` is a WSL path inside hooks; convert with `wslpath -w` only when a Windows-native CLI truly requires it.
 - Use WSL for repo Bash/Python validation rather than native PowerShell test runs.
@@ -488,9 +422,12 @@ On Windows, `opencode-loop` delegates Bash-facing workflows through WSL.
 
 1. Create the OpenSpec change.
 2. Write `proposal.md` before `task-master parse-prd`.
-3. Import with `opencode-loop plan --from-taskmaster`.
-4. Enrich `verification` and `acceptance_checks`.
-5. Promote each task.
-6. Initialize `--mode execute`.
-7. Start with `opencode-loop start --profile execute`.
-8. Inspect `queue status`, `queue show`, `status --json`, and progress logs when anything fails.
+3. Import with `opencode-loop plan --from-taskmaster` — this creates `.opencode-loop/queue.json`.
+4. Enrich `verification` and `acceptance_checks` in `queue.json`.
+5. Set `review_required: true` on tasks that need gated review (hook alone is not sufficient).
+6. Promote each task.
+7. Initialize with `opencode-loop init --mode execute` — this creates `opencode.json`, `.opencode-loop/state.json`, and other runtime files. **Only `git add` files that exist at this point** (openspec/, .taskmaster/); `opencode.json` is gitignored by `setup.sh` and should not be committed.
+8. Start with `opencode-loop start --profile execute`.
+9. Inspect `queue status`, `queue show`, `status --json`, and progress logs when anything fails.
+
+**When continuing in a new worktree**: Follow the full Worktree Continuation Checklist in SKILL.md § Worktree Isolation Lifecycle (state migration, dependency installation, baseline validation).
