@@ -433,6 +433,6 @@ On Windows, `opencode-loop` delegates Bash-facing workflows through WSL.
 6. Promote each task.
 7. Initialize with `opencode-loop init --mode execute` — this creates `opencode.json`, `.opencode-loop/state.json`, and other runtime files. **Only `git add` files that exist at this point** (openspec/, .taskmaster/); `opencode.json` is gitignored by `setup.sh` and should not be committed.
 8. Start with `opencode-loop start --profile execute`.
-9. Inspect `queue status`, `queue show`, `status --json`, and progress logs when anything fails.
+9. Inspect `queue status`, `queue show`, `status --json`, and then verify live activity with `ps` plus the latest `output-*.jsonl`; use progress/supervisor logs as supporting context rather than the sole source of truth.
 
 **When continuing in a new worktree**: Follow the full Worktree Continuation Checklist in SKILL.md § Worktree Isolation Lifecycle (state migration, dependency installation, baseline validation).

@@ -157,7 +157,7 @@ Key core-script flags:
 
 ### 4. Monitor
 
-Use `status --json` as the primary health check — it merges all runtime state into one JSON object:
+Use `status --json` as the primary summary view — it merges all runtime state into one JSON object:
 
 ```bash
 opencode-loop status --dir /path/to/target --json
@@ -169,14 +169,23 @@ The JSON output includes:
 - `control` — desired state (running/stopped) and pending config from `control.json`
 - `circuit_breaker` — breaker state (closed/open/half_open) from `circuit_breaker.json`
 - `process_check` — PID liveness for loop, supervisor, and child processes
-- `process_alive` — convenience boolean: is the loop process actually running?
+- `process_alive` — convenience boolean: is the main loop process actually running?
 - `warning` — stale-running detection (state says running but process is dead)
 - `logs` — paths to `progress.txt`, `supervisor.log`, `supervisor-child.log`
 
-Use `ps` or log inspection only when `status --json` shows unexpected results.
+Do not treat `status --json` as liveness ground truth by itself. When a run looks stuck or inconsistent, use this order:
+
+1. `ps` / PID check
+2. Latest `output-*.jsonl` — the closest thing to the live execution stream
+3. `supervisor-child.log` / `supervisor.log`
+4. `state.json` / `runtime.json` / `progress.txt`
 
 ```bash
 opencode-loop logs --dir /path/to/target --file progress --tail 80
+opencode-loop logs --dir /path/to/target --file output --tail 80
+opencode-loop logs --dir /path/to/target --file stderr --tail 80
+opencode-loop logs --dir /path/to/target --file hook --match gate-review --tail 80
+opencode-loop logs --dir /path/to/target --file gate --match policy --tail 80
 ```
 
 Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/state.json`, `.opencode-loop/runtime.json`, `.opencode-loop/logs/`, `.opencode-loop/output-*.jsonl`, and `.opencode-loop/stderr-*.log`.
