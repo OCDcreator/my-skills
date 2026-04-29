@@ -160,11 +160,13 @@ opencode-loop plan --dir /path/to/target --from-taskmaster --tag tm
 
 This reads `.taskmaster/tasks/tasks.json` and creates `.opencode-loop/queue.json` with tasks in `draft`.
 
-`plan` refuses to overwrite an existing `queue.json`. Delete or rename the old file before re-importing.
+`plan` refuses to overwrite a non-empty existing `queue.json`. It may replace the empty execute placeholder created by `init --mode execute`, so import-before-init and init-before-import are both valid. If you use `--from-form` or `--manual`, keep the input file outside the target repo, for example under `/tmp`; otherwise the execute dirty-worktree guard may block on the untracked import artifact.
 
 ### Step 2: Enrich
 
 Task Master imports typically carry `verification` from `testStrategy`, but `acceptance_checks` still need to be added. Discover the project's real verification commands first, then assign per-task checks. Avoid assuming `npm test`.
+
+Finish enrichment before promotion/start. The active execute prompt is captured when a task is selected; changing `scope_paths`, `forbidden_paths`, `verification`, or `acceptance_checks` on an already `in_progress` task hardens gates but does not rewrite the prompt already handed to OpenCode. If the active task contract was too broad, pause/stop and let the next retry pick up the corrected queue entry.
 
 Supported acceptance check types:
 
@@ -181,6 +183,13 @@ jq '(.tasks[] | select(.id == "tm-1") | .verification) = ["make test"]' \
   "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
 
 jq '(.tasks[] | select(.id == "tm-1") | .acceptance_checks) = [{"type":"file_exists","path":"src/auth.ts"}]' \
+  "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
+```
+
+For command acceptance checks that inspect the task diff after execute mode commits, compare `HEAD^ HEAD` rather than plain `HEAD`:
+
+```bash
+jq '(.tasks[] | select(.id == "tm-1") | .acceptance_checks) = [{"type":"command","command":"git diff --name-only HEAD^ HEAD | grep -q \"src/auth.ts\""}]' \
   "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
 ```
 
@@ -282,6 +291,14 @@ opencode-loop init --dir /path/to/target --mode execute
 opencode-loop start --dir /path/to/target --profile execute
 ```
 
+For macOS, Codex Desktop handoff, SSH, or any long run where the parent terminal may disappear, start execute mode through a tmux-backed supervisor instead of `nohup ... &`:
+
+```bash
+opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --tmux-session target-loop
+```
+
+Run the printed command, then verify both `process_check.supervisor_alive` and `process_check.supervisor_child_alive` with `opencode-loop status --dir /path/to/target --json`. The tmux-wrapped execute recommendation defaults to `--stale-minutes 1440`; pass `--stale-minutes N` explicitly only when the target's verification budget is known.
+
 Or use the core script when the user needs advanced flags:
 
 ```bash
@@ -335,7 +352,9 @@ for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' "$QUEUE"); do
 done
 
 opencode-loop init --dir "$TARGET" --mode execute
-opencode-loop start --dir "$TARGET" --profile execute
+START_CMD="$(opencode-loop next-command --dir "$TARGET" --kind supervisor --profile execute --wrap tmux --tmux-session "${CHANGE}-loop")"
+echo "$START_CMD"
+eval "$START_CMD"
 ```
 
 ## One-Script Summary (PowerShell)
@@ -432,7 +451,7 @@ On Windows, `opencode-loop` delegates Bash-facing workflows through WSL.
 5. Set `review_required: true` on tasks that need gated review (hook alone is not sufficient).
 6. Promote each task.
 7. Initialize with `opencode-loop init --mode execute` — this creates `opencode.json`, `.opencode-loop/state.json`, and other runtime files. **Only `git add` files that exist at this point** (openspec/, .taskmaster/); `opencode.json` is gitignored by `setup.sh` and should not be committed.
-8. Start with `opencode-loop start --profile execute`.
+8. On macOS/Codex/SSH long runs, start with the printed `opencode-loop next-command --kind supervisor --profile execute --wrap tmux` command. Use plain `opencode-loop start --profile execute` only for short foreground runs.
 9. Inspect `queue status`, `queue show`, `status --json`, and then verify live activity with `ps` plus the latest `output-*.jsonl`; use progress/supervisor logs as supporting context rather than the sole source of truth.
 
 **When continuing in a new worktree**: Follow the full Worktree Continuation Checklist in SKILL.md § Worktree Isolation Lifecycle (state migration, dependency installation, baseline validation).

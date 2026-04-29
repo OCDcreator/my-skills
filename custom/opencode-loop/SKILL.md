@@ -54,6 +54,7 @@ opencode-loop --version
 opencode-loop doctor --dir /path/to/target --json
 opencode-loop status --dir /path/to/target --json
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile long
+opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --tmux-session target-loop
 ```
 
 Use `opencode-loop update-check --json` only when the user explicitly asks whether the tool itself is current.
@@ -144,6 +145,14 @@ For longer runs, prefer the supervisor:
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile long
 opencode-loop supervisor --dir /path/to/target --profile long
 ```
+
+On macOS, Codex Desktop handoff, SSH, or any session that might lose its parent shell, do not rely on `nohup ... &` for long execute runs. Generate a tmux-backed supervisor command instead:
+
+```bash
+opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --tmux-session target-loop
+```
+
+That command keeps the supervisor parent alive after the current terminal/session disconnects. For `execute` profile, tmux-wrapped `next-command` defaults stale detection to `1440` minutes; override with `--stale-minutes N` only after confirming the target's verification time.
 
 Key core-script flags:
 
@@ -262,6 +271,8 @@ opencode-loop plan --dir /path/to/target --from-taskmaster --tag my-project
 
 The Task Master adapter already handles `.master.tasks[]` automatically; do not hand-roll a parser around Task Master output.
 
+For `--from-form` and `--manual`, keep the temporary input file outside the target repo, such as `/tmp/task-form.json` or `/tmp/requirements.md`. If an import artifact is left untracked inside the target repo, execute mode's dirty-worktree protection can block before the first task starts. `plan` can replace the empty execute placeholder queue created by `init --mode execute`, but it must not overwrite a non-empty queue.
+
 ### 2. Enrich Tasks
 
 Imported tasks need the task-level contract filled in before execution. Task Master imports usually carry `verification` from `testStrategy`, but `acceptance_checks` still need attention.
@@ -281,6 +292,8 @@ Add for each task:
 - `tdd_required: true` — to enable the TDD gate.
 
 Use project-neutral verification: discover the project's real test/lint/build command first, then assign per-task checks. Do not assume `npm test` exists.
+
+Finish enrichment before the task becomes `in_progress`; execute prompts are captured at task selection time. Updating an active task can still harden gates, but it does not rewrite the prompt already handed to OpenCode. If a command acceptance check inspects a committed task diff, compare `HEAD^ HEAD` rather than plain `HEAD`.
 
 ```bash
 jq '(.tasks[] | select(.id == "openspec-1-1") | .verification) = ["make test"]' \
