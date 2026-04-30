@@ -302,6 +302,22 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 )
                 self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
 
+    def test_fresh_scaffold_excludes_docs_from_targeted_test_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            (repo_root / "src").mkdir()
+            (repo_root / "tests").mkdir()
+            (repo_root / "docs").mkdir()
+
+            result = run_scaffold(repo_root)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            config = json.loads((repo_root / "automation" / "autopilot-config.json").read_text(encoding="utf-8"))
+            self.assertIn("docs/", config["full_test_required_paths"])
+            self.assertNotIn("docs/", config["targeted_test_required_paths"])
+            self.assertIn("src/", config["targeted_test_required_paths"])
+            self.assertIn("tests/", config["targeted_test_required_paths"])
+
     def test_scaffold_next_steps_use_bash_wrappers_for_mac_shell_scripts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))
@@ -2033,6 +2049,73 @@ class ScaffoldVersioningTests(unittest.TestCase):
 
             self.assertIsNotNone(failure_reason)
             self.assertIn("did not report targeted tests", failure_reason)
+
+    def test_docs_only_checkpoint_does_not_require_targeted_tests(self) -> None:
+        validation_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "validation.py",
+            "_template_validation_docs_only_checkpoint_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = create_target_repo(Path(temp_dir))
+            phase_doc_path = repo_root / "docs" / "status" / "lanes" / "m3-checkpoint" / "autopilot-phase-1.md"
+            roadmap_path = repo_root / "docs" / "status" / "lanes" / "m3-checkpoint" / "autopilot-round-roadmap.md"
+            phase_doc_path.parent.mkdir(parents=True, exist_ok=True)
+            phase_doc_path.write_text("# phase 1\n", encoding="utf-8")
+            roadmap_path.write_text("# roadmap\n", encoding="utf-8")
+            self.assertEqual(run_git(repo_root, "add", ".").returncode, 0)
+            self.assertEqual(run_git(repo_root, "commit", "-m", "autopilot: round 1 - checkpoint").returncode, 0)
+            commit_sha = run_git(repo_root, "rev-parse", "HEAD").stdout.strip()
+            commit_message = run_git(repo_root, "log", "-1", "--pretty=%s", commit_sha).stdout.strip()
+
+            result = {
+                "status": "success",
+                "lane_id": "m3-checkpoint",
+                "phase_doc_path": "docs/status/lanes/m3-checkpoint/autopilot-phase-1.md",
+                "commit_sha": commit_sha,
+                "commit_message": commit_message,
+                "summary": "checkpoint",
+                "next_focus": "",
+                "tests_run": ["npm run verify"],
+                "commands_run": [],
+                "build_ran": False,
+                "build_id": "",
+                "deploy_ran": False,
+                "deploy_verified": False,
+                "background_tasks_used": False,
+                "background_tasks_completed": True,
+                "repo_visible_work_landed": True,
+                "final_artifacts_written": True,
+            }
+            config = {
+                "commit_prefix": "autopilot",
+                "build_command": "",
+                "deploy_policy": "never",
+                "targeted_test_required": True,
+                "targeted_test_required_paths": ["src/", "tests/", "docs/"],
+                "targeted_test_prefixes": ["npm test --", "npm run test --"],
+                "full_test_command": "npm run verify",
+                "full_test_cadence_rounds": 1,
+                "full_test_required_paths": ["src/", "tests/", "docs/"],
+            }
+
+            failure_reason = validation_module.validate_round_result(
+                attempt_number=1,
+                result=result,
+                schema={},
+                phase_doc_relative_path="docs/status/lanes/m3-checkpoint/autopilot-phase-1.md",
+                expected_lane_id="m3-checkpoint",
+                config=config,
+                ending_head=commit_sha,
+                working_tree_dirty=False,
+                support=validation_module.ValidationSupport(
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    resolve_repo_path=lambda value: repo_root / str(value),
+                    run_git=lambda args: run_git(repo_root, *args),
+                    info=lambda message: None,
+                ),
+            )
+
+            self.assertIsNone(failure_reason)
 
     def test_success_result_with_pnpm_vitest_targeted_tests_is_not_misclassified(self) -> None:
         validation_module = load_module_from_path(

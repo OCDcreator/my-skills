@@ -22,7 +22,7 @@ TEMPLATES_ROOT = SKILL_ROOT / "templates"
 COMMON_TEMPLATES_ROOT = TEMPLATES_ROOT / "common"
 PRESET_TEMPLATES_ROOT = TEMPLATES_ROOT / "presets"
 SCAFFOLD_NAME = "codex-autopilot-scaffold"
-SCAFFOLD_VERSION = "1.1.10"
+SCAFFOLD_VERSION = "1.1.11"
 SCAFFOLD_VERSION_MARKER = Path("automation/autopilot-scaffold-version.json")
 SEED_PLAN_DESTINATION = Path("docs/status/autopilot-seed-plan.md")
 SEED_SPEC_DESTINATION = Path("docs/status/autopilot-seed-spec.md")
@@ -729,6 +729,19 @@ def build_path_list(repo_root: Path, detection: DetectionResult) -> list[str]:
     return paths
 
 
+def build_targeted_test_path_list(repo_root: Path, detection: DetectionResult) -> list[str]:
+    paths: list[str] = []
+    for root_dir in detection.root_dirs:
+        normalized = root_dir.rstrip("/")
+        if normalized in {"docs", "documentation"}:
+            continue
+        paths.append(root_dir)
+    for manifest in ["package.json", "package-lock.json", "pyproject.toml", "Cargo.toml", "go.mod", "Makefile", "justfile"]:
+        if (repo_root / manifest).exists():
+            paths.append(manifest)
+    return paths
+
+
 def markdown_bullets(items: list[str]) -> str:
     if not items:
         return "- `README.md`"
@@ -955,6 +968,7 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
     metadata = PRESET_METADATA[preset]
     lanes = build_preset_lanes(preset)
     path_list = build_path_list(detection.repo_root, detection)
+    targeted_test_path_list = build_targeted_test_path_list(detection.repo_root, detection)
     entrypoints = build_entrypoints(detection, preset)
     prerequisite_paths = build_prerequisite_paths(detection.repo_root, preset)
     review_enabled = preset == "review-gated"
@@ -990,7 +1004,7 @@ def default_tokens(detection: DetectionResult, preset: str) -> dict[str, str]:
         "VULTURE_COMMAND_JSON": json.dumps(vulture_command, ensure_ascii=False),
         "TARGETED_TEST_REQUIRED_JSON": "true" if bool(detection.targeted_test_prefixes) else "false",
         "TARGETED_TEST_PREFIXES_JSON": json_token(detection.targeted_test_prefixes),
-        "TARGETED_TEST_REQUIRED_PATHS_JSON": json_token(path_list),
+        "TARGETED_TEST_REQUIRED_PATHS_JSON": json_token(targeted_test_path_list),
         "FULL_TEST_REQUIRED_PATHS_JSON": json_token(path_list),
         "BUILD_REQUIRED_PATHS_JSON": json_token(path_list),
         "FULL_TEST_CADENCE_ROUNDS": "1" if full_test_command else "0",

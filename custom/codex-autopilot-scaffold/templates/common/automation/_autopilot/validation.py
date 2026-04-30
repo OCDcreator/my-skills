@@ -105,12 +105,29 @@ def path_matches_any(file_path: str, configured_paths: list[str]) -> bool:
     return False
 
 
+def targeted_testable_file(file_path: str) -> bool:
+    normalized = normalize_repo_file_path(file_path)
+    if not normalized:
+        return False
+    if normalized.startswith(("docs/", "documentation/")):
+        return False
+    if normalized.startswith(("src/", "app/", "lib/", "pkg/", "internal/", "cmd/", "crates/", "server/", "client/", "tests/")):
+        return True
+    if normalized in {"package.json", "package-lock.json", "pyproject.toml", "Cargo.toml", "go.mod", "Makefile", "justfile"}:
+        return True
+    return normalized.endswith((".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".py", ".rs", ".go", ".java", ".kt", ".swift"))
+
+
 def test_targeted_tests_required(files: list[str], config: dict[str, Any]) -> bool:
+    testable_files = [file_path for file_path in files if targeted_testable_file(file_path)]
+    if not testable_files:
+        return False
+
     configured_paths = list(config.get("targeted_test_required_paths", []))
     if configured_paths:
-        return any(path_matches_any(file_path, configured_paths) for file_path in files)
+        return any(path_matches_any(file_path, configured_paths) for file_path in testable_files)
 
-    for file_path in files:
+    for file_path in testable_files:
         normalized = normalize_repo_file_path(file_path)
         if normalized.startswith(("src/", "app/", "lib/", "pkg/", "internal/", "cmd/", "crates/", "tests/")):
             return True
