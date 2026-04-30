@@ -38,6 +38,7 @@ def new_state(config: dict[str, Any], *, support: StateRuntimeSupport) -> dict[s
         "status": "active",
         "current_round": 0,
         "consecutive_failures": 0,
+        "consecutive_runner_start_failures": 0,
         "active_lane_id": initial_lane_id,
         "lane_progress": lane_progress,
         "next_phase_number": lane_progress[initial_lane_id]["next_phase_number"],
@@ -76,6 +77,23 @@ def ensure_next_phase_after_completed_round(
     sync_active_lane_mirror_fields(state, config, support=support.lane_support)
 
 
+def is_legacy_runner_start_blocker(blocking_reason: Any, *, support: StateRuntimeSupport) -> bool:
+    reason_text = support.clean_string(blocking_reason).lower()
+    return any(
+        marker in reason_text
+        for marker in (
+            "before repository work began",
+            "premature schema",
+            "schema-only",
+            "final json schema was emitted prematurely",
+            "final response was requested in schema-only format",
+            "no files were changed, no commands were run",
+            "no repository commands",
+            "repository workflow",
+        )
+    )
+
+
 def resume_state_if_threshold_allows(
     state: dict[str, Any],
     config: dict[str, Any],
@@ -90,6 +108,21 @@ def resume_state_if_threshold_allows(
         should_resume = int(state["current_round"]) < int(config["max_rounds"])
     elif previous_status == "stopped_failures":
         should_resume = int(state["consecutive_failures"]) < int(config["max_consecutive_failures"])
+        if not should_resume and is_legacy_runner_start_blocker(state.get("last_blocking_reason"), support=support):
+            runner_start_failures = max(
+                support.parse_int(state.get("consecutive_runner_start_failures"), 0),
+                support.parse_int(state.get("consecutive_failures"), 0),
+            )
+            runner_start_limit = support.parse_int(config.get("max_consecutive_runner_start_failures"), 8)
+            if runner_start_failures < runner_start_limit:
+                state["consecutive_runner_start_failures"] = runner_start_failures
+                state["consecutive_failures"] = 0
+                state["last_result"] = "runner_start_failure"
+                state["last_blocking_reason"] = f"runner_start_failure: {state.get('last_blocking_reason')}"
+                support.info(
+                    "Migrated legacy pre-work schema failures to runner-start failure budget; resuming."
+                )
+                should_resume = True
     elif previous_status == DRY_RUN_STOP_STATUS:
         should_resume = True
     elif previous_status == "complete" and has_any_unfinished_lane_work(config, state, support=support.lane_support):

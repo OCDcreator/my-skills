@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -757,6 +758,161 @@ class ScaffoldVersioningTests(unittest.TestCase):
             self.assertIsNotNone(evaluation.failure_reason)
             self.assertIn("Agent output JSON was not created.", evaluation.failure_reason)
             self.assertIn("background-task-aware completion contract", evaluation.failure_reason)
+
+    def test_pre_work_schema_failure_uses_runner_start_budget_not_business_failure_budget(self) -> None:
+        start_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "start_runtime.py",
+            "_template_start_runtime_pre_work_schema_failure_test",
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime_directory = Path(temp_dir)
+            state_path = runtime_directory / "autopilot-state.json"
+            saved_states: list[dict[str, object]] = []
+            history_entries: list[dict[str, object]] = []
+            reset_calls: list[str] = []
+
+            state = {
+                "status": "active",
+                "current_round": 8,
+                "consecutive_failures": 2,
+                "consecutive_runner_start_failures": 0,
+                "last_result": None,
+                "last_blocking_reason": None,
+            }
+            result = {
+                "status": "failure",
+                "blocking_reason": "internal_error: invalid channel response format attempted before repository work began",
+                "summary": "No files were changed, no commands were run, no validation or commit occurred.",
+                "commands_run": [],
+                "tests_run": [],
+                "changed_files": [],
+                "repo_visible_work_landed": False,
+                "final_artifacts_written": False,
+            }
+
+            should_stop = start_module.record_failed_round(
+                state=state,
+                config={"max_consecutive_runner_start_failures": 3},
+                state_path=state_path,
+                runtime_directory=runtime_directory,
+                starting_head="abc123",
+                ending_head="abc123",
+                working_tree_dirty=False,
+                attempt_number=9,
+                failure_reason="internal_error: invalid channel response format attempted before repository work began",
+                result=result,
+                history_entry={"round": 9, "status": "failure"},
+                support=start_module.StartRuntimeSupport(
+                    error_type=RuntimeError,
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    compact_text=lambda value, max_length=180: str(value)[:max_length],
+                    info=lambda message: None,
+                    load_config=lambda *args: ({}, Path("unused"), Path("unused")),
+                    resolve_repo_path=lambda value: Path(value),
+                    read_json=lambda path: {},
+                    save_state=lambda next_state, _path: saved_states.append(dict(next_state)),
+                    new_state=lambda config: {},
+                    normalize_state_for_lanes=lambda state, config: state,
+                    resume_state_if_threshold_allows=lambda state, config, path: state,
+                    get_current_branch=lambda: "autopilot/test",
+                    test_branch_allowed=lambda branch, prefixes: True,
+                    is_working_tree_dirty=lambda: False,
+                    get_head_sha=lambda: "abc123",
+                    autopilot_lock=lambda *args, **kwargs: None,
+                    refresh_vulture_metrics=lambda state, config: None,
+                    reset_worktree_to_head=lambda sha: reset_calls.append(sha),
+                    append_history_entry=lambda directory, entry: history_entries.append(entry),
+                    increment_active_lane_phase=lambda state, config: None,
+                    has_remaining_lane_work=lambda config, state, lane_id: False,
+                    set_active_lane=lambda state, config, lane_id: None,
+                    mark_lane_complete=lambda state, lane_id: None,
+                    next_unfinished_lane_id=lambda config, state, after_lane_id=None: None,
+                    config_lane_map=lambda config: {},
+                    active_lane_id_for_state=lambda state, config: "m1-hotspot-slice",
+                    active_lane_config=lambda state, config: {},
+                    sync_active_lane_mirror_fields=lambda state, config: None,
+                    baseline_support=None,
+                ),
+            )
+
+            self.assertFalse(should_stop)
+            self.assertEqual(state["consecutive_failures"], 2)
+            self.assertEqual(state["consecutive_runner_start_failures"], 1)
+            self.assertEqual(state["last_result"], "runner_start_failure")
+            self.assertIn("runner_start_failure", str(state["last_blocking_reason"]))
+            self.assertEqual(reset_calls, [])
+            self.assertEqual(history_entries, [{"round": 9, "status": "failure"}])
+            self.assertTrue(saved_states)
+
+    def test_stopped_failures_from_legacy_pre_work_schema_failure_resume_under_runner_start_budget(self) -> None:
+        state_module = load_module_from_path(
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "state_runtime.py",
+            "_template_state_runtime_legacy_pre_work_resume_test",
+        )
+        saved_states: list[dict[str, object]] = []
+        info_messages: list[str] = []
+        state = {
+            "status": "stopped_failures",
+            "current_round": 11,
+            "consecutive_failures": 3,
+            "active_lane_id": "m1-hotspot-slice",
+            "lane_progress": {
+                "m1-hotspot-slice": {
+                    "status": "active",
+                    "next_phase_number": 1,
+                    "last_phase_doc": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md",
+                }
+            },
+            "last_phase_doc": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md",
+            "last_blocking_reason": "internal_error: invalid channel response format attempted before repository work began",
+        }
+        config = {
+            "max_consecutive_failures": 3,
+            "max_consecutive_runner_start_failures": 8,
+            "lanes": [
+                {
+                    "id": "m1-hotspot-slice",
+                    "label": "M1",
+                    "focus_hint": "M1",
+                    "phase_doc_prefix": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-",
+                    "starting_phase_doc": "docs/status/lanes/m1-hotspot-slice/autopilot-phase-0.md",
+                    "roadmap_path": "docs/status/lanes/m1-hotspot-slice/autopilot-round-roadmap.md",
+                    "prompt_template": "automation/round-prompt.md",
+                    "commit_prefix": "autopilot",
+                }
+            ],
+        }
+
+        resumed = state_module.resume_state_if_threshold_allows(
+            state,
+            config,
+            Path("automation/runtime/autopilot-state.json"),
+            support=state_module.StateRuntimeSupport(
+                clean_string=lambda value: "" if value is None else str(value).strip(),
+                parse_int=lambda value, default: int(value) if value is not None and str(value).strip() else default,
+                now_timestamp=lambda: "2026-04-30T20:00:00",
+                info=info_messages.append,
+                save_state=lambda next_state, _path: saved_states.append(dict(next_state)),
+                lane_support=state_module.LaneSupport(
+                    error_type=RuntimeError,
+                    clean_string=lambda value: "" if value is None else str(value).strip(),
+                    normalize_path_text=lambda value: "" if value is None else str(value).strip(),
+                    infer_roadmap_path_text_from_phase_doc=lambda value: "",
+                    infer_round_roadmap_path_from_phase_doc=lambda value: None,
+                    ensure_path_within_repo=lambda value, **kwargs: Path(value),
+                    resolve_repo_path=lambda value: Path(value),
+                    read_text=lambda path: "",
+                    parse_int=lambda value, default: int(value) if value is not None and str(value).strip() else default,
+                    queue_item_status_re=re.compile(r"^\s*- \[(?P<status>[^\]]+)\]"),
+                ),
+            ),
+        )
+
+        self.assertEqual(resumed["status"], "active")
+        self.assertEqual(resumed["consecutive_failures"], 0)
+        self.assertEqual(resumed["consecutive_runner_start_failures"], 3)
+        self.assertTrue(saved_states)
+        self.assertTrue(any("runner-start failure budget" in message for message in info_messages))
 
     def test_doctor_does_not_run_validation_baseline_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

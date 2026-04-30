@@ -171,9 +171,51 @@ def should_stop_before_round(
     return False
 
 
+def is_runner_start_failure(
+    *,
+    failure_reason: str,
+    result: dict[str, Any] | None,
+    starting_head: str,
+    ending_head: str,
+    working_tree_dirty: bool,
+    support: StartRuntimeSupport,
+) -> bool:
+    if ending_head != starting_head or working_tree_dirty or not isinstance(result, dict):
+        return False
+
+    if support.clean_string(result.get("status")) != "failure":
+        return False
+
+    if result.get("changed_files") or result.get("tests_run") or result.get("repo_visible_work_landed"):
+        return False
+
+    reason_text = " ".join(
+        support.clean_string(value).lower()
+        for value in (
+            failure_reason,
+            result.get("blocking_reason"),
+            result.get("summary"),
+        )
+    )
+    return any(
+        marker in reason_text
+        for marker in (
+            "before repository work began",
+            "premature schema",
+            "schema-only",
+            "final json schema was emitted prematurely",
+            "final response was requested in schema-only format",
+            "no files were changed, no commands were run",
+            "no repository commands",
+            "repository workflow",
+        )
+    )
+
+
 def record_failed_round(
     *,
     state: dict[str, Any],
+    config: dict[str, Any],
     state_path: Path,
     runtime_directory: Path,
     starting_head: str,
@@ -190,6 +232,40 @@ def record_failed_round(
         support.info(f"Reverting worktree to {starting_head}")
         support.reset_worktree_to_head(starting_head)
 
+    if is_runner_start_failure(
+        failure_reason=failure_reason,
+        result=result,
+        starting_head=starting_head,
+        ending_head=ending_head,
+        working_tree_dirty=working_tree_dirty,
+        support=support,
+    ):
+        state["consecutive_runner_start_failures"] = int(state.get("consecutive_runner_start_failures") or 0) + 1
+        state["last_result"] = "runner_start_failure"
+        state["last_blocking_reason"] = f"runner_start_failure: {failure_reason}"
+        if result and support.clean_string(result.get("next_focus")):
+            state["last_next_focus"] = result.get("next_focus")
+
+        support.append_history_entry(runtime_directory, history_entry)
+        support.save_state(state, state_path)
+
+        runner_start_limit = int(config.get("max_consecutive_runner_start_failures") or 8)
+        if int(state["consecutive_runner_start_failures"]) >= runner_start_limit:
+            state["status"] = "stopped_infra_error"
+            support.save_state(state, state_path)
+            support.info(
+                "Stopping after repeated runner-start failures: "
+                f"{state['consecutive_runner_start_failures']}/{runner_start_limit}."
+            )
+            return True
+
+        support.info(
+            "Treating this as a runner-start failure; preserving business failure budget "
+            f"({state.get('consecutive_failures', 0)}/{config.get('max_consecutive_failures')})."
+        )
+        return False
+
+    state["consecutive_runner_start_failures"] = 0
     state["consecutive_failures"] = int(state["consecutive_failures"]) + 1
     state["last_result"] = "failure"
     state["last_blocking_reason"] = failure_reason
@@ -221,6 +297,7 @@ def record_successful_round(
     support: StartRuntimeSupport,
 ) -> None:
     state["consecutive_failures"] = 0
+    state["consecutive_runner_start_failures"] = 0
     state["last_result"] = result["status"]
     state["last_blocking_reason"] = None
     state["last_summary"] = result["summary"]
@@ -368,6 +445,7 @@ def run_start(
                 saw_round_failure = True
                 should_stop = record_failed_round(
                     state=state,
+                    config=config,
                     state_path=state_path,
                     runtime_directory=runtime_directory,
                     starting_head=starting_head,

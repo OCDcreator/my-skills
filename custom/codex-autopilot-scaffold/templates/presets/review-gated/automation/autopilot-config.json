@@ -4,6 +4,7 @@
   "next_phase_number": [[NEXT_PHASE_NUMBER]],
   "max_rounds": [[MAX_ROUNDS]],
   "max_consecutive_failures": [[MAX_CONSECUTIVE_FAILURES]],
+  "max_consecutive_runner_start_failures": 8,
   "lint_command": [[LINT_COMMAND_JSON]],
   "typecheck_command": [[TYPECHECK_COMMAND_JSON]],
   "full_test_command": [[FULL_TEST_COMMAND_JSON]],
