@@ -295,6 +295,8 @@ Use project-neutral verification: discover the project's real test/lint/build co
 
 Finish enrichment before the task becomes `in_progress`; execute prompts are captured at task selection time. Updating an active task can still harden gates, but it does not rewrite the prompt already handed to OpenCode. If a command acceptance check inspects a committed task diff, compare `HEAD^ HEAD` rather than plain `HEAD`.
 
+Avoid command checks that start with `!` and contain a pipe, such as `! git diff ... | awk ...`; Bash negates the whole pipeline and can invert pass/fail in surprising ways. Use explicit shell logic instead, and run `opencode-loop queue lint --strict` before start.
+
 ```bash
 jq '(.tasks[] | select(.id == "openspec-1-1") | .verification) = ["make test"]' \
   /path/to/target/.opencode-loop/queue.json > /tmp/q.tmp && mv /tmp/q.tmp /path/to/target/.opencode-loop/queue.json

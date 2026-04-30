@@ -193,6 +193,8 @@ jq '(.tasks[] | select(.id == "tm-1") | .acceptance_checks) = [{"type":"command"
   "$QUEUE" > "${QUEUE}.tmp" && mv "${QUEUE}.tmp" "$QUEUE"
 ```
 
+Do not start command checks with `!` when the command contains a pipe, for example `! git diff ... | awk ...`. Bash negates the whole pipeline; this can make a correct no-op diff fail its acceptance gate. Use explicit `if ...; then exit 1; else exit 0; fi` logic and run `opencode-loop queue lint --strict` before starting.
+
 Example PowerShell enrichment using UTF-8 no-BOM and `[System.IO.File]::WriteAllText`:
 
 ```powershell
