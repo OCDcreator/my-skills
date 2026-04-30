@@ -24,7 +24,7 @@ SKILL_SOURCES=(
   "axton-obsidian-visual-skills|https://github.com/axtonliu/axton-obsidian-visual-skills.git|main|."
   "baoyu-skills|https://github.com/JimLiu/baoyu-skills.git|main|skills"
   "kepano-obsidian-skills|https://github.com/kepano/obsidian-skills.git|main|skills"
-  "taste-skill|https://github.com/Leonxlnx/taste-skill.git|master|skills"
+  "taste-skill|https://github.com/Leonxlnx/taste-skill.git|main|skills"
   "html-ppt-skill|https://github.com/lewislulu/html-ppt-skill.git|main|."
   "ui-ux-pro-max-skill|https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git|main|.claude/skills"
 )
