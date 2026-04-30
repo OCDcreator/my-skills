@@ -16,6 +16,10 @@ Mission:
 - For this preset, each round must pass a plan review before coding and a code review before final validation/commit.
 - Do not start another round.
 
+Execution contract:
+- You may and should use repository tools, shell commands, file edits, tests, and commits throughout the round.
+- The JSON schema constrains only your final terminal response. It does not forbid planning, tool use, edits, validation, or intermediate work.
+
 Round metadata:
 - Active lane id: `{{current_lane_id}}`
 - Active lane label: `{{current_lane_label}}`

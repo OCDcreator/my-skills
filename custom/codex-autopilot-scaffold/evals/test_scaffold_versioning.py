@@ -1005,6 +1005,19 @@ class ScaffoldVersioningTests(unittest.TestCase):
                 self.assertIn("main pass", prompt_text)
                 self.assertIn("final round artifacts", prompt_text)
 
+    def test_all_preset_prompts_allow_work_before_final_schema_json(self) -> None:
+        for prompt_path in sorted((SKILL_ROOT / "templates" / "presets").glob("*/automation/round-prompt.md")):
+            with self.subTest(prompt_path=prompt_path):
+                prompt_text = prompt_path.read_text(encoding="utf-8")
+                self.assertIn("You may and should use repository tools", prompt_text)
+                self.assertIn("The JSON schema constrains only your final terminal response", prompt_text)
+
+    def test_bootstrap_template_sets_fail_on_round_failure_default(self) -> None:
+        bootstrap_text = (
+            SKILL_ROOT / "templates" / "common" / "automation" / "_autopilot" / "bootstrap_runtime.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("bootstrap_args.fail_on_round_failure = False", bootstrap_text)
+
     def test_review_gated_dry_run_writes_prompt_with_schema_contract(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = create_target_repo(Path(temp_dir))

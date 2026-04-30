@@ -41,6 +41,7 @@ def run_bootstrap_and_daemonize(args: argparse.Namespace, *, support: BootstrapR
     bootstrap_args.single_round = True
     bootstrap_args.max_rounds_this_run = 0
     bootstrap_args.dry_run = False
+    bootstrap_args.fail_on_round_failure = False
 
     support.info("Running one foreground bootstrap round before background continuation.")
     result = support.run_start(bootstrap_args)
