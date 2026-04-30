@@ -33,6 +33,12 @@ Clarify if unclear:
 
 Everything else (proposal, tasks, gates) you handle autonomously.
 
+## Full Auto Workspace Policy
+
+For Git-backed target projects, the Full Auto Pipeline must execute in a dedicated worktree, not the user's main workspace. Treat the main workspace as the final merge/verify/push location only. New imported execute queues default to `profile.isolation: "worktree"` and `profile.integration_strategy: "fast_forward_merge"`; keep those defaults unless the user explicitly requests in-place execution and accepts the risk.
+
+Before starting a new goal, archive or reset stale runtime state (`.opencode-loop/queue.json`, `state.json`, `runtime.json`, logs) instead of silently resuming an old queue. Resume an existing queue only when the user explicitly asks to continue that queue and you have verified the current task/status from live state.
+
 ## Locate The Repo
 
 When already inside the `opencode-loop` repository, use the current repo root. Otherwise locate it first:
@@ -271,6 +277,8 @@ opencode-loop plan --dir /path/to/target --from-taskmaster --tag my-project
 
 The Task Master adapter already handles `.master.tasks[]` automatically; do not hand-roll a parser around Task Master output.
 
+Imported execute queues default to `profile.isolation: "worktree"` and `profile.integration_strategy: "fast_forward_merge"`. This is the Full Auto default; hand-written low-level queues can still use `isolation: "none"` when that is intentional.
+
 For `--from-form` and `--manual`, keep the temporary input file outside the target repo, such as `/tmp/task-form.json` or `/tmp/requirements.md`. If an import artifact is left untracked inside the target repo, execute mode's dirty-worktree protection can block before the first task starts. `plan` can replace the empty execute placeholder queue created by `init --mode execute`, but it must not overwrite a non-empty queue.
 
 ### 2. Enrich Tasks
@@ -356,6 +364,8 @@ Use `jq` with atomic temp-then-rename writes for queue edits not exposed by the 
 
 - `"isolation": "none" | "worktree" | "branch"`
 - `"integration_strategy": "fast_forward_merge" | "branch_chain" | "manual"`
+
+For Full Auto and newly imported execute queues, prefer `worktree` plus `fast_forward_merge`. Use `none` only for intentional in-place execution, low-level tests, or emergency recovery where worktree isolation is unavailable.
 
 Core-script emergency flags:
 

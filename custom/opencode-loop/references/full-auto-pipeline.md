@@ -152,13 +152,15 @@ Notes:
 
 ## Layer 3: Import Into `opencode-loop`
 
+For Git-backed target projects, run Full Auto execution in a dedicated worktree. The user's main workspace is for final merge, verification, and push only. Before starting a new goal, archive or reset stale `.opencode-loop/` runtime state; resume an old queue only when the user explicitly asks for that exact continuation and live queue status confirms it.
+
 ### Step 1: Import
 
 ```bash
 opencode-loop plan --dir /path/to/target --from-taskmaster --tag tm
 ```
 
-This reads `.taskmaster/tasks/tasks.json` and creates `.opencode-loop/queue.json` with tasks in `draft`.
+This reads `.taskmaster/tasks/tasks.json` and creates `.opencode-loop/queue.json` with tasks in `draft`. Imported execute queues default to `profile.isolation: "worktree"` and `profile.integration_strategy: "fast_forward_merge"`; keep that policy for Full Auto unless the user explicitly requests in-place execution.
 
 `plan` refuses to overwrite a non-empty existing `queue.json`. It may replace the empty execute placeholder created by `init --mode execute`, so import-before-init and init-before-import are both valid. If you use `--from-form` or `--manual`, keep the input file outside the target repo, for example under `/tmp`; otherwise the execute dirty-worktree guard may block on the untracked import artifact.
 
