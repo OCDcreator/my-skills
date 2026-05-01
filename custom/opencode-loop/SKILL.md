@@ -209,6 +209,16 @@ Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/sta
 
 Normal hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted. Do not confuse these with execute mode's `gate-review` blocking gate hook: that hook is consumed by the review gate, and a missing or failing `gate-review` makes the gate unavailable/fail instead of merely warning.
 
+For execute review gates, do not write reviewer scripts that only inspect raw `git diff` from the worktree. A task may already be committed and clean when the review gate runs. Use the gate-provided review context first:
+
+- `OPENCODE_LOOP_REVIEW_DIFF_FILE`
+- `OPENCODE_LOOP_REVIEW_STAT_FILE`
+- `OPENCODE_LOOP_REVIEW_CHANGED_FILES_FILE`
+- `OPENCODE_LOOP_REVIEW_CONTEXT_FILE`
+- `OPENCODE_LOOP_REVIEW_DIFF_RANGE`
+
+These files represent the task branch/worktree diff that should be reviewed, including committed clean states.
+
 **Detect reviewer commands before adding hooks.** Commands vary across machines:
 
 ```bash
@@ -225,6 +235,7 @@ opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Review"' --attempts 3
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name claude-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review code changes."' --attempts 3
+opencode-loop hooks install-review --dir /path/to/target --codex-bin codex --timeout 1800
 opencode-loop hooks install-recovery --dir /path/to/target --codex-bin codex --timeout 900
 opencode-loop hooks list --dir /path/to/target --json
 ```
@@ -245,6 +256,8 @@ timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteratio
 Do not treat `hooks test` as the sole gate-keper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook is still functional.
 
 For Full Auto execute queues, install the recovery hook before starting the supervisor. The helper only writes `.opencode-loop/gate-recovery-review-codex.sh` and `hooks.json`; it does not call Codex during setup. During execution, Codex is called only after a failed gate to decide whether a narrow queue contract can be repaired safely, for example by adding precise supporting tests to `scope_paths`.
+
+For Full Auto queues that require review, prefer `hooks install-review` over hand-written review scripts. The installed `gate-review` reads opencode-loop's review diff/context files, so committed clean task worktrees remain reviewable instead of being misclassified as "no diff".
 
 For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
@@ -352,6 +365,13 @@ The review gate requires a `post_iteration` hook named exactly `gate-review`, wh
 - `{"result":"pass"}`
 - `{"result":"needs_changes"}`
 - `{"result":"reject"}`
+
+For new Full Auto queues, install this hook with:
+
+```bash
+opencode-loop hooks install-review --dir /path/to/target --codex-bin codex --timeout 1800
+opencode-loop hooks test --dir /path/to/target --event post_iteration --gate
+```
 
 ### 5. Manage Queue Progress
 
