@@ -251,6 +251,15 @@ opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name gate-review --command "$REVIEWER_CMD $REVIEWER_FLAGS --cwd \"\$OPENCODE_LOOP_TARGET_DIR\" \"$REVIEW_MSG\"" --attempts 3
 ```
 
+Install the recovery review hook for Full Auto queues:
+
+```bash
+opencode-loop hooks install-recovery --dir /path/to/target --codex-bin codex --timeout 900
+opencode-loop hooks test --dir /path/to/target --event post_iteration --recovery
+```
+
+The recovery helper does not call Codex during setup. It installs `gate-recovery-review`, which is invoked only after a gate failure. Its job is to inspect the recovery context and decide whether the previous round actually went wrong or whether the queue contract is too narrow. Only a valid JSON `{"action":"continue","scope_paths_add":[...]}` can repair queue scope and rerun gates in the same iteration.
+
 The last line of stdout must be valid JSON:
 
 - `{"result":"pass"}`
@@ -418,6 +427,15 @@ opencode-loop hooks add --dir /path/to/target --event post_iteration \
 ```
 
 **Important**: The `gate-review` hook must be paired with `review_required: true` on each task (or `reviewer_required: true` on the queue profile) for the review gate to participate in gate decisions. A hook without the queue flag is a no-op for gating.
+
+### Recovery Review Hook
+
+```bash
+opencode-loop hooks install-recovery --dir /path/to/target --codex-bin codex --timeout 900
+opencode-loop hooks test --dir /path/to/target --event post_iteration --recovery
+```
+
+Use this in Full Auto by default after importing/enriching the queue and before starting execute. It creates a Codex-backed `gate-recovery-review` hook but does not run Codex at install time. The hook is reserved for failed gate recovery and can continue only by producing a valid JSON action that updates canonical `.opencode-loop/queue.json` and reruns gates.
 
 ### Extra Reviewer Hooks
 

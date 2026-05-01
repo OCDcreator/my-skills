@@ -225,6 +225,7 @@ opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Review"' --attempts 3
 opencode-loop hooks add --dir /path/to/target --event post_iteration \
   --name claude-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review code changes."' --attempts 3
+opencode-loop hooks install-recovery --dir /path/to/target --codex-bin codex --timeout 900
 opencode-loop hooks list --dir /path/to/target --json
 ```
 
@@ -238,9 +239,12 @@ $KIMI_CMD --print --final-message-only --cwd /path/to/target "Output ONLY JSON: 
 # Layer 2 (supplementary): hooks test confirms wiring
 # Use a timeout — it can hang if the reviewer takes >30s
 timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --iteration 0
+timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --recovery
 ```
 
 Do not treat `hooks test` as the sole gate-keper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook is still functional.
+
+For Full Auto execute queues, install the recovery hook before starting the supervisor. The helper only writes `.opencode-loop/gate-recovery-review-codex.sh` and `hooks.json`; it does not call Codex during setup. During execution, Codex is called only after a failed gate to decide whether a narrow queue contract can be repaired safely, for example by adding precise supporting tests to `scope_paths`.
 
 For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
