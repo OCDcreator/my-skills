@@ -334,8 +334,7 @@ try {
         $Status = "PARTIAL"
         $Detail = "已提交并推送可用更新，但有部分来源下载失败。"
     }
-
-catch {
+} catch {
     if ($_ -is [System.Management.Automation.ErrorRecord] -and $_.Exception.Message -eq "cancelled") {
         # 已处理
     } elseif ($_.Exception.Message -notin @("no-changes", "cancelled")) {

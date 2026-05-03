@@ -150,8 +150,7 @@ try {
         throw "reset-failed"
     }
     Write-Host "[OK] 本地已覆盖为 origin/main"
-
-catch {
+} catch {
     if ($_ -is [System.Management.Automation.ErrorRecord] -and $_.Exception.Message -eq "cancelled") {
         # 已处理
     }

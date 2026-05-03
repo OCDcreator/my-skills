@@ -170,8 +170,7 @@ try {
         throw "push-failed"
     }
     Write-Host "[OK] 已成功推送到远端"
-
-catch {
+} catch {
     if ($_ -is [System.Management.Automation.ErrorRecord] -and $_.Exception.Message -eq "no-changes") {
         # 已处理
     }
