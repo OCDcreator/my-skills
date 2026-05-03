@@ -36,7 +36,9 @@ function Invoke-Git {
     )
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "git"
-    $psi.Arguments = $Arguments -join " "
+    foreach ($arg in $Arguments) {
+        $psi.ArgumentList.Add($arg)
+    }
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.UseShellExecute = $false
@@ -170,6 +172,12 @@ try {
 
         try {
             Invoke-Git @("clone", "--depth", "1", "--branch", $Src.Branch, $Src.Url, $CloneDir) -IgnoreExitCode | Out-Null
+            if ($script:LastGitExitCode -ne 0) {
+                $SourceErrors++
+                Write-Host "[WARN] $($Src.Name) 下载失败 (exit code $script:LastGitExitCode)"
+                $SkillIndex++
+                continue
+            }
         } catch {
             $SourceErrors++
             Write-Host "[WARN] $($Src.Name) 下载失败"
@@ -237,6 +245,10 @@ try {
 
     try {
         Invoke-Git @("clone", "--depth", "1", "--branch", "main", "https://github.com/VoltAgent/awesome-design-md.git", $RefCloneDir) -IgnoreExitCode | Out-Null
+        if ($script:LastGitExitCode -ne 0) {
+            $SourceErrors++
+            Write-Host "[WARN] awesome-design-md 下载失败 (exit code $script:LastGitExitCode)"
+        }
     } catch {
         $SourceErrors++
         Write-Host "[WARN] awesome-design-md 下载失败"
@@ -310,7 +322,7 @@ try {
     Write-Host "[步骤 7/7] 提交并推送更新结果..."
     Write-Host "[INFO] 提交信息: $CommitMsg"
     try {
-        Invoke-Git @("commit", "-m", "`"$CommitMsg`"")
+        Invoke-Git @("commit", "-m", $CommitMsg)
     } catch {
         $Status = "ERROR"
         $Detail = "git commit 失败。常见原因是 Git 用户名/邮箱未配置，或提交钩子报错。"

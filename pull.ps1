@@ -31,7 +31,9 @@ function Invoke-Git {
     )
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "git"
-    $psi.Arguments = $Arguments -join " "
+    foreach ($arg in $Arguments) {
+        $psi.ArgumentList.Add($arg)
+    }
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.UseShellExecute = $false

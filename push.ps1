@@ -34,7 +34,9 @@ function Invoke-Git {
     )
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "git"
-    $psi.Arguments = $Arguments -join " "
+    foreach ($arg in $Arguments) {
+        $psi.ArgumentList.Add($arg)
+    }
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
     $psi.UseShellExecute = $false
@@ -153,7 +155,7 @@ try {
     Write-Host "[步骤 5/5] 创建提交并推送到远端..."
     Write-Host "[INFO] 提交信息: $CommitMsg"
     try {
-        Invoke-Git @("commit", "-m", "`"$CommitMsg`"")
+        Invoke-Git @("commit", "-m", $CommitMsg)
     } catch {
         $Status = "ERROR"
         $Detail = "git commit 失败。常见原因是 Git 用户名/邮箱未配置，或提交钩子报错。"

@@ -38,8 +38,8 @@ finish() {
   line
   echo
 
-  echo "当前仓库状态："
-  git status --short --branch 2>/dev/null || true
+  echo "当前分支："
+  git branch --show-current 2>/dev/null || true
   echo
 
   echo "最近 5 条提交："
