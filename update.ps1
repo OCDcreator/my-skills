@@ -48,6 +48,8 @@ function Invoke-Git {
     $stderr = $proc.StandardError.ReadToEnd()
     $proc.WaitForExit()
 
+    $script:LastGitExitCode = $proc.ExitCode
+
     if (-not $IgnoreExitCode -and $proc.ExitCode -ne 0) {
         throw "git $($Arguments -join ' ') failed (exit code $($proc.ExitCode)): $stderr"
     }
@@ -278,9 +280,9 @@ try {
     $DiffExit = 0
     try {
         Invoke-Git @("diff", "--cached", "--quiet") -IgnoreExitCode | Out-Null
-        $DiffExit = $LASTEXITCODE
+        $DiffExit = $script:LastGitExitCode
     } catch {
-        $DiffExit = $LASTEXITCODE
+        $DiffExit = $script:LastGitExitCode
     }
 
     if ($DiffExit -eq 0) {
