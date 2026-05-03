@@ -310,7 +310,7 @@ try {
     Write-Host "[步骤 7/7] 提交并推送更新结果..."
     Write-Host "[INFO] 提交信息: $CommitMsg"
     try {
-        Invoke-Git @("commit", "-m", $CommitMsg)
+        Invoke-Git @("commit", "-m", "`"$CommitMsg`"")
     } catch {
         $Status = "ERROR"
         $Detail = "git commit 失败。常见原因是 Git 用户名/邮箱未配置，或提交钩子报错。"
