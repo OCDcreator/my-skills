@@ -139,6 +139,39 @@ STYLE: [style characteristics]
 ASPECT: 16:9
 ```
 
+**Infographic + sketch-notes + macaron palette** (default / `hand-drawn-edu` preset):
+```
+Single-page hand-drawn educational infographic in a clean presentation style.
+Warm cream paper background, black hand-drawn lines with slight wobble, soft
+pastel color blocks. Feels simple, friendly, and easy to understand at a glance.
+Diagram-style visuals ONLY — no realistic or photographic images.
+
+PALETTE: macaron — soft pastel blocks on warm cream
+COLORS: Warm Cream background (#F5F0E8); Black (#1A1A1A) for ALL lines, text,
+        arrows, and doodles; section fills in Light Blue (#A8D8EA), Mint Green
+        (#B5E5CF), Lavender (#D5C6E0), Peach (#FFD5C2); Coral Red (#E8655A)
+        sparingly for one or two emphasis points only.
+
+LAYOUT (top → bottom):
+- TOP: Bold hand-lettered title, oversized, slightly wobbly, with an optional
+       decorative underline or small doodle.
+- MIDDLE: 2–6 rounded-rectangle info boxes arranged in a clean grid, row, or
+          radial pattern. Each box = one section, one pastel fill color, one
+          simple icon or sketchy cartoon element, one short keyword/phrase.
+          Hand-drawn arrows connect related zones.
+- BOTTOM: One short hand-lettered takeaway sentence summarizing the main idea.
+
+ELEMENTS: Rounded info boxes with clear sectioning, wavy/straight hand-drawn
+          arrows with small inline labels, simple icons and sketchy cartoon
+          elements (stick figures, tools, objects), small doodle decorations
+          (stars, sparkles, underlines, dots, asterisks) used sparingly.
+
+STYLE: Minimal, well-organized, airy. Color fills don't completely fill
+       outlines (slight "hand-painted" overshoot). ALL text hand-lettered —
+       no computer fonts. Short labels and keywords only, never long
+       paragraphs. Generous white space between sections.
+```
+
 **Infographic + vector-illustration**:
 ```
 Flat vector illustration infographic. Clean black outlines on all elements.

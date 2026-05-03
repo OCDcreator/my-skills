@@ -46,7 +46,7 @@ options:
   - label: "Google (Recommended)"
     description: "Gemini multimodal - high quality, reference images, flexible sizes"
   - label: "OpenAI"
-    description: "GPT Image - consistent quality, reliable output"
+    description: "GPT Image 2 - latest OpenAI image model, reference-image workflows"
   - label: "Azure OpenAI"
     description: "Azure-hosted GPT Image deployments with resource-specific routing"
   - label: "OpenRouter"
@@ -101,10 +101,12 @@ Only show if user selected Azure OpenAI.
 header: "Azure Deploy"
 question: "Default Azure image deployment name?"
 options:
-  - label: "gpt-image-1.5 (Recommended)"
-    description: "Best default if your Azure deployment uses the same name"
-  - label: "gpt-image-1"
+  - label: "gpt-image-2 (Recommended)"
+    description: "Use if your Azure deployment uses the GPT Image 2 model name"
+  - label: "gpt-image-1.5"
     description: "Previous GPT Image deployment name"
+  - label: "gpt-image-1"
+    description: "Earlier GPT Image deployment name"
 ```
 
 ### Question 2d: Default MiniMax Model
@@ -214,10 +216,12 @@ options:
 header: "OpenAI Model"
 question: "Choose a default OpenAI image generation model?"
 options:
-  - label: "gpt-image-1.5 (Recommended)"
-    description: "Latest GPT Image model, high quality"
+  - label: "gpt-image-2 (Recommended)"
+    description: "Latest GPT Image model, flexible sizes up to 4K, high-fidelity image inputs"
+  - label: "gpt-image-1.5"
+    description: "Previous GPT Image model"
   - label: "gpt-image-1"
-    description: "Previous generation GPT Image model"
+    description: "Earlier GPT Image model"
 ```
 
 ### Azure Deployment Selection
@@ -226,8 +230,10 @@ options:
 header: "Azure Deploy"
 question: "Choose a default Azure image deployment name?"
 options:
-  - label: "gpt-image-1.5 (Recommended)"
-    description: "Use when your Azure deployment name matches the GPT-image-1.5 model"
+  - label: "gpt-image-2 (Recommended)"
+    description: "Use when your Azure deployment name matches the GPT Image 2 model"
+  - label: "gpt-image-1.5"
+    description: "Use when your Azure deployment name matches the GPT Image 1.5 model"
   - label: "gpt-image-1"
     description: "Use when your Azure deployment name matches GPT-image-1"
 ```
@@ -265,6 +271,10 @@ options:
     description: "Legacy Qwen model with five fixed output sizes"
   - label: "qwen-image-plus"
     description: "Legacy Qwen model, same current capability as qwen-image"
+  - label: "wan2.7-image-pro"
+    description: "Wan 2.7 Pro — supports up to 4K text-to-image and reference-image editing"
+  - label: "wan2.7-image"
+    description: "Wan 2.7 base — faster generation, up to 2K, supports reference-image editing"
   - label: "z-image-turbo"
     description: "Legacy DashScope model for compatibility"
   - label: "z-image-ultra"
@@ -275,6 +285,7 @@ Notes for DashScope setup:
 
 - Prefer `qwen-image-2.0-pro` when the user needs custom `--size`, uncommon ratios like `21:9`, or strong Chinese/English text rendering.
 - `qwen-image-max` / `qwen-image-plus` / `qwen-image` only support five fixed sizes: `1664*928`, `1472*1104`, `1328*1328`, `1104*1472`, `928*1664`.
+- `wan2.7-image-pro` and `wan2.7-image` are the only DashScope models that accept `--ref`. Pick one of these when the user wants reference-image editing or multi-image fusion via DashScope.
 - In `baoyu-imagine`, `quality` is a compatibility preset. It is not a native DashScope parameter.
 
 ### Z.AI Model Selection

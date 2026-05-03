@@ -123,6 +123,12 @@ for 小红书图文 (1242×1660).
 - Don't add more than one new template file unless a genuinely new layout
   type is needed. Prefer composition.
 - Don't delete slides from the showcase decks.
+- **Don't put presenter-only text on the slide.** Any descriptive text,
+  narration cues, or explanations meant for the speaker (e.g. "这一页的重点是…",
+  "Note: mention X here", small grey captions explaining the slide's purpose)
+  MUST go inside `<div class="notes">`, not as visible elements. The `.notes`
+  div is hidden (`display:none`) and only shown via the S overlay. Slides
+  should contain ONLY audience-facing content.
 
 ## Troubleshooting
 
