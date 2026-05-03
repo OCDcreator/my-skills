@@ -36,6 +36,7 @@ function Invoke-Git {
     )
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = "git"
+    $psi.WorkingDirectory = $RepoDir
     foreach ($arg in $Arguments) {
         $psi.ArgumentList.Add($arg)
     }
