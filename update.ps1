@@ -361,8 +361,8 @@ finally {
     Write-Line
     Write-Host ""
 
-    Write-Host "当前仓库状态："
-    try { Invoke-Git @("status", "--short", "--branch") | Write-Host } catch { }
+    Write-Host "当前分支："
+    try { Invoke-Git @("branch", "--show-current") | Write-Host } catch { }
     Write-Host ""
 
     Write-Host "最近 5 条提交："
