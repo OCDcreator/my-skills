@@ -22,7 +22,7 @@ my-skills/
 │   ├── skill-catalog-maintainer/              # 技能目录/README/AGENTS 维护
 │   ├── skill-router/                          # 任务先路由到 my-skills 中合适技能
 │   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
-│   ├── windows-mac-ssh/                       # Windows PowerShell 通过 SSH/SCP 操作 Mac
+│   ├── ssh/                                    # SSH/SCP 远程操作（Mac/Windows/Unraid/路由器/飞牛）
 │   ├── opencode-source-compass/               # OpenCode 源码架构导航与 SDK 版本兼容性诊断
 │   ├── opencode-cli-handbook/                 # OpenCode CLI 速查手册（agent 非交互调用）
 │   ├── kimi-code-review/                      # 让其他 Agent 调用 Kimi Code CLI 进行代码审查
@@ -68,7 +68,7 @@ my-skills/
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
 | [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |
 | [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
-| [windows-mac-ssh](custom/windows-mac-ssh/) | Windows PowerShell / Codex CLI 通过 SSH/SCP 流畅操作 Mac，重点规避引号、换行、路径、变量展开与远程 zsh 命令坑 |
+| [ssh](custom/ssh/) | SSH/SCP 远程操作全设备（Mac Mini、Windows、Unraid、QWRT 路由器、飞牛 fnOS），含设备清单、引号安全、base64 跨平台脚本、文件传输与后台任务 |
 | [x-reader](custom/x-reader/) | 内容转录与分析套件（含 [video](custom/x-reader/video/) 视频/播客转录、[analyzer](custom/x-reader/analyzer/) 多维内容分析） |
 | [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |
 
