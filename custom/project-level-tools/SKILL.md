@@ -1,5 +1,5 @@
 ---
-name: windows-project-level-tools
+name: project-level-tools
 description: "Use when the user wants to configure GitNexus, lean-ctx, or any MCP tools/skills at the project level instead of globally. Triggers on phrases like 'project level', 'project-level', 'don't install globally', 'per project', 'mcp setup', 'gitnexus setup', 'lean-ctx setup', or when the user wants to isolate tool configurations to a specific repository. Also triggers when the user mentions adding constraints so tools update after code changes, or when setting up on a new machine (Windows or Mac)."
 compatibility: opencode
 ---

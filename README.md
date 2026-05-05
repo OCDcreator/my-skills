@@ -72,7 +72,7 @@ my-skills/
 | [ssh](custom/ssh/) | SSH/SCP 远程操作全设备（Mac Mini、Windows、Unraid、QWRT 路由器、飞牛 fnOS），含设备清单、引号安全、base64 跨平台脚本、文件传输与后台任务 |
 | [x-reader](custom/x-reader/) | 内容转录与分析套件（含 [video](custom/x-reader/video/) 视频/播客转录、[analyzer](custom/x-reader/analyzer/) 多维内容分析） |
 | [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |
-| [windows-project-level-tools](custom/windows-project-level-tools/) | Windows 上将 GitNexus 和 lean-ctx 从全局配置迁移到项目级，含 WSL 兼容、LadybugDB WAL 处理、auto-update 约束与 verify gate |
+| [project-level-tools](custom/project-level-tools/) | 将 GitNexus 和 lean-ctx 从全局配置迁移到项目级（Windows + macOS），含跨平台脚本、WSL 兼容、LadybugDB WAL 处理、auto-update 约束与 verify gate |
 
 ## 外部技能来源 (external/)
 
