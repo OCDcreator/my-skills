@@ -1,7 +1,6 @@
 ---
 name: project-level-tools
-description: "Configure GitNexus and lean-ctx at the PROJECT LEVEL instead of globally. Use this skill whenever the user mentions project-level MCP setup, per-project configuration, isolating tools to a repo, or says anything like 'don''t install globally', 'project level only', 'per project', 'mcp setup', 'gitnexus setup', 'lean-ctx setup'. Also trigger when the user wants code intelligence, context compression, auto-update constraints after code changes, or is setting up a new machine (Windows or Mac). Trigger even if the user doesn''t explicitly name GitNexus or lean-ctx but mentions wanting smarter code understanding or token savings in their project."
-compatibility: opencode
+description: "Use when the user wants GitNexus and/or lean-ctx configured for one repository instead of globally, including project-level MCP setup, repo-local config files, trusted-project setup, local templates, or Windows/macOS per-project tool isolation."
 ---
 
 # Project-Level MCP & Tool Setup
@@ -12,7 +11,7 @@ Works on both Windows (with WSL workaround) and macOS (native).
 ## What This Skill Covers
 
 - Migrate MCP servers from global config to project-level for **OpenCode** (`.opencode/opencode.json`) and **Codex** (`.codex/config.toml`)
-- Install GitNexus skills locally under `.opencode/skills/` (OpenCode) or `.claude/skills/` (Claude Code / Codex)
+- Install GitNexus skills locally for harnesses that support repo-local skill folders (for example `.opencode/skills/` or `.claude/skills/`)
 - Create cross-platform scripts to check tool freshness and auto-update indexes
 - Wire constraints into `package.json`, `AGENTS.md`, and git hooks
 - Handle Windows-specific issues (LadybugDB WAL incompatibility via WSL)
@@ -24,8 +23,8 @@ Works on both Windows (with WSL workaround) and macOS (native).
 - User wants GitNexus on a new project
 - User wants lean-ctx isolated per project
 - User asks to add constraints so indexes update after code changes
-- User mentions code intelligence / context compression setup
-- User is setting up on a new machine (Windows or Mac)
+- User explicitly wants MCP/tool isolation at the repo level
+- User is setting up one specific repo on Windows or macOS
 
 ## Prerequisites
 
@@ -42,6 +41,11 @@ npm install -g gitnexus
 
 On Windows, also verify WSL: `wsl -l -v`
 
+## Shell Notes
+
+- On Windows, use PowerShell for simple commands and Git Bash or WSL for Unix-style commands like `cp`, `chmod`, or `mkdir -p`
+- Treat shell snippets below as patterns, not copy-paste mandates; translate them to the user's shell when needed
+
 ## Workflow
 
 ### Step 1: Assess Current State
@@ -53,9 +57,14 @@ cat ~/.config/opencode/opencode.json
 
 Look for `mcp` entries with `lean-ctx` and/or `gitnexus`.
 
+On Windows PowerShell, prefer:
+```powershell
+Get-Content $HOME\.config\opencode\opencode.json
+```
+
 ### Step 2: Remove Global MCP Entries
 
-Edit `~/.config/opencode/opencode.json` and remove `lean-ctx` and `gitnexus` MCP entries. Leave other MCPs untouched.
+If the user wants true project-only isolation, edit `~/.config/opencode/opencode.json` and remove `lean-ctx` and `gitnexus` MCP entries. Leave other MCPs untouched.
 
 **Also check and clean other agents'' global configs:**
 - `~/.cursor/mcp.json` — remove lean-ctx/gitnexus
@@ -101,7 +110,7 @@ Then create `.opencode/opencode.json` locally (do not commit):
       "command": ["lean-ctx"],
       "enabled": true,
       "environment": {
-        "LEAN_CTX_DATA_DIR": "C:\Users\<USERNAME>\.config\lean-ctx"
+        "LEAN_CTX_DATA_DIR": "C:\\Users\\<USERNAME>\\.config\\lean-ctx"
       }
     },
     "gitnexus": {
@@ -145,25 +154,30 @@ Then create `.opencode/opencode.json` locally (do not commit):
 Create `.codex/config.toml.template` (committed to git):
 ```toml
 # Copy to .codex/config.toml locally. Do NOT commit the local copy.
+# Codex reads .codex/config.toml for trusted projects.
 
 # Windows:
-# [mcp_servers.lean-ctx]
-# command = "C:\Users\<USERNAME>\.cargo\bin\lean-ctx.exe"
+# [mcp_servers."lean-ctx"]
+# command = 'C:\Users\<USERNAME>\.cargo\bin\lean-ctx.exe'
+# args = []
+#
 # [mcp_servers.gitnexus]
-# command = "cmd"
-# args = ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
+# command = "wsl"
+# args = ["-d", "Ubuntu", "-e", "bash", "-lc", "cd '/mnt/c/<WSL_PATH>' && npx -y gitnexus@<VERSION> mcp"]
 
 # macOS:
-# [mcp_servers.lean-ctx]
+# [mcp_servers."lean-ctx"]
 # command = "lean-ctx"
+# args = []
+#
 # [mcp_servers.gitnexus]
 # command = "npx"
-# args = ["-y", "gitnexus@latest", "mcp"]
+# args = ["-y", "gitnexus@<VERSION>", "mcp"]
 ```
 
 Then create `.codex/config.toml` locally (do not commit), uncommenting the appropriate platform section.
 
-**Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. The index must be built and served from WSL. On macOS, GitNexus runs natively without issues.
+**Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. On Windows, both indexing and MCP serving should route through WSL. On macOS, GitNexus runs natively without issues.
 
 ### Step 4: Copy GitNexus Skills to Project
 
@@ -182,7 +196,11 @@ cp "<SRC>/gitnexus-cli.md" .opencode/skills/gitnexus-cli/SKILL.md
 cp "<SRC>/gitnexus-pr-review.md" .opencode/skills/gitnexus-pr-review/SKILL.md
 ```
 
+On Windows PowerShell, replace the Unix copy commands with `New-Item -ItemType Directory -Force` and `Copy-Item`.
+
 Update stale-index references in copied skills from `npx gitnexus analyze` to `npm run update:gitnexus`.
+
+**Do not assume Codex uses `.claude/skills`.** For Codex, the reliable repo-local configuration point is `.codex/config.toml`; repo-local skill folders depend on runtime/workflow and should be verified before copying files.
 
 ### Step 5: Create Scripts
 
@@ -212,16 +230,19 @@ console.log("✅ GitNexus index fresh");
 import { execSync } from "child_process";
 
 const FORCE = process.argv.includes("--force") ? " --force" : "";
+const SKIP_AGENTS_MD = " --skip-agents-md";
 const IS_WINDOWS = process.platform === "win32";
 
 if (IS_WINDOWS) {
   const distro = process.env.GITNEXUS_WSL_DISTRO || "Ubuntu";
   const wslPath = execSync(`wsl -d ${distro} -e wslpath -u "${process.cwd()}"`, { encoding: "utf-8" }).trim();
-  execSync(`wsl -d ${distro} -e bash -lc "cd '${wslPath}' && npx -y gitnexus@latest analyze${FORCE}"`, { stdio: "inherit" });
+  execSync(`wsl -d ${distro} -e bash -lc "cd '${wslPath}' && npx -y gitnexus@<VERSION> analyze${FORCE}${SKIP_AGENTS_MD}"`, { stdio: "inherit" });
 } else {
-  execSync(`npx -y gitnexus@latest analyze${FORCE}`, { stdio: "inherit" });
+  execSync(`npx -y gitnexus@<VERSION> analyze${FORCE}${SKIP_AGENTS_MD}`, { stdio: "inherit" });
 }
 ```
+
+Use `--skip-agents-md` when you want stable `AGENTS.md` / `CLAUDE.md` guidance instead of having GitNexus rewrite volatile repo statistics after every refresh.
 
 **`check-lean-ctx.mjs`:**
 ```javascript
@@ -253,6 +274,7 @@ try {
 ### Step 7: Update AGENTS.md
 
 Add lean-ctx usage guide, GitNexus usage guide, and the update constraint rule (after every code change, run `npm run update:gitnexus`).
+Prefer stable prose over volatile symbol-count statistics if the repo docs are meant to stay clean after index refreshes.
 
 ### Step 8: Add Pre-Commit Hook
 
@@ -384,7 +406,7 @@ trust_level = "trusted"
 | Syncthing overwrites `.opencode/opencode.json` | Add to `.stignore` on both machines |
 | Sync conflict files (`.sync-conflict-*`) | Restore from git, ensure `.stignore` configured |
 | Codex not loading project MCP | Check `~/.codex/config.toml` project trust level |
-| **Configured wrong project** | `git reset --hard HEAD~1` to revert, then confirm target project |
+| **Configured wrong project** | Stop, inspect the worktree, and revert only the task-local changes after confirming the intended repo |
 | **Git conflict on `.codex/config.toml`** | File is platform-specific; keep local version, don''t merge |
 
 ## References
