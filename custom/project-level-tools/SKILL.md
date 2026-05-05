@@ -1,12 +1,12 @@
 ---
 name: project-level-tools
-description: "Use when the user wants to configure GitNexus, lean-ctx, or any MCP tools/skills at the project level instead of globally. Triggers on phrases like 'project level', 'project-level', 'don't install globally', 'per project', 'mcp setup', 'gitnexus setup', 'lean-ctx setup', or when the user wants to isolate tool configurations to a specific repository. Also triggers when the user mentions adding constraints so tools update after code changes, or when setting up on a new machine (Windows or Mac)."
+description: "Configure GitNexus and lean-ctx at the PROJECT LEVEL instead of globally. Use this skill whenever the user mentions project-level MCP setup, per-project configuration, isolating tools to a repo, or says anything like 'don''t install globally', 'project level only', 'per project', 'mcp setup', 'gitnexus setup', 'lean-ctx setup'. Also trigger when the user wants code intelligence, context compression, auto-update constraints after code changes, or is setting up a new machine (Windows or Mac). Trigger even if the user doesn''t explicitly name GitNexus or lean-ctx but mentions wanting smarter code understanding or token savings in their project."
 compatibility: opencode
 ---
 
 # Project-Level MCP & Tool Setup
 
-Configure GitNexus and lean-ctx at the project level, with auto-update constraints.
+Configure GitNexus (code intelligence) and lean-ctx (token compression) at the project level, with auto-update constraints.
 Works on both Windows (with WSL workaround) and macOS (native).
 
 ## What This Skill Covers
@@ -20,7 +20,7 @@ Works on both Windows (with WSL workaround) and macOS (native).
 
 ## When to Use
 
-- User says "don't install globally" or "project level only"
+- User says "don''t install globally" or "project level only"
 - User wants GitNexus on a new project
 - User wants lean-ctx isolated per project
 - User asks to add constraints so indexes update after code changes
@@ -29,29 +29,24 @@ Works on both Windows (with WSL workaround) and macOS (native).
 
 ## Prerequisites
 
-Before starting, verify these are already installed globally:
-
 ```bash
 lean-ctx --version    # Should show 3.x.x
 gitnexus --version    # Should show 1.x.x
 ```
 
-If missing, install first:
+If missing:
 ```bash
 cargo install lean-ctx
 npm install -g gitnexus
 ```
 
-On Windows, also verify WSL:
-```bash
-wsl -l -v             # Should show Ubuntu (or another distro)
-```
+On Windows, also verify WSL: `wsl -l -v`
 
 ## Workflow
 
 ### Step 1: Assess Current State
 
-Read the global OpenCode config to see what's currently installed globally:
+Read the global OpenCode config to see what''s currently installed globally:
 ```bash
 cat ~/.config/opencode/opencode.json
 ```
@@ -60,20 +55,43 @@ Look for `mcp` entries with `lean-ctx` and/or `gitnexus`.
 
 ### Step 2: Remove Global MCP Entries
 
-Edit `~/.config/opencode/opencode.json` and remove:
-- The `lean-ctx` MCP entry
-- The `gitnexus` MCP entry
+Edit `~/.config/opencode/opencode.json` and remove `lean-ctx` and `gitnexus` MCP entries. Leave other MCPs untouched.
 
-Leave other MCPs (web-reader, zread, etc.) untouched.
+**Also check and clean other agents'' global configs:**
+- `~/.cursor/mcp.json` — remove lean-ctx/gitnexus
+- `~/.codex/config.toml` — remove `[mcp_servers.lean-ctx]` and `[mcp_servers.gitnexus]`
+- `~/.claude/settings.json` — remove GitNexus hooks
+- `~/.codeium/windsurf/mcp_config.json` — remove if present
 
 ### Step 3: Create Project-Level MCP Config
 
-**Important:** `.opencode/opencode.json` is platform-specific. It should NOT be committed to git or synced via Syncthing. Use the template below and create it locally on each machine.
+**Critical rule:** Platform-specific config files must NOT be committed to git. Use the template approach: commit a `.template` file, create the actual config locally on each machine.
 
-Create `.opencode/opencode.json` in the project root:
+#### OpenCode (`.opencode/opencode.json`)
 
-#### Windows
+Create `.opencode/opencode.json.template` (committed to git):
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "lean-ctx": {
+      "type": "local",
+      "command": ["lean-ctx"],
+      "enabled": true
+    },
+    "gitnexus": {
+      "type": "local",
+      "command": ["gitnexus", "mcp"],
+      "enabled": true,
+      "timeout": 15000
+    }
+  }
+}
+```
 
+Then create `.opencode/opencode.json` locally (do not commit):
+
+**Windows:**
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
@@ -83,32 +101,23 @@ Create `.opencode/opencode.json` in the project root:
       "command": ["lean-ctx"],
       "enabled": true,
       "environment": {
-        "LEAN_CTX_DATA_DIR": "C:\\Users\\<USERNAME>\\.config\\lean-ctx"
+        "LEAN_CTX_DATA_DIR": "C:\Users\<USERNAME>\.config\lean-ctx"
       }
     },
     "gitnexus": {
       "type": "local",
       "command": [
-        "wsl",
-        "-d",
-        "Ubuntu",
-        "-e",
-        "bash",
-        "-lc",
-        "cd \"$GITNEXUS_REPO_PATH\" && npx -y gitnexus@<VERSION> mcp"
+        "wsl", "-d", "Ubuntu", "-e", "bash", "-lc",
+        "cd \"/mnt/c/<WSL_PATH>\" && npx -y gitnexus@<VERSION> mcp"
       ],
       "enabled": true,
-      "environment": {
-        "GITNEXUS_REPO_PATH": "/mnt/c/<WSL_PATH_TO_PROJECT>"
-      },
       "timeout": 15000
     }
   }
 }
 ```
 
-#### macOS
-
+**macOS:**
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
@@ -131,92 +140,39 @@ Create `.opencode/opencode.json` in the project root:
 }
 ```
 
-Replace:
-- `<USERNAME>` with the actual username
-- `<WSL_PATH_TO_PROJECT>` (Windows only) with the WSL path (e.g., `/mnt/c/Users/alice/project`)
-- `<VERSION>` (Windows only) with the installed GitNexus version (e.g., `1.6.3`)
-
-**Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. The index must be built and served from WSL. On macOS, GitNexus runs natively without issues.
-
-### Step 3b: Create Project-Level Codex MCP Config (Optional)
-
-If the user also uses **Codex** (OpenAI Codex CLI), create `.codex/config.toml`:
-
-**Important:** `.codex/config.toml` is platform-specific and should NOT be committed to git. Use the template approach below.
+#### Codex (`.codex/config.toml`)
 
 Create `.codex/config.toml.template` (committed to git):
-
 ```toml
-# Codex project-level MCP configuration template
-# Copy this file to .codex/config.toml and adjust paths for your platform.
-# Do NOT commit .codex/config.toml — it contains platform-specific absolute paths.
+# Copy to .codex/config.toml locally. Do NOT commit the local copy.
 
-# =============================================================================
-# Windows Configuration
-# =============================================================================
+# Windows:
 # [mcp_servers.lean-ctx]
-# command = "C:\\Users\\<USERNAME>\\.cargo\\bin\\lean-ctx.exe"
-#
+# command = "C:\Users\<USERNAME>\.cargo\bin\lean-ctx.exe"
 # [mcp_servers.gitnexus]
 # command = "cmd"
 # args = ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
 
-# =============================================================================
-# macOS Configuration
-# =============================================================================
+# macOS:
 # [mcp_servers.lean-ctx]
 # command = "lean-ctx"
-#
 # [mcp_servers.gitnexus]
 # command = "npx"
 # args = ["-y", "gitnexus@latest", "mcp"]
 ```
 
-Then create `.codex/config.toml` locally on each machine (do not commit):
+Then create `.codex/config.toml` locally (do not commit), uncommenting the appropriate platform section.
 
-#### Windows
-
-```toml
-[mcp_servers.lean-ctx]
-command = "C:\\Users\\<USERNAME>\\.cargo\\bin\\lean-ctx.exe"
-
-[mcp_servers.gitnexus]
-command = "cmd"
-args = ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
-```
-
-#### macOS
-
-```toml
-[mcp_servers.lean-ctx]
-command = "lean-ctx"
-
-[mcp_servers.gitnexus]
-command = "npx"
-args = ["-y", "gitnexus@latest", "mcp"]
-```
-
-Add `.codex/config.toml` to `.gitignore`:
-```gitignore
-# Codex local config (platform-specific)
-.codex/config.toml
-```
-
-**Note:** Codex loads project-level config from `.codex/config.toml` when the project is trusted. The config precedence is: CLI flags > profile > project config (`.codex/config.toml`) > user config (`~/.codex/config.toml`).
+**Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. The index must be built and served from WSL. On macOS, GitNexus runs natively without issues.
 
 ### Step 4: Copy GitNexus Skills to Project
 
-GitNexus skills are bundled with the npm package. Copy them to the project:
-
 ```bash
-# Find the source path
+# Find source path
 # Windows: %APPDATA%/npm/node_modules/gitnexus/skills
 # macOS: $(npm root -g)/gitnexus/skills
 
-# Destination
 mkdir -p .opencode/skills
-
-# Copy each skill into its own directory with SKILL.md
 cp "<SRC>/gitnexus-guide.md" .opencode/skills/gitnexus-guide/SKILL.md
 cp "<SRC>/gitnexus-exploring.md" .opencode/skills/gitnexus-exploring/SKILL.md
 cp "<SRC>/gitnexus-impact-analysis.md" .opencode/skills/gitnexus-impact-analysis/SKILL.md
@@ -226,195 +182,114 @@ cp "<SRC>/gitnexus-cli.md" .opencode/skills/gitnexus-cli/SKILL.md
 cp "<SRC>/gitnexus-pr-review.md" .opencode/skills/gitnexus-pr-review/SKILL.md
 ```
 
-Then update all stale-index references in the copied skills from `npx gitnexus analyze` to `npm run update:gitnexus`.
+Update stale-index references in copied skills from `npx gitnexus analyze` to `npm run update:gitnexus`.
 
-### Step 5: Create Freshness Check Script
+### Step 5: Create Scripts
 
-Create `scripts/check-gitnexus-freshness.mjs`:
+Create three scripts in `scripts/`:
 
+**`check-gitnexus-freshness.mjs`:**
 ```javascript
 #!/usr/bin/env node
 import { execSync } from "child_process";
 import { existsSync, readFileSync } from "fs";
-import { resolve } from "path";
 
-const META_PATH = resolve(".gitnexus/meta.json");
+const meta = existsSync(".gitnexus/meta.json")
+  ? JSON.parse(readFileSync(".gitnexus/meta.json", "utf-8"))
+  : null;
+const head = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
 
-function getCurrentHead() {
-  return execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
-}
-
-function getMetaCommit() {
-  if (!existsSync(META_PATH)) return null;
-  try {
-    const meta = JSON.parse(readFileSync(META_PATH, "utf-8"));
-    return meta.lastCommit || null;
-  } catch {
-    return null;
-  }
-}
-
-const currentHead = getCurrentHead();
-const metaCommit = getMetaCommit();
-
-if (!metaCommit || metaCommit !== currentHead) {
-  console.error("❌ GitNexus index is stale. Run: npm run update:gitnexus");
+if (!meta || meta.lastCommit !== head) {
+  console.error("❌ GitNexus index stale. Run: npm run update:gitnexus");
   process.exit(1);
 }
-
-console.log("✅ GitNexus index is fresh");
+console.log("✅ GitNexus index fresh");
 ```
 
-### Step 6: Create Cross-Platform Update Script
-
-Create `scripts/update-gitnexus.mjs`:
-
+**`update-gitnexus.mjs`:**
 ```javascript
 #!/usr/bin/env node
-/**
- * update-gitnexus.mjs
- *
- * Rebuilds the GitNexus index.
- * On macOS/Linux: runs natively.
- * On Windows: uses WSL (LadybugDB WAL incompatibility).
- */
-
 import { execSync } from "child_process";
-import { resolve } from "path";
 
-const REPO_ROOT = resolve(".");
-const FORCE = process.argv.includes("--force");
+const FORCE = process.argv.includes("--force") ? " --force" : "";
 const IS_WINDOWS = process.platform === "win32";
 
-function main() {
-  const forceFlag = FORCE ? " --force" : "";
-
-  if (IS_WINDOWS) {
-    const DISTRO = process.env.GITNEXUS_WSL_DISTRO || "Ubuntu";
-    let wslPath;
-    try {
-      wslPath = execSync(
-        `wsl -d ${DISTRO} -e wslpath -u "${REPO_ROOT}"`,
-        { encoding: "utf-8" }
-      ).trim();
-    } catch {
-      console.error(`❌ Failed to convert path to WSL format.`);
-      process.exit(1);
-    }
-
-    console.log(`🔄 Updating GitNexus index via WSL (${DISTRO})...`);
-    execSync(
-      `wsl -d ${DISTRO} -e bash -lc "cd '${wslPath.replace(/'/g, "'\"'\"'")}' && npx -y gitnexus@<VERSION> analyze${forceFlag}"`,
-      { stdio: "inherit", cwd: REPO_ROOT }
-    );
-  } else {
-    console.log("🔄 Updating GitNexus index...");
-    execSync(
-      `npx -y gitnexus@<VERSION> analyze${forceFlag}`,
-      { stdio: "inherit", cwd: REPO_ROOT }
-    );
-  }
-
-  console.log("✅ GitNexus index updated successfully");
+if (IS_WINDOWS) {
+  const distro = process.env.GITNEXUS_WSL_DISTRO || "Ubuntu";
+  const wslPath = execSync(`wsl -d ${distro} -e wslpath -u "${process.cwd()}"`, { encoding: "utf-8" }).trim();
+  execSync(`wsl -d ${distro} -e bash -lc "cd '${wslPath}' && npx -y gitnexus@latest analyze${FORCE}"`, { stdio: "inherit" });
+} else {
+  execSync(`npx -y gitnexus@latest analyze${FORCE}`, { stdio: "inherit" });
 }
-
-main();
 ```
 
-Replace `<VERSION>` with the GitNexus version (e.g., `1.6.3`).
-
-### Step 7: Create lean-ctx Check Script
-
-Create `scripts/check-lean-ctx.mjs`:
-
+**`check-lean-ctx.mjs`:**
 ```javascript
 #!/usr/bin/env node
 import { execSync } from "child_process";
 
 try {
-  const version = execSync("lean-ctx --version", { encoding: "utf-8" }).trim();
-  console.log(`✅ lean-ctx is installed (${version})`);
-  process.exit(0);
+  const v = execSync("lean-ctx --version", { encoding: "utf-8" }).trim();
+  console.log(`✅ lean-ctx ${v}`);
 } catch {
   console.error("❌ lean-ctx not found. Install: cargo install lean-ctx");
   process.exit(1);
 }
 ```
 
-### Step 8: Wire Into package.json
+### Step 6: Wire Into package.json
 
-Add scripts:
 ```json
 {
   "scripts": {
     "check:gitnexus-freshness": "node scripts/check-gitnexus-freshness.mjs",
     "check:lean-ctx": "node scripts/check-lean-ctx.mjs",
-    "update:gitnexus": "node scripts/update-gitnexus.mjs"
+    "update:gitnexus": "node scripts/update-gitnexus.mjs",
+    "verify": "npm run check:gitnexus-freshness && npm run check:lean-ctx && <rest>"
   }
 }
 ```
 
-Add to the `verify` script (at the beginning):
-```bash
-npm run check:gitnexus-freshness && npm run check:lean-ctx && ...
-```
+### Step 7: Update AGENTS.md
 
-### Step 9: Update AGENTS.md
+Add lean-ctx usage guide, GitNexus usage guide, and the update constraint rule (after every code change, run `npm run update:gitnexus`).
 
-Add two sections:
-
-1. **lean-ctx usage** — Explain how it works (shell hooks, auto-compress on cd), CLI commands (`cache stats`, `cache clear`, `doctor`), and MCP tool usage.
-
-2. **GitNexus usage** — Explain the tools (`query`, `context`, `impact`, `detect_changes`), stale index warning, and the update constraint.
-
-3. **Update Constraint** — Explicit rule: after every code change, run `npm run update:gitnexus`.
-
-### Step 10: Add Pre-Commit Hook
+### Step 8: Add Pre-Commit Hook
 
 Create `.git/hooks/pre-commit`:
-
 ```bash
 #!/bin/sh
-echo "🔍 Checking GitNexus index freshness..."
-node scripts/check-gitnexus-freshness.mjs
-if [ $? -ne 0 ]; then
-    echo "❌ Commit blocked: index stale. Run: npm run update:gitnexus"
-    exit 1
-fi
-echo "✅ Index is fresh. Proceeding."
+node scripts/check-gitnexus-freshness.mjs || {
+  echo "❌ Commit blocked: index stale. Run: npm run update:gitnexus"
+  exit 1
+}
 ```
+`chmod +x .git/hooks/pre-commit`
 
-Make it executable:
-```bash
-chmod +x .git/hooks/pre-commit
-```
+### Step 9: Configure gitignore and Syncthing
 
-### Step 11: Configure gitignore and Syncthing
-
-Add to `.gitignore`:
+`.gitignore`:
 ```gitignore
-# Platform-specific OpenCode MCP config
+# Platform-specific MCP configs
 .opencode/opencode.json
-
-# Platform-specific Codex MCP config
 .codex/config.toml
 
-# Local git hooks (platform-specific paths)
+# Local git hooks
 .git/hooks/pre-commit
 
-# GitNexus index data
+# GitNexus index
 .gitnexus
 
-# Syncthing internal files
+# Syncthing
 .stfolder
 .stignore.local
 ```
 
-Add to `.stignore` (if using Syncthing):
+`.stignore`:
 ```
-# Syncthing ignore patterns
 .gitnexus
 .opencode/opencode.json
+.codex/config.toml
 .git/hooks/pre-commit
 .stfolder
 .stignore.local
@@ -422,60 +297,55 @@ Add to `.stignore` (if using Syncthing):
 Thumbs.db
 ```
 
-**Why exclude `.opencode/opencode.json`?** This file contains platform-specific paths (Windows WSL vs macOS native). If synced between machines, it will cause constant conflicts and overwrite the correct configuration.
+### Step 10: Build Initial Index
 
-### Step 12: Build Initial Index
-
-Run the GitNexus analyzer:
 ```bash
 npm run update:gitnexus
 ```
 
-### Step 13: Verify
+### Step 11: Verify
 
-Run the verify gate:
 ```bash
 npm run verify
+node scripts/check-gitnexus-freshness.mjs
+node scripts/check-lean-ctx.mjs
 ```
 
-Also verify manually:
-```bash
-node scripts/check-gitnexus-freshness.mjs   # Should pass
-node scripts/check-lean-ctx.mjs             # Should pass
-```
+## Critical Gotchas (From Real Usage)
 
-## Platform-Specific Notes
+### 1. Double-Check the Target Project
 
-### Windows: LadybugDB WAL Corruption
+**Before starting, confirm which project the user wants to configure.** Ask explicitly: "Which project should I configure?" Common projects:
+- `skills-manager-system`
+- `opencodian`
+- Other repos under `custom-project/`
 
-**Symptom:** `Runtime exception: Corrupted wal file. Read out invalid WAL record type.`
+### 2. Platform-Specific Configs Must Stay Out of Git
 
-**Cause:** GitNexus uses LadybugDB for the knowledge graph. Its Write-Ahead Log (WAL) implementation is incompatible with Windows native filesystem locking.
+`.opencode/opencode.json` and `.codex/config.toml` contain absolute paths (Windows `C:` vs macOS `/Users/`). If committed, they cause:
+- Constant git conflicts between Windows and Mac
+- Syncthing overwriting the correct config with the wrong platform''s paths
+- Agents failing to start because paths don''t exist
 
-**Solution:** Always run GitNexus MCP server and `analyze` through WSL. The index lives in `.gitnexus/` but the registry and MCP must operate from the Linux side.
+**Always:**
+- Commit only the `.template` file
+- Add the actual config file to `.gitignore`
+- Create the actual config locally on each machine
 
-### macOS: npm Global Bin PATH
+### 3. GitNexus Index Commit Mismatch After Pull/Merge
 
-If `gitnexus` command is not found after `npm install -g gitnexus`:
+After `git pull` or `git merge`, the GitNexus index may be stale even if you didn''t change code (the merge commit changed HEAD). Always run `npm run update:gitnexus` after pulling.
 
-```bash
-# Find the binary location
-ls $(npm root -g)/../bin/gitnexus
+### 4. Windows: Never Run `npx gitnexus analyze` Natively
 
-# Add to PATH in ~/.zshrc
-echo 'export PATH="/opt/homebrew/bin:$PATH"' >> ~/.zshrc
-source ~/.zshrc
+Always use `npm run update:gitnexus` (which routes through WSL). Running natively on Windows corrupts the LadybugDB WAL.
 
-# Or create a symlink
-ln -s $(npm root -g)/../bin/gitnexus /opt/homebrew/bin/gitnexus
-```
+### 5. Codex Project Trust
 
-### macOS: lean-ctx Shell Hook
-
-On macOS, lean-ctx shell hooks work with zsh. After installation:
-```bash
-lean-ctx init --global    # Installs zsh aliases
-source ~/.zshrc           # Activate in current session
+Codex only loads `.codex/config.toml` when the project is trusted. Check `~/.codex/config.toml`:
+```toml
+[projects."/path/to/project"]
+trust_level = "trusted"
 ```
 
 ## Verification Checklist
@@ -489,35 +359,37 @@ source ~/.zshrc           # Activate in current session
 - [ ] Project `.codex/config.toml` has both MCP entries (platform-specific, not in git)
 - [ ] `.codex/config.toml.template` is committed to git
 - [ ] `.gitignore` excludes `.codex/config.toml`
-- [ ] Codex recognizes the project as trusted (shows in `codex` TUI or `~/.codex/config.toml` projects table)
+- [ ] Codex project trust level is `trusted`
 
 ### Shared
-- [ ] `.gitignore` excludes `.opencode/opencode.json`, `.codex/config.toml`, and `.gitnexus/`
-- [ ] `.stignore` (if using Syncthing) excludes platform-specific files
+- [ ] `.gitignore` excludes `.opencode/opencode.json`, `.codex/config.toml`, `.gitnexus/`
+- [ ] `.stignore` excludes platform-specific files
 - [ ] `npm run check:gitnexus-freshness` passes
 - [ ] `npm run check:lean-ctx` passes
 - [ ] `npm run update:gitnexus` completes without errors
-- [ ] `.gitnexus/meta.json` exists and `lastCommit` matches `git rev-parse HEAD`
-- [ ] `npm run verify` passes (including the new checks)
-- [ ] Git commit triggers the pre-commit hook successfully
+- [ ] `.gitnexus/meta.json` `lastCommit` matches `git rev-parse HEAD`
+- [ ] `npm run verify` passes
+- [ ] Git commit triggers pre-commit hook
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| GitNexus index stale after update | Restart OpenCode to reload the MCP server |
-| `wslpath` not found (Windows) | Ensure WSL Ubuntu is installed: `wsl --install -d Ubuntu` |
-| `gitnexus` not found (macOS) | Add npm global bin to PATH or create symlink to `/opt/homebrew/bin/` |
-| lean-ctx hook not active (Windows) | Run `. $PROFILE` in PowerShell, or restart terminal |
-| lean-ctx hook not active (macOS) | Run `source ~/.zshrc`, or restart terminal |
-| `npx gitnexus analyze` fails on Windows | Never run this on Windows native — always use `npm run update:gitnexus` |
-| Pre-commit hook not running | Ensure it's executable: `chmod +x .git/hooks/pre-commit` |
-| Syncthing keeps overwriting `.opencode/opencode.json` | Add `.opencode/opencode.json` to `.stignore` on both machines |
-| Sync conflict files appear (`.sync-conflict-*`) | Restore files from git and ensure `.stignore` is configured |
+| GitNexus index stale after update | Restart agent to reload MCP server |
+| `wslpath` not found (Windows) | `wsl --install -d Ubuntu` |
+| `gitnexus` not found (macOS) | Add npm global bin to PATH or symlink to `/opt/homebrew/bin/` |
+| lean-ctx hook not active | Windows: `. $PROFILE`; macOS: `source ~/.zshrc` |
+| `npx gitnexus analyze` fails on Windows | Never run natively — always use `npm run update:gitnexus` |
+| Pre-commit hook not running | `chmod +x .git/hooks/pre-commit` |
+| Syncthing overwrites `.opencode/opencode.json` | Add to `.stignore` on both machines |
+| Sync conflict files (`.sync-conflict-*`) | Restore from git, ensure `.stignore` configured |
+| Codex not loading project MCP | Check `~/.codex/config.toml` project trust level |
+| **Configured wrong project** | `git reset --hard HEAD~1` to revert, then confirm target project |
+| **Git conflict on `.codex/config.toml`** | File is platform-specific; keep local version, don''t merge |
 
 ## References
 
 - lean-ctx: https://github.com/yvgude/lean-ctx
 - GitNexus: https://github.com/abhigyanpatwari/gitnexus
-- OpenCode MCP docs: https://opencode.ai/docs/zh-cn/mcp-servers/
-- OpenCode Skills docs: https://opencode.ai/docs/zh-cn/skills/
+- OpenCode MCP: https://opencode.ai/docs/zh-cn/mcp-servers/
+- Codex MCP: https://developers.openai.com/codex/mcp
