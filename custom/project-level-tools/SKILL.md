@@ -11,8 +11,8 @@ Works on both Windows (with WSL workaround) and macOS (native).
 
 ## What This Skill Covers
 
-- Migrate MCP servers from global `~/.config/opencode/opencode.json` to project-level `.opencode/opencode.json`
-- Install GitNexus skills locally under `.opencode/skills/`
+- Migrate MCP servers from global config to project-level for **OpenCode** (`.opencode/opencode.json`) and **Codex** (`.codex/config.toml`)
+- Install GitNexus skills locally under `.opencode/skills/` (OpenCode) or `.claude/skills/` (Claude Code / Codex)
 - Create cross-platform scripts to check tool freshness and auto-update indexes
 - Wire constraints into `package.json`, `AGENTS.md`, and git hooks
 - Handle Windows-specific issues (LadybugDB WAL incompatibility via WSL)
@@ -137,6 +137,72 @@ Replace:
 - `<VERSION>` (Windows only) with the installed GitNexus version (e.g., `1.6.3`)
 
 **Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. The index must be built and served from WSL. On macOS, GitNexus runs natively without issues.
+
+### Step 3b: Create Project-Level Codex MCP Config (Optional)
+
+If the user also uses **Codex** (OpenAI Codex CLI), create `.codex/config.toml`:
+
+**Important:** `.codex/config.toml` is platform-specific and should NOT be committed to git. Use the template approach below.
+
+Create `.codex/config.toml.template` (committed to git):
+
+```toml
+# Codex project-level MCP configuration template
+# Copy this file to .codex/config.toml and adjust paths for your platform.
+# Do NOT commit .codex/config.toml — it contains platform-specific absolute paths.
+
+# =============================================================================
+# Windows Configuration
+# =============================================================================
+# [mcp_servers.lean-ctx]
+# command = "C:\\Users\\<USERNAME>\\.cargo\\bin\\lean-ctx.exe"
+#
+# [mcp_servers.gitnexus]
+# command = "cmd"
+# args = ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
+
+# =============================================================================
+# macOS Configuration
+# =============================================================================
+# [mcp_servers.lean-ctx]
+# command = "lean-ctx"
+#
+# [mcp_servers.gitnexus]
+# command = "npx"
+# args = ["-y", "gitnexus@latest", "mcp"]
+```
+
+Then create `.codex/config.toml` locally on each machine (do not commit):
+
+#### Windows
+
+```toml
+[mcp_servers.lean-ctx]
+command = "C:\\Users\\<USERNAME>\\.cargo\\bin\\lean-ctx.exe"
+
+[mcp_servers.gitnexus]
+command = "cmd"
+args = ["/c", "npx", "-y", "gitnexus@latest", "mcp"]
+```
+
+#### macOS
+
+```toml
+[mcp_servers.lean-ctx]
+command = "lean-ctx"
+
+[mcp_servers.gitnexus]
+command = "npx"
+args = ["-y", "gitnexus@latest", "mcp"]
+```
+
+Add `.codex/config.toml` to `.gitignore`:
+```gitignore
+# Codex local config (platform-specific)
+.codex/config.toml
+```
+
+**Note:** Codex loads project-level config from `.codex/config.toml` when the project is trusted. The config precedence is: CLI flags > profile > project config (`.codex/config.toml`) > user config (`~/.codex/config.toml`).
 
 ### Step 4: Copy GitNexus Skills to Project
 
@@ -330,6 +396,9 @@ Add to `.gitignore`:
 # Platform-specific OpenCode MCP config
 .opencode/opencode.json
 
+# Platform-specific Codex MCP config
+.codex/config.toml
+
 # Local git hooks (platform-specific paths)
 .git/hooks/pre-commit
 
@@ -411,10 +480,19 @@ source ~/.zshrc           # Activate in current session
 
 ## Verification Checklist
 
+### OpenCode
 - [ ] Global `~/.config/opencode/opencode.json` no longer has `lean-ctx` or `gitnexus` MCP entries
 - [ ] Project `.opencode/opencode.json` has both MCP entries (platform-specific, not in git)
 - [ ] `.opencode/skills/` contains 7 GitNexus skills
-- [ ] `.gitignore` excludes `.opencode/opencode.json` and `.gitnexus/`
+
+### Codex (if configured)
+- [ ] Project `.codex/config.toml` has both MCP entries (platform-specific, not in git)
+- [ ] `.codex/config.toml.template` is committed to git
+- [ ] `.gitignore` excludes `.codex/config.toml`
+- [ ] Codex recognizes the project as trusted (shows in `codex` TUI or `~/.codex/config.toml` projects table)
+
+### Shared
+- [ ] `.gitignore` excludes `.opencode/opencode.json`, `.codex/config.toml`, and `.gitnexus/`
 - [ ] `.stignore` (if using Syncthing) excludes platform-specific files
 - [ ] `npm run check:gitnexus-freshness` passes
 - [ ] `npm run check:lean-ctx` passes
