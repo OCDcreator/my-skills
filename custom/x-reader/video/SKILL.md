@@ -56,7 +56,7 @@ Step 4: Save to Output Directory ← 自动保存到 /Volumes/SDD2T/obsidian-vau
 
 ```bash
 # Clean up temp files
-rm -f /tmp/media_sub*.vtt /tmp/media_audio.mp3 /tmp/media_transcript*.txt /tmp/media_segment_*.mp3 2>/dev/null || true
+rm -f /tmp/media_sub*.vtt /tmp/media_audio.* /tmp/media_transcript*.txt /tmp/media_segment_*.mp3 /tmp/fresh_audio.* 2>/dev/null || true
 
 # YouTube (prefer English, fallback Chinese)
 yt-dlp --skip-download --write-auto-sub --sub-lang "en,zh-Hans" -o "/tmp/media_sub" "VIDEO_URL"
@@ -166,6 +166,51 @@ done
 ```
 
 → Call Step 2c for each segment, concatenate results
+
+### Step 2b-verify: Audio Integrity Check
+
+> ⚠️ Critical: Verify the downloaded audio matches the video metadata before transcribing.
+> Without this, a stale or incorrect audio file will waste the full transcription run.
+
+```bash
+# 1. Get API-declared duration from Step 1
+API_DURATION=<duration from Step 1 (seconds)>
+
+# 2. Check file exists
+if [ ! -f /tmp/media_audio.m4s ]; then
+  echo "❌ Download failed: /tmp/media_audio.m4s not found!"
+  exit 1
+fi
+
+# 3. Check file timestamp — reject files older than 5 minutes
+CURRENT_TS=$(date +%s)
+FILE_TS=$(stat -f %m /tmp/media_audio.m4s 2>/dev/null || stat -c %Y /tmp/media_audio.m4s 2>/dev/null)
+FILE_AGE=$((CURRENT_TS - FILE_TS))
+echo "File created: $(date -r $FILE_TS '+%Y-%m-%d %H:%M:%S')"
+echo "File age: ${FILE_AGE}s"
+if [ $FILE_AGE -gt 300 ]; then
+  echo "❌ File is not freshly downloaded (${FILE_AGE}s old)! Possible stale file."
+  exit 1
+fi
+
+# 4. Compare audio duration vs API declaration (allow 10% tolerance)
+ACTUAL_DURATION=$(ffprobe -v error -show_entries format=duration -of csv=p=0 /tmp/media_audio.m4s 2>/dev/null | head -1)
+ACTUAL_DURATION_INT=$(echo "$ACTUAL_DURATION" | cut -d. -f1)
+echo "API duration: ${API_DURATION}s"
+echo "Audio duration: ${ACTUAL_DURATION_INT}s"
+
+THRESHOLD=$(python3 -c "print(int($API_DURATION * 0.9))")
+if [ "$ACTUAL_DURATION_INT" -lt "$THRESHOLD" ]; then
+  echo "❌ Audio duration (${ACTUAL_DURATION_INT}s) doesn't match API (${API_DURATION}s)!"
+  echo "   Possible: stale CDN cache / wrong file / incomplete download"
+  exit 1
+fi
+echo "✅ Audio integrity check passed"
+```
+
+**On failure**: Interrupt immediately, don't waste transcription time.
+
+**On pass** → Continue to Step 2c
 
 ### Step 2c: Transcription (Priority Order)
 

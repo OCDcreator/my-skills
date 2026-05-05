@@ -27,6 +27,7 @@ my-skills/
 │   ├── opencode-cli-handbook/                 # OpenCode CLI 速查手册（agent 非交互调用）
 │   ├── kimi-code-review/                      # 让其他 Agent 调用 Kimi Code CLI 进行代码审查
 │   ├── design-reference-router/               # 品牌/产品风格参考路由技能
+│   ├── windows-project-level-tools/             # Windows 项目级 GitNexus + lean-ctx 配置教程
 │   ├── x-reader/                              # 内容转录与分析（含子技能）
 │   │   ├── video/                             #   视频/播客转录与结构化总结
 │   │   └── analyzer/                          #   多维内容分析与 actionable insights
@@ -71,6 +72,7 @@ my-skills/
 | [ssh](custom/ssh/) | SSH/SCP 远程操作全设备（Mac Mini、Windows、Unraid、QWRT 路由器、飞牛 fnOS），含设备清单、引号安全、base64 跨平台脚本、文件传输与后台任务 |
 | [x-reader](custom/x-reader/) | 内容转录与分析套件（含 [video](custom/x-reader/video/) 视频/播客转录、[analyzer](custom/x-reader/analyzer/) 多维内容分析） |
 | [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |
+| [windows-project-level-tools](custom/windows-project-level-tools/) | Windows 上将 GitNexus 和 lean-ctx 从全局配置迁移到项目级，含 WSL 兼容、LadybugDB WAL 处理、auto-update 约束与 verify gate |
 
 ## 外部技能来源 (external/)
 
