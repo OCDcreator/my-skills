@@ -1,28 +1,31 @@
 ---
 name: windows-project-level-tools
-description: "Use when the user wants to configure GitNexus, lean-ctx, or any MCP tools/skills at the project level instead of globally on Windows. Triggers on phrases like 'project level', 'project-level', 'don't install globally', 'per project', 'windows mcp setup', 'gitnexus windows', 'lean-ctx setup', or when the user wants to isolate tool configurations to a specific repository. Also triggers when the user mentions adding constraints so tools update after code changes."
+description: "Use when the user wants to configure GitNexus, lean-ctx, or any MCP tools/skills at the project level instead of globally. Triggers on phrases like 'project level', 'project-level', 'don't install globally', 'per project', 'mcp setup', 'gitnexus setup', 'lean-ctx setup', or when the user wants to isolate tool configurations to a specific repository. Also triggers when the user mentions adding constraints so tools update after code changes, or when setting up on a new machine (Windows or Mac)."
 compatibility: opencode
 ---
 
-# Windows Project-Level MCP & Tool Setup
+# Project-Level MCP & Tool Setup
 
-Configure GitNexus and lean-ctx at the project level on Windows, with auto-update constraints.
+Configure GitNexus and lean-ctx at the project level, with auto-update constraints.
+Works on both Windows (with WSL workaround) and macOS (native).
 
 ## What This Skill Covers
 
 - Migrate MCP servers from global `~/.config/opencode/opencode.json` to project-level `.opencode/opencode.json`
 - Install GitNexus skills locally under `.opencode/skills/`
-- Create scripts to check tool freshness and auto-update indexes
+- Create cross-platform scripts to check tool freshness and auto-update indexes
 - Wire constraints into `package.json`, `AGENTS.md`, and git hooks
 - Handle Windows-specific issues (LadybugDB WAL incompatibility via WSL)
+- Keep platform-specific configs out of git/Syncthing to avoid sync conflicts
 
 ## When to Use
 
 - User says "don't install globally" or "project level only"
-- User wants GitNexus on a new Windows project
+- User wants GitNexus on a new project
 - User wants lean-ctx isolated per project
 - User asks to add constraints so indexes update after code changes
-- User mentions Windows + code intelligence / context compression setup
+- User mentions code intelligence / context compression setup
+- User is setting up on a new machine (Windows or Mac)
 
 ## Prerequisites
 
@@ -31,13 +34,17 @@ Before starting, verify these are already installed globally:
 ```bash
 lean-ctx --version    # Should show 3.x.x
 gitnexus --version    # Should show 1.x.x
-wsl -l -v             # Should show Ubuntu (or another distro)
 ```
 
 If missing, install first:
 ```bash
 cargo install lean-ctx
 npm install -g gitnexus
+```
+
+On Windows, also verify WSL:
+```bash
+wsl -l -v             # Should show Ubuntu (or another distro)
 ```
 
 ## Workflow
@@ -61,7 +68,11 @@ Leave other MCPs (web-reader, zread, etc.) untouched.
 
 ### Step 3: Create Project-Level MCP Config
 
+**Important:** `.opencode/opencode.json` is platform-specific. It should NOT be committed to git or synced via Syncthing. Use the template below and create it locally on each machine.
+
 Create `.opencode/opencode.json` in the project root:
+
+#### Windows
 
 ```json
 {
@@ -96,32 +107,57 @@ Create `.opencode/opencode.json` in the project root:
 }
 ```
 
-Replace:
-- `<USERNAME>` with the actual Windows username
-- `<WSL_PATH_TO_PROJECT>` with the WSL path (e.g., `/mnt/c/Users/alice/project`)
-- `<VERSION>` with the installed GitNexus version (e.g., `1.6.3`)
+#### macOS
 
-**Why WSL for GitNexus?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. The index must be built and served from WSL.
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "lean-ctx": {
+      "type": "local",
+      "command": ["lean-ctx"],
+      "enabled": true,
+      "environment": {
+        "LEAN_CTX_DATA_DIR": "/Users/<USERNAME>/.config/lean-ctx"
+      }
+    },
+    "gitnexus": {
+      "type": "local",
+      "command": ["gitnexus", "mcp"],
+      "enabled": true,
+      "timeout": 15000
+    }
+  }
+}
+```
+
+Replace:
+- `<USERNAME>` with the actual username
+- `<WSL_PATH_TO_PROJECT>` (Windows only) with the WSL path (e.g., `/mnt/c/Users/alice/project`)
+- `<VERSION>` (Windows only) with the installed GitNexus version (e.g., `1.6.3`)
+
+**Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. The index must be built and served from WSL. On macOS, GitNexus runs natively without issues.
 
 ### Step 4: Copy GitNexus Skills to Project
 
 GitNexus skills are bundled with the npm package. Copy them to the project:
 
 ```bash
-# Source path (adjust version if needed)
-SRC="$APPDATA/npm/node_modules/gitnexus/skills"
+# Find the source path
+# Windows: %APPDATA%/npm/node_modules/gitnexus/skills
+# macOS: $(npm root -g)/gitnexus/skills
 
 # Destination
 mkdir -p .opencode/skills
 
 # Copy each skill into its own directory with SKILL.md
-cp "$SRC/gitnexus-guide.md" .opencode/skills/gitnexus-guide/SKILL.md
-cp "$SRC/gitnexus-exploring.md" .opencode/skills/gitnexus-exploring/SKILL.md
-cp "$SRC/gitnexus-impact-analysis.md" .opencode/skills/gitnexus-impact-analysis/SKILL.md
-cp "$SRC/gitnexus-debugging.md" .opencode/skills/gitnexus-debugging/SKILL.md
-cp "$SRC/gitnexus-refactoring.md" .opencode/skills/gitnexus-refactoring/SKILL.md
-cp "$SRC/gitnexus-cli.md" .opencode/skills/gitnexus-cli/SKILL.md
-cp "$SRC/gitnexus-pr-review.md" .opencode/skills/gitnexus-pr-review/SKILL.md
+cp "<SRC>/gitnexus-guide.md" .opencode/skills/gitnexus-guide/SKILL.md
+cp "<SRC>/gitnexus-exploring.md" .opencode/skills/gitnexus-exploring/SKILL.md
+cp "<SRC>/gitnexus-impact-analysis.md" .opencode/skills/gitnexus-impact-analysis/SKILL.md
+cp "<SRC>/gitnexus-debugging.md" .opencode/skills/gitnexus-debugging/SKILL.md
+cp "<SRC>/gitnexus-refactoring.md" .opencode/skills/gitnexus-refactoring/SKILL.md
+cp "<SRC>/gitnexus-cli.md" .opencode/skills/gitnexus-cli/SKILL.md
+cp "<SRC>/gitnexus-pr-review.md" .opencode/skills/gitnexus-pr-review/SKILL.md
 ```
 
 Then update all stale-index references in the copied skills from `npx gitnexus analyze` to `npm run update:gitnexus`.
@@ -163,36 +199,63 @@ if (!metaCommit || metaCommit !== currentHead) {
 console.log("✅ GitNexus index is fresh");
 ```
 
-### Step 6: Create Update Script
+### Step 6: Create Cross-Platform Update Script
 
 Create `scripts/update-gitnexus.mjs`:
 
 ```javascript
 #!/usr/bin/env node
+/**
+ * update-gitnexus.mjs
+ *
+ * Rebuilds the GitNexus index.
+ * On macOS/Linux: runs natively.
+ * On Windows: uses WSL (LadybugDB WAL incompatibility).
+ */
+
 import { execSync } from "child_process";
 import { resolve } from "path";
 
 const REPO_ROOT = resolve(".");
 const FORCE = process.argv.includes("--force");
-const DISTRO = process.env.GITNEXUS_WSL_DISTRO || "Ubuntu";
+const IS_WINDOWS = process.platform === "win32";
 
-const forceFlag = FORCE ? " --force" : "";
-const wslPath = execSync(
-  `wsl -d ${DISTRO} -e wslpath -u "${REPO_ROOT}"`,
-  { encoding: "utf-8" }
-).trim();
+function main() {
+  const forceFlag = FORCE ? " --force" : "";
 
-function escapeShellArg(arg) {
-  return "'" + arg.replace(/'/g, "'\"'\"'") + "'";
+  if (IS_WINDOWS) {
+    const DISTRO = process.env.GITNEXUS_WSL_DISTRO || "Ubuntu";
+    let wslPath;
+    try {
+      wslPath = execSync(
+        `wsl -d ${DISTRO} -e wslpath -u "${REPO_ROOT}"`,
+        { encoding: "utf-8" }
+      ).trim();
+    } catch {
+      console.error(`❌ Failed to convert path to WSL format.`);
+      process.exit(1);
+    }
+
+    console.log(`🔄 Updating GitNexus index via WSL (${DISTRO})...`);
+    execSync(
+      `wsl -d ${DISTRO} -e bash -lc "cd '${wslPath.replace(/'/g, "'\"'\"'")}' && npx -y gitnexus@<VERSION> analyze${forceFlag}"`,
+      { stdio: "inherit", cwd: REPO_ROOT }
+    );
+  } else {
+    console.log("🔄 Updating GitNexus index...");
+    execSync(
+      `npx -y gitnexus@<VERSION> analyze${forceFlag}`,
+      { stdio: "inherit", cwd: REPO_ROOT }
+    );
+  }
+
+  console.log("✅ GitNexus index updated successfully");
 }
 
-execSync(
-  `wsl -d ${DISTRO} -e bash -lc "cd ${escapeShellArg(wslPath)} && npx -y gitnexus@<VERSION> analyze${forceFlag}"`,
-  { stdio: "inherit" }
-);
+main();
 ```
 
-Replace `<VERSION>` with the GitNexus version.
+Replace `<VERSION>` with the GitNexus version (e.g., `1.6.3`).
 
 ### Step 7: Create lean-ctx Check Script
 
@@ -260,14 +323,46 @@ Make it executable:
 chmod +x .git/hooks/pre-commit
 ```
 
-### Step 11: Build Initial Index
+### Step 11: Configure gitignore and Syncthing
 
-Run the GitNexus analyzer via WSL:
+Add to `.gitignore`:
+```gitignore
+# Platform-specific OpenCode MCP config
+.opencode/opencode.json
+
+# Local git hooks (platform-specific paths)
+.git/hooks/pre-commit
+
+# GitNexus index data
+.gitnexus
+
+# Syncthing internal files
+.stfolder
+.stignore.local
+```
+
+Add to `.stignore` (if using Syncthing):
+```
+# Syncthing ignore patterns
+.gitnexus
+.opencode/opencode.json
+.git/hooks/pre-commit
+.stfolder
+.stignore.local
+.DS_Store
+Thumbs.db
+```
+
+**Why exclude `.opencode/opencode.json`?** This file contains platform-specific paths (Windows WSL vs macOS native). If synced between machines, it will cause constant conflicts and overwrite the correct configuration.
+
+### Step 12: Build Initial Index
+
+Run the GitNexus analyzer:
 ```bash
 npm run update:gitnexus
 ```
 
-### Step 12: Verify
+### Step 13: Verify
 
 Run the verify gate:
 ```bash
@@ -280,9 +375,9 @@ node scripts/check-gitnexus-freshness.mjs   # Should pass
 node scripts/check-lean-ctx.mjs             # Should pass
 ```
 
-## Windows-Specific Issues
+## Platform-Specific Notes
 
-### LadybugDB WAL Corruption
+### Windows: LadybugDB WAL Corruption
 
 **Symptom:** `Runtime exception: Corrupted wal file. Read out invalid WAL record type.`
 
@@ -290,21 +385,37 @@ node scripts/check-lean-ctx.mjs             # Should pass
 
 **Solution:** Always run GitNexus MCP server and `analyze` through WSL. The index lives in `.gitnexus/` but the registry and MCP must operate from the Linux side.
 
-### WSL Path Conversion
+### macOS: npm Global Bin PATH
 
-Use `wslpath -u` to convert Windows paths to WSL paths:
+If `gitnexus` command is not found after `npm install -g gitnexus`:
+
 ```bash
-wsl -d Ubuntu -e wslpath -u "C:\Users\Alice\project"
-# Output: /mnt/c/Users/Alice/project
+# Find the binary location
+ls $(npm root -g)/../bin/gitnexus
+
+# Add to PATH in ~/.zshrc
+echo 'export PATH="/opt/homebrew/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Or create a symlink
+ln -s $(npm root -g)/../bin/gitnexus /opt/homebrew/bin/gitnexus
 ```
 
-Always quote paths and escape shell arguments when building WSL commands programmatically.
+### macOS: lean-ctx Shell Hook
+
+On macOS, lean-ctx shell hooks work with zsh. After installation:
+```bash
+lean-ctx init --global    # Installs zsh aliases
+source ~/.zshrc           # Activate in current session
+```
 
 ## Verification Checklist
 
 - [ ] Global `~/.config/opencode/opencode.json` no longer has `lean-ctx` or `gitnexus` MCP entries
-- [ ] Project `.opencode/opencode.json` has both MCP entries
+- [ ] Project `.opencode/opencode.json` has both MCP entries (platform-specific, not in git)
 - [ ] `.opencode/skills/` contains 7 GitNexus skills
+- [ ] `.gitignore` excludes `.opencode/opencode.json` and `.gitnexus/`
+- [ ] `.stignore` (if using Syncthing) excludes platform-specific files
 - [ ] `npm run check:gitnexus-freshness` passes
 - [ ] `npm run check:lean-ctx` passes
 - [ ] `npm run update:gitnexus` completes without errors
@@ -316,11 +427,15 @@ Always quote paths and escape shell arguments when building WSL commands program
 
 | Issue | Solution |
 |-------|----------|
-| GitNexus index stale after update | Restart OpenCode to reload the WSL-based MCP server |
-| `wslpath` not found | Ensure WSL Ubuntu is installed: `wsl --install -d Ubuntu` |
-| lean-ctx hook not active | Run `. $PROFILE` in PowerShell, or restart terminal |
+| GitNexus index stale after update | Restart OpenCode to reload the MCP server |
+| `wslpath` not found (Windows) | Ensure WSL Ubuntu is installed: `wsl --install -d Ubuntu` |
+| `gitnexus` not found (macOS) | Add npm global bin to PATH or create symlink to `/opt/homebrew/bin/` |
+| lean-ctx hook not active (Windows) | Run `. $PROFILE` in PowerShell, or restart terminal |
+| lean-ctx hook not active (macOS) | Run `source ~/.zshrc`, or restart terminal |
 | `npx gitnexus analyze` fails on Windows | Never run this on Windows native — always use `npm run update:gitnexus` |
 | Pre-commit hook not running | Ensure it's executable: `chmod +x .git/hooks/pre-commit` |
+| Syncthing keeps overwriting `.opencode/opencode.json` | Add `.opencode/opencode.json` to `.stignore` on both machines |
+| Sync conflict files appear (`.sync-conflict-*`) | Restore files from git and ensure `.stignore` is configured |
 
 ## References
 
