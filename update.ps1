@@ -213,14 +213,17 @@ try {
             }
             Copy-Item -Recurse -Force "$CloneDir\*" $TargetDir
         } elseif ($Src.Name -eq "claude-plugins-official") {
-            # 特殊处理：plugins/* 和 external_plugins/*
+            # 特殊处理：plugins/<plugin>/skills/<skill>/SKILL.md 和 external_plugins/<plugin>/skills/<skill>/SKILL.md
             foreach ($SubDir in @("plugins", "external_plugins")) {
-                $SubPath = Join-Path $SourcePath $SubDir
+                $SubPath = Join-Path $CloneDir $SubDir
                 if (Test-Path $SubPath) {
                     Get-ChildItem -Directory $SubPath | ForEach-Object {
-                        Get-ChildItem -Directory $_.FullName | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object {
-                            $Dest = Join-Path $TargetDir $_.Name
-                            Copy-Item -Recurse -Force $_.FullName $Dest
+                        $SkillsPath = Join-Path $_.FullName "skills"
+                        if (Test-Path $SkillsPath) {
+                            Get-ChildItem -Directory $SkillsPath | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object {
+                                $Dest = Join-Path $TargetDir $_.Name
+                                Copy-Item -Recurse -Force $_.FullName $Dest
+                            }
                         }
                     }
                 }
