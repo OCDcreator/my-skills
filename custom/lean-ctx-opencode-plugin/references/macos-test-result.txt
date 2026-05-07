@@ -1,0 +1,57 @@
+=== lean-ctx OpenCode Plugin — macOS Test Results ===
+
+Environment:
+- Device: Mac Mini
+- OS: macOS (Darwin)
+- OpenCode: 1.14.39
+- lean-ctx: 3.4.7 (installed via cargo at /Users/dht/.cargo/bin/lean-ctx)
+- Plugin: .opencode/plugins/lean-ctx.ts (same file as Windows)
+- Integration mode: CLI-redirect (project-level plugin, NO MCP)
+
+Configuration changes made:
+1. Removed lean-ctx from .opencode/opencode.json mcpServers
+2. Deployed .opencode/plugins/lean-ctx.ts (copied from Windows project)
+3. No global plugins at ~/.config/opencode/plugins/
+
+=== Tool Test: READ ===
+Tool used: "tool":"read" (plugin override, NOT MCP)
+Output: F1 cached main.rs [15L 81t] (read #12)
+Analysis: lean-ctx compressed format with cache hit. File header shows line count (15L) and token count (81t).
+
+=== Tool Test: GREP ===
+Tool used: "tool":"grep" (plugin override, NOT MCP)
+Output:
+  src-tauri/src/cli/main.rs:3:fn main() {
+  src-tauri/src/main.rs:7:fn main() {
+  src-tauri/src/main.rs:12:fn main() {
+Analysis: Compact grep format (path:line:content), consistent with lean-ctx compression.
+
+=== Tool Test: GLOB ===
+Tool used: "tool":"glob" (plugin override, NOT MCP)
+Output: File list via lean-ctx find
+Analysis: Uses lean-ctx find with leaf pattern extraction (splits **/*.rs → searchPath + *.rs).
+
+=== Tool Test: BASH ===
+Tool used: "tool":"bash" (with tool.execute.before hook)
+Output:
+  位于分支 main
+  您们的分支与上游分支 'origin/main' 一致。
+  无文件要提交，工作区干净
+Analysis: bash hook rewrite works correctly on macOS (no Unix-path issue unlike Windows).
+  The isUnixPath guard (/^\/[a-zA-Z]\//) does NOT trigger because macOS paths
+  like /Users/dht/.cargo/bin/lean-ctx are valid Unix paths that the shell can execute.
+
+=== Platform Differences Summary ===
+
+| Aspect | Windows | macOS |
+|--------|---------|-------|
+| Plugin file | Same .ts file | Same .ts file |
+| Bun.spawn | Required (Bun shell breaks multi-word args) | Required (same reason) |
+| bash hook rewrite | SKIPPED (Unix-style /c/ paths can't execute in PowerShell) | WORKS (native Unix paths) |
+| lean-ctx find glob split | Required (no **/*.rs support) | Required (same limitation) |
+| MCP conflict | Must remove | Must remove |
+| Global plugin conflict | Must remove | N/A (no global plugin) |
+
+=== Conclusion ===
+The same plugin file works on both Windows and macOS without modification.
+All 4 tools verified working on macOS with lean-ctx compression active.
