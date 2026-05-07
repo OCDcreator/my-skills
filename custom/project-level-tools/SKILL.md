@@ -1,6 +1,6 @@
 ---
 name: project-level-tools
-description: "Use when the user wants GitNexus and/or lean-ctx configured for one repository instead of globally, including project-level MCP setup, repo-local config files, trusted-project setup, local templates, or Windows/macOS per-project tool isolation."
+description: "Use when the user wants GitNexus and/or lean-ctx configured for one repository instead of globally, including project-level MCP setup, repo-local Codex hooks, trusted-project setup, local templates, or Windows/macOS per-project tool isolation."
 ---
 
 # Project-Level MCP & Tool Setup
@@ -10,7 +10,7 @@ Works on both Windows (with WSL workaround) and macOS (native).
 
 ## What This Skill Covers
 
-- Migrate MCP servers from global config to project-level for **OpenCode** (`.opencode/opencode.json`) and **Codex** (`.codex/config.toml`)
+- Migrate MCP servers from global config to project-level for **OpenCode** (`.opencode/opencode.json`) and **Codex** (`.codex/config.toml`), plus repo-local Codex hooks in `.codex/hooks.json`
 - Install GitNexus skills locally for harnesses that support repo-local skill folders (for example `.opencode/skills/` or `.claude/skills/`)
 - Create cross-platform scripts to check tool freshness and auto-update indexes
 - Wire constraints into `package.json`, `AGENTS.md`, and git hooks
@@ -68,7 +68,8 @@ If the user wants true project-only isolation, edit `~/.config/opencode/opencode
 
 **Also check and clean other agents'' global configs:**
 - `~/.cursor/mcp.json` — remove lean-ctx/gitnexus
-- `~/.codex/config.toml` — remove `[mcp_servers.lean-ctx]` and `[mcp_servers.gitnexus]`
+- `~/.codex/config.toml` — remove `[mcp_servers.lean-ctx]` and `[mcp_servers.gitnexus]`, and remove inline global `[hooks.*]` entries for tools you are moving repo-local
+- `~/.codex/hooks.json` — remove global lean-ctx hook entries if this repo should own the Codex hook behavior
 - `~/.claude/settings.json` — remove GitNexus hooks
 - `~/.codeium/windsurf/mcp_config.json` — remove if present
 
@@ -149,7 +150,7 @@ Then create `.opencode/opencode.json` locally (do not commit):
 }
 ```
 
-#### Codex (`.codex/config.toml`)
+#### Codex MCP (`.codex/config.toml`)
 
 Create `.codex/config.toml.template` (committed to git):
 ```toml
@@ -177,6 +178,44 @@ Create `.codex/config.toml.template` (committed to git):
 
 Then create `.codex/config.toml` locally (do not commit), uncommenting the appropriate platform section.
 
+#### Codex hooks (`.codex/hooks.json`)
+
+For project-level Codex hooks, prefer `.codex/hooks.json` over inline `[hooks]` in `.codex/config.toml`. The hooks file is portable, purpose-built, and can usually be committed because it does not need machine-specific binary paths.
+
+Commit `.codex/hooks.json`:
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook codex-session-start",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook codex-pretooluse",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Codex loads both `.codex/hooks.json` and inline `[hooks]` if you define both in the same project layer, and it also loads matching global hooks. For a clean repo-local deployment, keep the project hook definitions in `.codex/hooks.json`, keep MCP in `.codex/config.toml`, and delete duplicate global lean-ctx hooks.
+
 **Why WSL for GitNexus on Windows?** GitNexus uses LadybugDB which has WAL corruption issues on Windows native filesystem. On Windows, both indexing and MCP serving should route through WSL. On macOS, GitNexus runs natively without issues.
 
 ### Step 4: Copy GitNexus Skills to Project
@@ -200,7 +239,7 @@ On Windows PowerShell, replace the Unix copy commands with `New-Item -ItemType D
 
 Update stale-index references in copied skills from `npx gitnexus analyze` to `npm run update:gitnexus`.
 
-**Do not assume Codex uses `.claude/skills`.** For Codex, the reliable repo-local configuration point is `.codex/config.toml`; repo-local skill folders depend on runtime/workflow and should be verified before copying files.
+**Do not assume Codex uses `.claude/skills`.** For Codex, the reliable repo-local configuration points are `.codex/config.toml` for MCP and `.codex/hooks.json` for lifecycle hooks; repo-local skill folders depend on runtime/workflow and should be verified before copying files.
 
 ### Step 5: Create Scripts
 
@@ -354,6 +393,8 @@ node scripts/check-lean-ctx.mjs
 - Add the actual config file to `.gitignore`
 - Create the actual config locally on each machine
 
+By contrast, `.codex/hooks.json` is usually portable and can be committed directly when the hook commands themselves are path-free.
+
 ### 3. GitNexus Index Commit Mismatch After Pull/Merge
 
 After `git pull` or `git merge`, the GitNexus index may be stale even if you didn''t change code (the merge commit changed HEAD). Always run `npm run update:gitnexus` after pulling.
@@ -364,7 +405,7 @@ Always use `npm run update:gitnexus` (which routes through WSL). Running nativel
 
 ### 5. Codex Project Trust
 
-Codex only loads `.codex/config.toml` when the project is trusted. Check `~/.codex/config.toml`:
+Codex only loads project `.codex/` lifecycle config when the project is trusted. Check `~/.codex/config.toml`:
 ```toml
 [projects."/path/to/project"]
 trust_level = "trusted"
@@ -381,7 +422,9 @@ trust_level = "trusted"
 - [ ] Project `.codex/config.toml` has both MCP entries (platform-specific, not in git)
 - [ ] `.codex/config.toml.template` is committed to git
 - [ ] `.gitignore` excludes `.codex/config.toml`
+- [ ] Project `.codex/hooks.json` is committed if repo-local Codex hooks are desired
 - [ ] Codex project trust level is `trusted`
+- [ ] Global `~/.codex/hooks.json` does not still define duplicate lean-ctx hooks
 
 ### Shared
 - [ ] `.gitignore` excludes `.opencode/opencode.json`, `.codex/config.toml`, `.gitnexus/`
@@ -406,6 +449,7 @@ trust_level = "trusted"
 | Syncthing overwrites `.opencode/opencode.json` | Add to `.stignore` on both machines |
 | Sync conflict files (`.sync-conflict-*`) | Restore from git, ensure `.stignore` configured |
 | Codex not loading project MCP | Check `~/.codex/config.toml` project trust level |
+| Codex hooks run twice | Remove duplicate lean-ctx hooks from `~/.codex/hooks.json` or inline global `[hooks.*]` |
 | **Configured wrong project** | Stop, inspect the worktree, and revert only the task-local changes after confirming the intended repo |
 | **Git conflict on `.codex/config.toml`** | File is platform-specific; keep local version, don''t merge |
 

@@ -24,7 +24,7 @@ description: Guide for deploying lean-ctx token optimization into AI coding agen
 - **Hybrid**: Best of both worlds — MCP tools for file reads, hooks intercept Bash commands and redirect to `lean-ctx -c`.
 - **Claude Code**: Best-supported agent. Pure MCP (Mode A). Configure project-level `.claude/settings.local.json` + `.claude/rules/lean-ctx.md` manually (avoid `lean-ctx init` — it modifies global files).
 - **OpenCode**: Both Mode A and B work. **Do NOT use both simultaneously** — agent prefers MCP tools over plugin overrides.
-- **Codex**: Use Mode C (Hybrid). `lean-ctx init --agent codex` sets this up automatically.
+- **Codex**: Use Mode C (Hybrid). For project-level deployment, prefer committed `.codex/hooks.json` for hooks and keep `.codex/config.toml` local for MCP paths. Avoid `lean-ctx init --agent codex` when you want project-only setup, because it installs global Codex config.
 - **Project-level > global**: Portable, commit-friendly, avoids sync conflicts.
 
 ---
@@ -105,6 +105,8 @@ Expected:
 
 Officially recommended by lean-ctx (`lean-ctx init --agent codex`). Combines MCP tools for file reads with shell hooks that intercept Bash commands.
 
+Codex supports both repo-local `.codex/hooks.json` and inline `[hooks]` inside `.codex/config.toml`, and loads all matching hook sources. For project-level deployment, prefer `.codex/hooks.json` for hooks because it is portable, purpose-built, and can be committed without machine-specific paths. Keep `.codex/config.toml` for MCP server settings only.
+
 ### How It Works
 
 1. **MCP server** provides `ctx_read`, `ctx_search`, `ctx_shell`, etc. via `[mcp_servers]`
@@ -122,10 +124,12 @@ Global config must have hooks enabled: `[features] codex_hooks = true`
 
 ### Steps (Project-Level)
 
-1. **Create `.codex/config.toml`** in project root — see `references/mcp-config-examples.md` for complete Codex config with both MCP and hooks
-2. **Ensure project is trusted** — add `[projects."/path/to/project"] trust_level = "trusted"` to `~/.codex/config.toml`
-3. **Verify hooks** — test manually (see below)
-4. **Verify MCP** — run `codex exec "List all MCP tools starting with mcp__"`
+1. **Ensure project is trusted first** — add `[projects."/path/to/project"] trust_level = "trusted"` to `~/.codex/config.toml`
+2. **Keep global Codex lean-ctx config minimal** — leave `[features] codex_hooks = true`, but remove global lean-ctx hook definitions from `~/.codex/hooks.json` and remove inline global `[hooks.*]` entries if you are moving the workflow to one repo
+3. **Create committed `.codex/hooks.json`** in project root — see `references/mcp-config-examples.md` for the portable Codex hooks file
+4. **Create local `.codex/config.toml`** in project root for `[mcp_servers.lean-ctx]` only — keep it uncommitted if it contains machine-specific paths
+5. **Verify hooks** — test manually (see below)
+6. **Verify MCP** — run `codex exec "List all MCP tools starting with mcp__"`
 
 ### Manual Hook Verification
 
@@ -156,7 +160,8 @@ Codex exposes lean-ctx MCP tools as `mcp__lean_ctx__.*`:
 |--------|---------|-------|
 | MCP command | `C:\Users\<user>\.cargo\bin\lean-ctx.exe` | `lean-ctx` (if in PATH) |
 | Hook command | `lean-ctx hook codex-*` | `lean-ctx hook codex-*` |
-| Config location | `<repo>\.codex\config.toml` | `<repo>/.codex/config.toml` |
+| Hook config | `<repo>\.codex\hooks.json` | `<repo>/.codex/hooks.json` |
+| MCP config | `<repo>\.codex\config.toml` | `<repo>/.codex/config.toml` |
 | Trust path format | `C:\\Users\\...` (escaped) | `/Volumes/...` or `/Users/...` |
 
 ### Codex Test Results
@@ -199,11 +204,12 @@ Full macOS test output: `references/macos-test-result.txt`
 - **Bun.spawn empty**: Verify lean-ctx in PATH. Use Bun.spawn (not shell template strings).
 
 ### Codex Hybrid Mode
-- **Hooks not firing**: Check `[features] codex_hooks = true` in global `~/.codex/config.toml`. Check project is trusted.
+- **Hooks not firing**: Check `[features] codex_hooks = true` in global `~/.codex/config.toml`. Check project is trusted. Verify the repo uses `.codex/hooks.json` or inline `[hooks]`, not an empty layer.
 - **MCP tools not appearing**: Verify `.codex/config.toml` has `[mcp_servers.lean-ctx]`. Run `codex exec "List MCP tools"`.
 - **PreToolUse doesn't block**: Hook only blocks commands matching lean-ctx compression rules (git, npm, cargo, etc.).
 - **Mac Codex hangs in exec**: Likely API connection issue, not hooks. Test hooks manually first.
 - **Trust prompt appears**: Add project path to `~/.codex/config.toml` under `[projects]`.
+- **Hook runs twice**: Remove duplicate lean-ctx hooks from global `~/.codex/hooks.json` or inline global `[hooks.*]`, and avoid defining both `hooks.json` and inline `[hooks]` in the same project layer.
 
 ---
 

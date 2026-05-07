@@ -252,51 +252,53 @@ Reference lean-ctx as a local MCP server in the Kiro config format.
 
 lean-ctx officially recommends **Hybrid mode** for Codex: MCP for file reads + hooks for Bash compression.
 
-### `.codex/config.toml` (project-level) — Windows
+### `.codex/hooks.json` (project-level, committed) — Windows + macOS
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook codex-session-start",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook codex-pretooluse",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### `.codex/config.toml` (project-level, local MCP only) — Windows
 
 ```toml
 [mcp_servers."lean-ctx"]
 command = "C:\\Users\\<user>\\.cargo\\bin\\lean-ctx.exe"
 args = []
-
-[[hooks.SessionStart]]
-matcher = "startup|resume|clear"
-
-[[hooks.SessionStart.hooks]]
-type = "command"
-command = "lean-ctx hook codex-session-start"
-timeout = 15
-
-[[hooks.PreToolUse]]
-matcher = "Bash"
-
-[[hooks.PreToolUse.hooks]]
-type = "command"
-command = "lean-ctx hook codex-pretooluse"
-timeout = 15
 ```
 
-### `.codex/config.toml` (project-level) — macOS
+### `.codex/config.toml` (project-level, local MCP only) — macOS
 
 ```toml
 [mcp_servers.lean-ctx]
 command = "lean-ctx"
-
-[[hooks.SessionStart]]
-matcher = "startup|resume|clear"
-
-[[hooks.SessionStart.hooks]]
-type = "command"
-command = "lean-ctx hook codex-session-start"
-timeout = 15
-
-[[hooks.PreToolUse]]
-matcher = "Bash"
-
-[[hooks.PreToolUse.hooks]]
-type = "command"
-command = "lean-ctx hook codex-pretooluse"
-timeout = 15
+args = []
 ```
 
 ### `~/.codex/config.toml` (global) — Required settings
@@ -309,6 +311,8 @@ codex_hooks = true
 [projects."/path/to/your/project"]
 trust_level = "trusted"
 ```
+
+If `~/.codex/hooks.json` or inline global `[hooks.*]` already define lean-ctx Codex hooks, remove those entries when moving to project-level deployment. Keep the global feature flag and trust list, but avoid duplicate hook definitions.
 
 ### Codex Rules (AGENTS.md snippet)
 
@@ -335,8 +339,11 @@ For Bash commands that get blocked by lean-ctx hooks, rerun with the exact comma
 # Auto-setup (installs global hooks + MCP + rules):
 lean-ctx init --agent codex
 
-# Or project-level only (add hooks to project .codex/config.toml):
-# See config snippets above
+# Or project-level only:
+# 1) trust the repo in ~/.codex/config.toml
+# 2) commit .codex/hooks.json
+# 3) keep .codex/config.toml local for MCP
+# 4) remove duplicate global lean-ctx hook definitions
 ```
 
 ### Verification
@@ -359,7 +366,8 @@ codex exec "List all MCP tools starting with mcp__ and use ctx_read to read a fi
 |--------|---------|-------|
 | lean-ctx binary | `C:\Users\<user>\.cargo\bin\lean-ctx.exe` | `/Users/<user>/.cargo/bin/lean-ctx` |
 | Data directory | `%APPDATA%\lean-ctx` or default | `~/.config/lean-ctx` or override |
-| Config location | Same (project-level) | Same |
+| Hooks file | `.codex/hooks.json` | `.codex/hooks.json` |
+| MCP config | `.codex/config.toml` | `.codex/config.toml` |
 | Codex MCP command | Full `.exe` path recommended | `lean-ctx` (if in PATH) |
 | Codex trust path | `C:\\Users\\...` (escaped backslashes) | `/Users/...` or `/Volumes/...` |
 | Known issues | None specific to MCP mode | None |
