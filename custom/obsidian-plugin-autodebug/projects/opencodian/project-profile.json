@@ -1,0 +1,27 @@
+{
+  "id": "opencodian",
+  "displayName": "OpenCodian",
+  "description": "Project-specific reusable autodebug assets for the OpenCodian Obsidian plugin. Load only when the target repo or plugin id is clearly OpenCodian.",
+  "match": {
+    "pluginIds": [
+      "opencodian"
+    ],
+    "repoNames": [
+      "opencodian"
+    ],
+    "commands": [
+      "opencodian:open-view"
+    ],
+    "viewTypes": [
+      "opencodian-view"
+    ]
+  },
+  "assets": {
+    "viewHealthAssertions": "assertions/slash-view-health.json",
+    "statefulSlashAssertion": "scripts/slash-runtime-assertion.js",
+    "agentMentionLayoutAssertion": "scripts/agent-mention-layout-assertion.js",
+    "issueSignatures": "rules/issue-signatures.json",
+    "issuePlaybooks": "rules/issue-playbooks.json"
+  },
+  "loadingPolicy": "Do not load these assets as generic Obsidian plugin defaults. Reference them explicitly for OpenCodian debug, smoke, or release-validation runs."
+}

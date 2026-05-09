@@ -1,5 +1,5 @@
 {
-  "description": "Optional OpenCodian/OpenCode-specific playbooks. Do not load these as generic Obsidian plugin defaults; copy or reference them only for projects that intentionally use the matching signatures.",
+  "description": "Optional OpenCodian/OpenCode-specific playbooks. Load only for OpenCodian runs and only with matching project-specific signatures.",
   "playbooks": [
     {
       "id": "restore-or-session-drift",

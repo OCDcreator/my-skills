@@ -1,5 +1,5 @@
 {
-  "description": "Optional OpenCodian/OpenCode-specific signatures. Do not load these as generic Obsidian plugin defaults; copy or reference them only for projects that intentionally expose these logs and timing metrics.",
+  "description": "Optional OpenCodian/OpenCode-specific signatures. Load only for OpenCodian runs; do not load these as generic Obsidian plugin defaults.",
   "signatures": [
     {
       "id": "server-connection-refused",

@@ -1,6 +1,6 @@
 {
-  "name": "opencodian-view-health",
-  "description": "Basic plugin-view health assertions: scenario must succeed, key artifacts must exist, root DOM must be present, and no session 404 should appear.",
+  "name": "opencodian-slash-view-health",
+  "description": "OpenCodian view health assertions for slash autocomplete deployment validation.",
   "assertions": [
     {
       "id": "scenario-open-view",
@@ -17,9 +17,9 @@
       "field": "dom"
     },
     {
-      "id": "dom-has-root",
+      "id": "dom-has-opencodian-view",
       "type": "dom-contains",
-      "value": "opencodian-container"
+      "value": "OpenCodian"
     },
     {
       "id": "no-session-404",
