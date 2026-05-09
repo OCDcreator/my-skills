@@ -115,8 +115,33 @@ For exact commands, read `references/command-reference.md`.
 8. **Create review/handoff artifacts**: generate `visual-review.json/html` when a screenshot exists, and generate `agent-tools.json` plus `control-backends.json` when another model will continue the run.
 9. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
 10. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
+11. **Capture reusable learning**: before the final response, run a short after-action triage. Promote generic workflow/tooling improvements to this skill, keep long-lived plugin-specific assets in a project profile or the target plugin repo, and leave one-off machine noise only in the run report.
 
 Save runtime artifacts under `.obsidian-debug/` or another repo-local debug folder. Do not commit raw runtime logs unless the user asks.
+
+## Continuous Skill Improvement
+
+End every real autodebug run with a lightweight improvement pass. The goal is to make the next run easier without polluting the global skill with one project’s assumptions.
+
+Classify each lesson:
+
+- **Global skill improvement**: reusable across many Obsidian plugins, such as a safer wrapper script, clearer CDP fallback guidance, a generic assertion type, or a correction to stale workflow instructions. Patch this skill or its bundled resources, then run `skill-creator/scripts/quick_validate.py` against the skill folder.
+- **Project profile asset**: reusable across repeated development of one long-lived plugin, such as stable view commands, DOM assertions, stateful UI scripts, project log signatures, or project playbooks. Store it under `projects/<plugin-id-or-name>/` inside this skill when it should travel with the skill, or in the target repo when the repo should own it. Do not add it to bundled defaults.
+- **Project-local learning**: specific to one plugin’s DOM, commands, logs, settings, server lifecycle, or data model but better owned by the project repo. Save it in that project’s docs, `autodebug/`, `.obsidian-debug/`, or project-local assertion/signature files. Do not add it to this skill’s bundled defaults.
+- **Run-only evidence**: specific to one machine state, transient app focus, stale vault data, or a temporary debug port. Mention it in the final report and keep artifacts under `.obsidian-debug/`; do not promote it.
+
+When improving this skill, keep global changes small and generic. Prefer adding or refining scripts and reference guidance over adding project-named defaults. Project-specific assets may live in `projects/<project>/`, but they must be explicitly selected only after the target repo, plugin id, command id, or view type clearly matches that project.
+
+## Project Profiles
+
+Project profiles are optional, isolated bundles for repeat debugging of a specific plugin. They may contain assertions, scripts, JavaScript behavior checks, signatures, playbooks, or profile metadata under `projects/<project>/`.
+
+Before loading a project profile:
+
+- confirm the target plugin id, repo name, command id, or view type matches the profile;
+- use profile files through explicit paths such as `projects/<project>/assertions/...` or `projects/<project>/rules/...`;
+- never treat profile files as generic defaults for another plugin;
+- keep machine-local job specs, vault paths, and one-run logs in the target repo or `.obsidian-debug/`, not in the shared project profile.
 
 ## Job Specs
 
@@ -142,6 +167,8 @@ Use DOM checks for deterministic assertions and screenshots for visual review. G
 
 Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/plugin-surface.template.json` when the plugin does not have one obvious command id or root selector.
 
+Do not trust bundled or copied assertion text blindly. If a custom assertion fails but `scenario-report.json`, `obsidian eval`, or a targeted DOM query proves the plugin surface is open, treat the assertion target as stale and replace it with a stable current surface signal such as the plugin view type, a durable root selector, visible title text, or command-owned UI text. Keep project-specific assertion fixes in the matching project profile or project debug folder unless the bundled example itself is stale.
+
 Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` when the plugin needs click/locator assertions and either a Playwright module is installed in the repo or `playwright-cli` can be resolved.
 
 For the local `playwright-script` lane, Playwright resolution is:
@@ -161,6 +188,10 @@ The scenario runner resolves surface-opening strategies in this order:
 3. CDP DOM heuristics.
 
 `scenario-report.json` records the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, empty states, and Playwright driver details. When Playwright cannot be acquired, the runner writes a structured failure report and exits with code `1` instead of crashing with a raw stack trace.
+
+When `scenario.enabled` is true, the scenario lane may probe CDP DOM heuristics even if the selected open action is an Obsidian CLI command. If the run fails with `ECONNREFUSED 127.0.0.1:9222`, first recover CDP with `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` and rerun, or disable the scenario and use CLI `obsidian eval`/DOM assertions for a pure CLI pass.
+
+For behavior that cannot be proven from a static DOM capture, write a small JavaScript assertion and run it through `scripts/obsidian_eval_file.mjs`. This is useful for composer input, settings toggles, command palettes, cached catalogs, and other stateful UI paths. Keep one-off assertions in `.obsidian-debug/`; keep reusable project-specific assertion scripts in `projects/<project>/scripts/` and reusable assertion configs in `projects/<project>/assertions/`, or store either in the target repo’s debug folder. If a matching project profile already exposes a stateful assertion script, prefer running that script before writing a new inline `obsidian eval` command. The assertion should open the target surface, interact with real DOM controls, throw on failure or return JSON with `ok: false`, restore any settings it changes, and save command output under `.obsidian-debug/`.
 
 For screenshot-based GUI handoff, run `scripts/obsidian_debug_visual_review.mjs` after diagnosis. The generated `visual-review.html` is useful for human review of blank panes, visible errors, clipped text, contrast, obvious layout regressions, and target surface reachability. It does **not** replace reliable manual GUI validation for hover/focus/drag behavior, keyboard feel, timing-sensitive animation, or final official-review judgment. Back critical visual findings with DOM/text/log assertions whenever possible.
 
@@ -265,9 +296,7 @@ Read `diagnosis.json` before raw logs. Use it to answer:
 3. Did known issue signatures match?
 4. Which recommendation is the best next edit or instrumentation pass?
 
-Default signatures in `rules/issue-signatures.json` must stay generic to Obsidian plugin debugging. A target plugin may need its own tests, assertions, signatures, or playbooks, but those are project-local configuration: copy them into that plugin repo or pass them explicitly with `--signatures` / `--playbooks`. Do not promote one plugin's business-domain logs into the skill's default rules.
-
-`rules/opencodian-issue-signatures.json` and `rules/opencodian-issue-playbooks.json` are optional examples for an OpenCodian/OpenCode-style plugin only. Load them only for projects that intentionally emit those logs and metrics.
+Default signatures in `rules/issue-signatures.json` must stay generic to Obsidian plugin debugging. A target plugin may need its own tests, assertions, signatures, or playbooks, but those are project-local configuration: keep them in that plugin repo or pass them explicitly with `--signatures` / `--playbooks`. Do not promote one plugin's business-domain logs into this skill's bundled rules.
 
 If diagnosis is inconclusive, inspect raw console/CDP logs and consider adding a generic signature to `rules/issue-signatures.json` so the next run catches that symptom automatically.
 
@@ -281,6 +310,7 @@ If diagnosis is inconclusive, inspect raw console/CDP logs and consider adding a
 - `fixtures/wdio-obsidian-service-smoke-plugin/`: optional WebdriverIO-style `wdio-obsidian-service` fixture with repo-owned adapter config and CI dry-run job sample.
 - `scripts/obsidian_debug_visual_review_smoke.mjs`: verifies screenshot/DOM/scenario evidence becomes a human-review-gated visual pack.
 - `scripts/obsidian_debug_control_backend_smoke.mjs`: verifies capability routing across CLI, CDP, REST/MCP, DevTools MCP, and Playwright lanes.
+- `scripts/obsidian_eval_file.mjs`: runs a project-local JavaScript assertion file through `obsidian eval` without brittle shell quoting.
 - `evals/evals.json`: behavior prompts for evaluating whether the skill still covers common autodebug workflows.
 
 ## Final Report Format
@@ -294,6 +324,7 @@ When handing back results, include:
 - log/screenshot/DOM/report artifact paths;
 - root cause and code path;
 - remaining background long-tail work, if any;
+- reusable learning captured, split into global skill improvements, project-local notes, and run-only evidence;
 - whether changes were committed.
 
 Summarize important log lines with artifact paths and line numbers. Do not paste raw logs unless the user asks.

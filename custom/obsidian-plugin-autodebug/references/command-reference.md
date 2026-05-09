@@ -21,6 +21,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 | Scaffold sample plugin | `scripts/obsidian_debug_scaffold_plugin.mjs` | `node scripts/obsidian_debug_scaffold_plugin.mjs --output-dir <sample> --plugin-id sample-plugin --plugin-name "Sample Plugin"` |
 | Generate backend routing | `scripts/obsidian_debug_control_backend_support.mjs` | `node scripts/obsidian_debug_control_backend_support.mjs --doctor .obsidian-debug/doctor.json --output .obsidian-debug/control-backends.json` |
 | Run config-driven loop | `scripts/obsidian_debug_job.mjs` | `node scripts/obsidian_debug_job.mjs --job .obsidian-debug/job.json --platform auto --mode run` |
+| Run JS behavior assertion | `scripts/obsidian_eval_file.mjs` | `node scripts/obsidian_eval_file.mjs --vault-name "<vault>" --file .obsidian-debug/assertion.js --output .obsidian-debug/assertion-result.json` |
 | Generate visual review pack | `scripts/obsidian_debug_visual_review.mjs` | `node scripts/obsidian_debug_visual_review.mjs --diagnosis .obsidian-debug/diagnosis.json --output .obsidian-debug/visual-review.json --html-output .obsidian-debug/visual-review.html` |
 | Windows ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.ps1` | `powershell -File scripts/obsidian_plugin_debug_cycle.ps1 -PluginId <id> -TestVaultPluginDir <dir>` |
 | Bash/macOS ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.sh` | `bash scripts/obsidian_plugin_debug_cycle.sh --plugin-id <id> --test-vault-plugin-dir <dir>` |
@@ -168,12 +169,35 @@ On Windows, the launcher automatically uses `npm.cmd` / `npx.cmd` through `cmd.e
 - Use `scenarios/open-plugin-view.json` when a plugin has a known open-view command or view type.
 - Use `surface-profiles/plugin-surface.template.json` when the plugin surface needs discovery hints.
 - Start generic assertions from `assertions/plugin-view-health.template.json` and replace placeholder selectors/text with plugin-specific expectations.
+- If scenario execution fails with `ECONNREFUSED 127.0.0.1:9222`, recover CDP with `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` before rerunning the scenario, or disable scenario and use `obsidian eval` assertions for a CLI-only proof.
 - Use `scripts/obsidian_debug_scenario_runner.mjs --dry-run` with `surface-profiles/synthetic-plugin-surface.fixture.json` to validate strategy selection without touching Obsidian.
 - Use `--control-backend obsidian-cli|bundled-cdp|playwright-script` as a backend alias for local scenario runs. DevTools MCP and Playwright MCP are external agent-native backends, so route them through the MCP client rather than this local runner.
 - Use `--playwright-cli-command <cmd>` when the repo has no Playwright dependency but a known `playwright-cli` entrypoint exists.
 - Use `--playwright-no-bootstrap` when the environment must not auto-install `@playwright/cli`.
 
 If Playwright setup fails, the scenario runner still writes `scenario-report.json` and exits `1`, so automation can inspect a structured error instead of parsing a raw stack trace.
+
+For stateful UI behavior, write a small `.obsidian-debug/<case>.js` file and run:
+
+```bash
+node scripts/obsidian_eval_file.mjs \
+  --vault-name "<vault>" \
+  --file .obsidian-debug/<case>.js \
+  --output .obsidian-debug/<case>-result.json
+```
+
+Have the script open the plugin surface, interact with the real DOM, throw on failure or return JSON with `ok: false`, and restore any settings it mutates. `obsidian_eval_file.mjs` captures the raw eval output, parses a final `=> {...}` JSON result when present, and exits non-zero when that JSON says `ok: false`. Prefer this for composer input, autocomplete menus, settings toggles, and cached runtime catalogs where screenshots or static DOM text cannot prove the behavior.
+
+If the assertion becomes useful across repeated work on one plugin, promote it from `.obsidian-debug/` into `projects/<project>/scripts/` or the target repo's debug folder. Project-profile scripts are reusable, but they must still be loaded by explicit path after confirming the target plugin matches that profile.
+
+Example for an OpenCodian run after confirming the target plugin id is `opencodian`:
+
+```bash
+node scripts/obsidian_eval_file.mjs \
+  --vault-name "<vault>" \
+  --file projects/opencodian/scripts/agent-mention-layout-assertion.js \
+  --output .obsidian-debug/agent-mention-layout-result.json
+```
 
 ## Analysis And Reports
 
@@ -190,17 +214,34 @@ Read `diagnosis.json` before raw logs. It summarizes artifact presence, assertio
 Use `visual-review.html` for screenshot-based human review of blank panes, clipping, visible errors, contrast, and obvious layout regressions. It cannot replace reliable manual GUI validation for hover/focus/drag behavior, timing-sensitive animations, or official review acceptance.
 When `Logstravaganza` is available, the cycle wrappers also emit `vault-log-capture.json`; the diagnosis/report layer merges those NDJSON events with CLI/CDP evidence while keeping source paths and line numbers visible.
 
-Default `rules/issue-signatures.json` and `rules/issue-playbooks.json` are plugin-neutral. If a target plugin needs domain-specific signatures, keep them in that plugin repo or pass them explicitly:
+## After-Action Improvement Triage
+
+After each real run, classify any reusable lesson before the final response:
+
+| Class | Put it here | Examples |
+| --- | --- | --- |
+| Generic autodebug workflow/tooling | This skill | wrapper scripts, CDP fallback guidance, generic assertion behavior, stale documentation fixes |
+| Reusable target-plugin assets | `projects/<project>/` in this skill, or the target plugin repo | plugin commands, root selectors, project assertions, stateful behavior scripts, domain-specific log signatures/playbooks |
+| Target plugin notes | Target plugin repo | architecture context, ownership notes, project docs, local debug conventions |
+| One-run machine state | Run report only | temporary CDP restart, dirty vault state, transient app focus, local-only path quirks |
+
+If this skill changes, validate it:
+
+```bash
+python3 /Users/dht/.codex/skills/.system/skill-creator/scripts/quick_validate.py <path-to-obsidian-plugin-autodebug>
+```
+
+Do not add plugin-named assertions, business-domain signatures, or project DOM selectors to this skill’s bundled defaults. Store those in `projects/<project>/` or the target project that produced them and reference them with `--assertions`, `--signatures`, or `--playbooks`.
+
+Default `rules/issue-signatures.json` and `rules/issue-playbooks.json` are plugin-neutral. If a target plugin needs domain-specific signatures, keep them in that plugin repo or in a matching project profile, then pass them explicitly:
 
 ```bash
 node scripts/obsidian_debug_analyze.mjs \
   --summary .obsidian-debug/summary.json \
-  --signatures path/to/project-issue-signatures.json \
-  --playbooks path/to/project-issue-playbooks.json \
+  --signatures projects/<project>/rules/issue-signatures.json \
+  --playbooks projects/<project>/rules/issue-playbooks.json \
   --output .obsidian-debug/diagnosis.json
 ```
-
-The bundled `rules/opencodian-issue-signatures.json` and `rules/opencodian-issue-playbooks.json` are examples for OpenCodian/OpenCode-style projects only; they are not generic Obsidian plugin defaults.
 
 ## Agent Handoff Manifest
 

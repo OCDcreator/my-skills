@@ -1,0 +1,4 @@
+interface:
+  display_name: "Obsidian Plugin Autodebug"
+  short_description: "Debug Obsidian plugins with reload evidence"
+  default_prompt: "Use $obsidian-plugin-autodebug to build, deploy, reload, capture evidence, and diagnose this Obsidian plugin."
