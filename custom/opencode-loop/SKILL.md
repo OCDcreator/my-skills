@@ -15,7 +15,7 @@ When the user gives you a requirement (e.g., "帮我写一个计算器库", "bui
 2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
 3. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
 4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, promote, `init --mode execute`, start.
-5. **Install the outer self-healing guard** — generate a productized cron/heartbeat prompt with `opencode-loop heartbeat --dir <target> --interval-minutes 30 --json` and create or hand off the Codex automation.
+5. **Install the outer self-healing guard** — run `opencode-loop heartbeat install --dir <target> --runner auto --interval-minutes 30` so a local cron/launchd heartbeat can wake Codex or OpenCode to repair `opencode-loop` itself.
 6. **Hand off** the running loop to the user with heartbeat/status instructions.
 
 Do NOT ask "which mode?" or "which route?" when the user gives a requirement. Just start the pipeline. Only ask for clarification if the target project path is unclear or the requirement is genuinely ambiguous.
@@ -62,7 +62,8 @@ opencode-loop doctor --dir /path/to/target --json
 opencode-loop status --dir /path/to/target --json
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile long
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --tmux-session target-loop
-opencode-loop heartbeat --dir /path/to/target --interval-minutes 30 --json
+opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-minutes 30
+opencode-loop heartbeat status --dir /path/to/target --json
 ```
 
 Use `opencode-loop update-check --json` only when the user explicitly asks whether the tool itself is current.
@@ -164,20 +165,22 @@ That command keeps the supervisor parent alive after the current terminal/sessio
 
 ### 3b. Productized Cron/Heartbeat Guard
 
-For any run the user expects to keep going unattended, the supervisor is necessary but not sufficient. Always add an outer Codex cron/heartbeat guard unless the user explicitly declines it. This guard is responsible for cases where the shell, supervisor, controller repo, queue contract, or wrapper breaks and no local child process remains alive to self-restart.
+For any run the user expects to keep going unattended, the supervisor is necessary but not sufficient. Always add an outer cron/heartbeat guard unless the user explicitly declines it. This guard is responsible for cases where the shell, supervisor, controller repo, queue contract, or wrapper breaks and no local child process remains alive to self-restart.
 
-Generate the standardized automation payload:
+Install the local scheduler:
 
 ```bash
-opencode-loop heartbeat --dir /path/to/target --interval-minutes 30 --json
+opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-minutes 30
 ```
 
-Use the returned `name`, `schedule_hint`, and `prompt` to create a Codex cron or thread heartbeat. Prefer the Codex app automation tool/UI when available; do not invent raw scheduler syntax by hand. The generated prompt requires the automation to:
+`--runner auto` first tries `codex exec --cd <opencode-loop repo>` and falls back to `opencode run --dir <opencode-loop repo> -- "<prompt>"` if Codex is unavailable or out of quota. Use `--runner codex` or `--runner opencode` only when the user explicitly wants one runner. The scheduler calls a generated `run.sh`, which skips model calls while the target is healthy and only invokes a runner when status/observe/logs show an unhealthy loop. The executable scheduler copy and CLI snapshot live under the user's HOME heartbeat runtime so macOS launchd/cron does not need to execute controller scripts from external volumes; target-side `.opencode-loop/heartbeat/` keeps config and logs.
+
+The generated repair prompt requires the runner to:
 
 - inspect `status --json`, `observe --json`, and latest logs before acting;
 - leave healthy runs alone and report exact task/process state;
 - when broken, preserve task work, fix verified `opencode-loop` controller bugs first, run tests, prepend `docs/pitfalls-and-lessons.md`, commit, redeploy with `bash bin/install-cli.sh`, and resume the original queue with `--resume-existing-queue`;
-- pause or disable itself only after the target task is truly complete.
+- pause itself with `opencode-loop heartbeat pause --dir /path/to/target` only after the target task is truly complete.
 
 Key core-script flags:
 
