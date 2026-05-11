@@ -16,6 +16,7 @@ Connect to and manage all known devices via SSH/SCP from the current workstation
 | **unraid** | 192.168.31.98 | root | 13322 | `ssh -p 13322 root@192.168.31.98` | Custom SSH port |
 | **router** | 192.168.31.204 | root | 22 | `ssh root@192.168.31.204` | QWRT, busybox shell |
 | **fnos** | 192.168.31.147 | letian | 22 | `ssh letian@192.168.31.147` | 飞牛 fnOS, Linux |
+| **fa880** | 192.168.31.49 | letain | 22 | `ssh letain@192.168.31.49` | Windows OpenSSH, key-based auth, hostname FA880 |
 
 When the user says "连 Mac", "SSH 到路由器", "Unraid 上执行" etc., resolve to the matching device above. If the target is ambiguous, ask which device.
 
@@ -88,6 +89,14 @@ $Fnos = 'letian@192.168.31.147'
 ```
 
 Standard Linux environment. Uses bash by default.
+
+### FA880 Windows (fa880)
+
+```powershell
+$Fa880 = 'letain@192.168.31.49'
+```
+
+Windows OpenSSH, hostname FA880. Same quirks as the other Windows device: default shell may be cmd.exe or PowerShell depending on configuration.
 
 ## Bundled scripts (Mac-specific)
 
@@ -168,6 +177,13 @@ Host router
 Host fnos
   HostName 192.168.31.147
   User letian
+  Port 22
+  ServerAliveInterval 30
+  ServerAliveCountMax 4
+
+Host fa880
+  HostName 192.168.31.49
+  User letain
   Port 22
   ServerAliveInterval 30
   ServerAliveCountMax 4
