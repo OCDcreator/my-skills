@@ -22,6 +22,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 | Generate backend routing | `scripts/obsidian_debug_control_backend_support.mjs` | `node scripts/obsidian_debug_control_backend_support.mjs --doctor .obsidian-debug/doctor.json --output .obsidian-debug/control-backends.json` |
 | Run config-driven loop | `scripts/obsidian_debug_job.mjs` | `node scripts/obsidian_debug_job.mjs --job .obsidian-debug/job.json --platform auto --mode run` |
 | Run JS behavior assertion | `scripts/obsidian_eval_file.mjs` | `node scripts/obsidian_eval_file.mjs --vault-name "<vault>" --file .obsidian-debug/assertion.js --clear-before --capture-after --output .obsidian-debug/assertion-result.json` |
+| Generate settings deep-link assertion | `scripts/obsidian_debug_settings_deeplink_template.mjs` | `node scripts/obsidian_debug_settings_deeplink_template.mjs --output .obsidian-debug/settings-deeplink-assertion.js` |
 | Generate visual review pack | `scripts/obsidian_debug_visual_review.mjs` | `node scripts/obsidian_debug_visual_review.mjs --diagnosis .obsidian-debug/diagnosis.json --output .obsidian-debug/visual-review.json --html-output .obsidian-debug/visual-review.html` |
 | Windows ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.ps1` | `powershell -File scripts/obsidian_plugin_debug_cycle.ps1 -PluginId <id> -TestVaultPluginDir <dir>` |
 | Bash/macOS ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.sh` | `bash scripts/obsidian_plugin_debug_cycle.sh --plugin-id <id> --test-vault-plugin-dir <dir>` |
