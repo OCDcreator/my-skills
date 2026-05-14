@@ -21,7 +21,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 | Scaffold sample plugin | `scripts/obsidian_debug_scaffold_plugin.mjs` | `node scripts/obsidian_debug_scaffold_plugin.mjs --output-dir <sample> --plugin-id sample-plugin --plugin-name "Sample Plugin"` |
 | Generate backend routing | `scripts/obsidian_debug_control_backend_support.mjs` | `node scripts/obsidian_debug_control_backend_support.mjs --doctor .obsidian-debug/doctor.json --output .obsidian-debug/control-backends.json` |
 | Run config-driven loop | `scripts/obsidian_debug_job.mjs` | `node scripts/obsidian_debug_job.mjs --job .obsidian-debug/job.json --platform auto --mode run` |
-| Run JS behavior assertion | `scripts/obsidian_eval_file.mjs` | `node scripts/obsidian_eval_file.mjs --vault-name "<vault>" --file .obsidian-debug/assertion.js --output .obsidian-debug/assertion-result.json` |
+| Run JS behavior assertion | `scripts/obsidian_eval_file.mjs` | `node scripts/obsidian_eval_file.mjs --vault-name "<vault>" --file .obsidian-debug/assertion.js --clear-before --capture-after --output .obsidian-debug/assertion-result.json` |
 | Generate visual review pack | `scripts/obsidian_debug_visual_review.mjs` | `node scripts/obsidian_debug_visual_review.mjs --diagnosis .obsidian-debug/diagnosis.json --output .obsidian-debug/visual-review.json --html-output .obsidian-debug/visual-review.html` |
 | Windows ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.ps1` | `powershell -File scripts/obsidian_plugin_debug_cycle.ps1 -PluginId <id> -TestVaultPluginDir <dir>` |
 | Bash/macOS ad-hoc cycle | `scripts/obsidian_plugin_debug_cycle.sh` | `bash scripts/obsidian_plugin_debug_cycle.sh --plugin-id <id> --test-vault-plugin-dir <dir>` |
@@ -183,10 +183,59 @@ For stateful UI behavior, write a small `.obsidian-debug/<case>.js` file and run
 node scripts/obsidian_eval_file.mjs \
   --vault-name "<vault>" \
   --file .obsidian-debug/<case>.js \
+  --clear-before \
+  --capture-after \
   --output .obsidian-debug/<case>-result.json
 ```
 
-Have the script open the plugin surface, interact with the real DOM, throw on failure or return JSON with `ok: false`, and restore any settings it mutates. `obsidian_eval_file.mjs` captures the raw eval output, parses a final `=> {...}` JSON result when present, and exits non-zero when that JSON says `ok: false`. Prefer this for composer input, autocomplete menus, settings toggles, and cached runtime catalogs where screenshots or static DOM text cannot prove the behavior.
+Important: `obsidian eval` does not support `file=<path>`. It only accepts inline `code=<javascript>`. Always use `scripts/obsidian_eval_file.mjs` for JS files so the wrapper reads the file and passes it as `code=...` without shell-quoting failures.
+
+Have the script open the plugin surface, interact with the real DOM, throw on failure or return JSON with `ok: false`, and restore any settings it mutates. `obsidian_eval_file.mjs` captures the raw eval output, parses a final `=> {...}` JSON result when present, and exits non-zero when that JSON says `ok: false`. With `--clear-before`, it runs `dev:console clear` and `dev:errors clear` before the eval. With `--capture-after`, it stores final `dev:console limit=<n>` and `dev:errors` output under `captures` in the result JSON; use `--capture-limit <n>` to change the console limit. Prefer this for composer input, autocomplete menus, settings toggles, and cached runtime catalogs where screenshots or static DOM text cannot prove the behavior.
+
+Treat stdout from reload, settings restore, and service restart steps as phase evidence, not automatically as final failure. The wrapper separates `phases` (clear/setup), eval `stdout`, and `captures`. Judge final residue from `captures.errors.stdout` and `captures.console.stdout` after cleanup/restore completes, while still preserving transient phase stdout for diagnosis.
+
+Stateful assertion cleanup contract:
+
+```js
+(async function assertSettingsSurface() {
+  const plugin = app.plugins.plugins["<plugin-id>"];
+  const snapshot = structuredClone(plugin.settings ?? plugin.data ?? {});
+  const result = { ok: false, restored: false, checks: [] };
+
+  try {
+    // Open the real surface, click real controls, and assert durable UI state.
+    // Push small check records into result.checks as each assertion passes.
+    result.ok = true;
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    result.ok = false;
+  } finally {
+    try {
+      plugin.settings = structuredClone(snapshot);
+      if (typeof plugin.saveSettings === "function") {
+        await plugin.saveSettings();
+      } else if (typeof plugin.saveData === "function") {
+        await plugin.saveData(snapshot);
+      }
+      result.restored = true;
+    } catch (restoreError) {
+      result.restored = false;
+      result.restoreError = restoreError instanceof Error ? restoreError.message : String(restoreError);
+    }
+    result.ok = result.ok && result.restored;
+    console.log(`=> ${JSON.stringify(result)}`);
+  }
+})();
+```
+
+For tabbed or multi-level settings surfaces, use this reusable shape:
+
+1. Locate the owner-level settings container first, not just an inner panel.
+2. Click the primary tab, then wait for an active-tab marker plus a durable content-shell selector.
+3. Click the secondary tab only after the primary owner is mounted.
+4. Trigger refresh/load buttons only after the intended tab is active.
+5. Assert the final control state and any captured service result.
+6. Restore settings/config in `finally` and return `{ "ok": true, "restored": true, "checks": [...] }`.
 
 If the assertion becomes useful across repeated work on one plugin, promote it from `.obsidian-debug/` into `projects/<project>/scripts/` or the target repo's debug folder. Project-profile scripts are reusable, but they must still be loaded by explicit path after confirming the target plugin matches that profile.
 

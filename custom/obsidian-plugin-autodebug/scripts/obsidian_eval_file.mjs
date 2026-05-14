@@ -10,6 +10,9 @@ function parseArgs(argv) {
     file: '',
     output: '',
     timeoutMs: 30000,
+    clearBefore: false,
+    captureAfter: false,
+    captureLimit: 200,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -30,6 +33,15 @@ function parseArgs(argv) {
       case '--timeout-ms':
         options.timeoutMs = Number(argv[++index] ?? '30000');
         break;
+      case '--clear-before':
+        options.clearBefore = true;
+        break;
+      case '--capture-after':
+        options.captureAfter = true;
+        break;
+      case '--capture-limit':
+        options.captureLimit = Number(argv[++index] ?? '200');
+        break;
       case '--help':
         printHelp();
         process.exit(0);
@@ -47,6 +59,10 @@ function parseArgs(argv) {
     throw new Error('--timeout-ms must be a positive number');
   }
 
+  if (!Number.isFinite(options.captureLimit) || options.captureLimit <= 0) {
+    throw new Error('--capture-limit must be a positive number');
+  }
+
   return options;
 }
 
@@ -58,6 +74,9 @@ Options:
   --vault-name <name>        Optional vault name passed as vault=<name>.
   --output <path>            Optional JSON result path.
   --timeout-ms <number>      Timeout in milliseconds. Defaults to 30000.
+  --clear-before             Clear dev:console and dev:errors before eval.
+  --capture-after            Capture dev:console and dev:errors after eval.
+  --capture-limit <number>   Console line limit for --capture-after. Defaults to 200.
   --help                     Show this help.
 `);
 }
@@ -103,6 +122,19 @@ function runCommand(command, args, timeoutMs) {
   });
 }
 
+function obsidianArgs(options, commandArgs) {
+  const args = [];
+  if (options.vaultName) {
+    args.push(`vault=${options.vaultName}`);
+  }
+  args.push(...commandArgs);
+  return args;
+}
+
+function commandOk(result) {
+  return result.exitCode === 0 && !result.timedOut;
+}
+
 function parseEvalStdout(stdout) {
   const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
   const resultLine = [...lines].reverse().find((line) => line.trim().startsWith('=>'));
@@ -125,23 +157,57 @@ function parseEvalStdout(stdout) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const source = await readFile(options.file, 'utf8');
-  const args = [];
-  if (options.vaultName) {
-    args.push(`vault=${options.vaultName}`);
-  }
-  args.push('eval', `code=${source}`);
+  const phases = [];
 
-  const result = await runCommand(options.obsidianCommand, args, options.timeoutMs);
+  if (options.clearBefore) {
+    phases.push({
+      name: 'clearConsoleBefore',
+      command: 'dev:console clear',
+      result: await runCommand(options.obsidianCommand, obsidianArgs(options, ['dev:console', 'clear']), options.timeoutMs),
+    });
+    phases.push({
+      name: 'clearErrorsBefore',
+      command: 'dev:errors clear',
+      result: await runCommand(options.obsidianCommand, obsidianArgs(options, ['dev:errors', 'clear']), options.timeoutMs),
+    });
+  }
+
+  const result = await runCommand(options.obsidianCommand, obsidianArgs(options, ['eval', `code=${source}`]), options.timeoutMs);
   const evalResult = parseEvalStdout(result.stdout);
   const assertionFailed = evalResult.json && evalResult.json.ok === false;
+  const captures = {};
+
+  if (options.captureAfter) {
+    const consoleResult = await runCommand(
+      options.obsidianCommand,
+      obsidianArgs(options, ['dev:console', `limit=${options.captureLimit}`]),
+      options.timeoutMs,
+    );
+    const errorsResult = await runCommand(options.obsidianCommand, obsidianArgs(options, ['dev:errors']), options.timeoutMs);
+    captures.console = consoleResult;
+    captures.errors = errorsResult;
+  }
+
+  const phasesOk = phases.every((phase) => commandOk(phase.result));
+  const capturesOk = Object.values(captures).every(commandOk);
+  const evalOk = commandOk(result) && !assertionFailed;
+
   const payload = {
     generatedAt: new Date().toISOString(),
     file: path.resolve(options.file),
     obsidianCommand: options.obsidianCommand,
     vaultName: options.vaultName || null,
-    ok: result.exitCode === 0 && !result.timedOut && !assertionFailed,
+    ok: phasesOk && evalOk && capturesOk,
+    phasesOk,
+    evalOk,
+    capturesOk,
     evalResultText: evalResult.text || null,
     evalJson: evalResult.json,
+    clearBefore: options.clearBefore,
+    captureAfter: options.captureAfter,
+    captureLimit: options.captureLimit,
+    phases,
+    captures,
     ...result,
   };
 
