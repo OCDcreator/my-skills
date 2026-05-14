@@ -70,6 +70,42 @@ If Obsidian is closed, run the launch helper first:
 node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json
 ```
 
+## Stale Runtime Versus Fresh Artifact
+
+Use this when deploy verification says the new artifact is present, but `plugin:reload` leaves the visible UI on old text, old CSS, or old behavior.
+
+Diagnosis sequence:
+
+1. Prove deploy freshness by grepping the deployed artifact, not the repo artifact.
+2. Prove runtime staleness from DOM/computed style.
+3. Reload the whole vault, then recapture.
+4. If still stale, disable/enable the plugin, then recapture.
+5. Only after those steps fail, suspect build output, copy target, plugin id, or cache logic.
+
+```bash
+grep -n "<new-build-id-or-string>" "<vault>/.obsidian/plugins/<plugin-id>/main.js"
+grep -n "<new-css-selector-or-token>" "<vault>/.obsidian/plugins/<plugin-id>/styles.css"
+
+obsidian dev:console clear
+obsidian plugin:reload id=<plugin-id>
+obsidian dev:dom selector="<stable-plugin-root>" all
+obsidian dev:css selector="<selector>" prop="<property>"
+
+obsidian reload vault="<vault>"
+obsidian dev:dom selector="<stable-plugin-root>" all
+obsidian dev:css selector="<selector>" prop="<property>"
+```
+
+If vault reload fixes the UI while artifact grep was already fresh, report the root cause as stale Obsidian runtime state or stale plugin webview/CSS injection, not as a failed deploy. Preserve the before/after grep and DOM/CSS captures in `.obsidian-debug/`.
+
+Disable/enable fallback:
+
+```bash
+obsidian plugin:disable id=<plugin-id>
+obsidian plugin:enable id=<plugin-id>
+obsidian dev:dom selector="<stable-plugin-root>" all
+```
+
 ## CDP Fallback
 
 Use direct CDP when CLI polling misses early logs, exact event ordering matters, or the user asks for real-time console capture.
@@ -194,6 +230,8 @@ Have the script open the plugin surface, interact with the real DOM, throw on fa
 
 Treat stdout from reload, settings restore, and service restart steps as phase evidence, not automatically as final failure. The wrapper separates `phases` (clear/setup), eval `stdout`, and `captures`. Judge final residue from `captures.errors.stdout` and `captures.console.stdout` after cleanup/restore completes, while still preserving transient phase stdout for diagnosis.
 
+When `--capture-after` is present, use the final `captures` object as the residual health signal. Console lines from service restarts, restore hooks, or intermediate reloads in `stdout` prove the path ran, but they are not final residue unless they also appear in the post-run captures.
+
 Stateful assertion cleanup contract:
 
 ```js
@@ -247,6 +285,93 @@ node scripts/obsidian_eval_file.mjs \
   --file projects/opencodian/scripts/agent-mention-layout-assertion.js \
   --output .obsidian-debug/agent-mention-layout-result.json
 ```
+
+### Runtime Locale And I18n Assertions
+
+Do not prove locale-sensitive UI by assigning `plugin.settings.locale` alone. Many plugins normalize locale through an i18n service, cached translator, settings coordinator, or render-time store.
+
+Preferred assertion order:
+
+1. Snapshot current settings and runtime locale fields.
+2. Change locale through the real settings UI when feasible.
+3. If using JS, save settings through the plugin's own API and then reload plugin or vault.
+4. Assert both runtime translation state and rendered UI text.
+5. Restore settings in `finally`, then use `--capture-after` to judge final console/errors.
+
+Minimal JS shape:
+
+```js
+(async function assertLocaleRuntime() {
+  const plugin = app.plugins.plugins["<plugin-id>"];
+  const snapshot = structuredClone(plugin.settings ?? {});
+  const result = { ok: false, restored: false, checks: [] };
+
+  try {
+    plugin.settings.locale = "en";
+    if (typeof plugin.saveSettings === "function") await plugin.saveSettings();
+    if (app.plugins.disablePlugin && app.plugins.enablePlugin) {
+      await app.plugins.disablePlugin("<plugin-id>");
+      await app.plugins.enablePlugin("<plugin-id>");
+    }
+
+    const activePlugin = app.plugins.plugins["<plugin-id>"] ?? plugin;
+    const runtimeLocale =
+      activePlugin.i18n?.getLocale?.() ??
+      activePlugin.locale?.getCurrent?.() ??
+      activePlugin.settings?.locale;
+    result.checks.push({ name: "runtime-locale", value: runtimeLocale });
+
+    const text = document.body.innerText;
+    result.checks.push({ name: "rendered-text", matched: text.includes("<expected-en-text>") });
+    result.ok = runtimeLocale === "en" && text.includes("<expected-en-text>");
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+  } finally {
+    try {
+      const activePlugin = app.plugins.plugins["<plugin-id>"] ?? plugin;
+      activePlugin.settings = structuredClone(snapshot);
+      if (typeof activePlugin.saveSettings === "function") await activePlugin.saveSettings();
+      result.restored = true;
+    } catch (restoreError) {
+      result.restoreError = restoreError instanceof Error ? restoreError.message : String(restoreError);
+    }
+    result.ok = result.ok && result.restored;
+    console.log(`=> ${JSON.stringify(result)}`);
+  }
+})();
+```
+
+If plugin reload still leaves old strings and artifact grep is fresh, run the stale-runtime flow above before changing i18n code.
+
+### CSS Regression Assertions With Synthetic Fixtures
+
+For visual states that are pure CSS, avoid depending on real plugin data, remote directories, server readiness, or async catalog hydration. Inject or open a stable fixture element, apply the expected classes/attributes, and assert computed style.
+
+```js
+(async function assertCssState() {
+  const result = { ok: false, checks: [] };
+  const host = document.createElement("div");
+  host.className = "<plugin-root-class>";
+  host.innerHTML = `<button class="<target-class>" data-state="active">Fixture</button>`;
+  document.body.appendChild(host);
+
+  try {
+    const node = host.querySelector(".<target-class>");
+    const style = getComputedStyle(node);
+    result.checks.push({ name: "background", value: style.backgroundColor });
+    result.checks.push({ name: "color", value: style.color });
+    result.ok = style.backgroundColor === "<expected-rgb>" && style.color === "<expected-rgb>";
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error);
+    result.ok = false;
+  } finally {
+    host.remove();
+    console.log(`=> ${JSON.stringify(result)}`);
+  }
+})();
+```
+
+Use a real-surface assertion when CSS depends on layout context, theme variables, or Obsidian workspace ancestry. Even then, assert computed style first and use screenshots as review evidence, not the only proof.
 
 ## Analysis And Reports
 
@@ -361,6 +486,9 @@ Keep the split explicit:
 ## Troubleshooting
 
 - `obsidian help` cannot find Obsidian: run `node scripts/obsidian_debug_launch_app.mjs --mode cli ...`, then retry.
+- Artifact grep is fresh but UI text/CSS is old after `plugin:reload`: run `obsidian reload vault="<vault>"`, recapture DOM/CSS, then disable/enable before editing plugin code.
+- Locale string assertions fail after changing `plugin.settings.locale`: assert the runtime translator state, save via the plugin API, and reload plugin or vault; prefer the real settings UI when the plugin wires locale through UI coordinators.
+- CSS visual assertions hang on missing business data: inject a synthetic fixture and assert `getComputedStyle`, then reserve screenshots for human review.
 - Windows note: the Node helpers now merge the current process `PATH` with the Windows user/machine `Path` scopes before probing `obsidian`, so stale long-lived agent sessions no longer misclassify the CLI just because they inherited an old `PATH`.
 - CDP fetch fails: let `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` perform its restart fallback, or run `scripts/obsidian_windows_restart_cdp.ps1` / `scripts/obsidian_mac_restart_cdp.sh` directly and then probe `http://127.0.0.1:9222/json/list`.
 - Logs show Hot Reload churn: use controlled mode for deterministic timing or coexist mode when intentionally letting Hot Reload drive reload.

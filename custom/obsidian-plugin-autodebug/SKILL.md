@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Use when any Obsidian community plugin work turns into debugging, smoke testing, or release validation, especially for white screens after reload, slow startup, manual refresh loops, closed-app recovery, fresh-vault install or discovery failures, BUILD_ID deploy checks, console or DevTools capture, screenshots, DOM assertions, watch-on-save, state reset, or other implicit plugin troubleshooting.
+description: Use when any Obsidian community plugin work turns into debugging, smoke testing, or release validation, especially for white screens after reload, slow startup, manual refresh loops, stale UI after deploy/reload despite fresh artifacts, runtime locale/i18n assertion problems, closed-app recovery, fresh-vault install or discovery failures, BUILD_ID deploy checks, console or DevTools capture, screenshots, DOM/CSS assertions, watch-on-save, state reset, or other implicit plugin troubleshooting.
 ---
 
 # Obsidian Plugin Autodebug
@@ -110,12 +110,13 @@ For exact commands, read `references/command-reference.md`.
 3. **Deploy**: copy only generated runtime artifacts into the test vault plugin directory: `main.js`, `manifest.json`, `styles.css`, and changed bundled assets.
 4. **Bootstrap**: for a brand-new plugin in a fresh vault, bootstrap discovery immediately after deploy and before the real reload/log-watch pass.
 5. **Reload**: use `obsidian plugin:reload id=<plugin-id>` first. Fall back to disable/enable or CDP only when reload is unavailable or stuck.
-6. **Capture**: clear stale buffers, watch console/errors, capture screenshot and DOM/CSS evidence, and run any configured scenario. If the target vault intentionally enables `Logstravaganza`, treat its NDJSON files as a persistent secondary log source alongside CLI/CDP capture and preserve the discovered source metadata in the generated `vault-log-capture.json`.
-7. **Generate diagnosis**: wrappers and `scripts/obsidian_debug_job.mjs` write `diagnosis.json` automatically; for a manual path, run `scripts/obsidian_debug_analyze.mjs --summary .obsidian-debug/summary.json --assertions assertions/plugin-view-health.template.json --output .obsidian-debug/diagnosis.json`.
-8. **Create review/handoff artifacts**: generate `visual-review.json/html` when a screenshot exists, and generate `agent-tools.json` plus `control-backends.json` when another model will continue the run.
-9. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
-10. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
-11. **Capture reusable learning**: before the final response, run a short after-action triage. Promote generic workflow/tooling improvements to this skill, keep long-lived plugin-specific assets in a project profile or the target plugin repo, and leave one-off machine noise only in the run report.
+6. **Runtime freshness gate**: when deployed `main.js`/`styles.css` contains the expected BUILD_ID, string, or CSS rule but the DOM still shows old UI, diagnose stale runtime separately from deploy failure. Verify the deployed artifact first, then reload vault or disable/enable before changing code.
+7. **Capture**: clear stale buffers, watch console/errors, capture screenshot and DOM/CSS evidence, and run any configured scenario. If the target vault intentionally enables `Logstravaganza`, treat its NDJSON files as a persistent secondary log source alongside CLI/CDP capture and preserve the discovered source metadata in the generated `vault-log-capture.json`.
+8. **Generate diagnosis**: wrappers and `scripts/obsidian_debug_job.mjs` write `diagnosis.json` automatically; for a manual path, run `scripts/obsidian_debug_analyze.mjs --summary .obsidian-debug/summary.json --assertions assertions/plugin-view-health.template.json --output .obsidian-debug/diagnosis.json`.
+9. **Create review/handoff artifacts**: generate `visual-review.json/html` when a screenshot exists, and generate `agent-tools.json` plus `control-backends.json` when another model will continue the run.
+10. **Analyze**: inspect `diagnosis.json` before raw logs. It aggregates assertions, timings, known issue signatures, and next-step recommendations.
+11. **Patch and repeat**: make the smallest root-cause fix, rebuild/deploy/reload, then compare against the previous diagnosis or saved baseline.
+12. **Capture reusable learning**: before the final response, run a short after-action triage. Promote generic workflow/tooling improvements to this skill, keep long-lived plugin-specific assets in a project profile or the target plugin repo, and leave one-off machine noise only in the run report.
 
 Save runtime artifacts under `.obsidian-debug/` or another repo-local debug folder. Do not commit raw runtime logs unless the user asks.
 
@@ -167,6 +168,8 @@ Use DOM checks for deterministic assertions and screenshots for visual review. G
 
 Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/plugin-surface.template.json` when the plugin does not have one obvious command id or root selector.
 
+For CSS-only regressions, prefer computed-style assertions against a small synthetic fixture or stable injected DOM over waiting for real business data, remote catalogs, or async directory hydration. Capture screenshots only after the computed style proves the expected class/rule is active.
+
 Do not trust bundled or copied assertion text blindly. If a custom assertion fails but `scenario-report.json`, `obsidian eval`, or a targeted DOM query proves the plugin surface is open, treat the assertion target as stale and replace it with a stable current surface signal such as the plugin view type, a durable root selector, visible title text, or command-owned UI text. Keep project-specific assertion fixes in the matching project profile or project debug folder unless the bundled example itself is stale.
 
 Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` when the plugin needs click/locator assertions and either a Playwright module is installed in the repo or `playwright-cli` can be resolved.
@@ -194,6 +197,8 @@ When `scenario.enabled` is true, the scenario lane may probe CDP DOM heuristics 
 For behavior that cannot be proven from a static DOM capture, write a small JavaScript assertion and run it through `scripts/obsidian_eval_file.mjs`; `obsidian eval` accepts `code=...`, not `file=...`. This is useful for composer input, settings toggles, command palettes, cached catalogs, and other stateful UI paths. Keep one-off assertions in `.obsidian-debug/`; keep reusable project-specific assertion scripts in `projects/<project>/scripts/` and reusable assertion configs in `projects/<project>/assertions/`, or store either in the target repo’s debug folder. If a matching project profile already exposes a stateful assertion script, prefer running that script before writing a new inline `obsidian eval` command.
 
 Stateful assertions must snapshot any settings/config they mutate, perform UI interactions inside `try`, restore in `finally`, and return JSON that includes both assertion status and restore status. Use `--clear-before --capture-after` when final console/error residue matters; distinguish transient stdout from reload/restore steps from final `dev:errors` or `dev:console` captures.
+
+For i18n checks, do not rely only on mutating `plugin.settings.locale`. Assert the runtime translation state that the UI actually reads. If the runtime locale remains stale, save the locale, reload the plugin or vault, or switch through the real settings UI before judging the string assertion.
 
 For tabbed or multi-level settings surfaces, anchor assertions to the current navigation owner before touching nested controls. After clicking a primary or secondary tab, wait for both the active tab marker and a content-shell attribute or durable root selector that proves the intended page is mounted. Trigger refresh buttons only after the intended tab is active; otherwise a refresh promise can re-render the previous content while the assertion has already moved on. When UI information architecture changes, treat old inner-tab selectors as stale test code and replace them with owner-level navigation selectors instead of adding fallback selectors that hide the mismatch.
 
@@ -341,11 +346,15 @@ Summarize important log lines with artifact paths and line numbers. Do not paste
 - Waiting for the user to manually open Obsidian when the built-in auto-launch helper can do that first.
 - Debugging plugin code when the real failure is “CLI cannot find Obsidian.”
 - Reloading before deploy/bootstrap finishes.
+- Treating a fresh deployed artifact plus stale DOM as a code/build failure before trying vault reload or disable/enable.
 - Committing machine-local vault paths or raw runtime logs.
 - Using screenshots as the only assertion when stable DOM/text checks are available.
+- Treating `plugin.settings.locale` as proof of runtime i18n state without checking rendered translation state.
+- Blocking a pure CSS regression check on real data hydration when computed style plus a synthetic fixture would prove it.
 - Refreshing a settings page before the intended tab is active, then mistaking a navigation/render race for a plugin data bug.
 - Keeping stale inner-tab selectors after a settings surface moves that navigation into the owner-level tab bar.
 - Checking final text only for a flicker bug; if a panel is destroyed and recreated with identical text, the assertion must compare node identity.
 - Mixing cold-start and warm-start timings in the same baseline class.
 - Putting desktop-only Obsidian phases into CI instead of local smoke workflows.
 - Claiming full manual GUI validation from a screenshot or visual diff alone.
+- Treating restart/restore stdout as final residue when `--capture-after` has cleaner post-run console/error captures.
