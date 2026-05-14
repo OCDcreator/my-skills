@@ -62,6 +62,7 @@ Common options:
   --agentic-probe-timeout-ms <n>    Per-request timeout for agentic probes. Defaults to 2000.
   --platform <auto|windows|bash>    Fix-plan command platform.
   --output <path>                   Doctor JSON output path.
+  --quiet | --summary               Print a compact terminal summary instead of the full JSON report.
   --fix                            Emit reviewable fix scripts/plan.
 `);
 }
@@ -87,6 +88,8 @@ const agenticProbeTimeoutMs = Math.max(250, getNumberOption(options, 'agentic-pr
 const outputPath = getStringOption(options, 'output', '').trim();
 const platform = normalizePlatform(getStringOption(options, 'platform', 'auto'));
 const fixRequested = getBooleanOption(options, 'fix', false);
+const summaryRequested = getBooleanOption(options, 'summary', false);
+const quietRequested = getBooleanOption(options, 'quiet', false);
 const toolRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const defaultFixOutput = outputPath
   ? path.join(path.dirname(path.resolve(outputPath)), `doctor-fixes.${scriptExtension(platform)}`)
@@ -165,6 +168,34 @@ function check(status, id, category, detail, data = {}, fixSpecs = []) {
     fixes: resolveFixes(fixSpecs),
     ...data,
   };
+}
+
+function buildDoctorConsoleSummary(report, outputPath) {
+  const counts = report.checks.reduce((acc, entry) => {
+    acc[entry.status] = (acc[entry.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  const important = report.checks
+    .filter((entry) => entry.status === 'fail' || entry.status === 'warn')
+    .sort((a, b) => statusRank(b.status) - statusRank(a.status));
+  const lines = [
+    `obsidian_debug_doctor: ${report.status}`,
+    `checks: pass=${counts.pass ?? 0} info=${counts.info ?? 0} warn=${counts.warn ?? 0} fail=${counts.fail ?? 0}`,
+  ];
+
+  if (outputPath) {
+    lines.push(`report: ${path.resolve(outputPath)}`);
+  }
+
+  for (const entry of important.slice(0, 20)) {
+    lines.push(`[${entry.status}] ${entry.id}: ${entry.detail}`);
+  }
+
+  if (important.length > 20) {
+    lines.push(`... ${important.length - 20} additional warn/fail checks omitted from terminal summary`);
+  }
+
+  return `${lines.join('\n')}\n`;
 }
 
 function supportStatus(entry) {
@@ -1461,4 +1492,8 @@ if (outputPath) {
   await fs.writeFile(resolvedOutput, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
 }
 
-console.log(JSON.stringify(report, null, 2));
+if (quietRequested || summaryRequested) {
+  console.log(buildDoctorConsoleSummary(report, outputPath));
+} else {
+  console.log(JSON.stringify(report, null, 2));
+}

@@ -137,12 +137,13 @@ function commandOk(result) {
 
 function parseEvalStdout(stdout) {
   const lines = stdout.trim().split(/\r?\n/).filter(Boolean);
-  const resultLine = [...lines].reverse().find((line) => line.trim().startsWith('=>'));
-  if (!resultLine) {
+  const resultLineIndex = lines.findLastIndex((line) => line.trim().startsWith('=>'));
+  if (resultLineIndex === -1) {
     return { text: '', json: null };
   }
 
-  const text = resultLine.replace(/^\s*=>\s*/, '').trim();
+  const firstLine = lines[resultLineIndex].replace(/^\s*=>\s*/, '');
+  const text = [firstLine, ...lines.slice(resultLineIndex + 1)].join('\n').trim();
   if (!text) {
     return { text, json: null };
   }

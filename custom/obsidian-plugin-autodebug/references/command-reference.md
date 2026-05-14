@@ -17,7 +17,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 | Launch/focus Obsidian first | `scripts/obsidian_debug_launch_app.mjs` | `node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json` |
 | Restart for CDP on Windows | `scripts/obsidian_windows_restart_cdp.ps1` | `powershell -File scripts/obsidian_windows_restart_cdp.ps1 -AppPath "C:\Program Files\Obsidian\Obsidian.exe" -Port 9222` |
 | Restart for CDP on macOS | `scripts/obsidian_mac_restart_cdp.sh` | `bash scripts/obsidian_mac_restart_cdp.sh /Applications/Obsidian.app 9222` |
-| Check environment | `scripts/obsidian_debug_doctor.mjs` | `node scripts/obsidian_debug_doctor.mjs --repo-dir <repo> --plugin-id <id> --test-vault-plugin-dir <vault>/.obsidian/plugins/<id> --output .obsidian-debug/doctor.json --fix` |
+| Check environment | `scripts/obsidian_debug_doctor.mjs` | `node scripts/obsidian_debug_doctor.mjs --repo-dir <repo> --plugin-id <id> --test-vault-plugin-dir <vault>/.obsidian/plugins/<id> --output .obsidian-debug/doctor.json --quiet --fix` |
 | Scaffold sample plugin | `scripts/obsidian_debug_scaffold_plugin.mjs` | `node scripts/obsidian_debug_scaffold_plugin.mjs --output-dir <sample> --plugin-id sample-plugin --plugin-name "Sample Plugin"` |
 | Generate backend routing | `scripts/obsidian_debug_control_backend_support.mjs` | `node scripts/obsidian_debug_control_backend_support.mjs --doctor .obsidian-debug/doctor.json --output .obsidian-debug/control-backends.json` |
 | Run config-driven loop | `scripts/obsidian_debug_job.mjs` | `node scripts/obsidian_debug_job.mjs --job .obsidian-debug/job.json --platform auto --mode run` |
@@ -28,6 +28,8 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 
 Prefer `obsidian_debug_job.mjs` for repeatable work and the shell wrappers for one-off local smoke passes.
 Both shell wrappers call the launch helper automatically unless you opt out with `--skip-app-launch`.
+
+For `obsidian_debug_doctor.mjs`, use `--quiet` or `--summary` when an agent needs compact terminal output. The full JSON report is still written to `--output`; stdout includes overall status, pass/info/warn/fail counts, the report path, and the first warn/fail checks.
 
 ## Job Specs
 
@@ -226,7 +228,7 @@ node scripts/obsidian_eval_file.mjs \
 
 Important: `obsidian eval` does not support `file=<path>`. It only accepts inline `code=<javascript>`. Always use `scripts/obsidian_eval_file.mjs` for JS files so the wrapper reads the file and passes it as `code=...` without shell-quoting failures.
 
-Have the script open the plugin surface, interact with the real DOM, throw on failure or return JSON with `ok: false`, and restore any settings it mutates. `obsidian_eval_file.mjs` captures the raw eval output, parses a final `=> {...}` JSON result when present, and exits non-zero when that JSON says `ok: false`. With `--clear-before`, it runs `dev:console clear` and `dev:errors clear` before the eval. With `--capture-after`, it stores final `dev:console limit=<n>` and `dev:errors` output under `captures` in the result JSON; use `--capture-limit <n>` to change the console limit. Prefer this for composer input, autocomplete menus, settings toggles, and cached runtime catalogs where screenshots or static DOM text cannot prove the behavior.
+Have the script open the plugin surface, interact with the real DOM, throw on failure or return JSON with `ok: false`, and restore any settings it mutates. `obsidian_eval_file.mjs` captures the raw eval output, parses a final `=> {...}` JSON result when present, including pretty-printed multi-line JSON blocks, and exits non-zero when that JSON says `ok: false`. With `--clear-before`, it runs `dev:console clear` and `dev:errors clear` before the eval. With `--capture-after`, it stores final `dev:console limit=<n>` and `dev:errors` output under `captures` in the result JSON; use `--capture-limit <n>` to change the console limit. Prefer this for composer input, autocomplete menus, settings toggles, and cached runtime catalogs where screenshots or static DOM text cannot prove the behavior.
 
 Treat stdout from reload, settings restore, and service restart steps as phase evidence, not automatically as final failure. The wrapper separates `phases` (clear/setup), eval `stdout`, and `captures`. Judge final residue from `captures.errors.stdout` and `captures.console.stdout` after cleanup/restore completes, while still preserving transient phase stdout for diagnosis.
 
