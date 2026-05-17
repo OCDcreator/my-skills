@@ -1,0 +1,4 @@
+interface:
+  display_name: "Math to Obsidian Note"
+  short_description: "数学材料整理为 Obsidian Markdown 笔记"
+  default_prompt: "Use $math-to-obsidian-note to turn uploaded math problems, answers, or knowledge points into a polished Obsidian Markdown note."
