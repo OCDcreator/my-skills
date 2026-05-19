@@ -279,6 +279,8 @@ Use this low-freedom sequence when a stalled run reveals an `opencode-loop` cont
 
 The intended evolution loop is: detect trap → repair controller/skill → validate → commit → install wrapper → refresh scheduler snapshot → deploy target-local skill → resume the same queue. Treat a stale heartbeat snapshot as an undeployed fix.
 
+For `environment_blocked` after `Isolation integration conflict`, do not reset the target root. Preserve the root diff, verify dirty files match the blocked task's `scope_paths`, and use the controller's blocked-integration dirty-scope recovery path. The safe target-side shape is a blocked task with `last_error/status_reason` containing `integration conflict` plus dirty files owned by that same task. Anything else needs manual diagnosis before resuming.
+
 ### 5. Optional Hooks
 
 Normal hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted. Do not confuse these with execute mode's `gate-review` blocking gate hook: that hook is consumed by the review gate, and a missing or failing `gate-review` makes the gate unavailable/fail instead of merely warning.
