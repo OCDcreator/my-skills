@@ -173,12 +173,14 @@ Install the local scheduler:
 opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-minutes 30
 ```
 
-`--runner auto` first tries `codex exec --cd <opencode-loop repo>` and falls back to `opencode run --dir <opencode-loop repo> -- "<prompt>"` if Codex is unavailable or out of quota. Use `--runner codex` or `--runner opencode` only when the user explicitly wants one runner. The scheduler calls a generated `run.sh`, which skips model calls while the target is healthy and only invokes a runner when status/observe/logs show an unhealthy loop. The executable scheduler copy and CLI snapshot live under the user's HOME heartbeat runtime so macOS launchd/cron does not need to execute controller scripts from external volumes; target-side `.opencode-loop/heartbeat/` keeps config and logs.
+`--runner auto` first tries `codex exec --cd <opencode-loop repo>` and falls back to `opencode run --dir <opencode-loop repo> -- "<prompt>"` if Codex is unavailable or out of quota. Use `--runner codex` or `--runner opencode` only when the user explicitly wants one runner. The scheduler calls a generated `run.sh`, which skips model calls while the target is genuinely healthy and only invokes a runner when status/observe/logs show an unhealthy loop or a progress trap. The executable scheduler copy and CLI snapshot live under the user's HOME heartbeat runtime so macOS launchd/cron does not need to execute controller scripts from external volumes; target-side `.opencode-loop/heartbeat/` keeps config and logs.
 
 The generated repair prompt requires the runner to:
 
 - inspect `status --json`, `observe --json`, and latest logs before acting;
-- leave healthy runs alone and report exact task/process state;
+- treat process liveness as necessary but not sufficient: a live loop repeatedly failing `gate-review`, accumulating rejected tasks, or requeueing the same phase is unhealthy even if `status.health` says `healthy`;
+- leave only genuinely healthy runs alone and report exact task/process state;
+- when progress is abnormal, pause blind relaunches, preserve task work, extract the latest `gate-review` JSON `reason` plus queue `last_error`, and turn that into a concrete repair objective for the next run;
 - when broken, preserve task work, fix verified `opencode-loop` controller bugs first, run tests, prepend `docs/pitfalls-and-lessons.md`, commit, redeploy with `bash bin/install-cli.sh`, and resume the original queue with `--resume-existing-queue`;
 - pause itself with `opencode-loop heartbeat pause --dir /path/to/target` only after the target task is truly complete.
 
@@ -224,6 +226,15 @@ opencode-loop logs --dir /path/to/target --file stderr --tail 80
 opencode-loop logs --dir /path/to/target --file hook --match gate-review --tail 80
 opencode-loop logs --dir /path/to/target --file gate --match policy --tail 80
 ```
+
+Watch for abnormal progress, not only dead processes. These are heartbeat-worthy problems even while supervisor and child PIDs are alive:
+
+- The same task/phase hits `Queue gate review needs_changes` repeatedly.
+- `queue.json` has one or more `rejected` tasks while another task is `in_progress`.
+- Progress shows `queue_inconsistent:rejected_exhausted` or repeated manual requeues.
+- The latest hook log repeats the same reviewer reason, so the model is likely receiving too vague a repair objective.
+
+In those cases, do not simply relaunch. Back up `queue.json` and task-worktree diffs, stop blind retries if they are burning time, read the newest `gate-review` hook stdout JSON and the affected task's `last_error`, then write a targeted recovery prompt such as "fix duplicate status/session handler registration in OpenCodeAdapter" rather than "continue the task". If the failure is a controller/heartbeat behavior gap, fix and deploy `opencode-loop` first, then resume the target queue.
 
 Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/state.json`, `.opencode-loop/runtime.json`, `.opencode-loop/logs/`, `.opencode-loop/output-*.jsonl`, and `.opencode-loop/stderr-*.log`.
 
