@@ -238,6 +238,47 @@ In those cases, do not simply relaunch. Back up `queue.json` and task-worktree d
 
 Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/state.json`, `.opencode-loop/runtime.json`, `.opencode-loop/logs/`, `.opencode-loop/output-*.jsonl`, and `.opencode-loop/stderr-*.log`.
 
+### Self-Repair / Self-Evolution Protocol
+
+Use this low-freedom sequence when a stalled run reveals an `opencode-loop` controller, heartbeat, queue-contract, or skill gap. Do not skip to relaunching the target loop.
+
+1. Freeze blind retries:
+   ```bash
+   opencode-loop status --dir /path/to/target --json
+   opencode-loop observe --dir /path/to/target --json
+   opencode-loop heartbeat status --dir /path/to/target --json
+   ```
+2. Preserve evidence and task work before touching controller or target state:
+   ```bash
+   mkdir -p /path/to/target/.opencode-loop/recovery/$(date -u +%Y%m%dT%H%M%SZ)
+   git -C /path/to/target status --short --branch
+   git -C /path/to/target diff --stat
+   ```
+3. Extract the first concrete blocker from the latest progress/output/stderr/supervisor/gate logs and queue `last_error`. The next model prompt must name that blocker, not say "continue".
+4. If the blocker is controller-side, fix the `opencode-loop` source first. Run the narrow relevant test, then `bash bin/test.sh` when feasible. Prepend the lesson to `docs/pitfalls-and-lessons.md`, commit, and deploy:
+   ```bash
+   bash bin/install-cli.sh
+   opencode-loop heartbeat refresh --dir /path/to/target --interval-minutes 10
+   ```
+5. If the blocker is skill-side, update this skill only after reading `$skill-creator`:
+   ```bash
+   sed -n '1,220p' "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/SKILL.md"
+   "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" /path/to/my-skills/custom/opencode-loop
+   ```
+   Keep fragile recovery steps low-freedom with exact commands. After validation, commit the skill repo change.
+6. Deploy the refreshed skill to any dedicated target worktree that carries a repo-local copy:
+   ```bash
+   mkdir -p /path/to/target/.codex/skills/opencode-loop
+   cp /path/to/my-skills/custom/opencode-loop/SKILL.md /path/to/target/.codex/skills/opencode-loop/SKILL.md
+   ```
+7. Resume only the original queue:
+   ```bash
+   opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --resume-existing-queue
+   opencode-loop status --dir /path/to/target --json
+   ```
+
+The intended evolution loop is: detect trap → repair controller/skill → validate → commit → install wrapper → refresh scheduler snapshot → deploy target-local skill → resume the same queue. Treat a stale heartbeat snapshot as an undeployed fix.
+
 ### 5. Optional Hooks
 
 Normal hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted. Do not confuse these with execute mode's `gate-review` blocking gate hook: that hook is consumed by the review gate, and a missing or failing `gate-review` makes the gate unavailable/fail instead of merely warning.
