@@ -49,8 +49,9 @@ When already inside the `opencode-loop` repository, use the current repo root. O
 - On macOS, use the native repo path directly.
 - On Windows, prefer WSL for Bash-facing workflows.
 - Known Windows repo pattern for this environment: `C:\Users\lt\Desktop\Write\open-source-project\autonomous-ai-agents\agent-loops\opencode-loop`.
+- Requires Python >= 3.11; the engine uses only stdlib modules.
 
-Never run `lib/*.sh` directly; they are sourced modules behind `opencode-loop.sh`.
+The Python engine at `engine/` handles orchestration. `opencode-loop.sh` and `bin/opencode-loop-cli.sh` are thin wrappers around `python3 -m engine.loop` / `python3 -m engine.cli`; `lib/*.sh` are thin bridges for backward compatibility.
 
 ## Prefer The AI-Friendly CLI
 
@@ -108,7 +109,7 @@ opencode-loop doctor --dir /path/to/target --json
 Fallback from the repo root:
 
 ```bash
-bash -n opencode-loop.sh
+python3 --version
 command -v opencode && command -v jq && command -v git
 ```
 
@@ -142,11 +143,15 @@ opencode-loop start --dir /path/to/target --profile quick
 opencode-loop start --dir /path/to/target --profile long
 ```
 
+Profile defaults match the original Bash behavior: `quick` = 3 iterations/15min/single session; `long` = 30/60/multi rotate 10; `ml` = 200/30/multi rotate 10; `execute` = 30/60/multi rotate 1 with 1440min stale detection.
+
 Use the core script when the user needs advanced flags:
 
 ```bash
 bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 5 --timeout 15 --auto-reset
 ```
+
+`--auto-reset` is now the default startup behavior; keep it in older command snippets only for explicitness.
 
 For longer runs, prefer the supervisor:
 
@@ -190,7 +195,8 @@ Key core-script flags:
 - `--timeout MIN` — per-iteration timeout.
 - `--mode dev|ml|execute` — route selection.
 - `--program FILE` — custom program prompt.
-- `--auto-reset` — reset circuit breaker on startup.
+- `--auto-reset` — reset circuit breaker on startup; default is enabled.
+- `--no-auto-reset` — opt out of startup circuit-breaker reset.
 - `--session-mode single|multi|auto|clean` — session strategy.
 - `--session-rotate N` — iterations per session in multi mode.
 
@@ -206,7 +212,7 @@ The JSON output includes:
 - `state` — iteration count, status, session ID from `state.json`
 - `runtime` — PID, process state, active config, last exit reason from `runtime.json`
 - `control` — desired state (running/stopped) and pending config from `control.json`
-- `circuit_breaker` — breaker state (closed/open/half_open) from `circuit_breaker.json`
+- `circuit_breaker` — breaker state (closed/open/half_open/permanent_open) from `circuit_breaker.json`
 - `process_check` — PID liveness for loop, supervisor, and child processes
 - `process_alive` — convenience boolean: is the main loop process actually running?
 - `warning` — stale-running detection (state says running but process is dead)
@@ -233,6 +239,10 @@ Watch for abnormal progress, not only dead processes. These are heartbeat-worthy
 - `queue.json` has one or more `rejected` tasks while another task is `in_progress`.
 - Progress shows `queue_inconsistent:rejected_exhausted` or repeated manual requeues.
 - The latest hook log repeats the same reviewer reason, so the model is likely receiving too vague a repair objective.
+
+The Python engine records iteration epilogue health with `cb_record_progress(has_progress, has_error, error_msg)`. The breaker opens after 3 consecutive no-progress iterations or 5 repeated same-error iterations, cools down for 30 minutes, and enters `permanent_open` after `MAX_OPEN_CYCLES=5` open/half-open loops.
+
+Self-healing is built into state handling: orphaned tasks with no dirty files reset to `todo` after 2x timeout, orphaned tasks with dirty files are reverted and reset after 10x timeout, tasks are auto-blocked when `attempt_count >= max_attempts`, and state writes use atomic tmpfile-plus-rename semantics.
 
 In those cases, do not simply relaunch. Back up `queue.json` and task-worktree diffs, stop blind retries if they are burning time, read the newest `gate-review` hook stdout JSON and the affected task's `last_error`, then write a targeted recovery prompt such as "fix duplicate status/session handler registration in OpenCodeAdapter" rather than "continue the task". If the failure is a controller/heartbeat behavior gap, fix and deploy `opencode-loop` first, then resume the target queue.
 
@@ -476,7 +486,7 @@ bash opencode-loop.sh --dir /path/to/target --mode execute --unsafe-skip-baselin
 
 ### Worktree Isolation Lifecycle
 
-When `profile.isolation` is `worktree`, each queue task runs in an isolated Git worktree. The loop's `isolation_manager.sh` handles creation, cleanup, and integration automatically — but when an agent needs to manually manage worktrees (for recovery, continuation, or inspection), follow this lifecycle.
+When `profile.isolation` is `worktree`, each queue task runs in an isolated Git worktree. The Python isolation manager handles creation, cleanup, and integration automatically — but when an agent needs to manually manage worktrees (for recovery, continuation, or inspection), follow this lifecycle.
 
 #### Recovery From Interrupted Worktree Creation
 
@@ -515,7 +525,7 @@ else
 fi
 ```
 
-If the loop's `isolation_manager.sh` refuses to delete a branch with unique commits, you must manually decide: (a) integrate the commits into base with `git checkout main && git merge --ff-only task/<id>`, or (b) re-bind the branch to a worktree path with `git worktree add <path> task/<id>`. Do not force-delete branches with unmerged work.
+If the loop's isolation manager refuses to delete a branch with unique commits, you must manually decide: (a) integrate the commits into base with `git checkout main && git merge --ff-only task/<id>`, or (b) re-bind the branch to a worktree path with `git worktree add <path> task/<id>`. Do not force-delete branches with unmerged work.
 
 #### State Migration To New Worktree
 
@@ -582,13 +592,18 @@ git checkout -- opencode.json
 
 This is not a task-execution failure — the task's code changed successfully, but `opencode.json` was rewritten by runtime and left dirty. The loop correctly detects this and exits cleanly rather than spinning. Option A is preferred; verify `.gitignore` has `opencode.json` before starting long unattended runs.
 
+Resume guard auto-resolution can clear `stale_running_without_process` with `--auto-resume-safe` when the saved PID is gone and no live loop owns the queue; use it for unattended recovery instead of forcing `--resume-existing-queue` blindly.
+
 ### Failure / Recovery
 
 | Symptom | Check | Fix |
 |---------|-------|-----|
 | `doctor --json` shows `ok: false` | Missing `opencode`, `jq`, or `git` | Install missing dependency |
-| Circuit breaker OPEN | 3+ no-progress or 5+ errors | `--auto-reset` on next start, or wait 30min cooldown |
+| Circuit breaker OPEN | 3+ no-progress or 5+ same errors | Default `--auto-reset` on next start, or wait 30min cooldown |
+| Circuit breaker `permanent_open` | 5 open/half-open cycles exhausted | Inspect repeated blocker, fix root cause, then reset breaker intentionally |
 | Task stuck `rejected` | `queue show --task ID --json` | Fix gate failure, `queue set-status --task ID --status todo --reason "retry"` |
+| Task auto-blocked | `attempt_count >= max_attempts` | Fix task cause, raise max attempts only if justified, then requeue |
+| Orphaned task with dirty files | `last_activity` > 10x timeout and worktree dirty | Engine reverts task work and resets to `todo`; inspect recovery logs |
 | Stale `index.lock` blocks worktree ops | `.git/index.lock` exists, no git process | `rm -f .git/index.lock` |
 | Worktree: branch exists, path missing | `git branch` shows branch, `git worktree list` doesn't | `git worktree add <path> <branch>` (re-bind) |
 | "Dirty working tree with no active task" | Completed task, `opencode.json` dirty | Loop exits `environment_blocked` (code 6). Gitignore `opencode.json` or absorb into commit |
@@ -596,7 +611,6 @@ This is not a task-execution failure — the task's code changed successfully, b
 | Supervisor says stale | No activity for `--stale-minutes` | Check `supervisor.log` |
 | WSL hooks can't find CLI | CLIs not in WSL PATH | Symlink: `ln -s $(which claude.exe) /usr/local/bin/claude` |
 | `plan` refuses overwrite | `queue.json` exists | Delete before re-import |
-| macOS `declare -A` error | `/bin/bash` is 3.2 | `brew install bash`, PATH priority |
 
 For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
