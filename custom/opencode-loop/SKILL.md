@@ -1,6 +1,6 @@
 ---
 name: opencode-loop
-description: "Use when the user wants opencode-loop — a Python-powered unattended coding engine — to run self-healing multi-iteration coding over a target project. Trigger on: 无人值守, 自动循环, 自动修 bug, 让大模型自己跑, overnight coding, autopilot coding, supervisor watchdog, self-healing loop, 全自动流水线, 从需求到代码, run opencode-loop, start the loop, gated queue, task-by-task execution. Also trigger for: build-verify-fix cycles, optimize/refactor repos, fix test/lint/type failures, bootstrap projects, queue-gated execute mode, verification/acceptance gates, OpenSpec/Task Master adapter import, gate failures and retries, circuit breaker, orphaned task, heartbeat install, worktree isolation. Do not trigger for one-shot debugging, generic for/while loops, or CI/CD pipeline setup."
+description: "Use when the user wants opencode-loop — a Python-powered unattended coding engine — to run self-healing multi-iteration coding over a target project. Trigger on: 无人值守, 自动循环, 自动修 bug, overnight coding, autopilot coding, self-healing loop, run opencode-loop, start the loop, gated queue, circuit breaker, orphaned task, heartbeat install, worktree isolation, build-verify-fix cycles, verification/acceptance gates. Do not trigger for one-shot debugging, generic loops, or CI/CD pipeline setup."
 ---
 
 # OpenCode Loop Skill
@@ -10,6 +10,8 @@ Use this skill to turn a natural language requirement into an autonomously execu
 ## How This Skill Works
 
 When the user gives you a requirement (e.g., "帮我写一个计算器库", "build a REST API", "add auth to my app"), you do this automatically:
+
+> **Summary** — these 6 steps are a high-level overview. `references/full-auto-pipeline.md` contains the complete three-layer workflow with all prerequisites, edge cases, and validation checkpoints. Load it before execution.
 
 1. **Read `references/full-auto-pipeline.md`** — it contains the complete three-layer workflow. Load it now and follow it end-to-end.
 2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
@@ -33,6 +35,8 @@ Clarify if unclear:
 - Safety boundary: files or directories the loop must not modify.
 
 Everything else (proposal, tasks, gates) you handle autonomously.
+
+**Pre-flight check:** Before starting any unattended run, ensure `opencode.json` is in the target project's `.gitignore`. `setup.sh` generates this file at runtime — if it is not gitignored, the loop exits with `environment_blocked` (exit code 6) after the first task commits. Verify with: `grep -q '^opencode.json$' /path/to/target/.gitignore || echo 'opencode.json' >> /path/to/target/.gitignore`
 
 ## Full Auto Workspace Policy
 
@@ -148,10 +152,10 @@ Profile defaults match the original Bash behavior: `quick` = 3 iterations/15min/
 Use the core script when the user needs advanced flags:
 
 ```bash
-bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 5 --timeout 15 --auto-reset
+bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 5 --timeout 15
 ```
 
-`--auto-reset` is now the default startup behavior; keep it in older command snippets only for explicitness.
+Note: `--auto-reset` (circuit breaker reset on startup) is now the default. Use `--no-auto-reset` to opt out. All examples below omit it since it is implied.
 
 For longer runs, prefer the supervisor:
 
@@ -168,7 +172,7 @@ opencode-loop next-command --dir /path/to/target --kind supervisor --profile exe
 
 That command keeps the supervisor parent alive after the current terminal/session disconnects. For `execute` profile, tmux-wrapped `next-command` defaults stale detection to `1440` minutes; override with `--stale-minutes N` only after confirming the target's verification time.
 
-### 3b. Productized Cron/Heartbeat Guard
+### 4. Productized Cron/Heartbeat Guard
 
 For any run the user expects to keep going unattended, the supervisor is necessary but not sufficient. Always add an outer cron/heartbeat guard unless the user explicitly declines it. This guard is responsible for cases where the shell, supervisor, controller repo, queue contract, or wrapper breaks and no local child process remains alive to self-restart.
 
@@ -195,12 +199,10 @@ Key core-script flags:
 - `--timeout MIN` — per-iteration timeout.
 - `--mode dev|ml|execute` — route selection.
 - `--program FILE` — custom program prompt.
-- `--auto-reset` — reset circuit breaker on startup; default is enabled.
-- `--no-auto-reset` — opt out of startup circuit-breaker reset.
 - `--session-mode single|multi|auto|clean` — session strategy.
 - `--session-rotate N` — iterations per session in multi mode.
 
-### 4. Monitor
+### 5. Monitor
 
 Use `status --json` as the primary summary view — it merges all runtime state into one JSON object:
 
@@ -208,15 +210,7 @@ Use `status --json` as the primary summary view — it merges all runtime state 
 opencode-loop status --dir /path/to/target --json
 ```
 
-The JSON output includes:
-- `state` — iteration count, status, session ID from `state.json`
-- `runtime` — PID, process state, active config, last exit reason from `runtime.json`
-- `control` — desired state (running/stopped) and pending config from `control.json`
-- `circuit_breaker` — breaker state (closed/open/half_open/permanent_open) from `circuit_breaker.json`
-- `process_check` — PID liveness for loop, supervisor, and child processes
-- `process_alive` — convenience boolean: is the main loop process actually running?
-- `warning` — stale-running detection (state says running but process is dead)
-- `logs` — paths to `progress.txt`, `supervisor.log`, `supervisor-child.log`
+The JSON output merges all runtime state: `state`, `runtime`, `control`, `circuit_breaker`, `process_check`, `process_alive`, `warning`, `logs`.
 
 Do not treat `status --json` as liveness ground truth by itself. When a run looks stuck or inconsistent, use this order:
 
@@ -240,112 +234,20 @@ Watch for abnormal progress, not only dead processes. These are heartbeat-worthy
 - Progress shows `queue_inconsistent:rejected_exhausted` or repeated manual requeues.
 - The latest hook log repeats the same reviewer reason, so the model is likely receiving too vague a repair objective.
 
-The Python engine records iteration epilogue health with `cb_record_progress(has_progress, has_error, error_msg)`. The breaker opens after 3 consecutive no-progress iterations or 5 repeated same-error iterations, cools down for 30 minutes, and enters `permanent_open` after `MAX_OPEN_CYCLES=5` open/half-open loops.
-
-Self-healing is built into state handling: orphaned tasks with no dirty files reset to `todo` after 2x timeout, orphaned tasks with dirty files are reverted and reset after 10x timeout, tasks are auto-blocked when `attempt_count >= max_attempts`, and state writes use atomic tmpfile-plus-rename semantics.
+The Python engine self-heals through: circuit breaker (`cb_record_progress`), orphaned task recovery (2x/10x timeout thresholds), auto-blocking at `max_attempts`, and atomic state writes. See `references/hooks-and-recovery.md` for the full self-repair protocol.
 
 In those cases, do not simply relaunch. Back up `queue.json` and task-worktree diffs, stop blind retries if they are burning time, read the newest `gate-review` hook stdout JSON and the affected task's `last_error`, then write a targeted recovery prompt such as "fix duplicate status/session handler registration in OpenCodeAdapter" rather than "continue the task". If the failure is a controller/heartbeat behavior gap, fix and deploy `opencode-loop` first, then resume the target queue.
 
 Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/state.json`, `.opencode-loop/runtime.json`, `.opencode-loop/logs/`, `.opencode-loop/output-*.jsonl`, and `.opencode-loop/stderr-*.log`.
 
-### Self-Repair / Self-Evolution Protocol
+### Self-Repair and Hooks
 
-Use this low-freedom sequence when a stalled run reveals an `opencode-loop` controller, heartbeat, queue-contract, or skill gap. Do not skip to relaunching the target loop.
+For the complete self-repair protocol (7-step evolution loop for stalled runs) and optional hooks configuration (reviewer detection, two-layer validation, install-review/install-recovery), **read `references/hooks-and-recovery.md`**.
 
-1. Freeze blind retries:
-   ```bash
-   opencode-loop status --dir /path/to/target --json
-   opencode-loop observe --dir /path/to/target --json
-   opencode-loop heartbeat status --dir /path/to/target --json
-   ```
-2. Preserve evidence and task work before touching controller or target state:
-   ```bash
-   mkdir -p /path/to/target/.opencode-loop/recovery/$(date -u +%Y%m%dT%H%M%SZ)
-   git -C /path/to/target status --short --branch
-   git -C /path/to/target diff --stat
-   ```
-3. Extract the first concrete blocker from the latest progress/output/stderr/supervisor/gate logs and queue `last_error`. The next model prompt must name that blocker, not say "continue".
-4. If the blocker is controller-side, fix the `opencode-loop` source first. Run the narrow relevant test, then `bash bin/test.sh` when feasible. Prepend the lesson to `docs/pitfalls-and-lessons.md`, commit, and deploy:
-   ```bash
-   bash bin/install-cli.sh
-   opencode-loop heartbeat refresh --dir /path/to/target --interval-minutes 10
-   ```
-5. If the blocker is skill-side, update this skill only after reading `$skill-creator`:
-   ```bash
-   sed -n '1,220p' "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/SKILL.md"
-   "${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py" /path/to/my-skills/custom/opencode-loop
-   ```
-   Keep fragile recovery steps low-freedom with exact commands. After validation, commit the skill repo change.
-6. Deploy the refreshed skill to any dedicated target worktree that carries a repo-local copy:
-   ```bash
-   mkdir -p /path/to/target/.codex/skills/opencode-loop
-   cp /path/to/my-skills/custom/opencode-loop/SKILL.md /path/to/target/.codex/skills/opencode-loop/SKILL.md
-   ```
-7. Resume only the original queue:
-   ```bash
-   opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --resume-existing-queue
-   opencode-loop status --dir /path/to/target --json
-   ```
+Key flags:
 
-The intended evolution loop is: detect trap → repair controller/skill → validate → commit → install wrapper → refresh scheduler snapshot → deploy target-local skill → resume the same queue. Treat a stale heartbeat snapshot as an undeployed fix.
-
-For `environment_blocked` after `Isolation integration conflict`, do not reset the target root. Preserve the root diff, verify dirty files match the blocked task's `scope_paths`, and use the controller's blocked-integration dirty-scope recovery path. The safe target-side shape is a blocked task with `last_error/status_reason` containing `integration conflict` plus dirty files owned by that same task. Anything else needs manual diagnosis before resuming.
-
-### 5. Optional Hooks
-
-Normal hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted. Do not confuse these with execute mode's `gate-review` blocking gate hook: that hook is consumed by the review gate, and a missing or failing `gate-review` makes the gate unavailable/fail instead of merely warning.
-
-For execute review gates, do not write reviewer scripts that only inspect raw `git diff` from the worktree. A task may already be committed and clean when the review gate runs. Use the gate-provided review context first:
-
-- `OPENCODE_LOOP_REVIEW_DIFF_FILE`
-- `OPENCODE_LOOP_REVIEW_STAT_FILE`
-- `OPENCODE_LOOP_REVIEW_CHANGED_FILES_FILE`
-- `OPENCODE_LOOP_REVIEW_CONTEXT_FILE`
-- `OPENCODE_LOOP_REVIEW_DIFF_RANGE`
-
-These files represent the task branch/worktree diff that should be reviewed, including committed clean states.
-
-**Detect reviewer commands before adding hooks.** Commands vary across machines:
-
-```bash
-# Detect Kimi CLI (may be `kimi` or `kimi-code`)
-KIMI_CMD=$(command -v kimi-code 2>/dev/null || command -v kimi 2>/dev/null || echo "")
-CLAUDE_CMD=$(command -v claude 2>/dev/null || echo "")
-CODEX_CMD=$(command -v codex 2>/dev/null || echo "")
-```
-
-```bash
-opencode-loop hooks add --dir /path/to/target --event pre_iteration \
-  --name kimi-ui --command "$KIMI_CMD --dir \"\$OPENCODE_LOOP_TARGET_DIR\" \"Review UI\"" --attempts 3
-opencode-loop hooks add --dir /path/to/target --event post_iteration \
-  --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Review"' --attempts 3
-opencode-loop hooks add --dir /path/to/target --event post_iteration \
-  --name claude-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review code changes."' --attempts 3
-opencode-loop hooks install-review --dir /path/to/target --codex-bin codex --timeout 1800
-opencode-loop hooks install-recovery --dir /path/to/target --codex-bin codex --timeout 900
-opencode-loop hooks list --dir /path/to/target --json
-```
-
-**Validate hooks in two layers.** `hooks test` may hang on slow reviewers — validate the reviewer command directly first:
-
-```bash
-# Layer 1: Validate reviewer produces valid output independently
-$KIMI_CMD --print --final-message-only --cwd /path/to/target "Output ONLY JSON: {\"result\":\"pass\"}"
-# Expected: {"result":"pass"}
-
-# Layer 2 (supplementary): hooks test confirms wiring
-# Use a timeout — it can hang if the reviewer takes >30s
-timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --iteration 0
-timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --recovery
-```
-
-Do not treat `hooks test` as the sole gate-keper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook is still functional.
-
-For Full Auto execute queues, install the recovery hook before starting the supervisor. The helper only writes `.opencode-loop/gate-recovery-review-codex.sh` and `hooks.json`; it does not call Codex during setup. During execution, Codex is called only after a failed gate to decide whether a narrow queue contract can be repaired safely, for example by adding precise supporting tests to `scope_paths`.
-
-For Full Auto queues that require review, prefer `hooks install-review` over hand-written review scripts. The installed `gate-review` reads opencode-loop's review diff/context files, so committed clean task worktrees remain reviewable instead of being misclassified as "no diff".
-
-For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
+- `--no-auto-reset` — opt out of startup circuit-breaker reset (default is enabled).
+- `--auto-resume-safe` — auto-resolve `stale_running_without_process` when no live loop owns the queue.
 
 ## Queue-Gated Execute Mode
 
@@ -435,7 +337,7 @@ Promotion checks queue integrity and valid verification configuration.
 opencode-loop init --dir /path/to/target --mode execute
 opencode-loop start --dir /path/to/target --profile execute
 
-bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 30 --timeout 60 --session-mode multi --session-rotate 5 --auto-reset
+bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 30 --timeout 60 --session-mode multi --session-rotate 5
 ```
 
 Gate order stays fixed:
@@ -515,7 +417,7 @@ Resume guard auto-resolution can clear `stale_running_without_process` with `--a
 | WSL hooks can't find CLI | CLIs not in WSL PATH | Symlink: `ln -s $(which claude.exe) /usr/local/bin/claude` |
 | `plan` refuses overwrite | `queue.json` exists | Delete before re-import |
 
-For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
+For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`. For accumulated operational debugging knowledge (8 rounds of real-world failure analysis), see `references/opencode-loop-pitfalls-summary.local.md`.
 
 ## TUI Workflow
 
@@ -543,8 +445,10 @@ bash bin/opencode-loop-tui.sh --dir /path/to/target
 macOS:
 
 ```bash
-open "/Volumes/SDD2T/obsidian-vault-write/open-source-project/autonomous-ai-agents/agent-loops/opencode-loop/OpenCode Loop TUI.command"
+open "<opencode-loop-repo>/OpenCode Loop TUI.command"
 ```
+
+Replace `<opencode-loop-repo>` with the actual clone path.
 
 Windows:
 
