@@ -1,0 +1,4 @@
+interface:
+  display_name: "PDF TOC Bookmarker"
+  short_description: "Create PDF bookmarks from scanned table-of-contents pages."
+  default_prompt: "Create bookmarks for this PDF from its scanned table of contents. Require the PDF path, TOC page range, and the actual PDF page where printed page 1 begins before writing a new file."
