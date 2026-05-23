@@ -22,6 +22,8 @@ offset = printed_page_1_pdf_page - 1
 target_pdf_page = printed_page + offset
 ```
 
+Also create a top-level bookmark named `目录` that targets the first page in `toc_pages`. This lets the PDF outline jump back to the scanned table of contents for a full-book overview. Do not include this `目录` entry in `toc_items.json`; add it when writing the outline.
+
 ## Workflow
 
 1. Verify the PDF exists and inspect page count.
@@ -48,12 +50,13 @@ Rules for the subagent:
    - search for `[?]`,
    - confirm printed pages are nondecreasing unless the book visibly resets numbering,
    - confirm `printed_page + offset` stays within the PDF page count.
-8. Write a new PDF with `scripts/write_pdf_outline.py`.
+8. Write a new PDF with `scripts/write_pdf_outline.py`, passing `--toc-page <first TOC page>` so the first bookmark is `目录`.
 9. Reopen the output PDF and verify:
 - output exists,
 - page count is unchanged,
-- TOC count matches JSON item count,
-- first and last bookmark targets are in range.
+- TOC count matches JSON item count plus the `目录` bookmark,
+- first bookmark targets the first TOC page,
+- last bookmark target is in range.
 
 ## Scripts
 
@@ -68,7 +71,7 @@ python scripts/render_toc_pages.py --pdf "C:\path\book.pdf" --pages 11-16 --out 
 Write outline:
 
 ```bash
-python scripts/write_pdf_outline.py --pdf "C:\path\book.pdf" --toc-json "C:\path\work\toc_items.json" --printed-page-1-pdf-page 17 --out "C:\path\book.with-toc.pdf"
+python scripts/write_pdf_outline.py --pdf "C:\path\book.pdf" --toc-json "C:\path\work\toc_items.json" --printed-page-1-pdf-page 17 --toc-page 11 --out "C:\path\book.with-toc.pdf"
 ```
 
 If `--out` is omitted, write next to the input PDF using `.with-toc.pdf`.

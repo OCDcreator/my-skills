@@ -23,6 +23,7 @@ SKILL_SOURCES=(
   "claude-plugins-official|https://github.com/anthropics/claude-plugins-official.git|main|."
   "axton-obsidian-visual-skills|https://github.com/axtonliu/axton-obsidian-visual-skills.git|main|."
   "baoyu-skills|https://github.com/JimLiu/baoyu-skills.git|main|skills"
+  "deep-research-skills|https://github.com/Weizhena/Deep-Research-skills.git|main|skills|preserve"
   "kepano-obsidian-skills|https://github.com/kepano/obsidian-skills.git|main|skills"
   "taste-skill|https://github.com/Leonxlnx/taste-skill.git|main|skills"
   "html-ppt-skill|https://github.com/lewislulu/html-ppt-skill.git|main|."
@@ -208,7 +209,7 @@ echo
 source_index=0
 for source in "${SKILL_SOURCES[@]}"; do
   source_index=$((source_index + 1))
-  IFS='|' read -r prefix url branch search_root <<< "$source"
+  IFS='|' read -r prefix url branch search_root copy_mode <<< "$source"
 
   echo "[技能 $source_index/${#SKILL_SOURCES[@]}] $prefix"
   clone_dir="$TMP_DIR/$prefix"
@@ -232,6 +233,24 @@ for source in "${SKILL_SOURCES[@]}"; do
 
   rm -rf "$REPO_DIR/external/$prefix"
   mkdir -p "$REPO_DIR/external/$prefix"
+  if [ "$copy_mode" = "preserve" ]; then
+    cp -R "$search_path"/. "$REPO_DIR/external/$prefix/$search_root"
+    for support_dir in agents agents-codex scripts; do
+      if [ -d "$clone_dir/$support_dir" ]; then
+        cp -R "$clone_dir/$support_dir" "$REPO_DIR/external/$prefix/$support_dir"
+      fi
+    done
+    for support_file in README.md README.zh.md LICENSE workflow.png; do
+      if [ -f "$clone_dir/$support_file" ]; then
+        cp "$clone_dir/$support_file" "$REPO_DIR/external/$prefix/$support_file"
+      fi
+    done
+    copied="$(find "$search_path" -name "SKILL.md" | wc -l | tr -d ' ')"
+    echo "[OK] $prefix 已保留相对路径复制 $copied 个技能"
+    echo
+    continue
+  fi
+
   copied=0
   while IFS= read -r skill_dir; do
     skill_dir="${skill_dir%/}"

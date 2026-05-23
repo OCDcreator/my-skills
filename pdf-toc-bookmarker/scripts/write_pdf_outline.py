@@ -45,6 +45,16 @@ def main() -> int:
         type=int,
         help="Actual PDF page where printed page 1 begins",
     )
+    parser.add_argument(
+        "--toc-page",
+        type=int,
+        help="Actual PDF page where the table of contents begins. Adds a top-level TOC bookmark.",
+    )
+    parser.add_argument(
+        "--toc-title",
+        default="目录",
+        help='Title for the table-of-contents bookmark. Defaults to "目录".',
+    )
     parser.add_argument("--out", help="Output PDF path. Defaults to <input>.with-toc.pdf")
     parser.add_argument("--keep-raw-levels", action="store_true", help="Do not normalize levels by title pattern")
     args = parser.parse_args()
@@ -71,6 +81,16 @@ def main() -> int:
     uncertain_titles: list[tuple[int, str]] = []
     decreasing_pages: list[tuple[int, int, int, str]] = []
     try:
+        if args.toc_page is not None:
+            if not (1 <= args.toc_page <= doc.page_count):
+                raise SystemExit(
+                    f"TOC bookmark target out of range: toc_page={args.toc_page}, page_count={doc.page_count}"
+                )
+            toc_title = str(args.toc_title).strip()
+            if not toc_title:
+                raise SystemExit("TOC bookmark title must not be empty")
+            outline.append([1, toc_title, args.toc_page])
+
         for index, item in enumerate(items, start=1):
             if not isinstance(item, dict):
                 raise SystemExit(f"Item {index} is not an object")
@@ -95,7 +115,7 @@ def main() -> int:
             else:
                 level = normalize_level(title, item.get("level", 1))
 
-            if not outline:
+            if len(outline) == 0:
                 level = 1
             elif level > previous_level + 1:
                 level = previous_level + 1

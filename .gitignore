@@ -2,6 +2,11 @@
 .tmp-skills/
 __pycache__/
 *.pyc
+
+# Local secrets and API credentials
+**/.env
+**/.env.*
+
 automation/runtime/
 custom/knowledge-to-print-html/artifacts/
 custom/knowledge-to-print-html/evals/

@@ -38,14 +38,15 @@ my-skills/
 │   ├── baoyu-skills/                          # 宝玉中文技能
 │   ├── claude-plugins-official/               # Anthropic 插件技能
 │   ├── axton-obsidian-visual-skills/          # Obsidian 可视化技能
+│   ├── deep-research-skills/                  # Deep Research 结构化调研技能（Claude/OpenCode/Codex）
 │   ├── kepano-obsidian-skills/                # Obsidian 官方 CLI/Canvas 技能
 │   ├── taste-skill/                            # 高级前端设计技能（多风格）
 │   ├── html-ppt-skill/                          # HTML PPT 演示文稿生成技能
 │   ├── ui-ux-pro-max-skill/                    # UI/UX Pro Max 设计智能工具包（7 技能）
 │   └── awesome-design-md/                       # 品牌/产品风格参考索引（getdesign.md 按需读取）
-├── update.sh / update.bat                     # 同步外部技能与设计参考源
-├── pull.sh / pull.bat                         # 拉取远端覆盖本地
-└── push.sh / push.bat                         # 提交推送
+├── update.sh / update.ps1                     # 同步外部技能与设计参考源
+├── pull.sh / pull.ps1                         # 拉取远端覆盖本地
+└── push.sh / push.ps1                         # 提交推送
 ```
 
 ## 自有技能 (custom/)
@@ -85,6 +86,7 @@ my-skills/
 | `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills) | 宝玉的中文技能 |
 | `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) | Anthropic 官方插件技能 |
 | `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills) | Obsidian 可视化技能 |
+| `external/deep-research-skills/` | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills) | 结构化深度调研工作流技能，保留 `research-*` 语言/平台分组和配套 agents/scripts |
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 Markdown/Bases/Canvas/CLI 技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 高级前端设计技能（多风格、参数可调） |
 | `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill) | HTML PPT 演示文稿生成技能（多主题/布局/动画） |
@@ -100,11 +102,11 @@ my-skills/
 
 | 脚本 | 说明 |
 |------|------|
-| `update.sh` / `update.bat` | 同步 `external/` 下的外部技能与设计参考源 → 自动 commit & push |
-| `pull.sh` / `pull.bat` | 拉取远端仓库覆盖本地 |
-| `push.sh` / `push.bat` | 提交所有变更并推送到远端 |
+| `update.sh` / `update.ps1` | 同步 `external/` 下的外部技能与设计参考源 → 自动 commit & push |
+| `pull.sh` / `pull.ps1` | 拉取远端仓库覆盖本地 |
+| `push.sh` / `push.ps1` | 提交所有变更并推送到远端 |
 
 ### 使用方式
 
 - **macOS / Linux**: 运行 `.sh` 脚本
-- **Windows**: 双击 `.bat` 文件（需安装 Git）
+- **Windows**: 运行 `.ps1` 文件（需安装 Git）

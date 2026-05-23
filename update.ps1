@@ -158,6 +158,7 @@ try {
         @{ Name = "claude-plugins-official"; Url = "https://github.com/anthropics/claude-plugins-official.git"; Branch = "main"; SourceDir = "plugins" },
         @{ Name = "baoyu-skills"; Url = "https://github.com/JimLiu/baoyu-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "axton-obsidian-visual-skills"; Url = "https://github.com/axtonliu/axton-obsidian-visual-skills.git"; Branch = "main"; SourceDir = "." },
+        @{ Name = "deep-research-skills"; Url = "https://github.com/Weizhena/Deep-Research-skills.git"; Branch = "main"; SourceDir = "skills"; CopyMode = "preserve" },
         @{ Name = "kepano-obsidian-skills"; Url = "https://github.com/kepano/obsidian-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "taste-skill"; Url = "https://github.com/Leonxlnx/taste-skill.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "html-ppt-skill"; Url = "https://github.com/lewislulu/html-ppt-skill.git"; Branch = "main"; SourceDir = "SKILL.md" },
@@ -200,7 +201,24 @@ try {
         }
         New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
 
-        if ($Src.SourceDir -eq ".") {
+        if ($Src.CopyMode -eq "preserve") {
+            $PreservedSourceDir = Join-Path $TargetDir $Src.SourceDir
+            New-Item -ItemType Directory -Path $PreservedSourceDir -Force | Out-Null
+            Copy-Item -Recurse -Force "$SourcePath\*" $PreservedSourceDir
+
+            foreach ($SupportDir in @("agents", "agents-codex", "scripts")) {
+                $SupportPath = Join-Path $CloneDir $SupportDir
+                if (Test-Path $SupportPath) {
+                    Copy-Item -Recurse -Force $SupportPath (Join-Path $TargetDir $SupportDir)
+                }
+            }
+            foreach ($SupportFile in @("README.md", "README.zh.md", "LICENSE", "workflow.png")) {
+                $SupportPath = Join-Path $CloneDir $SupportFile
+                if (Test-Path $SupportPath) {
+                    Copy-Item -Force $SupportPath $TargetDir
+                }
+            }
+        } elseif ($Src.SourceDir -eq ".") {
             # 根目录：复制所有包含 SKILL.md 的子目录
             Get-ChildItem -Directory $SourcePath | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object {
                 $Dest = Join-Path $TargetDir $_.Name
