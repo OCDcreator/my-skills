@@ -1,6 +1,6 @@
 ---
 name: skill-catalog-maintainer
-description: Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, rename, or maintain skills and their metadata, or to update `SKILLS.md`, `README.md`, `AGENTS.md`, `update.sh`, or `update.bat` after skill changes.
+description: Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, rename, or maintain skills and their metadata, or to update `SKILLS.md`, `README.md`, `AGENTS.md`, `update.sh`, or `update.ps1` after skill changes.
 ---
 
 # Skill Catalog Maintainer
@@ -22,7 +22,7 @@ This skill is for catalog maintenance. If the immediate job is to decide which s
 
 ## Inventory Workflow
 
-1. Read `README.md`, `AGENTS.md`, `update.sh`, and `update.bat` first.
+1. Read `README.md`, `AGENTS.md`, `update.sh`, and `update.ps1` first.
 2. Find skills with `custom/**/SKILL.md` and `external/**/SKILL.md`; do not assume either tree is flat.
 3. For each `SKILL.md`, extract frontmatter `name` and `description` before reading the full body.
 4. Preserve both path and source because different external sources may contain skills with the same `name`.
@@ -143,7 +143,7 @@ When adding or removing a skill, update all relevant files in the same change:
 | Change | Required updates |
 |--------|------------------|
 | Custom skill | `custom/<path>/SKILL.md`, `README.md` tree/table, `SKILLS.md` |
-| External source | `external/<source>/`, `update.sh`, `update.bat`, `README.md`, `SKILLS.md` with source repo/subdir info |
+| External source | `external/<source>/`, `update.sh`, `update.ps1`, `README.md`, `SKILLS.md` with source repo/subdir info |
 | Skill rename/move | Any links in `README.md`, `SKILLS.md`, and `AGENTS.md` that mention the old path |
 | Workflow rule change | `AGENTS.md` |
 
@@ -153,8 +153,8 @@ When adding or removing a skill, update all relevant files in the same change:
 - External sources can duplicate skill names; catalog by `path + name`, not name alone.
 - Recommendation output must include a clone/copy source. A local path alone is not enough for project-specific installation.
 - Project install guidance should name agent-specific directories. Do not say only "copy to the project" without specifying `.claude/skills`, `.agents/skills`, or `.opencode/skills`.
-- `update.sh` auto-discovers skill dirs under each source's configured subdir; `update.bat` mirrors this manually.
-- `update.sh` has `EXCLUDE_NAMES`; `update.bat` may not have equivalent filtering. Document this asymmetry when it affects catalog completeness.
+- `update.sh` auto-discovers skill dirs under each source's configured subdir; `update.ps1` mirrors this manually.
+- `update.sh` and `update.ps1` must keep `EXCLUDE_NAMES` equivalent so example/template skills do not reappear from one platform.
 - Do not list every upstream README or asset as a skill. A skill is a directory containing `SKILL.md`.
 
 ## Verification
@@ -163,8 +163,9 @@ Before saying the catalog is current:
 
 1. Count current `SKILL.md` files in `custom/` and `external/`.
 2. Check that new/removed skill paths are reflected in `README.md` and `SKILLS.md`.
-3. For external source changes, verify `update.sh` and `update.bat` both mention the source and that `.bat` counters are consistent.
-4. Run `git diff --name-status` to confirm only intended catalog, docs, script, and skill files changed.
+3. For external source changes, verify `update.sh` and `update.ps1` both mention the source and that copy modes and exclusions are consistent.
+4. Run `python3 scripts/generate_skills_catalog.py` if the skill set changed.
+5. Run `python3 scripts/verify_structure.py` and `git diff --name-status` to confirm only intended catalog, docs, script, and skill files changed.
 
 ## Output Style
 

@@ -3,7 +3,7 @@
 ## Repo overview
 
 my-skills is a Git-based collection of AI agent skills and external reference libraries. No build/test/lint steps.
-Two top-level directories: `custom/` (self-authored skills) and `external/` (cloned upstream skill sources and reference sources).
+The two main skill trees are `custom/` (self-authored skills) and `external/` (cloned upstream skill sources and reference sources). Repo-local automation and status docs live in `automation/` and `docs/`; utility scripts live in `scripts/`.
 
 ## When adding a new skill
 
@@ -15,7 +15,8 @@ Two top-level directories: `custom/` (self-authored skills) and `external/` (clo
 4. Update `README.md`: add entry to directory tree + custom skill table
 5. If `SKILLS.md` exists or the user asks for a skill catalog or catalog maintenance, use `custom/skill-catalog-maintainer` and include source repo/subdir/install hints in the catalog
    - For project-specific recommendations, install hints should name target paths for Claude Code (`.claude/skills`), OpenCode (`.opencode/skills`), and/or Codex (`.agents/skills`)
-6. Commit and push
+6. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
+7. Commit and push
 
 ### External skill (`external/`)
 
@@ -36,6 +37,7 @@ When adding a new external source, **all four files** must be updated:
    - External sources table (columns: local dir, source repo link, description)
    - Source count in the `update.sh` / `update.ps1` row of the scripts table
 5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`; external entries should keep source repo, branch, subdir, and install hints. Project install hints should mention `.claude/skills`, `.agents/skills`, and `.opencode/skills` where relevant.
+6. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
 
 ### External reference source (`external/`)
 
@@ -47,6 +49,7 @@ When adding a new external reference source, update all four files:
 2. **`update.sh`** — append to `REFERENCE_SOURCES` and keep the copy logic aligned with the upstream structure
 3. **`update.ps1`** — add the matching Windows clone+copy block and keep the reference counters consistent
 4. **`README.md`** — update the directory tree, the external reference table, and the update-script description if the wording changes
+5. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
 
 Reference-source rules:
 
@@ -57,7 +60,7 @@ Reference-source rules:
 ## Gotchas
 
 - **`update.ps1` mirrors `.sh` manually**: there is no code generation; any change to `.sh` must be replicated to `.ps1` by hand.
-- **`EXCLUDE_NAMES` only in `update.sh`**: the `.sh` script filters out excluded skill names; keep `.ps1` behavior in mind when adding excluded examples or templates.
+- **`EXCLUDE_NAMES` must match in `update.sh` and `update.ps1`**: both scripts filter excluded skill names; keep the arrays and behavior aligned.
 - **`external/<name>/` structure varies by source**: some sources put skill dirs directly under the cloned root (subdir=`.`), others use a `skills/` subdirectory (subdir=`skills`). The `update.sh` `SKILL_SOURCES` `subdir` field controls this.
 - **Duplicate leaf skill names need `preserve` mode**: sources like deep-research-skills contain repeated names under language/platform groups, so keep the relative source path instead of flattening.
 - **Duplicate skill names are normal**: catalog external skills by path and source, not by `name` alone.
@@ -73,6 +76,7 @@ Reference-source rules:
 - `.sh` is canonical; `.ps1` mirrors for Windows
 - `update.sh` uses `SKILL_SOURCES` and `REFERENCE_SOURCES`; `update.ps1` mirrors them manually with PowerShell clone/copy blocks
 - Temp clone directory: `.tmp-skills/` (gitignored)
+- `scripts/generate_skills_catalog.py` regenerates `SKILLS.md`; `scripts/verify_structure.py` is the lightweight structure gate
 
 ## Conventions
 
@@ -80,3 +84,4 @@ Reference-source rules:
 - Remote: `origin` → `git@github.com:OCDcreator/my-skills.git`
 - No dependencies, no package manager, no build system
 - Every skill must contain a `SKILL.md` at its directory root
+- Self-authored skills belong under `custom/`; do not add root-level skill directories

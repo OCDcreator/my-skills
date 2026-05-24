@@ -60,6 +60,19 @@ function Invoke-Git {
     return $stdout.Trim()
 }
 
+function Test-ExcludedSkillName {
+    param(
+        [string]$SkillName,
+        [string[]]$ExcludeNames
+    )
+    foreach ($Excluded in $ExcludeNames) {
+        if ($SkillName.StartsWith($Excluded, [System.StringComparison]::Ordinal)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 # --- 主流程 ---
 try {
     Write-Line
@@ -155,14 +168,20 @@ try {
     $SkillSources = @(
         @{ Name = "anthropics-skills"; Url = "https://github.com/anthropics/skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "awesome-claude-skills"; Url = "https://github.com/ComposioHQ/awesome-claude-skills.git"; Branch = "master"; SourceDir = "." },
-        @{ Name = "claude-plugins-official"; Url = "https://github.com/anthropics/claude-plugins-official.git"; Branch = "main"; SourceDir = "plugins" },
+        @{ Name = "claude-plugins-official"; Url = "https://github.com/anthropics/claude-plugins-official.git"; Branch = "main"; SourceDir = "." },
         @{ Name = "baoyu-skills"; Url = "https://github.com/JimLiu/baoyu-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "axton-obsidian-visual-skills"; Url = "https://github.com/axtonliu/axton-obsidian-visual-skills.git"; Branch = "main"; SourceDir = "." },
         @{ Name = "deep-research-skills"; Url = "https://github.com/Weizhena/Deep-Research-skills.git"; Branch = "main"; SourceDir = "skills"; CopyMode = "preserve" },
         @{ Name = "kepano-obsidian-skills"; Url = "https://github.com/kepano/obsidian-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "taste-skill"; Url = "https://github.com/Leonxlnx/taste-skill.git"; Branch = "main"; SourceDir = "skills" },
-        @{ Name = "html-ppt-skill"; Url = "https://github.com/lewislulu/html-ppt-skill.git"; Branch = "main"; SourceDir = "SKILL.md" },
+        @{ Name = "html-ppt-skill"; Url = "https://github.com/lewislulu/html-ppt-skill.git"; Branch = "main"; SourceDir = "." },
         @{ Name = "ui-ux-pro-max-skill"; Url = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git"; Branch = "main"; SourceDir = ".claude/skills" }
+    )
+    $ExcludeNames = @(
+        "composio-skills",
+        "template-skill",
+        "example-command",
+        "example-skill"
     )
 
     $SkillIndex = 1
@@ -218,39 +237,24 @@ try {
                     Copy-Item -Force $SupportPath $TargetDir
                 }
             }
-        } elseif ($Src.SourceDir -eq ".") {
-            # 根目录：复制所有包含 SKILL.md 的子目录
-            Get-ChildItem -Directory $SourcePath | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object {
-                $Dest = Join-Path $TargetDir $_.Name
-                Copy-Item -Recurse -Force $_.FullName $Dest
-            }
-        } elseif ($Src.SourceDir -eq "SKILL.md") {
-            # 单文件技能：复制整个仓库（去除 .git）
-            if (Test-Path (Join-Path $CloneDir ".git")) {
-                Remove-Item -Recurse -Force (Join-Path $CloneDir ".git")
-            }
-            Copy-Item -Recurse -Force "$CloneDir\*" $TargetDir
-        } elseif ($Src.Name -eq "claude-plugins-official") {
-            # 特殊处理：plugins/<plugin>/skills/<skill>/SKILL.md 和 external_plugins/<plugin>/skills/<skill>/SKILL.md
-            foreach ($SubDir in @("plugins", "external_plugins")) {
-                $SubPath = Join-Path $CloneDir $SubDir
-                if (Test-Path $SubPath) {
-                    Get-ChildItem -Directory $SubPath | ForEach-Object {
-                        $SkillsPath = Join-Path $_.FullName "skills"
-                        if (Test-Path $SkillsPath) {
-                            Get-ChildItem -Directory $SkillsPath | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object {
-                                $Dest = Join-Path $TargetDir $_.Name
-                                Copy-Item -Recurse -Force $_.FullName $Dest
+        } else {
+            # 标准：递归复制 SourceDir 下所有包含 SKILL.md 的技能目录。
+            Get-ChildItem -Path $SourcePath -Recurse -Filter "SKILL.md" -File |
+                Sort-Object FullName |
+                ForEach-Object {
+                    $SkillDir = $_.Directory.FullName
+                    $SkillName = Split-Path -Leaf $SkillDir
+                    if (-not (Test-ExcludedSkillName -SkillName $SkillName -ExcludeNames $ExcludeNames)) {
+                        if ($SkillDir -eq $CloneDir) {
+                            Copy-Item -Recurse -Force (Join-Path $SkillDir "*") $TargetDir
+                        } else {
+                            $Dest = Join-Path $TargetDir $SkillName
+                            if (Test-Path $Dest) {
+                                Remove-Item -Recurse -Force $Dest
                             }
+                            Copy-Item -Recurse -Force $SkillDir $Dest
                         }
                     }
-                }
-            }
-        } else {
-            # 标准：复制 SourceDir 下包含 SKILL.md 的子目录
-            Get-ChildItem -Directory $SourcePath | Where-Object { Test-Path (Join-Path $_.FullName "SKILL.md") } | ForEach-Object {
-                $Dest = Join-Path $TargetDir $_.Name
-                Copy-Item -Recurse -Force $_.FullName $Dest
             }
         }
 
