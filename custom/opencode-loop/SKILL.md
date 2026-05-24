@@ -56,8 +56,8 @@ When already inside the `opencode-loop` repository, use the current repo root. O
 - On Windows, prefer WSL for Bash-facing workflows.
 - Known Windows repo pattern for this environment: `C:\Users\lt\Desktop\Write\open-source-project\autonomous-ai-agents\agent-loops\opencode-loop`.
 - Requires Python >= 3.11; the engine uses only stdlib modules.
-
-The Python engine at `engine/` handles orchestration. `opencode-loop.sh` and `bin/opencode-loop-cli.sh` are thin wrappers around `python3 -m engine.loop` / `python3 -m engine.cli`; `lib/*.sh` are thin bridges for backward compatibility.
+- The Python engine at `engine/` handles orchestration. Public Bash/PowerShell files are launchers only: `opencode-loop.sh` delegates to `python3 -m engine.loop`, and `bin/opencode-loop-cli.sh` delegates to `python3 -m engine.cli`.
+- The migrated project should not contain an active `lib/*.sh` private orchestration layer or `engine.bridge` Bash-to-Python bridge. Treat either as a migration regression and verify against the current checkout before documenting or depending on it.
 
 ## Prefer The AI-Friendly CLI
 
@@ -307,6 +307,14 @@ Add for each task:
 - `tdd_required: true` — to enable the TDD gate.
 
 Use project-neutral verification: discover the project's real test/lint/build command first, then assign per-task checks. Do not assume `npm test` exists.
+
+For command gates, verify the command works in the same non-interactive shell that gates use, especially on macOS where login shells may resolve a different `python3` than Codex's current shell:
+
+```bash
+bash --noprofile --norc -c 'command -v python3 && python3 -m pytest -q'
+```
+
+If this resolves the wrong interpreter or misses dependencies, use the project's virtualenv/absolute tool path in `verification` and `acceptance_checks` instead of a bare command.
 
 Prefer behavior-based acceptance checks over file-placement checks. File checks are fine for newly required artifacts, but avoid over-specifying which source file must contain an implementation detail when the public behavior can be verified through tests or CLI/API output.
 
