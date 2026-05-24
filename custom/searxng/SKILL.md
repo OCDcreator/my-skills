@@ -20,10 +20,16 @@ Search the internet using your self-hosted SearXNG instance.
 | **Host** | 飞牛 NAS `192.168.31.147` (letian, SSH port 22) |
 | **Container** | `searxng` / `searxng/searxng:latest` |
 | **Config** | `/vol1/docker/searxng/settings.yml` (NAS 上) |
-| **Proxy** | 所有出站流量经 `http://192.168.31.148:7897` (Mihomo/Clash Verge) |
+| **Proxy** | 所有出站流量经 `http://Clash:<OpenClash password>@192.168.31.204:7893` (飞牛 Docker QWRT/OpenClash) |
+| **Host route** | `/etc/systemd/system/qwrt-macvlan-shim.service` keeps host access to the QWRT macvlan container |
+| **Default engines** | `bing`, `google`; additional stable engines are enabled for explicit `engines=` use |
 
-> ⚠️ 飞牛 NAS 没有直连外网出口，搜索引擎流量依赖 `192.168.31.148:7897` 代理。
-> 若搜索超时，检查用户电脑 (192.168.31.148) 是否开机且 Clash Verge 在运行。
+> ⚠️ 飞牛 NAS 没有直连外网出口，搜索引擎流量依赖飞牛 Docker 里的 QWRT/OpenClash。
+> QWRT 是 macvlan 容器，宿主机需要 `qwrt-macvlan-shim.service` 提供 `qwrt-shim`
+> 路由，才能从飞牛宿主机或 bridge 容器访问 `192.168.31.204:7893`。
+> 泛搜索默认结果主要来自 `google,bing`。已启用并验证可按需指定的稳定引擎包括
+> `github`, `stackoverflow`, `docker hub`, `arxiv`, `pubmed`, `semantic scholar`,
+> `crossref`, `openalex`。DuckDuckGo 容易 CAPTCHA，Brave/Mojeek 容易限流或拒绝访问。
 
 ## Endpoint
 
@@ -94,6 +100,12 @@ curl -s "http://192.168.31.147:9900/search?q=AI新闻&format=json&language=zh-CN
 curl -s "http://192.168.31.147:9900/search?q=Python&format=json&engines=github,stackoverflow" | jq '.results[:5]'
 ```
 
+### Search academic sources
+
+```bash
+curl -s "http://192.168.31.147:9900/search?q=large%20language%20models&format=json&engines=arxiv,pubmed,semantic%20scholar,crossref,openalex" | jq '.results[:5]'
+```
+
 ### Get documentation
 
 ```bash
@@ -104,12 +116,16 @@ curl -s "http://192.168.31.147:9900/search?q=FastAPI+tutorial&format=json&engine
 
 ### All engines timeout / 0 results
 
-Likely cause: proxy (`192.168.31.148:7897`) unreachable.
+Likely cause: proxy (`192.168.31.204:7893`) unreachable or the macvlan shim route is missing.
 
 ```bash
 # From NAS, test proxy
 ssh letian@192.168.31.147
-curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x http://192.168.31.148:7897 https://www.google.com
+curl -s -o /dev/null -w '%{http_code}' --max-time 10 -x 'http://Clash:<OpenClash password>@192.168.31.204:7893' https://www.google.com
+
+# Check the QWRT macvlan host route
+systemctl is-active qwrt-macvlan-shim.service
+ip route get 192.168.31.204
 
 # Check container status
 sudo docker ps --filter name=searxng
@@ -120,7 +136,7 @@ sudo docker logs searxng --tail 20
 
 ```bash
 ssh letian@192.168.31.147
-echo '1q2w3e4r5t=q' | sudo -S docker restart searxng
+sudo docker restart searxng
 ```
 
 ### Update proxy address in settings.yml
@@ -131,7 +147,7 @@ If the user's PC IP or Mihomo port changes, update `/vol1/docker/searxng/setting
 outgoing:
   proxies:
     all://:
-      - http://NEW_IP:NEW_PORT
+      - http://USER:PASSWORD@NEW_IP:NEW_PORT
 ```
 
 Then restart: `sudo docker restart searxng`
