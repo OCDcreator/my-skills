@@ -20,6 +20,19 @@ Use it when the user wants a requirement turned into a gated execution queue ins
 - `opencode`, `jq`, and `git` available
 - Task Master AI provider configured before `task-master parse-prd`
 
+Check dependencies before choosing the route:
+
+```bash
+command -v openspec
+command -v task-master
+command -v opencode-loop
+command -v opencode
+command -v jq
+command -v git
+```
+
+If `openspec` or `task-master` is missing, the Full Auto Pipeline cannot run as written. Either install and configure the missing CLI, or explicitly fall back to queue-gated execute mode with a manual requirements/task file. When falling back, report which layer was bypassed so the user understands the probe did not validate OpenSpec or Task Master.
+
 Set the API key in the target project's `.env` file (ensure `.env` is in `.gitignore`):
 
 - `OPENAI_COMPATIBLE_API_KEY=<your-key>` for `--openai-compatible` providers
@@ -169,6 +182,10 @@ This reads `.taskmaster/tasks/tasks.json` and creates `.opencode-loop/queue.json
 Task Master imports typically carry `verification` from `testStrategy`, but `acceptance_checks` still need to be added. Discover the project's real verification commands first, then assign per-task checks. Avoid assuming `npm test`.
 
 Finish enrichment before promotion/start. The active execute prompt is captured when a task is selected; changing `scope_paths`, `forbidden_paths`, `verification`, or `acceptance_checks` on an already `in_progress` task hardens gates but does not rewrite the prompt already handed to OpenCode. If the active task contract was too broad, pause/stop and let the next retry pick up the corrected queue entry.
+
+Write acceptance checks against observable behavior when possible: command output, public API behavior, generated files that are part of the requirement, or tests that exercise the feature. Avoid checks that require a specific implementation detail to live in a specific source file unless that file placement is itself the requirement. Over-specific file/content checks can reject a correct implementation and burn queue attempts.
+
+Use the TDD gate deliberately. Set `tdd_required: true` only when the task prompt requires gate-visible `TDD_RED[...]` and `TDD_GREEN[...]` evidence. If the purpose is to validate the loop end to end, harden an existing project, or accept any correct implementation with verification and acceptance gates, leave TDD disabled unless you are explicitly testing TDD behavior.
 
 Supported acceptance check types:
 

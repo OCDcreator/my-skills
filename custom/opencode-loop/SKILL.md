@@ -38,6 +38,8 @@ Everything else (proposal, tasks, gates) you handle autonomously.
 
 **Pre-flight check:** Before starting any unattended run, ensure `opencode.json` is in the target project's `.gitignore`. `setup.sh` generates this file at runtime — if it is not gitignored, the loop exits with `environment_blocked` (exit code 6) after the first task commits. Verify with: `grep -q '^opencode.json$' /path/to/target/.gitignore || echo 'opencode.json' >> /path/to/target/.gitignore`
 
+**Pipeline dependency check:** The Full Auto Pipeline needs `openspec` and `task-master`. If either is missing, do not pretend the pipeline ran; install/configure the missing CLI when appropriate, or fall back to a manual queue-gated execute run and say which layer was bypassed.
+
 ## Full Auto Workspace Policy
 
 For Git-backed target projects, the Full Auto Pipeline must execute in a dedicated worktree, not the user's main workspace. Treat the main workspace as the final merge/verify/push location only. New imported execute queues default to `profile.isolation: "worktree"` and `profile.integration_strategy: "fast_forward_merge"`; keep those defaults unless the user explicitly requests in-place execution and accepts the risk.
@@ -305,6 +307,10 @@ Add for each task:
 - `tdd_required: true` — to enable the TDD gate.
 
 Use project-neutral verification: discover the project's real test/lint/build command first, then assign per-task checks. Do not assume `npm test` exists.
+
+Prefer behavior-based acceptance checks over file-placement checks. File checks are fine for newly required artifacts, but avoid over-specifying which source file must contain an implementation detail when the public behavior can be verified through tests or CLI/API output.
+
+Only set `tdd_required: true` when the task prompt explicitly asks the model to emit gate-recognized `TDD_RED[...]` and `TDD_GREEN[...]` evidence. For general E2E loop probes or legacy code hardening where TDD evidence is not part of the objective, leave it false so the TDD gate does not fail an otherwise valid delivery.
 
 Finish enrichment before the task becomes `in_progress`; execute prompts are captured at task selection time. Updating an active task can still harden gates, but it does not rewrite the prompt already handed to OpenCode. If a command acceptance check inspects a committed task diff, compare `HEAD^ HEAD` rather than plain `HEAD`.
 
