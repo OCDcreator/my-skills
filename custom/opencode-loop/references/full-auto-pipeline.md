@@ -192,6 +192,7 @@ Supported acceptance check types:
 - `command`
 - `file_exists`
 - `contains`
+- `reviewer`
 
 Example Bash enrichment:
 
@@ -410,6 +411,8 @@ done
 opencode-loop queue validate --dir "$TARGET"
 opencode-loop queue prepare --dir "$TARGET" --json
 opencode-loop queue prepare --dir "$TARGET" --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
+opencode-loop hooks install-review --dir "$TARGET" --codex-bin codex --timeout 1800
+opencode-loop hooks test --dir "$TARGET" --event post_iteration --gate
 for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' "$QUEUE"); do
   opencode-loop queue promote --dir "$TARGET" --task "$id"
 done
@@ -469,6 +472,8 @@ foreach ($id in (jq -r '.tasks[].id' $queue)) {
 opencode-loop queue validate --dir $Target
 opencode-loop queue prepare --dir $Target --json
 opencode-loop queue prepare --dir $Target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
+opencode-loop hooks install-review --dir $Target --codex-bin codex --timeout 1800
+opencode-loop hooks test --dir $Target --event post_iteration --gate
 foreach ($id in (jq -r '.tasks[] | select(.status=="draft") | .id' $queue)) {
   opencode-loop queue promote --dir $Target --task $id
 }
