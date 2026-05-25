@@ -1,6 +1,6 @@
 ---
 name: opencode-loop
-description: "Use when the user wants opencode-loop — a Python-powered unattended coding engine — to run self-healing multi-iteration coding over a target project. Trigger on: 无人值守, 自动循环, 自动修 bug, overnight coding, autopilot coding, self-healing loop, run opencode-loop, start the loop, gated queue, circuit breaker, orphaned task, heartbeat install, worktree isolation, build-verify-fix cycles, verification/acceptance gates. Do not trigger for one-shot debugging, generic loops, or CI/CD pipeline setup."
+description: "Use when the user wants opencode-loop unattended or self-running multi-iteration coding over a target project: run build-verify-fix cycles, optimize/refactor repos, fix test/lint/type failures, bootstrap projects, or watch a live human dashboard for long runs. Trigger on phrases like 无人值守, 自动循环, 自动修 bug, 让大模型自己跑, overnight coding, autopilot coding, supervisor watchdog, self-healing loop, 全自动流水线, 从需求到代码, human dashboard, 实时日志, 流式监控. Also trigger for queue-gated execute mode with verification/acceptance gates, task-by-task gated execution, OpenSpec/Task Master adapter import, gate failures and retries. Do not trigger for one-shot debugging, generic for/while loops, or CI/CD pipeline setup."
 ---
 
 # OpenCode Loop Skill
@@ -11,12 +11,10 @@ Use this skill to turn a natural language requirement into an autonomously execu
 
 When the user gives you a requirement (e.g., "帮我写一个计算器库", "build a REST API", "add auth to my app"), you do this automatically:
 
-> **Summary** — these 6 steps are a high-level overview. `references/full-auto-pipeline.md` contains the complete three-layer workflow with all prerequisites, edge cases, and validation checkpoints. Load it before execution.
-
 1. **Read `references/full-auto-pipeline.md`** — it contains the complete three-layer workflow. Load it now and follow it end-to-end.
 2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
 3. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
-4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, run `queue prepare`, promote, `init --mode execute`, start.
+4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, promote, `init --mode execute`, start.
 5. **Install the outer self-healing guard** — run `opencode-loop heartbeat install --dir <target> --runner auto --interval-minutes 30` so a local cron/launchd heartbeat can wake Codex or OpenCode to repair `opencode-loop` itself.
 6. **Hand off** the running loop to the user with heartbeat/status instructions.
 
@@ -36,10 +34,6 @@ Clarify if unclear:
 
 Everything else (proposal, tasks, gates) you handle autonomously.
 
-**Pre-flight check:** Before starting any unattended run, run `opencode-loop init --dir /path/to/target --mode execute` or `opencode-loop doctor --dir /path/to/target --json` so the controller can verify runtime state. `setup.sh` generates `opencode.json` and, for Git repos, ignores it through `.git/info/exclude` without dirtying tracked `.gitignore`; outside Git it falls back to `.gitignore`. Do not hand-edit tracked ignore files just to add `opencode.json` unless the target project explicitly wants that policy versioned.
-
-**Pipeline dependency check:** The Full Auto Pipeline needs `openspec` and `task-master`. If either is missing, do not pretend the pipeline ran; install/configure the missing CLI when appropriate, or fall back to a manual queue-gated execute run and say which layer was bypassed.
-
 ## Full Auto Workspace Policy
 
 For Git-backed target projects, the Full Auto Pipeline must execute in a dedicated worktree, not the user's main workspace. Treat the main workspace as the final merge/verify/push location only. New imported execute queues default to `profile.isolation: "worktree"` and `profile.integration_strategy: "fast_forward_merge"`; keep those defaults unless the user explicitly requests in-place execution and accepts the risk.
@@ -55,9 +49,8 @@ When already inside the `opencode-loop` repository, use the current repo root. O
 - On macOS, use the native repo path directly.
 - On Windows, prefer WSL for Bash-facing workflows.
 - Known Windows repo pattern for this environment: `C:\Users\lt\Desktop\Write\open-source-project\autonomous-ai-agents\agent-loops\opencode-loop`.
-- Requires Python >= 3.11; the engine uses only stdlib modules.
-- The Python engine at `engine/` handles orchestration. Public Bash/PowerShell files are launchers only: `opencode-loop.sh` delegates to `python3 -m engine.loop`, and `bin/opencode-loop-cli.sh` delegates to `python3 -m engine.cli`.
-- The migrated project should not contain an active `lib/*.sh` private orchestration layer or `engine.bridge` Bash-to-Python bridge. Treat either as a migration regression and verify against the current checkout before documenting or depending on it.
+
+Do not look for private `lib/*.sh` orchestration modules. The active implementation is Python-first under `engine/`; public shell files are thin launchers or platform wrappers.
 
 ## Prefer The AI-Friendly CLI
 
@@ -67,6 +60,8 @@ Prefer the wrapper for repeatable agent work:
 opencode-loop --version
 opencode-loop doctor --dir /path/to/target --json
 opencode-loop status --dir /path/to/target --json
+opencode-loop dashboard --dir /path/to/target --once
+opencode-loop dashboard --dir /path/to/target --json
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile long
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --tmux-session target-loop
 opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-minutes 30
@@ -115,7 +110,7 @@ opencode-loop doctor --dir /path/to/target --json
 Fallback from the repo root:
 
 ```bash
-python3 --version
+bash -n opencode-loop.sh
 command -v opencode && command -v jq && command -v git
 ```
 
@@ -149,15 +144,11 @@ opencode-loop start --dir /path/to/target --profile quick
 opencode-loop start --dir /path/to/target --profile long
 ```
 
-Profile defaults match the original Bash behavior: `quick` = 3 iterations/15min/single session; `long` = 30/60/multi rotate 10; `ml` = 200/30/multi rotate 10; `execute` = 30/60/multi rotate 1 with 1440min stale detection.
-
 Use the core script when the user needs advanced flags:
 
 ```bash
-bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 5 --timeout 15
+bash opencode-loop.sh --dir /path/to/target --mode dev --iterations 5 --timeout 15 --auto-reset
 ```
-
-Note: `--auto-reset` (circuit breaker reset on startup) is now the default. Use `--no-auto-reset` to opt out. All examples below omit it since it is implied.
 
 For longer runs, prefer the supervisor:
 
@@ -174,7 +165,7 @@ opencode-loop next-command --dir /path/to/target --kind supervisor --profile exe
 
 That command keeps the supervisor parent alive after the current terminal/session disconnects. For `execute` profile, tmux-wrapped `next-command` defaults stale detection to `1440` minutes; override with `--stale-minutes N` only after confirming the target's verification time.
 
-### 4. Productized Cron/Heartbeat Guard
+### 3b. Productized Cron/Heartbeat Guard
 
 For any run the user expects to keep going unattended, the supervisor is necessary but not sufficient. Always add an outer cron/heartbeat guard unless the user explicitly declines it. This guard is responsible for cases where the shell, supervisor, controller repo, queue contract, or wrapper breaks and no local child process remains alive to self-restart.
 
@@ -184,14 +175,12 @@ Install the local scheduler:
 opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-minutes 30
 ```
 
-`--runner auto` first tries `codex exec --cd <opencode-loop repo>` and falls back to `opencode run --dir <opencode-loop repo> -- "<prompt>"` if Codex is unavailable or out of quota. Use `--runner codex` or `--runner opencode` only when the user explicitly wants one runner. The scheduler calls a generated `run.sh`, which skips model calls while the target is genuinely healthy and only invokes a runner when status/observe/logs show an unhealthy loop or a progress trap. The executable scheduler copy and CLI snapshot live under the user's HOME heartbeat runtime so macOS launchd/cron does not need to execute controller scripts from external volumes; target-side `.opencode-loop/heartbeat/` keeps config and logs.
+`--runner auto` first tries `codex exec --cd <opencode-loop repo>` and falls back to `opencode run --dir <opencode-loop repo> -- "<prompt>"` if Codex is unavailable or out of quota. Use `--runner codex` or `--runner opencode` only when the user explicitly wants one runner. The scheduler calls a generated `run.sh`, which skips model calls while the target is healthy and only invokes a runner when status/observe/logs show an unhealthy loop. The executable scheduler copy and CLI snapshot live under the user's HOME heartbeat runtime so macOS launchd/cron does not need to execute controller scripts from external volumes; target-side `.opencode-loop/heartbeat/` keeps config and logs.
 
 The generated repair prompt requires the runner to:
 
 - inspect `status --json`, `observe --json`, and latest logs before acting;
-- treat process liveness as necessary but not sufficient: a live loop repeatedly failing `gate-review`, accumulating rejected tasks, or requeueing the same phase is unhealthy even if `status.health` says `healthy`;
-- leave only genuinely healthy runs alone and report exact task/process state;
-- when progress is abnormal, pause blind relaunches, preserve task work, extract the latest `gate-review` JSON `reason` plus queue `last_error`, and turn that into a concrete repair objective for the next run;
+- leave healthy runs alone and report exact task/process state;
 - when broken, preserve task work, fix verified `opencode-loop` controller bugs first, run tests, prepend `docs/pitfalls-and-lessons.md`, commit, redeploy with `bash bin/install-cli.sh`, and resume the original queue with `--resume-existing-queue`;
 - pause itself with `opencode-loop heartbeat pause --dir /path/to/target` only after the target task is truly complete.
 
@@ -201,10 +190,11 @@ Key core-script flags:
 - `--timeout MIN` — per-iteration timeout.
 - `--mode dev|ml|execute` — route selection.
 - `--program FILE` — custom program prompt.
+- `--auto-reset` — reset circuit breaker on startup.
 - `--session-mode single|multi|auto|clean` — session strategy.
 - `--session-rotate N` — iterations per session in multi mode.
 
-### 5. Monitor
+### 4. Monitor
 
 Use `status --json` as the primary summary view — it merges all runtime state into one JSON object:
 
@@ -212,14 +202,37 @@ Use `status --json` as the primary summary view — it merges all runtime state 
 opencode-loop status --dir /path/to/target --json
 ```
 
-The JSON output merges all runtime state: `state`, `runtime`, `control`, `circuit_breaker`, `process_check`, `process_alive`, `warning`, `logs`.
+The JSON output includes:
+- `state` — iteration count, status, session ID from `state.json`
+- `runtime` — PID, process state, active config, last exit reason from `runtime.json`
+- `control` — desired state (running/stopped) and pending config from `control.json`
+- `circuit_breaker` — breaker state (closed/open/half_open) from `circuit_breaker.json`
+- `process_check` — PID liveness for loop, supervisor, and child processes
+- `process_alive` — convenience boolean: is the main loop process actually running?
+- `warning` — stale-running detection (state says running but process is dead)
+- `logs` — paths to `progress.txt`, `supervisor.log`, `supervisor-child.log`
+
+Use `dashboard` for a human live stream when you want one readable line-by-line view while the loop runs:
+
+```bash
+opencode-loop dashboard --dir /path/to/target --once
+opencode-loop dashboard --dir /path/to/target --json
+opencode-loop dashboard --dir /path/to/target --tail 20 --poll-seconds 2
+```
+
+`dashboard` is append-only and human-oriented:
+- `--once` prints a summary plus recent tail and exits.
+- `--json` emits a stable snapshot object in once mode.
+- `--no-color` or `NO_COLOR=1` disables ANSI codes.
+- Prefer it over `observe --watch` when you want streaming deltas instead of repeated full snapshots.
 
 Do not treat `status --json` as liveness ground truth by itself. When a run looks stuck or inconsistent, use this order:
 
 1. `ps` / PID check
 2. Latest `output-*.jsonl` — the closest thing to the live execution stream
 3. `supervisor-child.log` / `supervisor.log`
-4. `state.json` / `runtime.json` / `progress.txt`
+4. `dashboard --once`
+5. `state.json` / `runtime.json` / `progress.txt`
 
 ```bash
 opencode-loop logs --dir /path/to/target --file progress --tail 80
@@ -229,27 +242,63 @@ opencode-loop logs --dir /path/to/target --file hook --match gate-review --tail 
 opencode-loop logs --dir /path/to/target --file gate --match policy --tail 80
 ```
 
-Watch for abnormal progress, not only dead processes. These are heartbeat-worthy problems even while supervisor and child PIDs are alive:
-
-- The same task/phase hits `Queue gate review needs_changes` repeatedly.
-- `queue.json` has one or more `rejected` tasks while another task is `in_progress`.
-- Progress shows `queue_inconsistent:rejected_exhausted` or repeated manual requeues.
-- The latest hook log repeats the same reviewer reason, so the model is likely receiving too vague a repair objective.
-
-The Python engine self-heals through: circuit breaker (`cb_record_progress`), orphaned task recovery (2x/10x timeout thresholds), auto-blocking at `max_attempts`, and atomic state writes. See `references/hooks-and-recovery.md` for the full self-repair protocol.
-
-In those cases, do not simply relaunch. Back up `queue.json` and task-worktree diffs, stop blind retries if they are burning time, read the newest `gate-review` hook stdout JSON and the affected task's `last_error`, then write a targeted recovery prompt such as "fix duplicate status/session handler registration in OpenCodeAdapter" rather than "continue the task". If the failure is a controller/heartbeat behavior gap, fix and deploy `opencode-loop` first, then resume the target queue.
-
 Target-side state lives under `.opencode-loop/progress.txt`, `.opencode-loop/state.json`, `.opencode-loop/runtime.json`, `.opencode-loop/logs/`, `.opencode-loop/output-*.jsonl`, and `.opencode-loop/stderr-*.log`.
 
-### Self-Repair and Hooks
+### 5. Optional Hooks
 
-For the complete self-repair protocol (7-step evolution loop for stalled runs) and optional hooks configuration (reviewer detection, two-layer validation, install-review/install-recovery), **read `references/hooks-and-recovery.md`**.
+Normal hooks run shell commands at pre/post iteration boundaries. They are useful for external review or side checks and never stop the loop when exhausted. Do not confuse these with execute mode's `gate-review` blocking gate hook: that hook is consumed by the review gate, and a missing or failing `gate-review` makes the gate unavailable/fail instead of merely warning.
 
-Key flags:
+For execute review gates, do not write reviewer scripts that only inspect raw `git diff` from the worktree. A task may already be committed and clean when the review gate runs. Use the gate-provided review context first:
 
-- `--no-auto-reset` — opt out of startup circuit-breaker reset (default is enabled).
-- `--auto-resume-safe` — auto-resolve `stale_running_without_process` when no live loop owns the queue.
+- `OPENCODE_LOOP_REVIEW_DIFF_FILE`
+- `OPENCODE_LOOP_REVIEW_STAT_FILE`
+- `OPENCODE_LOOP_REVIEW_CHANGED_FILES_FILE`
+- `OPENCODE_LOOP_REVIEW_CONTEXT_FILE`
+- `OPENCODE_LOOP_REVIEW_DIFF_RANGE`
+
+These files represent the task branch/worktree diff that should be reviewed, including committed clean states.
+
+**Detect reviewer commands before adding hooks.** Commands vary across machines:
+
+```bash
+# Detect Kimi CLI (may be `kimi` or `kimi-code`)
+KIMI_CMD=$(command -v kimi-code 2>/dev/null || command -v kimi 2>/dev/null || echo "")
+CLAUDE_CMD=$(command -v claude 2>/dev/null || echo "")
+CODEX_CMD=$(command -v codex 2>/dev/null || echo "")
+```
+
+```bash
+opencode-loop hooks add --dir /path/to/target --event pre_iteration \
+  --name kimi-ui --command "$KIMI_CMD --dir \"\$OPENCODE_LOOP_TARGET_DIR\" \"Review UI\"" --attempts 3
+opencode-loop hooks add --dir /path/to/target --event post_iteration \
+  --name codex-review --command 'codex exec --cd "$OPENCODE_LOOP_TARGET_DIR" "Review"' --attempts 3
+opencode-loop hooks add --dir /path/to/target --event post_iteration \
+  --name claude-review --command 'claude -p --cwd "$OPENCODE_LOOP_TARGET_DIR" "Review code changes."' --attempts 3
+opencode-loop hooks install-review --dir /path/to/target --codex-bin codex --timeout 1800
+opencode-loop hooks install-recovery --dir /path/to/target --codex-bin codex --timeout 900
+opencode-loop hooks list --dir /path/to/target --json
+```
+
+**Validate hooks in two layers.** `hooks test` may hang on slow reviewers — validate the reviewer command directly first:
+
+```bash
+# Layer 1: Validate reviewer produces valid output independently
+$KIMI_CMD --print --final-message-only --cwd /path/to/target "Output ONLY JSON: {\"result\":\"pass\"}"
+# Expected: {"result":"pass"}
+
+# Layer 2 (supplementary): hooks test confirms wiring
+# Use a timeout — it can hang if the reviewer takes >30s
+timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --iteration 0
+timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --recovery
+```
+
+Do not treat `hooks test` as the sole gate-keper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook is still functional.
+
+For Full Auto execute queues, install the recovery hook before starting the supervisor. The helper only writes `.opencode-loop/gate-recovery-review-codex.sh` and `hooks.json`; it does not call Codex during setup. During execution, Codex is called only after a failed gate to decide whether a narrow queue contract can be repaired safely, for example by adding precise supporting tests to `scope_paths`.
+
+For Full Auto queues that require review, prefer `hooks install-review` over hand-written review scripts. The installed `gate-review` reads opencode-loop's review diff/context files, so committed clean task worktrees remain reviewable instead of being misclassified as "no diff".
+
+For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
 ## Queue-Gated Execute Mode
 
@@ -288,21 +337,6 @@ Imported execute queues default to `profile.isolation: "worktree"` and `profile.
 
 For `--from-form` and `--manual`, keep the temporary input file outside the target repo, such as `/tmp/task-form.json` or `/tmp/requirements.md`. If an import artifact is left untracked inside the target repo, execute mode's dirty-worktree protection can block before the first task starts. `plan` can replace the empty execute placeholder queue created by `init --mode execute`, but it must not overwrite a non-empty queue.
 
-After import and enrichment, inspect for setup/meta tasks before promotion or start:
-
-```bash
-opencode-loop queue prepare --dir /path/to/target --json
-```
-
-If the result lists tasks such as "set up worktree", "initialize queue", or "bootstrap project", treat them as externally completed operator work, not product implementation work. Apply the prepare step before promotion:
-
-```bash
-opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
-opencode-loop status --dir /path/to/target --json
-```
-
-`queue prepare --apply --done-meta-tasks --reason` preserves those tasks in `queue.json` as `kind: "external_setup"` and `status: "done"` with an external completion reason, so dependency history remains auditable while execution starts on the first real implementation task. Confirm `status --json` includes `queue_prepare.valid: true` and no runnable setup/meta tasks before starting execute mode.
-
 ### 2. Enrich Tasks
 
 Imported tasks need the task-level contract filled in before execution. Task Master imports usually carry `verification` from `testStrategy`, but `acceptance_checks` still need attention.
@@ -323,18 +357,6 @@ Add for each task:
 
 Use project-neutral verification: discover the project's real test/lint/build command first, then assign per-task checks. Do not assume `npm test` exists.
 
-For command gates, verify the command works in the same non-interactive shell that gates use, especially on macOS where login shells may resolve a different `python3` than Codex's current shell:
-
-```bash
-bash --noprofile --norc -c 'command -v python3 && python3 -m pytest -q'
-```
-
-If this resolves the wrong interpreter or misses dependencies, use the project's virtualenv/absolute tool path in `verification` and `acceptance_checks` instead of a bare command.
-
-Prefer behavior-based acceptance checks over file-placement checks. File checks are fine for newly required artifacts, but avoid over-specifying which source file must contain an implementation detail when the public behavior can be verified through tests or CLI/API output.
-
-Only set `tdd_required: true` when the task prompt explicitly asks the model to emit gate-recognized `TDD_RED[...]` and `TDD_GREEN[...]` evidence. For general E2E loop probes or legacy code hardening where TDD evidence is not part of the objective, leave it false so the TDD gate does not fail an otherwise valid delivery.
-
 Finish enrichment before the task becomes `in_progress`; execute prompts are captured at task selection time. Updating an active task can still harden gates, but it does not rewrite the prompt already handed to OpenCode. If a command acceptance check inspects a committed task diff, compare `HEAD^ HEAD` rather than plain `HEAD`.
 
 Avoid command checks that start with `!` and contain a pipe, such as `! git diff ... | awk ...`; Bash negates the whole pipeline and can invert pass/fail in surprising ways. Use explicit shell logic instead, and run `opencode-loop queue lint --strict` before start.
@@ -352,15 +374,13 @@ jq '(.tasks[] | select(.id == "openspec-1-1") | .acceptance_checks) = [{"type":"
 Promote tasks one at a time:
 
 ```bash
-opencode-loop queue validate --dir /path/to/target
-opencode-loop queue prepare --dir /path/to/target --json
-opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
 opencode-loop queue status --dir /path/to/target --json
+opencode-loop queue validate --dir /path/to/target
 opencode-loop queue promote --dir /path/to/target --task openspec-1-1
 opencode-loop queue promote --dir /path/to/target --task openspec-1-2
 ```
 
-Promotion checks queue integrity and valid verification configuration. Do not promote or start a queue while `queue prepare` still reports runnable setup/meta tasks; that is how a self-referential bootstrap task can reach the review gate with no task diff.
+Promotion checks queue integrity and valid verification configuration.
 
 ### 4. Initialize And Start
 
@@ -368,7 +388,7 @@ Promotion checks queue integrity and valid verification configuration. Do not pr
 opencode-loop init --dir /path/to/target --mode execute
 opencode-loop start --dir /path/to/target --profile execute
 
-bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 30 --timeout 60 --session-mode multi --session-rotate 5
+bash opencode-loop.sh --dir /path/to/target --mode execute --iterations 30 --timeout 60 --session-mode multi --session-rotate 5 --auto-reset
 ```
 
 Gate order stays fixed:
@@ -417,31 +437,121 @@ bash opencode-loop.sh --dir /path/to/target --mode execute --skip-gates review,t
 bash opencode-loop.sh --dir /path/to/target --mode execute --unsafe-skip-baseline-gates
 ```
 
-Use these only for controlled diagnostics, emergency recovery, or explicit user-approved bypasses. Do not use them for normal Full Auto execution, and do not treat a run with skipped baseline gates as product-verified.
-
 ### Worktree Isolation Lifecycle
 
-When `profile.isolation` is `worktree`, each queue task runs in an isolated Git worktree. The Python isolation manager handles creation, cleanup, and integration automatically.
+When `profile.isolation` is `worktree`, each queue task runs in an isolated Git worktree. The Python `engine.process.isolation.IsolationManager` handles creation, cleanup, and integration automatically — but when an agent needs to manually manage worktrees (for recovery, continuation, or inspection), follow this lifecycle.
 
-For manual worktree management (recovery, continuation, inspection), **read `references/worktree-recovery.md`** which covers:
-- Recovery from interrupted worktree creation (index.lock, missing directories)
-- State migration to new worktrees
-- Dependency installation before execute
-- Full continuation checklist
-- Post-commit repo cleanliness (opencode.json dirty handling)
+#### Recovery From Interrupted Worktree Creation
 
-Resume guard auto-resolution can clear `stale_running_without_process` with `--auto-resume-safe` when the saved PID is gone and no live loop owns the queue; use it for unattended recovery instead of forcing `--resume-existing-queue` blindly.
+If `git worktree add -b <branch>` was killed mid-operation (SIGKILL, timeout, `index.lock` blockage), the branch may exist but the worktree directory may be missing or unregistered. Recovery:
+
+```bash
+TASK_ID="tm-8"
+BRANCH="task/${TASK_ID}"
+WORKTREE_PATH="/path/to/target/.opencode-loop/worktrees/${TASK_ID}"
+
+# Step 1: Clear stale index.lock (use git rev-parse for worktree-safe path)
+LOCK=$(git -C /path/to/target rev-parse --git-path index.lock 2>/dev/null || true)
+if [[ -f "$LOCK" ]]; then
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f "[g]it.*target" >/dev/null 2>&1 && echo "active lock" || rm -f "$LOCK"
+  else
+    PS_OUT=$(ps aux 2>/dev/null || true)
+    if [[ -z "$PS_OUT" ]] || echo "$PS_OUT" | grep -q "[g]it.*target"; then
+      echo "cannot confirm liveness — not removing lock"
+    else
+      rm -f "$LOCK"
+    fi
+  fi
+fi
+
+# Step 2: Inspect current state
+git -C /path/to/target worktree list
+git -C /path/to/target branch --list "$BRANCH"
+
+# Step 3: Re-bind existing branch OR create fresh (conditional)
+if git -C /path/to/target show-ref --verify "refs/heads/$BRANCH" 2>/dev/null &&
+   ! git -C /path/to/target worktree list | grep -qF "$WORKTREE_PATH"; then
+  git -C /path/to/target worktree add "$WORKTREE_PATH" "$BRANCH"
+else
+  git -C /path/to/target worktree add "$WORKTREE_PATH" -b "$BRANCH" HEAD
+fi
+```
+
+If `engine.process.isolation.IsolationManager` refuses to delete a branch with unique commits, you must manually decide: (a) integrate the commits into base with `git checkout main && git merge --ff-only task/<id>`, or (b) re-bind the branch to a worktree path with `git worktree add <path> task/<id>`. Do not force-delete branches with unmerged work.
+
+#### State Migration To New Worktree
+
+New worktrees carry only Git-tracked files — not the `.opencode-loop/` runtime state from the original tree. To continue a paused queue in a new worktree:
+
+```bash
+OLD="/path/to/original-target"
+NEW="/path/to/new-worktree"
+
+opencode-loop init --dir "$NEW" --mode execute
+
+cp "$OLD/.opencode-loop/queue.json"   "$NEW/.opencode-loop/"
+cp "$OLD/.opencode-loop/program.md"   "$NEW/.opencode-loop/"
+cp "$OLD/.opencode-loop/hooks.json"   "$NEW/.opencode-loop/"
+
+# Reset stuck tasks to retryable
+opencode-loop queue set-status --dir "$NEW" --task tm-8 --status todo --reason "continuing in new worktree"
+```
+
+#### Dependency Installation Before Execute
+
+New worktrees start with no runtime dependencies. Install them before starting the loop:
+
+```bash
+cd /path/to/new-worktree
+npm install          # Node.js
+# pip install -r requirements.txt   # Python
+# bundle install                     # Ruby
+opencode-loop doctor --dir . --json
+# Run project baseline tests
+```
+
+#### Full Continuation Checklist
+
+After creating a worktree for execution continuation:
+
+1. Create/add worktree with recovery checks (index.lock, branch state)
+2. Install project dependencies
+3. `opencode-loop doctor --dir <worktree> --json` to validate
+4. Run project baseline tests to verify environment health
+5. Migrate `.opencode-loop/` runtime state (`queue.json`, `program.md`, `hooks.json`)
+6. Reset tasks to appropriate statuses
+7. `opencode-loop start --dir <worktree> --profile execute`
+
+#### Post-Commit / Post-Task Repo Cleanliness
+
+After a task commits changes but before the loop finalizes the iteration, repo-visible runtime files (`opencode.json`) may show as uncommitted. (`.opencode-loop/` is already gitignored by `setup.sh` — it's `opencode.json` in the project root that causes the problem.) When this is detected with no active task, the loop immediately exits with `environment_blocked` status (exit code 6) — it does NOT spin or retry.
+
+Resolution:
+
+```bash
+git status --porcelain
+# If the only dirty file is opencode.json (everything else is clean or under .gitignore):
+
+# Option A: Ensure opencode.json is in .gitignore (preferred, one-time fix)
+grep -q "^opencode.json$" .gitignore 2>/dev/null || echo "opencode.json" >> .gitignore
+
+# Option B: Absorb the runtime config change into the task's cleanup commit
+git add opencode.json && git commit --amend --no-edit
+
+# Option C: Discard the runtime noise
+git checkout -- opencode.json
+```
+
+This is not a task-execution failure — the task's code changed successfully, but `opencode.json` was rewritten by runtime and left dirty. The loop correctly detects this and exits cleanly rather than spinning. Option A is preferred; verify `.gitignore` has `opencode.json` before starting long unattended runs.
 
 ### Failure / Recovery
 
 | Symptom | Check | Fix |
 |---------|-------|-----|
 | `doctor --json` shows `ok: false` | Missing `opencode`, `jq`, or `git` | Install missing dependency |
-| Circuit breaker OPEN | 3+ no-progress or 5+ same errors | Default `--auto-reset` on next start, or wait 30min cooldown |
-| Circuit breaker `permanent_open` | 5 open/half-open cycles exhausted | Inspect repeated blocker, fix root cause, then reset breaker intentionally |
+| Circuit breaker OPEN | 3+ no-progress or 5+ errors | `--auto-reset` on next start, or wait 30min cooldown |
 | Task stuck `rejected` | `queue show --task ID --json` | Fix gate failure, `queue set-status --task ID --status todo --reason "retry"` |
-| Task auto-blocked | `attempt_count >= max_attempts` | Fix task cause, raise max attempts only if justified, then requeue |
-| Orphaned task with dirty files | `last_activity` > 10x timeout and worktree dirty | Engine reverts task work and resets to `todo`; inspect recovery logs |
 | Stale `index.lock` blocks worktree ops | `.git/index.lock` exists, no git process | `rm -f .git/index.lock` |
 | Worktree: branch exists, path missing | `git branch` shows branch, `git worktree list` doesn't | `git worktree add <path> <branch>` (re-bind) |
 | "Dirty working tree with no active task" | Completed task, `opencode.json` dirty | Loop exits `environment_blocked` (code 6). Gitignore `opencode.json` or absorb into commit |
@@ -449,8 +559,9 @@ Resume guard auto-resolution can clear `stale_running_without_process` with `--a
 | Supervisor says stale | No activity for `--stale-minutes` | Check `supervisor.log` |
 | WSL hooks can't find CLI | CLIs not in WSL PATH | Symlink: `ln -s $(which claude.exe) /usr/local/bin/claude` |
 | `plan` refuses overwrite | `queue.json` exists | Delete before re-import |
+| macOS `declare -A` error | `/bin/bash` is 3.2 | `brew install bash`, PATH priority |
 
-For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`. For accumulated operational debugging knowledge (8 rounds of real-world failure analysis), see `references/opencode-loop-pitfalls-summary.local.md`.
+For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
 ## TUI Workflow
 
@@ -478,10 +589,8 @@ bash bin/opencode-loop-tui.sh --dir /path/to/target
 macOS:
 
 ```bash
-open "<opencode-loop-repo>/OpenCode Loop TUI.command"
+open "/Volumes/SDD2T/obsidian-vault-write/open-source-project/autonomous-ai-agents/agent-loops/opencode-loop/OpenCode Loop TUI.command"
 ```
-
-Replace `<opencode-loop-repo>` with the actual clone path.
 
 Windows:
 
@@ -512,7 +621,7 @@ The Windows TUI frontend runs natively while setup and loop actions still execut
   - `OPENAI_COMPATIBLE_API_KEY=<your-key>` for `--openai-compatible` providers
   - `ANTHROPIC_API_KEY=<your-key>` for Anthropic
   - `DEEPSEEK_API_KEY=<your-key>` for native `deepseek`
-- `provider_keys.ok` is evaluated against the configured provider set detected from the target `opencode.json`. If no provider is configured, provider-key status is advisory rather than blocking; if providers are configured, only those providers' keys are required. Therefore `DEEPSEEK_API_KEY` being detected does not by itself make preflight pass when the target config also names OpenAI, Anthropic, or OpenAI-compatible without their keys.
+- `provider_keys.ok` is evaluated against the configured provider set detected from the target `opencode.json`. If no provider is configured, all catalog keys are required; if providers are configured, only those providers' keys are required. Therefore `DEEPSEEK_API_KEY` being detected does not by itself make preflight pass when the target config also names OpenAI, Anthropic, or OpenAI-compatible without their keys.
 - In execute mode, imported tasks start as `draft` and require enrichment plus explicit promotion before execution.
 
 ## Final Response Pattern
