@@ -179,6 +179,22 @@ opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-m
 
 `--runner auto` first tries `codex exec --cd <opencode-loop repo>` and falls back to `opencode run --dir <opencode-loop repo> -- "<prompt>"` if Codex is unavailable or out of quota. Use `--runner codex` or `--runner opencode` only when the user explicitly wants one runner. The scheduler calls a generated `run.sh`, which skips model calls while the target is healthy and only invokes a runner when status/observe/logs show an unhealthy loop. The executable scheduler copy and CLI snapshot live under the user's HOME heartbeat runtime so macOS launchd/cron does not need to execute controller scripts from external volumes; target-side `.opencode-loop/heartbeat/` keeps config and logs.
 
+Do not stop at `heartbeat install --dry-run` or a generated plist preview. For macOS `launchd`, real deployment proof must include:
+
+```bash
+opencode-loop heartbeat refresh --dir /path/to/target --interval-minutes 30
+launchctl kickstart -k gui/$(id -u)/com.opencodeloop.heartbeat.<hash>
+opencode-loop heartbeat status --dir /path/to/target --json
+```
+
+Treat the heartbeat as truly repaired only when `status --json` confirms all of the following:
+- `scheduler.health` is `healthy`
+- `last_exit_code` is `0`
+- `snapshot.version_matches_controller` is `true`
+- the launchd plist `StandardOutPath` / `StandardErrorPath` point at the HOME scheduler runtime, not the target repo heartbeat directory
+
+If `status --json` still shows `EX_CONFIG`, `refresh_recommended`, or a plist/log path mismatch after a controller fix, treat that as a real deployment failure and keep working the install/refresh path before claiming heartbeat is repaired.
+
 The generated repair prompt requires the runner to:
 
 - inspect `status --json`, `observe --json`, and latest logs before acting;
