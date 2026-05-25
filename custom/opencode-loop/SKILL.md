@@ -36,7 +36,7 @@ Clarify if unclear:
 
 Everything else (proposal, tasks, gates) you handle autonomously.
 
-**Pre-flight check:** Before starting any unattended run, ensure `opencode.json` is in the target project's `.gitignore`. `setup.sh` generates this file at runtime — if it is not gitignored, the loop exits with `environment_blocked` (exit code 6) after the first task commits. Verify with: `grep -q '^opencode.json$' /path/to/target/.gitignore || echo 'opencode.json' >> /path/to/target/.gitignore`
+**Pre-flight check:** Before starting any unattended run, run `opencode-loop init --dir /path/to/target --mode execute` or `opencode-loop doctor --dir /path/to/target --json` so the controller can verify runtime state. `setup.sh` generates `opencode.json` and, for Git repos, ignores it through `.git/info/exclude` without dirtying tracked `.gitignore`; outside Git it falls back to `.gitignore`. Do not hand-edit tracked ignore files just to add `opencode.json` unless the target project explicitly wants that policy versioned.
 
 **Pipeline dependency check:** The Full Auto Pipeline needs `openspec` and `task-master`. If either is missing, do not pretend the pipeline ran; install/configure the missing CLI when appropriate, or fall back to a manual queue-gated execute run and say which layer was bypassed.
 
@@ -417,6 +417,8 @@ bash opencode-loop.sh --dir /path/to/target --mode execute --skip-gates review,t
 bash opencode-loop.sh --dir /path/to/target --mode execute --unsafe-skip-baseline-gates
 ```
 
+Use these only for controlled diagnostics, emergency recovery, or explicit user-approved bypasses. Do not use them for normal Full Auto execution, and do not treat a run with skipped baseline gates as product-verified.
+
 ### Worktree Isolation Lifecycle
 
 When `profile.isolation` is `worktree`, each queue task runs in an isolated Git worktree. The Python isolation manager handles creation, cleanup, and integration automatically.
@@ -510,7 +512,7 @@ The Windows TUI frontend runs natively while setup and loop actions still execut
   - `OPENAI_COMPATIBLE_API_KEY=<your-key>` for `--openai-compatible` providers
   - `ANTHROPIC_API_KEY=<your-key>` for Anthropic
   - `DEEPSEEK_API_KEY=<your-key>` for native `deepseek`
-- `provider_keys.ok` is evaluated against the configured provider set detected from the target `opencode.json`. If no provider is configured, all catalog keys are required; if providers are configured, only those providers' keys are required. Therefore `DEEPSEEK_API_KEY` being detected does not by itself make preflight pass when the target config also names OpenAI, Anthropic, or OpenAI-compatible without their keys.
+- `provider_keys.ok` is evaluated against the configured provider set detected from the target `opencode.json`. If no provider is configured, provider-key status is advisory rather than blocking; if providers are configured, only those providers' keys are required. Therefore `DEEPSEEK_API_KEY` being detected does not by itself make preflight pass when the target config also names OpenAI, Anthropic, or OpenAI-compatible without their keys.
 - In execute mode, imported tasks start as `draft` and require enrichment plus explicit promotion before execution.
 
 ## Final Response Pattern

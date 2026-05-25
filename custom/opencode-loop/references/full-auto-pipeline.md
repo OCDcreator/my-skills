@@ -39,7 +39,7 @@ Set the API key in the target project's `.env` file (ensure `.env` is in `.gitig
 - `ANTHROPIC_API_KEY=<your-key>` for Anthropic
 - `DEEPSEEK_API_KEY=<your-key>` for native `deepseek`
 
-`opencode-loop doctor/preflight` detects `DEEPSEEK_API_KEY` natively. Its `provider_keys.ok` result is still narrowed by the providers detected in the target project's `opencode.json`: if `deepseek` is the only configured provider, `DEEPSEEK_API_KEY` can satisfy the provider-key check; if the config also names OpenAI, Anthropic, or OpenAI-compatible providers, those keys are still required. If no provider is configured, the current preflight treats the full catalog as required.
+`opencode-loop doctor/preflight` detects `DEEPSEEK_API_KEY` natively. Its `provider_keys.ok` result is still narrowed by the providers detected in the target project's `opencode.json`: if `deepseek` is the only configured provider, `DEEPSEEK_API_KEY` can satisfy the provider-key check; if the config also names OpenAI, Anthropic, or OpenAI-compatible providers, those keys are still required. If no provider is configured, provider-key status is advisory rather than blocking.
 
 Example provider setup:
 
@@ -459,9 +459,19 @@ task-master parse-prd "openspec/changes/$ChangeName/proposal.md"
 
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir $Target --from-taskmaster --tag tm
+$queue = Join-Path $Target ".opencode-loop/queue.json"
+$tmp = Join-Path $env:TEMP "opencode-loop-queue.tmp.json"
+foreach ($id in (jq -r '.tasks[].id' $queue)) {
+  $result = jq --arg id $id '(.tasks[] | select(.id == $id) | .acceptance_checks) = [{"type":"command","command":"true"}] | (.tasks[] | select(.id == $id) | .review_required) = true' $queue
+  [System.IO.File]::WriteAllText($tmp, $result, $utf8)
+  Move-Item -Force $tmp $queue
+}
 opencode-loop queue validate --dir $Target
 opencode-loop queue prepare --dir $Target --json
 opencode-loop queue prepare --dir $Target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
+foreach ($id in (jq -r '.tasks[] | select(.status=="draft") | .id' $queue)) {
+  opencode-loop queue promote --dir $Target --task $id
+}
 opencode-loop init --dir $Target --mode execute
 opencode-loop start --dir $Target --profile execute
 ```

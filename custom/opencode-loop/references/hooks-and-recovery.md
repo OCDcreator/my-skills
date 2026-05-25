@@ -50,7 +50,7 @@ timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteratio
 timeout 120 opencode-loop hooks test --dir /path/to/target --event post_iteration --recovery
 ```
 
-Do not treat `hooks test` as the sole gatekeeper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook is still functional.
+Do not treat `hooks test` as the sole gatekeeper for hook readiness. If Layer 1 passes but Layer 2 hangs, the hook may still be functional, but inspect hook logs, quoting, timeout behavior, and unrelated extra hooks before trusting the wiring.
 
 For Full Auto execute queues, install the recovery hook before starting the supervisor. The helper only writes `.opencode-loop/gate-recovery-review-codex.sh` and `hooks.json`; it does not call Codex during setup. During execution, Codex is called only after a failed gate to decide whether a narrow queue contract can be repaired safely, for example by adding precise supporting tests to `scope_paths`.
 
