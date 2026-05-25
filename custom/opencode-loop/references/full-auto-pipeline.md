@@ -68,8 +68,8 @@ Layer 1: OpenSpec — create a change proposal
 Layer 2: Task Master — generate structured tasks
     task-master init --yes → task-master parse-prd → optional expand
     ↓
-Layer 3: opencode-loop — import, enrich, promote, execute
-    plan --from-taskmaster → enrich → queue promote → start execute
+Layer 3: opencode-loop — import, enrich, prepare, promote, execute
+    plan --from-taskmaster → enrich → queue prepare → queue promote → start execute
 ```
 
 ## Layer 1: OpenSpec
@@ -227,7 +227,27 @@ Move-Item -Force $tmp $queue
 
 PowerShell guidance here is **PowerShell 5.1+**, not 7+.
 
-### Step 3: Review Gate (Hook + Queue Contract)
+### Step 3: Prepare External Setup Tasks
+
+Run `queue prepare` after import/enrichment and before promotion or execute start:
+
+```bash
+opencode-loop queue prepare --dir /path/to/target --json
+opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
+opencode-loop status --dir /path/to/target --json
+```
+
+`queue prepare` reports setup/meta tasks that should not be executed by the same loop they are meant to bootstrap. Examples include Task Master's first "set up worktree", "initialize queue infrastructure", or "bootstrap project" tasks. `queue prepare --apply --done-meta-tasks --reason` does not delete them. It marks them as `kind: "external_setup"` and `status: "done"` with an external completion reason so dependency history remains intact and the next runnable task is real product work.
+
+Required checks before promotion:
+
+- `opencode-loop status --json` shows `queue_prepare.valid: true`.
+- `queue_prepare.has_meta_tasks` is `false`, or equivalent prepare JSON shows an empty `meta_tasks` list.
+- `opencode-loop queue next --dir /path/to/target` points at the first implementation task, not the bootstrap/setup task.
+
+If a setup task genuinely still needs implementation work inside the target product, rename/re-scope it as an implementation task with concrete `verification`, `acceptance_checks`, and review ownership. Do not use `external_setup` to bypass product work.
+
+### Step 4: Review Gate (Hook + Queue Contract)
 
 The review gate only recognizes a `post_iteration` hook named exactly `gate-review`, AND the task must have `review_required: true` (or the profile must have `reviewer_required: true`). **Attaching the hook is not enough** — the task-level flag must be set.
 
@@ -313,17 +333,19 @@ jq '.tasks[] | {id, review_required}' /path/to/target/.opencode-loop/queue.json
 jq '.profile.reviewer_required' /path/to/target/.opencode-loop/queue.json
 ```
 
-### Step 4: Promote
+### Step 5: Promote
 
 ```bash
 opencode-loop queue validate --dir /path/to/target
+opencode-loop queue prepare --dir /path/to/target --json
+opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
 
 for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' /path/to/target/.opencode-loop/queue.json); do
   opencode-loop queue promote --dir /path/to/target --task "$id"
 done
 ```
 
-### Step 5: Initialize And Start
+### Step 6: Initialize And Start
 
 ```bash
 opencode-loop init --dir /path/to/target --mode execute
@@ -386,6 +408,8 @@ for id in $(jq -r '.tasks[] | select(.acceptance_checks | length == 0) | .id' "$
 done
 
 opencode-loop queue validate --dir "$TARGET"
+opencode-loop queue prepare --dir "$TARGET" --json
+opencode-loop queue prepare --dir "$TARGET" --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
 for id in $(jq -r '.tasks[] | select(.status=="draft") | .id' "$QUEUE"); do
   opencode-loop queue promote --dir "$TARGET" --task "$id"
 done
@@ -436,6 +460,8 @@ task-master parse-prd "openspec/changes/$ChangeName/proposal.md"
 # === Layer 3: opencode-loop ===
 opencode-loop plan --dir $Target --from-taskmaster --tag tm
 opencode-loop queue validate --dir $Target
+opencode-loop queue prepare --dir $Target --json
+opencode-loop queue prepare --dir $Target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
 opencode-loop init --dir $Target --mode execute
 opencode-loop start --dir $Target --profile execute
 ```
@@ -495,10 +521,11 @@ On Windows, `opencode-loop` delegates Bash-facing workflows through WSL.
 2. Write `proposal.md` before `task-master parse-prd`.
 3. Import with `opencode-loop plan --from-taskmaster` — this creates `.opencode-loop/queue.json`.
 4. Enrich `verification` and `acceptance_checks` in `queue.json`.
-5. Set `review_required: true` on tasks that need gated review (hook alone is not sufficient).
-6. Promote each task.
-7. Initialize with `opencode-loop init --mode execute` — this creates `opencode.json`, `.opencode-loop/state.json`, and other runtime files. **Only `git add` files that exist at this point** (openspec/, .taskmaster/); `opencode.json` is gitignored by `setup.sh` and should not be committed.
-8. On macOS/Codex/SSH long runs, start with the printed `opencode-loop next-command --kind supervisor --profile execute --wrap tmux` command. Use plain `opencode-loop start --profile execute` only for short foreground runs.
-9. Inspect `queue status`, `queue show`, `status --json`, and then verify live activity with `ps` plus the latest `output-*.jsonl`; use progress/supervisor logs as supporting context rather than the sole source of truth.
+5. Run `opencode-loop queue prepare --dir /path/to/target --json`, then apply with `--apply --done-meta-tasks --reason "operator completed setup before loop launch" --json` before promotion; verify `status --json.queue_prepare.valid`, `queue_prepare.has_meta_tasks == false`, and that the next task is not setup/bootstrap.
+6. Set `review_required: true` on tasks that need gated review (hook alone is not sufficient).
+7. Promote each task.
+8. Initialize with `opencode-loop init --mode execute` — this creates `opencode.json`, `.opencode-loop/state.json`, and other runtime files. **Only `git add` files that exist at this point** (openspec/, .taskmaster/); `opencode.json` is gitignored by `setup.sh` and should not be committed.
+9. On macOS/Codex/SSH long runs, start with the printed `opencode-loop next-command --kind supervisor --profile execute --wrap tmux` command. Use plain `opencode-loop start --profile execute` only for short foreground runs.
+10. Inspect `queue status`, `queue show`, `status --json`, and then verify live activity with `ps` plus the latest `output-*.jsonl`; use progress/supervisor logs as supporting context rather than the sole source of truth.
 
 **When continuing in a new worktree**: Follow the full Worktree Continuation Checklist in SKILL.md § Worktree Isolation Lifecycle (state migration, dependency installation, baseline validation).

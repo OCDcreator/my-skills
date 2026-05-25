@@ -16,7 +16,7 @@ When the user gives you a requirement (e.g., "帮我写一个计算器库", "bui
 1. **Read `references/full-auto-pipeline.md`** — it contains the complete three-layer workflow. Load it now and follow it end-to-end.
 2. **Execute Layer 1** (OpenSpec) — `openspec init`, `openspec new change`, then YOU write the proposal.
 3. **Execute Layer 2** (Task Master) — `task-master init --yes`, `task-master parse-prd`, configure AI provider if needed.
-4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, promote, `init --mode execute`, start.
+4. **Execute Layer 3** (opencode-loop) — `plan --from-taskmaster`, enrich tasks, run `queue prepare`, promote, `init --mode execute`, start.
 5. **Install the outer self-healing guard** — run `opencode-loop heartbeat install --dir <target> --runner auto --interval-minutes 30` so a local cron/launchd heartbeat can wake Codex or OpenCode to repair `opencode-loop` itself.
 6. **Hand off** the running loop to the user with heartbeat/status instructions.
 
@@ -288,6 +288,21 @@ Imported execute queues default to `profile.isolation: "worktree"` and `profile.
 
 For `--from-form` and `--manual`, keep the temporary input file outside the target repo, such as `/tmp/task-form.json` or `/tmp/requirements.md`. If an import artifact is left untracked inside the target repo, execute mode's dirty-worktree protection can block before the first task starts. `plan` can replace the empty execute placeholder queue created by `init --mode execute`, but it must not overwrite a non-empty queue.
 
+After import, inspect for setup/meta tasks before enrichment or promotion:
+
+```bash
+opencode-loop queue prepare --dir /path/to/target --json
+```
+
+If the result lists tasks such as "set up worktree", "initialize queue", or "bootstrap project", treat them as externally completed operator work, not product implementation work. Apply the prepare step before promotion:
+
+```bash
+opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
+opencode-loop status --dir /path/to/target --json
+```
+
+`queue prepare --apply --done-meta-tasks --reason` preserves those tasks in `queue.json` as `kind: "external_setup"` and `status: "done"` with an external completion reason, so dependency history remains auditable while execution starts on the first real implementation task. Confirm `status --json` includes `queue_prepare.valid: true` and no runnable setup/meta tasks before starting execute mode.
+
 ### 2. Enrich Tasks
 
 Imported tasks need the task-level contract filled in before execution. Task Master imports usually carry `verification` from `testStrategy`, but `acceptance_checks` still need attention.
@@ -337,13 +352,15 @@ jq '(.tasks[] | select(.id == "openspec-1-1") | .acceptance_checks) = [{"type":"
 Promote tasks one at a time:
 
 ```bash
-opencode-loop queue status --dir /path/to/target --json
 opencode-loop queue validate --dir /path/to/target
+opencode-loop queue prepare --dir /path/to/target --json
+opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json
+opencode-loop queue status --dir /path/to/target --json
 opencode-loop queue promote --dir /path/to/target --task openspec-1-1
 opencode-loop queue promote --dir /path/to/target --task openspec-1-2
 ```
 
-Promotion checks queue integrity and valid verification configuration.
+Promotion checks queue integrity and valid verification configuration. Do not promote or start a queue while `queue prepare` still reports runnable setup/meta tasks; that is how a self-referential bootstrap task can reach the review gate with no task diff.
 
 ### 4. Initialize And Start
 

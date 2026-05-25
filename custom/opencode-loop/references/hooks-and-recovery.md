@@ -56,6 +56,8 @@ For Full Auto execute queues, install the recovery hook before starting the supe
 
 For Full Auto queues that require review, prefer `hooks install-review` over hand-written review scripts. The installed `gate-review` reads opencode-loop's review diff/context files, so committed clean task worktrees remain reviewable instead of being misclassified as "no diff".
 
+Before starting Full Auto execute queues, also run `opencode-loop queue prepare --dir /path/to/target --json` and then `opencode-loop queue prepare --dir /path/to/target --apply --done-meta-tasks --reason "operator completed setup before loop launch" --json`. This prevents setup/bootstrap tasks from reaching `gate-review` with no task diff. A prepared setup task stays in `queue.json` as `kind: "external_setup", status: "done"`; completed external setup tasks do not need review ownership because they represent operator/controller work already finished outside the target task queue.
+
 ## Self-Repair / Self-Evolution Protocol
 
 Use this low-freedom sequence when a stalled run reveals an `opencode-loop` controller, heartbeat, queue-contract, or skill gap. Do not skip to relaunching the target loop.
@@ -73,6 +75,13 @@ Use this low-freedom sequence when a stalled run reveals an `opencode-loop` cont
    git -C /path/to/target diff --stat
    ```
 3. Extract the first concrete blocker from the latest progress/output/stderr/supervisor/gate logs and queue `last_error`. The next model prompt must name that blocker, not say "continue".
+   If the blocker says the review/recovery hook failed with no captured diff on a setup/bootstrap task, inspect queue readiness before editing product code:
+   ```bash
+   opencode-loop queue prepare --dir /path/to/target --json
+   opencode-loop status --dir /path/to/target --json
+   opencode-loop queue next --dir /path/to/target
+   ```
+   If the current task is only external bootstrap work already completed by the operator, stop blind retries, apply `queue prepare`, verify the next task is real implementation work, and resume the same queue. Do not weaken `gate-review` globally to accept arbitrary no-diff completions.
 4. If the blocker is controller-side, fix the `opencode-loop` source first. Run the narrow relevant test, then `bash bin/test.sh` when feasible. Prepend the lesson to `docs/pitfalls-and-lessons.md`, commit, and deploy:
    ```bash
    bash bin/install-cli.sh
