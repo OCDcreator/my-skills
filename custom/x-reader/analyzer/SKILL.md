@@ -24,8 +24,9 @@ Choose tool based on input type:
 | Input | Tool |
 |-------|------|
 | Tweet URL | `fetch_tweet` or Jina Reader |
-| Web URL | `WebFetch` or Jina Reader |
+| Web URL | `WebFetch` or Jina Reader; use `x-reader/browser-fetch` if blocked, JS-rendered, or browser-only |
 | Local file | Read file directly |
+| CloakBrowser output | Read `/tmp/x_reader_browser_fetch.md` directly |
 | Transcript from video skill | Use directly |
 
 ### Step 2: Multi-Dimensional Analysis
