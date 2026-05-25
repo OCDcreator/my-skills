@@ -269,6 +269,7 @@ opencode-loop dashboard --dir /path/to/target --tail 20 --poll-seconds 2
 For execute queues with blocking review gates, inspect both audit surfaces when validating whether a reviewer really ran:
 - `.opencode-loop/review/<task>/review-*.json` plus the matching diff/stat/changed-files artifacts show the exact review context that was prepared for the reviewer.
 - `.opencode-loop/hooks/iteration-*-post_iteration-gate-review-blocking.log` and `...gate-recovery-review-blocking.log` should now exist for ordinary review and recovery review alike, preserving the invoked command plus stdout/stderr. If review context exists but the blocking hook log is missing after a controller update, treat that as a controller observability bug and fix `opencode-loop` before assuming the reviewer never ran.
+- For runtime-proof tasks, the review context JSON should also expose `analysis_signal_files`, `artifact_paths`, and `progress_excerpt`. Use those fields to verify gitignored proof artifacts such as `.obsidian-debug/...`; do not conclude "proof missing" from Git diff alone when the task contract depends on runtime screenshots, console captures, or generated JSON evidence.
 
 Do not treat `status --json` as liveness ground truth by itself. When a run looks stuck or inconsistent, use this order:
 
