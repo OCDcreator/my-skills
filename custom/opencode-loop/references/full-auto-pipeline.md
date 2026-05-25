@@ -249,7 +249,7 @@ If a setup task genuinely still needs implementation work inside the target prod
 
 ### Step 4: Review Gate (Hook + Queue Contract)
 
-The review gate only recognizes a `post_iteration` hook named exactly `gate-review`, AND the task must have `review_required: true` (or the profile must have `reviewer_required: true`). **Attaching the hook is not enough** — the task-level flag must be set.
+The review gate only recognizes a `post_iteration` hook named exactly `gate-review`, AND either the task must have `review_required: true` or the profile must have `reviewer_required: true`. **Attaching the hook is not enough** — one of those queue flags must enable review participation.
 
 Detect the reviewer command first, then build the appropriate flags per CLI:
 
@@ -462,7 +462,7 @@ opencode-loop plan --dir $Target --from-taskmaster --tag tm
 $queue = Join-Path $Target ".opencode-loop/queue.json"
 $tmp = Join-Path $env:TEMP "opencode-loop-queue.tmp.json"
 foreach ($id in (jq -r '.tasks[].id' $queue)) {
-  $result = jq --arg id $id '(.tasks[] | select(.id == $id) | .acceptance_checks) = [{"type":"command","command":"true"}] | (.tasks[] | select(.id == $id) | .review_required) = true' $queue
+  $result = jq --arg id $id '(.tasks[] | select(.id == $id) | .acceptance_checks) = [{"type":"reviewer"}] | (.tasks[] | select(.id == $id) | .review_required) = true' $queue
   [System.IO.File]::WriteAllText($tmp, $result, $utf8)
   Move-Item -Force $tmp $queue
 }
