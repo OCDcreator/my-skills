@@ -66,6 +66,8 @@ opencode-loop next-command --dir /path/to/target --kind supervisor --profile lon
 opencode-loop next-command --dir /path/to/target --kind supervisor --profile execute --wrap tmux --tmux-session target-loop
 opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-minutes 30
 opencode-loop heartbeat status --dir /path/to/target --json
+opencode-loop heartbeat incidents --dir /path/to/target
+opencode-loop heartbeat incidents --dir /path/to/target --json
 ```
 
 Use `opencode-loop update-check --json` only when the user explicitly asks whether the tool itself is current.
@@ -180,9 +182,31 @@ opencode-loop heartbeat install --dir /path/to/target --runner auto --interval-m
 The generated repair prompt requires the runner to:
 
 - inspect `status --json`, `observe --json`, and latest logs before acting;
+- inspect `heartbeat incidents --json` when any heartbeat recovery, repair, escalation, or cooldown suppression has occurred;
 - leave healthy runs alone and report exact task/process state;
 - when broken, preserve task work, fix verified `opencode-loop` controller bugs first, run tests, prepend `docs/pitfalls-and-lessons.md`, commit, redeploy with `bash bin/install-cli.sh`, and resume the original queue with `--resume-existing-queue`;
 - pause itself with `opencode-loop heartbeat pause --dir /path/to/target` only after the target task is truly complete.
+
+### 3c. Incident Journal And Hardening Loop
+
+Heartbeat is an outer recovery layer, not a substitute for a reliable controller. When `heartbeat run-once` decides to wake, repair, escalate, or suppress a wake because of cooldown, it records a structured incident under the target project's `.opencode-loop/heartbeat/incidents.jsonl`.
+
+Use the incident journal after every unexpected recovery:
+
+```bash
+opencode-loop heartbeat incidents --dir /path/to/target
+opencode-loop heartbeat incidents --dir /path/to/target --json
+```
+
+Treat each incident as product feedback:
+
+1. Identify the root cause class from the incident fields: scheduler, loop liveness, queue health, gate/review anomaly, or cooldown suppression.
+2. Check whether the same reason appears repeatedly. Repeated incidents mean the controller or queue contract needs hardening, not just another restart.
+3. If the cause is an `opencode-loop` bug or weak workflow contract, fix the controller repo, run focused tests, prepend the lesson to `docs/pitfalls-and-lessons.md`, commit, redeploy with `bash bin/install-cli.sh`, and refresh heartbeat.
+4. If the cause is skill guidance drift, update this skill and validate the skill repository instead of hiding the problem in a one-off prompt.
+5. In handoff summaries, include the latest incident action/reason, affected task, runner exit code, and whether a durable project fix was made.
+
+The goal is to reduce future incidents. Do not report "heartbeat recovered it" as complete unless you also checked whether the recovery revealed a durable bug, missing guardrail, or skill update.
 
 Key core-script flags:
 
