@@ -343,6 +343,8 @@ For Full Auto execute queues, install the recovery hook before starting the supe
 
 For Full Auto queues that require review, prefer `hooks install-review` over hand-written review scripts. The installed `gate-review` reads opencode-loop's review diff/context files, so committed clean task worktrees remain reviewable instead of being misclassified as "no diff".
 
+If `review/<task>/review-*.json` shows `artifact_paths` or `analysis_signal_files` but the matching `review-*-diff.patch` is empty, treat that as an artifact-only review case, not as proof the task is unreviewable. The correct contract is to keep the review hook running so the reviewer can inspect the repo-local artifacts and `progress_excerpt`; do not accept any controller/script version that rejects before the reviewer sees that context.
+
 For the complete three-layer pipeline (OpenSpec → Task Master → opencode-loop), see `references/full-auto-pipeline.md`.
 
 ## Queue-Gated Execute Mode
