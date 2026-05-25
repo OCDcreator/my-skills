@@ -288,7 +288,7 @@ Imported execute queues default to `profile.isolation: "worktree"` and `profile.
 
 For `--from-form` and `--manual`, keep the temporary input file outside the target repo, such as `/tmp/task-form.json` or `/tmp/requirements.md`. If an import artifact is left untracked inside the target repo, execute mode's dirty-worktree protection can block before the first task starts. `plan` can replace the empty execute placeholder queue created by `init --mode execute`, but it must not overwrite a non-empty queue.
 
-After import, inspect for setup/meta tasks before enrichment or promotion:
+After import and enrichment, inspect for setup/meta tasks before promotion or start:
 
 ```bash
 opencode-loop queue prepare --dir /path/to/target --json
