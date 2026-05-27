@@ -347,7 +347,7 @@
       "expected_output": "Generates or recommends a visual-review pack from screenshot, DOM, scenario, and comparison evidence while clearly stating that screenshots support human review but do not replace full manual GUI validation.",
       "files": [
         "scripts/obsidian_debug_visual_review.mjs",
-        "AGENT-QUICKSTART.md",
+        "references/command-reference.md",
         "SKILL.md"
       ],
       "expectations": [
@@ -391,9 +391,9 @@
       "id": 27,
       "name": "agent-one-page-quickstart",
       "prompt": "另一个 Agent 只愿意读一页。给它一个最短可执行入口：先看什么、跑什么 doctor、怎么选 backend、怎么生成 diagnosis/report/handoff。",
-      "expected_output": "Uses AGENT-QUICKSTART.md as the one-page operational entrypoint with exact commands, backend selection, analysis/report generation, handoff outputs, and GUI/screenshot boundaries.",
+      "expected_output": "Uses the one-page operational entry point in references/command-reference.md as the shortest executable path, including doctor, backend selection, diagnosis/report generation, handoff outputs, and GUI/screenshot boundaries.",
       "files": [
-        "AGENT-QUICKSTART.md"
+        "references/command-reference.md"
       ],
       "expectations": [
         "Starts with target identification and doctor.",

@@ -4,6 +4,7 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 
 ## Contents
 
+- [One-Page Operational Entry Point](#one-page-operational-entry-point)
 - [Desktop Control Preconditions](#desktop-control-preconditions)
 - [Primary Entrypoints](#primary-entrypoints)
 - [Job Specs](#job-specs)
@@ -20,6 +21,84 @@ Read this file only when you need concrete script commands, flags, or handoff ex
 - [Optional Ecosystem Tools](#optional-ecosystem-tools)
 - [CI And Headless Quality Gates](#ci-and-headless-quality-gates)
 - [Troubleshooting](#troubleshooting)
+
+## One-Page Operational Entry Point
+
+Use this section when another agent only needs the shortest executable path. Fall back to the later sections for flags and edge cases.
+
+1. Identify the target plugin id, repo build command, test vault plugin directory, and whether the available control lane is `obsidian-cli`, bundled CDP, or a routed MCP/REST/Playwright surface.
+2. Run doctor first:
+
+```bash
+node scripts/obsidian_debug_doctor.mjs \
+  --repo-dir <plugin-repo> \
+  --plugin-id <plugin-id> \
+  --test-vault-plugin-dir <vault>/.obsidian/plugins/<plugin-id> \
+  --output <plugin-repo>/.obsidian-debug/doctor.json \
+  --fix
+```
+
+3. If Obsidian is closed or the wrong vault is focused, recover app control before debugging plugin code:
+
+```bash
+node scripts/obsidian_debug_launch_app.mjs --mode auto --vault-name "<vault>" --output <plugin-repo>/.obsidian-debug/app-launch.json
+```
+
+4. Generate backend routing when the runtime exposes more than one viable lane:
+
+```bash
+node scripts/obsidian_debug_control_backend_support.mjs \
+  --doctor <plugin-repo>/.obsidian-debug/doctor.json \
+  --output <plugin-repo>/.obsidian-debug/control-backends.json
+```
+
+Default backend order:
+
+- `obsidian-cli` for reload, logs, screenshot, and DOM.
+- `bundled-cdp` when CLI misses timing-critical logs or cannot see Obsidian.
+- `playwright-script` for repo-owned locator/assertion flows.
+- `obsidian-cli-rest`, `chrome-devtools-mcp`, or `playwright-mcp` only when the current runtime exposes safe callable tools.
+
+5. Run either the repeatable job or a one-off local cycle:
+
+```bash
+node scripts/obsidian_debug_job.mjs --job <plugin-repo>/.obsidian-debug/job.json --platform auto --dry-run
+node scripts/obsidian_debug_job.mjs --job <plugin-repo>/.obsidian-debug/job.json --platform auto --mode run
+```
+
+```bash
+powershell -File scripts/obsidian_plugin_debug_cycle.ps1 -PluginId <plugin-id> -TestVaultPluginDir <vault>/.obsidian/plugins/<plugin-id>
+bash scripts/obsidian_plugin_debug_cycle.sh --plugin-id <plugin-id> --test-vault-plugin-dir <vault>/.obsidian/plugins/<plugin-id>
+```
+
+6. Generate diagnosis, visual review, and handoff artifacts in this order:
+
+```bash
+node scripts/obsidian_debug_analyze.mjs \
+  --summary <plugin-repo>/.obsidian-debug/summary.json \
+  --assertions assertions/plugin-view-health.template.json \
+  --doctor <plugin-repo>/.obsidian-debug/doctor.json \
+  --agent-tools-output <plugin-repo>/.obsidian-debug/agent-tools.json \
+  --output <plugin-repo>/.obsidian-debug/diagnosis.json
+
+node scripts/obsidian_debug_visual_review.mjs \
+  --diagnosis <plugin-repo>/.obsidian-debug/diagnosis.json \
+  --output <plugin-repo>/.obsidian-debug/visual-review.json \
+  --html-output <plugin-repo>/.obsidian-debug/visual-review.html
+
+node scripts/obsidian_debug_report.mjs \
+  --diagnosis <plugin-repo>/.obsidian-debug/diagnosis.json \
+  --agent-tools <plugin-repo>/.obsidian-debug/agent-tools.json \
+  --output <plugin-repo>/.obsidian-debug/report.html
+```
+
+Read the outputs in this order: `diagnosis.json` first, `agent-tools.json` second, `visual-review.html` third, raw logs only when the diagnosis is inconclusive.
+
+Boundaries:
+
+- Treat blank or wrong-surface screenshots as surface-activation or capture-routing failures until proven otherwise.
+- Treat screenshot packs as visual-review support, not full manual GUI verification.
+- Treat MCP/REST surfaces as optional routed control backends after localhost, auth, and tool-allowlist checks pass.
 
 ## Desktop Control Preconditions
 
