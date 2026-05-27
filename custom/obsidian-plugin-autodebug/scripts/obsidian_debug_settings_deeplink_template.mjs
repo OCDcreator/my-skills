@@ -95,6 +95,26 @@ function activeTabText(selector) {
   return element?.textContent?.trim() || element?.getAttribute('data-tab-id') || null;
 }
 
+function focusTargetLeaf(expectedTarget) {
+  const escapedTarget = CSS.escape(expectedTarget);
+  const target = document.querySelector(\`[data-settings-target="\${escapedTarget}"]\`);
+  if (!target) return { ok: false, reason: 'target-not-found' };
+  const leaf = target.closest('.workspace-leaf');
+  if (!leaf) return { ok: false, reason: 'no-leaf' };
+  if (!leaf.classList.contains('mod-active')) {
+    const parent = leaf.parentElement;
+    if (parent) {
+      for (const sibling of parent.children) {
+        if (sibling !== leaf && sibling.classList.contains('workspace-leaf')) {
+          sibling.classList.remove('mod-active');
+        }
+      }
+    }
+    leaf.classList.add('mod-active');
+  }
+  return { ok: true };
+}
+
 function measureTarget(expectedTarget) {
   const root = document.querySelector(ROOT_SELECTOR) || document.body;
   const escapedTarget = CSS.escape(expectedTarget);
@@ -125,6 +145,8 @@ const results = [];
 for (const item of ACTIONS) {
   await item.action();
   await sleep(700);
+  focusTargetLeaf(item.expectedTarget);
+  await sleep(200);
   const measurement = measureTarget(item.expectedTarget);
   const activePrimary = activeTabText('.opencodian-settings-tab-primary.opencodian-settings-tab-active');
   const activeSecondary = activeTabText('.opencodian-settings-tab-secondary.opencodian-settings-tab-active');

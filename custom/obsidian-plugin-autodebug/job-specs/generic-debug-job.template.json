@@ -98,7 +98,8 @@
   },
   "capture": {
     "screenshot": true,
-    "dom": true
+    "dom": true,
+    "preScreenshotEval": ""
   },
   "state": {
     "restoreAfterRun": false,

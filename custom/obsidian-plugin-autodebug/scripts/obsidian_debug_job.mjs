@@ -249,6 +249,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
     addSwitch(args, '-SkipReload', !enabled(reload, true));
     addSwitch(args, '-SkipScreenshot', !captureEnabled || capture.screenshot === false);
     addSwitch(args, '-SkipDom', !captureEnabled || capture.dom === false);
+    addValue(args, '-PreScreenshotEval', stringValue(capture.preScreenshotEval));
     return commandFor({
       phase: 'debug-cycle',
       executable: 'powershell',
@@ -311,6 +312,7 @@ function buildCycleCommand({ spec, platform, cwd, warnings, outputDirOverride = 
   addSwitch(args, '--skip-reload', !enabled(reload, true));
   addSwitch(args, '--skip-screenshot', !captureEnabled || capture.screenshot === false);
   addSwitch(args, '--skip-dom', !captureEnabled || capture.dom === false);
+  addValue(args, '--pre-screenshot-eval', stringValue(capture.preScreenshotEval));
   return commandFor({
     phase: 'debug-cycle',
     executable: 'bash',

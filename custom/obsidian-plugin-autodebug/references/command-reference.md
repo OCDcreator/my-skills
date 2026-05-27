@@ -119,6 +119,18 @@ node scripts/obsidian_cdp_reload_and_trace.mjs --plugin-id <id> --duration-secon
 node scripts/obsidian_cdp_capture_ui.mjs --selector ".workspace-leaf.mod-active" --html-output .obsidian-debug/dom.html --screenshot-output .obsidian-debug/screenshot.png
 ```
 
+For settings modals or race-prone tabbed surfaces, prefer a target selector plus a pre-capture eval instead of a broad active-leaf selector:
+
+```bash
+node scripts/obsidian_cdp_capture_ui.mjs \
+  --selector '[data-settings-target="claude-code-model-thinking"]' \
+  --pre-eval 'document.querySelector(\"[data-tab-id=\\\"model-thinking\\\"]\")?.click()' \
+  --html-output .obsidian-debug/settings-dom.html \
+  --screenshot-output .obsidian-debug/settings.png
+```
+
+The capture helper now auto-detects visible settings modals when `--selector` is omitted, waits longer after `--pre-eval`, and tries to focus the target modal/leaf before capture.
+
 On macOS, if no full Obsidian CLI is available, launch Obsidian with a debug port first:
 
 ```bash

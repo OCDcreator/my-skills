@@ -52,7 +52,8 @@ param(
   [switch]$SkipDeploy,
   [switch]$SkipReload,
   [switch]$SkipScreenshot,
-  [switch]$SkipDom
+  [switch]$SkipDom,
+  [string]$PreScreenshotEval = ""
 )
 
 Set-StrictMode -Version Latest
@@ -702,6 +703,12 @@ if (-not $UseCdp) {
 
 if (-not $SkipScreenshot) {
   Write-Section "Screenshot"
+  if ($PreScreenshotEval.Trim().Length -gt 0) {
+    Write-Section "Pre-Screenshot Eval"
+    Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "eval" -Arguments @("code=$PreScreenshotEval") -AllowFailure |
+      Set-Content -LiteralPath (Join-Path $resolvedOutputDir "pre-screenshot-eval.txt") -Encoding UTF8
+    Start-Sleep -Milliseconds 500
+  }
   Invoke-ObsidianCli -Executable $resolvedObsidianCommand -Command "dev:screenshot" -Arguments @("path=$screenshotPath") -AllowFailure |
     Set-Content -LiteralPath (Join-Path $resolvedOutputDir "screenshot-command.txt") -Encoding UTF8
 }

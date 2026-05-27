@@ -47,6 +47,7 @@ SKIP_DEPLOY=0
 SKIP_RELOAD=0
 SKIP_SCREENSHOT=0
 SKIP_DOM=0
+PRE_SCREENSHOT_EVAL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -96,6 +97,40 @@ while [[ $# -gt 0 ]]; do
     --skip-reload) SKIP_RELOAD=1; shift ;;
     --skip-screenshot) SKIP_SCREENSHOT=1; shift ;;
     --skip-dom) SKIP_DOM=1; shift ;;
+    --pre-screenshot-eval) PRE_SCREENSHOT_EVAL="$2"; shift 2 ;;
+    --help)
+      cat <<'EOF'
+Usage: bash scripts/obsidian_plugin_debug_cycle.sh [options]
+
+Required:
+  --plugin-id <id>
+  --test-vault-plugin-dir <path>
+
+Common options:
+  --vault-name <name>           Target vault name.
+  --build-command <cmd>         Build command. Default: "npm run build".
+  --deploy-from <dir>           Artifact source directory. Default: dist.
+  --output-dir <dir>            Debug output directory. Default: .obsidian-debug.
+  --watch-seconds <n>           Console watch duration. Default: 20.
+  --console-limit <n>           Console line limit. Default: 200.
+  --dom-selector <css>          DOM capture selector. Default: .workspace-leaf.mod-active.
+  --use-cdp                     Use CDP instead of CLI for reload/capture.
+  --cdp-host <host>             CDP host. Default: 127.0.0.1.
+  --cdp-port <n>                CDP port. Default: 9222.
+  --scenario-name <name>        Scenario name for view-opening.
+  --scenario-path <path>        Scenario JSON path.
+  --assertions <path>           Assertion JSON path.
+  --skip-app-launch             Skip auto-launch/focus.
+  --skip-build                  Skip build.
+  --skip-deploy                 Skip deploy.
+  --skip-reload                 Skip reload.
+  --skip-screenshot             Skip screenshot.
+  --skip-dom                    Skip DOM capture.
+  --pre-screenshot-eval <js>    JS expression to run before screenshot.
+  --help                        Show this help.
+EOF
+      exit 0
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 1
@@ -651,6 +686,11 @@ fi
 
 if [[ "$SKIP_SCREENSHOT" -eq 0 ]]; then
   write_section "Screenshot"
+  if [[ -n "$PRE_SCREENSHOT_EVAL" && "$CLI_AVAILABLE" -eq 1 ]]; then
+    write_section "Pre-Screenshot Eval"
+    obsidian_cli --quiet eval "code=$PRE_SCREENSHOT_EVAL" > "$OUTPUT_DIR/pre-screenshot-eval.txt" 2>&1 || true
+    sleep 0.5
+  fi
   if [[ "$CLI_AVAILABLE" -eq 1 ]]; then
     obsidian_cli --quiet dev:screenshot "path=$SCREENSHOT_PATH" > "$OUTPUT_DIR/screenshot-command.txt" 2>&1 || true
   elif [[ "$USE_CDP" -eq 1 ]]; then
@@ -664,6 +704,9 @@ if [[ "$SKIP_SCREENSHOT" -eq 0 ]]; then
     )
     if [[ -n "$CDP_TARGET_TITLE_CONTAINS" ]]; then
       cdp_capture_args+=(--target-title-contains "$CDP_TARGET_TITLE_CONTAINS")
+    fi
+    if [[ -n "$PRE_SCREENSHOT_EVAL" ]]; then
+      cdp_capture_args+=(--pre-eval "$PRE_SCREENSHOT_EVAL")
     fi
     node "${cdp_capture_args[@]}"
   fi

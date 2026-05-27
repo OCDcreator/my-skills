@@ -170,6 +170,8 @@ Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/
 
 For CSS-only regressions, prefer computed-style assertions against a small synthetic fixture or stable injected DOM over waiting for real business data, remote catalogs, or async directory hydration. Capture screenshots only after the computed style proves the expected class/rule is active.
 
+For settings surfaces that open in a modal, prefer stable `data-settings-target` selectors and let the capture helper auto-detect the modal instead of assuming `.workspace-leaf.mod-active`. Use `preEval` / `capture.preScreenshotEval` to click or activate the exact tab first when navigation is race-prone.
+
 Do not trust bundled or copied assertion text blindly. If a custom assertion fails but `scenario-report.json`, `obsidian eval`, or a targeted DOM query proves the plugin surface is open, treat the assertion target as stale and replace it with a stable current surface signal such as the plugin view type, a durable root selector, visible title text, or command-owned UI text. Keep project-specific assertion fixes in the matching project profile or project debug folder unless the bundled example itself is stale.
 
 Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` when the plugin needs click/locator assertions and either a Playwright module is installed in the repo or `playwright-cli` can be resolved.
@@ -207,6 +209,8 @@ For settings deep links from another plugin surface, prefer stable `data-*` targ
 For flicker, blink, or accidental-remount regressions, do not only assert that the same text appears after interaction. Capture the important DOM node before the action, perform the interaction, then assert the current query returns the exact same node and that any important child node is still contained by it. This catches visually subtle loading flashes where content returns to the same final text after being unnecessarily destroyed and recreated.
 
 For screenshot-based GUI handoff, run `scripts/obsidian_debug_visual_review.mjs` after diagnosis. The generated `visual-review.html` is useful for human review of blank panes, visible errors, clipped text, contrast, obvious layout regressions, and target surface reachability. It does **not** replace reliable manual GUI validation for hover/focus/drag behavior, keyboard feel, timing-sensitive animation, or final official-review judgment. Back critical visual findings with DOM/text/log assertions whenever possible.
+
+When a screenshot keeps landing on the wrong settings page, treat it as a capture-routing issue first: target the destination with `data-settings-target`, let the capture helper pick the visible settings modal when one exists, and only fall back to a leaf selector when the plugin surface truly lives in a workspace leaf.
 
 ## Performance Debugging Pattern
 
