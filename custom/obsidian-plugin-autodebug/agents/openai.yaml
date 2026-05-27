@@ -1,4 +1,4 @@
 interface:
   display_name: "Obsidian Plugin Autodebug"
-  short_description: "Debug Obsidian plugins with reload, screenshot, DOM evidence"
-  default_prompt: "Use $obsidian-plugin-autodebug to build, deploy, reload, capture console/DOM/screenshot evidence, and diagnose this Obsidian plugin. Prove the target surface is mounted before capturing; treat blank or wrong-surface screenshots as routing or activation issues first."
+  short_description: "Autodebug Obsidian plugins: build, deploy, reload, capture evidence"
+  default_prompt: "Use $obsidian-plugin-autodebug to run the full autodebug loop: build, deploy, reload, capture console/DOM/screenshot evidence, and diagnose this Obsidian plugin. Prove the target surface is mounted before capturing; treat blank or wrong-surface screenshots as routing or activation issues first."

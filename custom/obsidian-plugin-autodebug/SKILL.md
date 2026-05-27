@@ -1,6 +1,6 @@
 ---
 name: obsidian-plugin-autodebug
-description: Use when any Obsidian community plugin work turns into debugging, smoke testing, or release validation, especially for white screens after reload, slow startup, manual refresh loops, stale UI after deploy/reload despite fresh artifacts, runtime locale/i18n assertion problems, closed-app recovery, fresh-vault install or discovery failures, BUILD_ID deploy checks, console or DevTools capture, screenshots, DOM/CSS assertions, watch-on-save, state reset, or other implicit plugin troubleshooting.
+description: Use when Obsidian plugin work turns into debugging, smoke testing, or release validation. Triggers include white screens after reload, slow startup, stale UI after deploy, fresh-vault install failures, console/DevTools capture, screenshots, DOM/CSS assertions, locale/i18n checks, watch-on-save loops, state reset, or any implicit plugin troubleshooting.
 ---
 
 # Obsidian Plugin Autodebug
@@ -158,76 +158,36 @@ For an existing plugin, keep absolute machine paths in the copied repo-local job
 
 ## UI Surface And Assertions
 
-### Surface Activation Before Capture
+### Blank or Wrong-Surface Screenshot Triage
 
-Before every screenshot or DOM capture, prove the target surface is mounted and routed correctly. Do not blame the screenshot backend until these checks pass.
+Before blaming the screenshot backend, prove the target surface is mounted and routed correctly.
 
 **Required pre-capture checklist:**
 
-1. **Prove the surface opened.** For workspace-leaf views, run the real open-view command, then wait until `app.workspace.getLeavesOfType(<actual-view-type>).length > 0`. For settings modals, confirm the modal element is present in the DOM and the intended tab panel is visible.
+1. **Prove the surface opened.** For workspace-leaf views, run the real open-view command and confirm `getLeavesOfType(<actual-view-type>).length > 0`. For settings modals, confirm the modal is present and the intended tab panel is visible.
 2. **Prove routing matches reality.** Use the actual registered view type and command id from the repo or runtime. Do not assume the view type equals the plugin id.
-3. **Prove navigation is settled.** For tabbed settings surfaces, confirm the active-tab marker and a durable content-shell selector both match the intended page before capturing. Do not capture while a navigation race is in flight.
-4. **Capture only after proof.** Once the surface is proven mounted, use the correct selector or let the capture helper auto-detect the modal.
+3. **Prove navigation is settled.** For tabbed settings, confirm the active-tab marker and a durable content-shell selector both match the intended page. Do not capture while a navigation race is in flight.
+4. **Capture only after proof.** Use the correct selector or let the capture helper auto-detect the modal.
 
-If the leaf count stays `0` or the intended tab panel is not visible after the open command, treat the failure as **surface activation or capture routing**, never as a screenshot-backend failure. See `references/command-reference.md` for concrete eval commands and the full triage sequence.
+If any check fails → treat it as **surface activation or capture routing**, never as a screenshot-backend failure. See `references/command-reference.md` for concrete eval commands and the full triage sequence.
 
-Use DOM checks for deterministic assertions and screenshots for visual review. Good generic assertions include:
+### DOM Assertions And Scenarios
 
-- plugin view/root selector exists and is visible;
-- expected heading, status, button, or settings text is present;
-- error banners are absent;
-- key attributes or computed styles are correct;
-- startup or view-open timings stay within budget.
+Prefer DOM checks for deterministic proof; use screenshots for visual review only. Good generic assertions: plugin root selector visible, expected text present, error banners absent, computed styles correct, timings within budget.
 
-Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/plugin-surface.template.json` when the plugin does not have one obvious command id or root selector.
+Start from `assertions/plugin-view-health.template.json`. Use `surface-profiles/plugin-surface.template.json` when the plugin has no obvious command id or root selector. Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks.
 
-For CSS-only regressions, prefer computed-style assertions against a small synthetic fixture or stable injected DOM over waiting for real business data, remote catalogs, or async directory hydration. Capture screenshots only after the computed style proves the expected class/rule is active.
+For CSS-only regressions, assert computed style against a synthetic fixture before capturing screenshots. For settings modals, prefer stable `data-settings-target` selectors and let the capture helper auto-detect the modal.
 
-For settings surfaces that open in a modal, prefer stable `data-settings-target` selectors and let the capture helper auto-detect the modal instead of assuming `.workspace-leaf.mod-active`. Use `preEval` / `capture.preScreenshotEval` to click or activate the exact tab first when navigation is race-prone.
+For behavior that static DOM cannot prove (composer input, settings toggles, command palettes), write a small JavaScript assertion and run it through `scripts/obsidian_eval_file.mjs`. Stateful assertions must snapshot settings, perform interactions inside `try`, restore in `finally`, and return JSON with `ok` and `restored` status. Use `--clear-before --capture-after` to judge final console/error residue.
 
-For workspace-leaf plugin views, read the repo/runtime first, use the actual open-view command or `activateView()` equivalent, and wait until the leaf count is non-zero before capture.
+For i18n checks, assert runtime translation state and rendered UI text, not just `plugin.settings.locale`. For tabbed settings, anchor to the navigation owner and wait for both active-tab marker and durable content-shell selector before triggering refreshes.
 
-Do not trust bundled or copied assertion text blindly. If a custom assertion fails but `scenario-report.json`, `obsidian eval`, or a targeted DOM query proves the plugin surface is open, treat the assertion target as stale and replace it with a stable current surface signal such as the plugin view type, a durable root selector, visible title text, or command-owned UI text. Keep project-specific assertion fixes in the matching project profile or project debug folder unless the bundled example itself is stale.
+For flicker or remount regressions, assert node identity (same DOM node before and after interaction), not just identical text.
 
-Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` when the plugin needs click/locator assertions and either a Playwright module is installed in the repo or `playwright-cli` can be resolved.
+Run `scripts/obsidian_debug_visual_review.mjs` after diagnosis for human review of blank panes, clipping, and layout regressions. It does **not** replace manual GUI validation for hover, keyboard, or animation. Back critical visual findings with DOM/text/log assertions whenever possible.
 
-For the local `playwright-script` lane, Playwright resolution is:
-
-1. repo-local Playwright module (`playwright`, `playwright-core`, or `@playwright/test`);
-2. explicit `--playwright-cli-command <cmd>`;
-3. `playwright-cli` from `PATH`;
-4. local `npx --no-install playwright-cli`;
-5. automatic bootstrap via `npm exec --yes --package=@playwright/cli@latest -- playwright-cli` unless `--playwright-no-bootstrap` is set.
-
-On Windows, the runner transparently uses `npm.cmd` / `npx.cmd` through `cmd.exe /c`, so the fallback still works in a default PowerShell environment.
-
-The scenario runner resolves surface-opening strategies in this order:
-
-1. declared surface profile metadata;
-2. known Obsidian command ids or view types;
-3. CDP DOM heuristics.
-
-`scenario-report.json` records the selected strategy plus discovered root selectors, headings, settings surfaces, error banners, empty states, and Playwright driver details. When Playwright cannot be acquired, the runner writes a structured failure report and exits with code `1` instead of crashing with a raw stack trace.
-
-When `scenario.enabled` is true, the scenario lane may probe CDP DOM heuristics even if the selected open action is an Obsidian CLI command. If the run fails with `ECONNREFUSED 127.0.0.1:9222`, first recover CDP with `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` and rerun, or disable the scenario and use CLI `obsidian eval`/DOM assertions for a pure CLI pass.
-
-For behavior that cannot be proven from a static DOM capture, write a small JavaScript assertion and run it through `scripts/obsidian_eval_file.mjs`; `obsidian eval` accepts `code=...`, not `file=...`. This is useful for composer input, settings toggles, command palettes, cached catalogs, and other stateful UI paths. Keep one-off assertions in `.obsidian-debug/`; keep reusable project-specific assertion scripts in `projects/<project>/scripts/` and reusable assertion configs in `projects/<project>/assertions/`, or store either in the target repo’s debug folder. If a matching project profile already exposes a stateful assertion script, prefer running that script before writing a new inline `obsidian eval` command.
-
-Inline `obsidian eval` snippets must use an expression, top-level `await`, or an IIFE when they need control flow. A top-level `return` fails in CLI eval and can look like a plugin/runtime regression when the real issue is the assertion wrapper.
-
-Stateful assertions must snapshot any settings/config they mutate, perform UI interactions inside `try`, restore in `finally`, and return JSON that includes both assertion status and restore status. Use `--clear-before --capture-after` when final console/error residue matters; distinguish transient stdout from reload/restore steps from final `dev:errors` or `dev:console` captures.
-
-For i18n checks, do not rely only on mutating `plugin.settings.locale`. Assert the runtime translation state that the UI actually reads. If the runtime locale remains stale, save the locale, reload the plugin or vault, or switch through the real settings UI before judging the string assertion.
-
-For tabbed or multi-level settings surfaces, anchor assertions to the current navigation owner before touching nested controls. After clicking a primary or secondary tab, wait for both the active tab marker and a content-shell attribute or durable root selector that proves the intended page is mounted. Trigger refresh buttons only after the intended tab is active; otherwise a refresh promise can re-render the previous content while the assertion has already moved on. When UI information architecture changes, treat old inner-tab selectors as stale test code and replace them with owner-level navigation selectors instead of adding fallback selectors that hide the mismatch.
-
-For settings deep links from another plugin surface, prefer stable `data-*` targets over localized heading text. If a plugin does not already expose stable targets, recommend adding attributes such as `data-settings-target="section-subsection"` to the destination block. Use `scripts/obsidian_debug_settings_deeplink_template.mjs` to generate a project-local `obsidian_eval_file.mjs` assertion scaffold that reports active primary/secondary tabs, scroll container, `scrollTop`, target text, and target offset.
-
-For flicker, blink, or accidental-remount regressions, do not only assert that the same text appears after interaction. Capture the important DOM node before the action, perform the interaction, then assert the current query returns the exact same node and that any important child node is still contained by it. This catches visually subtle loading flashes where content returns to the same final text after being unnecessarily destroyed and recreated.
-
-For screenshot-based GUI handoff, run `scripts/obsidian_debug_visual_review.mjs` after diagnosis. The generated `visual-review.html` is useful for human review of blank panes, visible errors, clipped text, contrast, obvious layout regressions, and target surface reachability. It does **not** replace reliable manual GUI validation for hover/focus/drag behavior, keyboard feel, timing-sensitive animation, or final official-review judgment. Back critical visual findings with DOM/text/log assertions whenever possible.
-
-When a screenshot lands on the wrong settings page, follow the capture-routing checks in **Surface Activation Before Capture** first: confirm the intended tab is active, use `data-settings-target` when available, and let the capture helper auto-detect the visible modal. Only fall back to a leaf selector when the plugin surface truly lives in a workspace leaf.
+For Playwright resolution, scenario runner strategy, CDP recovery, and complete assertion code templates, see `references/command-reference.md`.
 
 ## Performance Debugging Pattern
 
