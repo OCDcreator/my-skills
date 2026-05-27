@@ -172,6 +172,8 @@ For CSS-only regressions, prefer computed-style assertions against a small synth
 
 For settings surfaces that open in a modal, prefer stable `data-settings-target` selectors and let the capture helper auto-detect the modal instead of assuming `.workspace-leaf.mod-active`. Use `preEval` / `capture.preScreenshotEval` to click or activate the exact tab first when navigation is race-prone.
 
+For workspace-leaf plugin views, do not assume the view type or open-view command matches the plugin id. Read the repo/runtime first, use the actual open-view command or `activateView()` equivalent, and wait until `app.workspace.getLeavesOfType(<actual-view-type>).length > 0` before capture. If the leaf count stays `0`, treat the problem as surface activation or capture routing, not as a screenshot-backend failure.
+
 Do not trust bundled or copied assertion text blindly. If a custom assertion fails but `scenario-report.json`, `obsidian eval`, or a targeted DOM query proves the plugin surface is open, treat the assertion target as stale and replace it with a stable current surface signal such as the plugin view type, a durable root selector, visible title text, or command-owned UI text. Keep project-specific assertion fixes in the matching project profile or project debug folder unless the bundled example itself is stale.
 
 Use `scenarios/open-plugin-view.json` for generic view-opening smoke checks. Use `scenarios/playwright-locator-health.template.json` when the plugin needs click/locator assertions and either a Playwright module is installed in the repo or `playwright-cli` can be resolved.
@@ -197,6 +199,8 @@ The scenario runner resolves surface-opening strategies in this order:
 When `scenario.enabled` is true, the scenario lane may probe CDP DOM heuristics even if the selected open action is an Obsidian CLI command. If the run fails with `ECONNREFUSED 127.0.0.1:9222`, first recover CDP with `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` and rerun, or disable the scenario and use CLI `obsidian eval`/DOM assertions for a pure CLI pass.
 
 For behavior that cannot be proven from a static DOM capture, write a small JavaScript assertion and run it through `scripts/obsidian_eval_file.mjs`; `obsidian eval` accepts `code=...`, not `file=...`. This is useful for composer input, settings toggles, command palettes, cached catalogs, and other stateful UI paths. Keep one-off assertions in `.obsidian-debug/`; keep reusable project-specific assertion scripts in `projects/<project>/scripts/` and reusable assertion configs in `projects/<project>/assertions/`, or store either in the target repo’s debug folder. If a matching project profile already exposes a stateful assertion script, prefer running that script before writing a new inline `obsidian eval` command.
+
+Inline `obsidian eval` snippets must use an expression, top-level `await`, or an IIFE when they need control flow. A top-level `return` fails in CLI eval and can look like a plugin/runtime regression when the real issue is the assertion wrapper.
 
 Stateful assertions must snapshot any settings/config they mutate, perform UI interactions inside `try`, restore in `finally`, and return JSON that includes both assertion status and restore status. Use `--clear-before --capture-after` when final console/error residue matters; distinguish transient stdout from reload/restore steps from final `dev:errors` or `dev:console` captures.
 

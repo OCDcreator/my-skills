@@ -73,6 +73,24 @@ If Obsidian is closed, run the launch helper first:
 node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json
 ```
 
+## Blank Screenshot Or Missing Leaf Triage
+
+For plugin-view captures, first prove the target surface actually mounted. Blank screenshots often mean the plugin leaf never opened or you guessed the wrong view type / command id.
+
+```bash
+obsidian eval vault="<vault>" code="Object.keys(app.commands.commands).filter((id)=>id.includes('<plugin-id>'))"
+obsidian eval vault="<vault>" code="await app.plugins.plugins.<plugin-id>.activateView(); 'opened'"
+obsidian eval vault="<vault>" code="JSON.stringify({leaves: app.workspace.getLeavesOfType('<actual-view-type>').length})"
+```
+
+Do not assume the view type equals the plugin id. Use the real registered view type from the repo or runtime, then wait until the leaf count is non-zero before capturing DOM or screenshots.
+
+When inline control flow needs `return`, wrap the snippet in an IIFE instead of using a top-level `return`:
+
+```bash
+obsidian eval vault="<vault>" code="(function(){ const leaves = app.workspace.getLeavesOfType('<actual-view-type>'); return JSON.stringify({ leaves: leaves.length }); })()"
+```
+
 ## Stale Runtime Versus Fresh Artifact
 
 Use this when deploy verification says the new artifact is present, but `plugin:reload` leaves the visible UI on old text, old CSS, or old behavior.
