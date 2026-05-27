@@ -158,6 +158,19 @@ For an existing plugin, keep absolute machine paths in the copied repo-local job
 
 ## UI Surface And Assertions
 
+### Surface Activation Before Capture
+
+Before every screenshot or DOM capture, prove the target surface is mounted and routed correctly. Do not blame the screenshot backend until these checks pass.
+
+**Required pre-capture checklist:**
+
+1. **Prove the surface opened.** For workspace-leaf views, run the real open-view command, then wait until `app.workspace.getLeavesOfType(<actual-view-type>).length > 0`. For settings modals, confirm the modal element is present in the DOM and the intended tab panel is visible.
+2. **Prove routing matches reality.** Use the actual registered view type and command id from the repo or runtime. Do not assume the view type equals the plugin id.
+3. **Prove navigation is settled.** For tabbed settings surfaces, confirm the active-tab marker and a durable content-shell selector both match the intended page before capturing. Do not capture while a navigation race is in flight.
+4. **Capture only after proof.** Once the surface is proven mounted, use the correct selector or let the capture helper auto-detect the modal.
+
+If the leaf count stays `0` or the intended tab panel is not visible after the open command, treat the failure as **surface activation or capture routing**, never as a screenshot-backend failure. See `references/command-reference.md` for concrete eval commands and the full triage sequence.
+
 Use DOM checks for deterministic assertions and screenshots for visual review. Good generic assertions include:
 
 - plugin view/root selector exists and is visible;
@@ -172,7 +185,7 @@ For CSS-only regressions, prefer computed-style assertions against a small synth
 
 For settings surfaces that open in a modal, prefer stable `data-settings-target` selectors and let the capture helper auto-detect the modal instead of assuming `.workspace-leaf.mod-active`. Use `preEval` / `capture.preScreenshotEval` to click or activate the exact tab first when navigation is race-prone.
 
-For workspace-leaf plugin views, do not assume the view type or open-view command matches the plugin id. Read the repo/runtime first, use the actual open-view command or `activateView()` equivalent, and wait until `app.workspace.getLeavesOfType(<actual-view-type>).length > 0` before capture. If the leaf count stays `0`, treat the problem as surface activation or capture routing, not as a screenshot-backend failure.
+For workspace-leaf plugin views, read the repo/runtime first, use the actual open-view command or `activateView()` equivalent, and wait until the leaf count is non-zero before capture.
 
 Do not trust bundled or copied assertion text blindly. If a custom assertion fails but `scenario-report.json`, `obsidian eval`, or a targeted DOM query proves the plugin surface is open, treat the assertion target as stale and replace it with a stable current surface signal such as the plugin view type, a durable root selector, visible title text, or command-owned UI text. Keep project-specific assertion fixes in the matching project profile or project debug folder unless the bundled example itself is stale.
 
@@ -214,7 +227,7 @@ For flicker, blink, or accidental-remount regressions, do not only assert that t
 
 For screenshot-based GUI handoff, run `scripts/obsidian_debug_visual_review.mjs` after diagnosis. The generated `visual-review.html` is useful for human review of blank panes, visible errors, clipped text, contrast, obvious layout regressions, and target surface reachability. It does **not** replace reliable manual GUI validation for hover/focus/drag behavior, keyboard feel, timing-sensitive animation, or final official-review judgment. Back critical visual findings with DOM/text/log assertions whenever possible.
 
-When a screenshot keeps landing on the wrong settings page, treat it as a capture-routing issue first: target the destination with `data-settings-target`, let the capture helper pick the visible settings modal when one exists, and only fall back to a leaf selector when the plugin surface truly lives in a workspace leaf.
+When a screenshot lands on the wrong settings page, follow the capture-routing checks in **Surface Activation Before Capture** first: confirm the intended tab is active, use `data-settings-target` when available, and let the capture helper auto-detect the visible modal. Only fall back to a leaf selector when the plugin surface truly lives in a workspace leaf.
 
 ## Performance Debugging Pattern
 

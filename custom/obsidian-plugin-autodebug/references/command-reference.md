@@ -2,6 +2,25 @@
 
 Read this file only when you need concrete script commands, flags, or handoff examples. For the authoritative option list, run the relevant script with `--help`; every runnable `.mjs` helper should exit 0 for `--help`.
 
+## Contents
+
+- [Desktop Control Preconditions](#desktop-control-preconditions)
+- [Primary Entrypoints](#primary-entrypoints)
+- [Job Specs](#job-specs)
+- [CLI-First Local Loop](#cli-first-local-loop)
+- [Screenshot Surface Triage](#screenshot-surface-triage)
+- [Stale Runtime Versus Fresh Artifact](#stale-runtime-versus-fresh-artifact)
+- [CDP Fallback](#cdp-fallback)
+- [Optional Agentic Surface Probes](#optional-agentic-surface-probes)
+- [Scenario And UI Assertions](#scenario-and-ui-assertions)
+- [Analysis And Reports](#analysis-and-reports)
+- [After-Action Improvement Triage](#after-action-improvement-triage)
+- [State, Watch, Profile, And Baseline](#state-watch-profile-and-baseline)
+- [Fixtures And Evals](#fixtures-and-evals)
+- [Optional Ecosystem Tools](#optional-ecosystem-tools)
+- [CI And Headless Quality Gates](#ci-and-headless-quality-gates)
+- [Troubleshooting](#troubleshooting)
+
 ## Desktop Control Preconditions
 
 - The built-in wrappers now try to auto-launch/focus Obsidian and the target vault before relying on `obsidian help`, `obsidian dev:*`, or `obsidian plugin:*`.
@@ -73,9 +92,13 @@ If Obsidian is closed, run the launch helper first:
 node scripts/obsidian_debug_launch_app.mjs --mode cli --vault-name "<vault>" --output .obsidian-debug/app-launch.json
 ```
 
-## Blank Screenshot Or Missing Leaf Triage
+## Screenshot Surface Triage
 
-For plugin-view captures, first prove the target surface actually mounted. Blank screenshots often mean the plugin leaf never opened or you guessed the wrong view type / command id.
+Blank or wrong-surface screenshots are usually capture-routing or surface-activation mistakes, not screenshot-backend failures. Prove the target surface is mounted and correctly routed before blaming the backend.
+
+**Step 1 — Prove the surface opened.**
+
+For workspace-leaf plugin views, discover the real command id and view type, open the view, and wait until the leaf count is non-zero:
 
 ```bash
 obsidian eval vault="<vault>" code="Object.keys(app.commands.commands).filter((id)=>id.includes('<plugin-id>'))"
@@ -83,7 +106,29 @@ obsidian eval vault="<vault>" code="await app.plugins.plugins.<plugin-id>.activa
 obsidian eval vault="<vault>" code="JSON.stringify({leaves: app.workspace.getLeavesOfType('<actual-view-type>').length})"
 ```
 
-Do not assume the view type equals the plugin id. Use the real registered view type from the repo or runtime, then wait until the leaf count is non-zero before capturing DOM or screenshots.
+Do not assume the view type equals the plugin id. Use the real registered view type from the repo or runtime. If the leaf count stays `0`, treat the failure as surface activation or capture routing, not as a screenshot-backend failure.
+
+For settings modals, confirm the modal is present and the intended tab is active before capture:
+
+```bash
+obsidian eval vault="<vault>" code="JSON.stringify({modalPresent: !!document.querySelector('.modal-container'), tabs: Array.from(document.querySelectorAll('.modal-container .setting-item')).map(e=>e.innerText).slice(0,10)})"
+obsidian eval vault="<vault>" code="document.querySelector('[data-tab-id=\"<target-tab>\"]')?.click(); 'clicked'"
+obsidian eval vault="<vault>" code="JSON.stringify({activeTab: document.querySelector('.modal-container .is-active, .modal-container .mod-active')?.innerText, targetPanel: !!document.querySelector('[data-settings-target=\"<target>\"]')})"
+```
+
+**Step 2 — Prove routing matches reality.**
+
+Use the actual registered view type, command id, and selector from the repo or runtime. Do not guess.
+
+**Step 3 — Capture only after proof.**
+
+Once the surface is proven mounted and the navigation is settled, capture with the correct selector or let the helper auto-detect the modal:
+
+```bash
+obsidian dev:screenshot path=.obsidian-debug/screenshot.png
+```
+
+For race-prone tabbed surfaces, use `preEval` or `--pre-eval` to activate the exact tab immediately before the capture helper fires.
 
 When inline control flow needs `return`, wrap the snippet in an IIFE instead of using a top-level `return`:
 
@@ -526,4 +571,5 @@ Keep the split explicit:
 - CDP fetch fails: let `scripts/obsidian_debug_launch_app.mjs --mode cdp ...` perform its restart fallback, or run `scripts/obsidian_windows_restart_cdp.ps1` / `scripts/obsidian_mac_restart_cdp.sh` directly and then probe `http://127.0.0.1:9222/json/list`.
 - Logs show Hot Reload churn: use controlled mode for deterministic timing or coexist mode when intentionally letting Hot Reload drive reload.
 - UI selectors are flaky: add a surface profile, then assert stable root selectors/text instead of screenshot-only evidence.
+- Blank or wrong-surface screenshot: follow the **Screenshot Surface Triage** checks above. Prove the target surface is mounted and routed before blaming the screenshot backend.
 - Screenshot review is still incomplete: generate `visual-review.html`, inspect it manually, then back critical findings with DOM/text/log assertions.
