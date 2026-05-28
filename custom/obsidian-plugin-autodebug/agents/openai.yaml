@@ -1,4 +1,4 @@
 interface:
   display_name: "Obsidian Plugin Autodebug"
   short_description: "Autodebug Obsidian plugins: build, deploy, reload, capture"
-  default_prompt: "Use $obsidian-plugin-autodebug to run the full autodebug loop: build, deploy, reload, capture console/DOM/screenshot evidence, and diagnose this Obsidian plugin. Prove the target surface is mounted before capturing; treat blank or wrong-surface screenshots as routing or activation issues first."
+  default_prompt: "Use $obsidian-plugin-autodebug to run the full autodebug loop: build, deploy, reload, capture console/DOM/screenshot evidence, and diagnose this Obsidian plugin. Before any screenshot, prove the target surface is open and navigation is settled: for workspace-leaf views confirm getLeavesOfType() > 0; for settings modals confirm the modal is present and the intended tab is active. Treat blank screenshots as surface-activation or routing failures first."

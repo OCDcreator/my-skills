@@ -88,6 +88,16 @@ Before editing or running a long loop, quickly detect:
 
 If the repo already has a release/deploy script or skill, reuse it instead of inventing a parallel deployment path.
 
+## Blank-Screenshot Prevention Rule
+
+Blank or wrong-surface screenshots are surface-activation or capture-routing problems, not screenshot-backend failures. Before capturing any screenshot:
+
+1. **Prove the surface opened.** For workspace-leaf views, run the real open-view command and confirm `getLeavesOfType(<actual-view-type>).length > 0`. For settings modals, confirm the modal is present and the intended tab panel is visible.
+2. **Prove navigation is settled.** For tabbed settings, confirm the active-tab marker and a durable content-shell selector both match the intended page. Do not capture during a navigation race.
+3. **Capture only after proof.** If any check fails, fix surface activation or routing first.
+
+See `references/command-reference.md` for concrete eval commands and the full triage sequence.
+
 ## Choose The Flow
 
 | Situation | Preferred path |
@@ -160,16 +170,7 @@ For an existing plugin, keep absolute machine paths in the copied repo-local job
 
 ### Blank or Wrong-Surface Screenshot Triage
 
-Before blaming the screenshot backend, prove the target surface is mounted and routed correctly.
-
-**Required pre-capture checklist:**
-
-1. **Prove the surface opened.** For workspace-leaf views, run the real open-view command and confirm `getLeavesOfType(<actual-view-type>).length > 0`. For settings modals, confirm the modal is present and the intended tab panel is visible.
-2. **Prove routing matches reality.** Use the actual registered view type and command id from the repo or runtime. Do not assume the view type equals the plugin id.
-3. **Prove navigation is settled.** For tabbed settings, confirm the active-tab marker and a durable content-shell selector both match the intended page. Do not capture while a navigation race is in flight.
-4. **Capture only after proof.** Use the correct selector or let the capture helper auto-detect the modal.
-
-If any check fails → treat it as **surface activation or capture routing**, never as a screenshot-backend failure. See `references/command-reference.md` for concrete eval commands and the full triage sequence.
+Follow the **Blank-Screenshot Prevention Rule** above before any capture. See `references/command-reference.md` for concrete eval commands and the full triage sequence.
 
 ### DOM Assertions And Scenarios
 
