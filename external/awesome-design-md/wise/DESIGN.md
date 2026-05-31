@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Wise Inspired
+name: Wise-Inspired-design-analysis
 description: An inspired interpretation of Wise's design language — a global money-transfer brand whose surface combines an unusually heavy near-black display sans (weight 900 at 64–126 px) with a vivid lime-green brand accent, sage-tinted surface neutrals, and rounded white cards on a pale green-tinted canvas; the whole system reads more like a Scandinavian fintech magazine than a bank.
 
 colors:

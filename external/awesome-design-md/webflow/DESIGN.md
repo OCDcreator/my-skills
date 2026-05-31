@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Webflow Inspired
+name: Webflow-Inspired-design-analysis
 description: An inspired interpretation of Webflow's design language — a visual web development platform whose surface contrasts a deep near-black `#080808` primary against a generous white canvas, broken by a five-stop chromatic accent system (purple / pink / blue / orange / green) that maps to the brand's product categories, and anchored by the proprietary WF Visual Sans family used at restrained 500 / 600 weights with negative tracking.
 
 colors:

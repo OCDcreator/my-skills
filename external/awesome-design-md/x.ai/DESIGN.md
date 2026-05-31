@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: xAI Inspired
+name: xAI-Inspired-design-analysis
 description: An inspired interpretation of xAI's design language — Elon Musk's frontier-AI company whose web surface is a strict near-black canvas broken only by white pill outlines, occasional warm sunset / dusk gradient accents, a custom geometric sans (Universal Sans) for display, and an uppercase tracked monospace caption face; the whole system reads as engineered-cosmic, unmarketed.
 
 colors:

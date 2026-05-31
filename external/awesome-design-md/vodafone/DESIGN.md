@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Vodafone Inspired
+name: Vodafone-Inspired-design-analysis
 description: An inspired interpretation of Vodafone's design language — a telecom super-brand whose web surface alternates between editorial photography hero bands with massive uppercase display headlines and clean white content bands, anchored by the company's signature scarlet red CTA and the proprietary Vodafone display sans set at impossibly heavy 800 weight.
 
 colors:

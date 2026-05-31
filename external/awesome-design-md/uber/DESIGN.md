@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Uber Inspired
+name: Uber-Inspired-design-analysis
 description: An inspired interpretation of Uber's design language — a transportation-and-delivery super-app brand whose web surface is a black-and-white duet, framed by a custom geometric display sans, accented by a single signature pill shape (radius 999px) on every interactive element, and decorated only by editorial 4:3 illustrations of riders, drivers, and city objects.
 
 colors:

@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Warp Inspired
+name: Warp-Inspired-design-analysis
 description: An inspired interpretation of Warp's design language — an agentic terminal-and-development-environment brand whose surface is a warm near-charcoal canvas (a tint warmer than pure black), broken only by clean Inter typography, the occasional Instrument Serif italic moment, and dense terminal-mockup imagery; CTAs are unusually understated, with shape geometry running tighter than most marketing sites.
 
 colors:

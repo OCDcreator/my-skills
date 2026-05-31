@@ -1,6 +1,6 @@
 ---
 version: alpha
-name: Together AI Inspired
+name: Together-AI-Inspired-design-analysis
 description: An inspired interpretation of Together AI's design language — an AI infrastructure platform whose surface alternates between near-black hero bands (with a three-color orange-magenta-periwinkle gradient as the single piece of brand chrome) and bright white research / pricing / docs bands, knit together by a custom display sans and an uppercase mono eyebrow face.
 
 colors:
