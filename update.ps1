@@ -171,7 +171,7 @@ try {
         @{ Name = "claude-plugins-official"; Url = "https://github.com/anthropics/claude-plugins-official.git"; Branch = "main"; SourceDir = "." },
         @{ Name = "baoyu-skills"; Url = "https://github.com/JimLiu/baoyu-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "axton-obsidian-visual-skills"; Url = "https://github.com/axtonliu/axton-obsidian-visual-skills.git"; Branch = "main"; SourceDir = "." },
-        @{ Name = "deep-research-skills"; Url = "https://github.com/Weizhena/Deep-Research-skills.git"; Branch = "main"; SourceDir = "skills"; CopyMode = "preserve" },
+        @{ Name = "deep-research-skills"; Url = "https://github.com/Weizhena/Deep-Research-skills.git"; Branch = "master"; SourceDir = "skills"; CopyMode = "preserve" },
         @{ Name = "kepano-obsidian-skills"; Url = "https://github.com/kepano/obsidian-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "taste-skill"; Url = "https://github.com/Leonxlnx/taste-skill.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "html-ppt-skill"; Url = "https://github.com/lewislulu/html-ppt-skill.git"; Branch = "main"; SourceDir = "." },

@@ -23,7 +23,7 @@ SKILL_SOURCES=(
   "claude-plugins-official|https://github.com/anthropics/claude-plugins-official.git|main|."
   "axton-obsidian-visual-skills|https://github.com/axtonliu/axton-obsidian-visual-skills.git|main|."
   "baoyu-skills|https://github.com/JimLiu/baoyu-skills.git|main|skills"
-  "deep-research-skills|https://github.com/Weizhena/Deep-Research-skills.git|main|skills|preserve"
+  "deep-research-skills|https://github.com/Weizhena/Deep-Research-skills.git|master|skills|preserve"
   "kepano-obsidian-skills|https://github.com/kepano/obsidian-skills.git|main|skills"
   "taste-skill|https://github.com/Leonxlnx/taste-skill.git|main|skills"
   "html-ppt-skill|https://github.com/lewislulu/html-ppt-skill.git|main|."
