@@ -34,6 +34,36 @@ Use this skill to debug the real subscription-conversion path for the local QWRT
 4. Private GitHub raw access, anti-bot pages, and short-lived upstream subscription windows add noise. They can fail independently from the local template mechanism.
 5. Rule lists inside the preset can still use GitHub raw URLs. This section only explains why the template INI itself is not the active runtime input in the native local path.
 
+## Auto Sync Modes
+
+### Current default: no auto sync
+
+- The current `docker-compose.yml` exposes ports only and does not mount any template files
+- Result: repo edits do not reach the running `subconverter` automatically
+- Required action after repo edits: `docker cp` or `docker compose up -d --build subconverter`
+
+### Recommended future mode: keep the native built-in path, add bind mounts
+
+- This still counts as using the built-in native path because OpenClash continues to call `config=config/custom/wallrule_hybrid_main.ini`
+- The only change is that the internal path `/base/config/custom/...` is backed by files from the `wallrule` repo
+- Add mounts like:
+
+```yaml
+services:
+  subconverter:
+    volumes:
+      - /Volumes/SDD2T/obsidian-vault-write/custom-project/wallrule/presets/wallrule_hybrid_main.ini:/base/config/custom/wallrule_hybrid_main.ini:ro
+      - /Volumes/SDD2T/obsidian-vault-write/custom-project/wallrule/configs/Iproyal_config.yaml:/base/config/custom/iproyal_proxy.yaml:ro
+```
+
+- After the compose change, rebuild or recreate `subconverter` once
+- Later edits to the repo files flow into the container path automatically; if behavior appears sticky, restart `subconverter` before retesting
+
+### Alternative: scripted sync, not true auto sync
+
+- If bind mounts are undesirable, keep a small sync script that copies the repo preset into `/Users/dht/sub-service/subconverter/base/config/custom/` and then recreates `subconverter`
+- This is safer than ad hoc manual copying, but it is still not automatic in the same sense as bind mounts
+
 ## Known Failure Patterns
 
 ### `proxy group ... 'IPRoyal' not found`
@@ -97,16 +127,18 @@ ssh root@192.168.31.204 "grep -n 'IPRoyal\\|12323\\|12324\\|🧠 Claude\\|🤖 O
 1. Edit the source files in the `wallrule` repo:
    - `presets/wallrule_hybrid_main.ini`
    - `configs/Iproyal_config.yaml`
-2. Sync the runtime copies under `/Users/dht/sub-service/subconverter/base/config/custom/`
-3. Apply the runtime changes with either:
+2. Decide whether this environment is in manual-sync mode or bind-mount auto-sync mode
+3. If still in manual-sync mode, sync the runtime copies under `/Users/dht/sub-service/subconverter/base/config/custom/`
+4. Apply the runtime changes with either:
    - `docker cp ... subconverter:/base/config/custom/...`
    - `docker compose up -d --build subconverter`
-4. Refresh OpenClash
-5. Verify `/etc/openclash/config/wget.yaml` on the router before declaring success
+5. Refresh OpenClash
+6. Verify `/etc/openclash/config/wget.yaml` on the router before declaring success
 
 ## Guardrails
 
 - Do not claim the GitHub raw template is active unless the log shows OpenClash is fetching that URL directly
 - Do not assume the repo file and the runtime file are the same; verify both
+- Do not call bind-mounted native files “GitHub raw mode”; they are still the built-in native path
 - Do not blame `wallrule` first when the generator returns no nodes
 - Do not assume fnOS or other hosts are automatically proxied; test the actual network path when upstream fetches are flaky
