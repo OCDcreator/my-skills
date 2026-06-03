@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sub Converter"
+  short_description: "OpenClash / sub-web / subconverter / wallrule 链路排障"
+  default_prompt: "Use $sub to diagnose this OpenClash, sub-web, subconverter, or wallrule subscription conversion issue and confirm which template and proxy definitions are actually active."

@@ -31,6 +31,7 @@ my-skills/
 │   ├── searxng/                               # SearXNG 联网搜索
 │   ├── skill-catalog-maintainer/              # 技能目录/README/AGENTS 维护
 │   ├── skill-router/                          # 任务先路由到 my-skills 中合适技能
+│   ├── sub/                                   # OpenClash / sub-web / subconverter / wallrule 链路排障
 │   ├── ssh/                                    # SSH/SCP 远程操作（Mac/Windows/Unraid/路由器/飞牛）
 │   ├── syncthing/                             # Syncthing 同步排障、保留名与 .stignore 规则
 │   └── x-reader/                              # 内容转录与分析（含子技能）
@@ -87,6 +88,7 @@ my-skills/
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
 | [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |
+| [sub](custom/sub/) | OpenClash、`sub-web`、`subconverter`、`wallrule` 本地订阅转换链路排障与模板同步，覆盖 `emoji=true` 命名副作用、`IPRoyal` 端口区分、运行中模板与仓库源码分离等问题 |
 | [ssh](custom/ssh/) | SSH/SCP 远程操作全设备（Mac Mini、Windows、Unraid、QWRT 路由器、飞牛 fnOS），含设备清单、引号安全、base64 跨平台脚本、文件传输与后台任务 |
 | [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
 | [x-reader](custom/x-reader/) | 内容转录与分析套件（含 [analyzer](custom/x-reader/analyzer/) 多维内容分析、[browser-fetch](custom/x-reader/browser-fetch/) 浏览器抓取兜底、[douyin](custom/x-reader/douyin/) 抖音短视频转写、[video](custom/x-reader/video/) 视频/播客转录） |

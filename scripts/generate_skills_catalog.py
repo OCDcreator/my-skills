@@ -87,6 +87,11 @@ def parse_sources() -> dict[str, dict[str, str]]:
 
 def category_for(path: str, name: str, description: str) -> str:
     haystack = f"{path} {name} {description}".lower()
+    if any(
+        token in haystack
+        for token in ["openclash", "subconverter", "sub-web", "wallrule", "proxy", "router", "qwrt"]
+    ):
+        return "DevOps/Config"
     if any(token in haystack for token in ["obsidian", "canvas", "bases", "vault"]):
         return "Obsidian"
     if any(token in haystack for token in ["pdf", "docx", "ppt", "xlsx", "print", "markdown", "slide"]):
