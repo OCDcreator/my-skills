@@ -28,6 +28,8 @@ SKILL_SOURCES=(
   "taste-skill|https://github.com/Leonxlnx/taste-skill.git|main|skills"
   "html-ppt-skill|https://github.com/lewislulu/html-ppt-skill.git|main|."
   "ui-ux-pro-max-skill|https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git|main|.claude/skills"
+  "startup-pressure-test|https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git|main|."
+  "mattpocock-skills|https://github.com/mattpocock/skills.git|main|skills"
 )
 
 REFERENCE_SOURCES=(

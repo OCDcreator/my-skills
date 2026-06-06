@@ -175,7 +175,9 @@ try {
         @{ Name = "kepano-obsidian-skills"; Url = "https://github.com/kepano/obsidian-skills.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "taste-skill"; Url = "https://github.com/Leonxlnx/taste-skill.git"; Branch = "main"; SourceDir = "skills" },
         @{ Name = "html-ppt-skill"; Url = "https://github.com/lewislulu/html-ppt-skill.git"; Branch = "main"; SourceDir = "." },
-        @{ Name = "ui-ux-pro-max-skill"; Url = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git"; Branch = "main"; SourceDir = ".claude/skills" }
+        @{ Name = "ui-ux-pro-max-skill"; Url = "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git"; Branch = "main"; SourceDir = ".claude/skills" },
+        @{ Name = "startup-pressure-test"; Url = "https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git"; Branch = "main"; SourceDir = "." },
+        @{ Name = "mattpocock-skills"; Url = "https://github.com/mattpocock/skills.git"; Branch = "main"; SourceDir = "skills" }
     )
     $ExcludeNames = @(
         "composio-skills",

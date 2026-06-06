@@ -50,6 +50,8 @@ my-skills/
 │   ├── taste-skill/                           # 高级前端设计技能（多风格）
 │   ├── html-ppt-skill/                        # HTML PPT 演示文稿生成技能
 │   ├── ui-ux-pro-max-skill/                   # UI/UX Pro Max 设计智能工具包（7 技能）
+│   ├── startup-pressure-test/                  # CodeX 创业想法压力测试技能
+│   ├── mattpocock-skills/                      # Matt Pocock 工程技能集（grill-me / tdd / 架构优化等）
 │   └── awesome-design-md/                     # 品牌/产品风格参考索引（getdesign.md 按需读取）
 ├── automation/                                # repo-local Codex autopilot 控制器与配置
 ├── docs/                                      # autopilot 状态、历史计划和规格文档
@@ -107,6 +109,8 @@ my-skills/
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 高级前端设计技能（多风格、参数可调） |
 | `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill) | HTML PPT 演示文稿生成技能（多主题/布局/动画） |
 | `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | UI/UX Pro Max 设计智能工具包（banner-design、brand、design、design-system、slides、ui-styling、ui-ux-pro-max 共 7 个技能） |
+| `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill) | CodeX 创业想法压力测试技能（6 种模式，BUILD/KILL/PIVOT 裁決） |
+| `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills) | Matt Pocock 工程技能集（grill-me、tdd、improve-codebase-architecture、triage、diagnose、to-issues 等 29 个技能） |
 
 ## 外部设计参考来源 (external/)
 
