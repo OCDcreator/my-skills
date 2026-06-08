@@ -150,14 +150,14 @@ body {
 }
 
 .transcript-body td img,
-.transcript-body td mjx-container[jax="SVG"],
-.transcript-body td .mjx-container[jax="SVG"] {
+.transcript-body td mjx-container[display="true"][jax="SVG"],
+.transcript-body td .mjx-container[display="true"][jax="SVG"] {
   display: block;
   margin: 0 auto;
 }
 
-.transcript-body td mjx-container[jax="SVG"],
-.transcript-body td .mjx-container[jax="SVG"] {
+.transcript-body td mjx-container[display="true"][jax="SVG"],
+.transcript-body td .mjx-container[display="true"][jax="SVG"] {
   max-width: 100%;
 }
 

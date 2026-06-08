@@ -174,7 +174,49 @@ def test_centers_table_cells_for_text_formula_and_media(tmp_path: Path) -> None:
 
     assert "text-align: center;" in html
     assert "vertical-align: middle;" in html
-    assert 'mjx-container[jax="SVG"]' in html
+    assert ".transcript-body td img," in html
+    assert 'mjx-container[display="true"][jax="SVG"]' in html
+
+
+def test_limits_block_centering_to_display_math_in_table_cells(tmp_path: Path) -> None:
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text(
+        "\n".join(
+            [
+                "## Page 1",
+                "",
+                "| 类型 | 内容 |",
+                "| --- | --- |",
+                r"| 混合内容 | 设 \( a // b \)，则可得结论。 |",
+                r"| 展示公式 | $$a // b$$ |",
+                "| 图形语言 | ![图 1](./images/example.png) |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--md",
+            str(source_md),
+            "--out-html",
+            str(out_html),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert '.transcript-body td mjx-container[jax="SVG"] {' not in html
+    assert '.transcript-body td .mjx-container[jax="SVG"] {' not in html
+    assert ".transcript-body td img," in html
+    assert '.transcript-body td mjx-container[display="true"][jax="SVG"]' in html
+    assert '.transcript-body td .mjx-container[display="true"][jax="SVG"]' in html
 
 
 def test_uses_kami_default_paper_tokens(tmp_path: Path) -> None:
