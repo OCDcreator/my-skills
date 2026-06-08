@@ -1,0 +1,52 @@
+:root {
+  --bg: #f5f4ed;
+  --surface: #faf9f5;
+  --surface-warm: #e8e6dc;
+  --fg: #141413;
+  --fg-2: #3d3d3a;
+  --muted: #504e49;
+  --meta: #6b6a64;
+  --border: #e8e6dc;
+  --border-soft: #e5e3d8;
+  --accent: #1b365d;
+  --accent-on: #faf9f5;
+  --accent-light: #2d5a8a;
+  --accent-hover: var(--accent);
+  --accent-active: #142a48;
+  --font-display: Charter, Georgia, Palatino, "Times New Roman", serif;
+  --font-body: Charter, Georgia, Palatino, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, Monaco, "TsangerJinKai02", "Source Han Serif SC", monospace;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+  --text-2xl: 32px;
+  --leading-display: 1.1;
+  --leading-tight: 1.25;
+  --leading-body: 1.55;
+  --tracking-display: -1.2px;
+  --tracking-label: 0.4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --elev-ring: 0 0 0 1px var(--border);
+  --elev-raised: 0 4px 24px rgba(0, 0, 0, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+}
+
+strong {
+  font-weight: 500;
+}
