@@ -30,6 +30,12 @@
   --radius-lg: 12px;
   --elev-ring: 0 0 0 1px var(--border);
   --elev-raised: 0 4px 24px rgba(0, 0, 0, 0.05);
+  --desk: var(--bg);
+  --ink: var(--fg);
+  --paper: var(--surface);
+  --line: var(--border);
+  --surface-soft: var(--surface-warm);
+  --line-strong: var(--border-soft);
 }
 
 * {

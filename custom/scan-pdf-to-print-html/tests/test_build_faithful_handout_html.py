@@ -163,3 +163,32 @@ def test_uses_kami_default_paper_tokens(tmp_path: Path) -> None:
     assert "--bg: #f5f4ed;" in html
     assert "--accent: #1b365d;" in html
     assert "Charter" in html
+
+
+def test_defines_legacy_ocr_css_variables_in_final_html(tmp_path: Path) -> None:
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("## Page 1\n\nLegacy OCR CSS token coverage\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--md",
+            str(source_md),
+            "--out-html",
+            str(out_html),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert "--desk:" in html
+    assert "--ink:" in html
+    assert "--paper:" in html
+    assert "--line:" in html
+    assert "--surface-soft:" in html
+    assert "--line-strong:" in html
