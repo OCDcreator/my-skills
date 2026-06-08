@@ -141,12 +141,24 @@ body {
 .transcript-body td {
   padding: 2.4mm 2.6mm;
   border: 1px solid var(--line);
-  vertical-align: top;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .transcript-body th {
   background: var(--surface-soft);
-  text-align: left;
+}
+
+.transcript-body td img,
+.transcript-body td mjx-container[jax="SVG"],
+.transcript-body td .mjx-container[jax="SVG"] {
+  display: block;
+  margin: 0 auto;
+}
+
+.transcript-body td mjx-container[jax="SVG"],
+.transcript-body td .mjx-container[jax="SVG"] {
+  max-width: 100%;
 }
 
 .transcript-body blockquote,
