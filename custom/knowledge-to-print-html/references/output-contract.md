@@ -15,6 +15,7 @@ artifacts/knowledge-handout/<slug>/
 ├── raw-input.md
 ├── brief.md
 ├── research.md
+├── citation-map.md          # optional for citation-heavy or submission-paper runs
 ├── outline.md
 ├── article.md
 ├── handout.html
@@ -33,6 +34,7 @@ artifacts/knowledge-handout/<slug>/
 | `raw-input.md` | Preserve the original user input before analysis; keep the original order and wording |
 | `brief.md` | Normalize user intent, defaults, questions resolved, research mode, and research constraints |
 | `research.md` | Source-backed notes organized by core knowledge point, including links, dates, facts, case studies, and claim support |
+| `citation-map.md` | Optional citation coverage map for submission-paper or bibliography-heavy runs |
 | `outline.md` | Final section plan before full drafting |
 | `article.md` | Source of truth for the written content |
 | `handout.html` | Final printable HTML artifact |
@@ -55,6 +57,12 @@ Record the research mode in `brief.md`:
 - `constrained` when the user forbids search, the environment is offline, the material is private, or the user explicitly limits sources
 
 If the run is `constrained`, state the reason clearly in `brief.md`.
+
+Also record the artifact mode in `brief.md`:
+
+- `teaching-handout`
+- `annotated-guide`
+- `submission-paper`
 
 For each core knowledge point in `research.md`, capture at least:
 
@@ -79,6 +87,14 @@ For each core knowledge point in `research.md`, capture at least:
 9. `## Takeaways`
 10. `## References`
 
+For `submission-paper` mode, this can be replaced by a paper-like structure such as:
+
+1. `# Title`
+2. `## Introduction`
+3. 3-5 argument-led sections
+4. `## Conclusion`
+5. `## Bibliography` or `## References`
+
 ## Citation Expectations
 
 - Keep research notes in `research.md` even if the final page uses compact references
@@ -87,6 +103,7 @@ For each core knowledge point in `research.md`, capture at least:
 - Prefer source URLs over vague source labels
 - Traceability belongs in `research.md` and the final `## References` section, not in the learner-facing prose
 - Do not write provenance/process notes such as “based on user-provided notes”, “compiled from the draft”, or “generated from the outline” inside `article.md` or `handout.html`
+- For `submission-paper` mode, each bibliography item should be cited in body text, figure/table notes, or endnotes; do not pad the bibliography decoratively
 
 ## Image And Diagram Placement
 

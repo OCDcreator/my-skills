@@ -101,6 +101,7 @@ For each page, review all of these:
 - **Typographic rhythm** — body text remains comfortable at print size and spacing is not obviously crushed to make the page fit
 - **Repair quality** — suggested fixes improve structure/content/layout instead of just shrinking type or squeezing spacing
 - **Print identity** — the page feels like a study handout, not a website hero, dashboard, mood board, or marketing page
+- **Submission-paper discipline** — when the artifact claims to be a formal paper or submission copy, the page should read like a paper page rather than a coaching worksheet; evidence figures/tables should look relevant, numbered when appropriate, and free of unrelated decorative chrome
 - **Page-local continuity** — blocks are not awkwardly split and the page can be understood in sequence
 
 When the page fails, prefer fixes in this order:
@@ -125,5 +126,6 @@ Do not recommend shrinking font size, line-height, or paragraph spacing as the p
 - the page relies on dense small-card grids or microtext boxes
 - the page fits only because typography rhythm has been visibly compressed
 - the page reads like web chrome rather than a teaching handout
+- a clean submission-paper page contains coaching annotations, audience labels, or unrelated decorative figure text
 - blocks split awkwardly or feel visually unbalanced
 - the page passes heuristics but the screenshot still looks visually broken

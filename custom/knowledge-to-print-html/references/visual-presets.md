@@ -37,6 +37,7 @@ Across all presets:
 
 - If the user gives no style direction, use `editorial-atlas`.
 - If the user asks for "简洁", "高级", "论文感", "像书页", or a calm premium feel, use `refined-minimal`.
+- If the output is a formal paper, competition essay, submission copy, or bibliography-heavy clean article, prefer `refined-minimal` unless the target format clearly wants something plainer or already-branded.
 - If the topic is technical, process-heavy, or system-like, prefer `technical-briefing`.
 - If the output is for an exam, worksheet, past-paper drill, or revision practice, use `exam-workbook`.
 - If the lesson depends on experiment logic, observation, variables, or lab records, use `lab-notebook`.
@@ -86,6 +87,7 @@ Best for serious or reflective topics.
 - Let hierarchy come from typography, rules, and margins rather than boxes.
 - Use only one or two quiet callouts per page.
 - Avoid decorative textures and heavy backgrounds.
+- This is the default preset for `submission-paper` mode unless a stricter target format overrides it.
 
 ### `technical-briefing`
 

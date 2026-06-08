@@ -19,6 +19,13 @@ These belong either in:
 - the final assistant hand-off message, or
 - internal working files such as `brief.md` / `research.md`
 
+For `submission-paper` mode, also keep these out of the clean paper body:
+
+- annotated coaching notes
+- “why this paragraph works” commentary
+- audience labels such as “for students”
+- decorative submission warnings unless the target format explicitly requires them
+
 ## Page density rules
 
 The page should look like a study handout, not a sparse landing page.
@@ -30,6 +37,11 @@ The page should look like a study handout, not a sparse landing page.
   - enlarge teaching visuals
   - introduce a comparison table or worked example
   - rebalance content across neighboring pages
+
+In `submission-paper` mode, use the same principle for paper pages:
+
+- do not waste a page on decorative cover treatments when the document is already tight
+- reserve space for figures/tables and bibliography early instead of pushing them into overflow later
 
 ## Card-grid anti-pattern
 
@@ -74,5 +86,11 @@ The artifact is a printable learning document. It should not feel like:
 - a product marketing sheet
 - a dashboard
 - a mood board
+
+In `submission-paper` mode, it also should not feel like:
+
+- a coaching worksheet hidden inside a paper skin
+- a poster deck with figures detached from the argument
+- a decorative cover page whose ornaments collide with paper metadata or text
 
 If a visual decision improves “style” but hurts density, continuity, or reading rhythm, reject it.

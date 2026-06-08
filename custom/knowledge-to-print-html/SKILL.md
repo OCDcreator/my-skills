@@ -37,15 +37,42 @@ Helpful optional inputs:
 
 - audience
 - target depth or page count
+- artifact mode
 - desired visual tone
 - required/banned sources
 - whether the topic needs current information
+
+## User Choice Interaction
+
+When the workflow genuinely needs the user to choose between a small number of viable branches, do not default to free-text typing.
+
+Prefer an `askuserquestion` / structured-choice / clickable-option interaction when the current platform supports it.
+
+High-priority cases:
+
+- choosing `artifact mode`
+- choosing a visual preset
+- choosing between two clearly different deliverable variants such as annotated copy vs clean submission copy
+
+Choice rules:
+
+- offer 2-3 mutually exclusive options
+- put the recommended option first
+- make the option labels short and human-readable
+- explain the tradeoff in one short sentence per option
+- avoid asking the user to type mode names or preset names unless no structured choice tool is available
+
+Fallback:
+
+- if the platform has no structured choice UI, present a very short numbered option list in plain text
+- if the choice is low-risk and the best option is obvious, choose it without interrupting the workflow
 
 Default assumptions when the user does not specify:
 
 - audience: motivated beginner to intermediate reader
 - depth: one strong explainer, roughly 4–8 A4 pages
 - language: match the user's language
+- artifact mode: `teaching-handout`
 - citation mode: supported claims plus a final references section
 - visual preset: `editorial-atlas`
 - output directory: `artifacts/knowledge-handout/<slug>/`
@@ -76,6 +103,9 @@ Read these references before finalizing:
 
 - `references/layout-guardrails.md`
 - `references/diagram-guardrails.md`
+- `references/academic-paper-mode.md`
+- `references/evidence-figure-workflow.md`
+- `references/preflight-density-check.md`
 - `references/review-loop.md`
 - `references/print-checklist.md`
 - `references/runtime-requirements.md`
@@ -101,6 +131,34 @@ Check whether each downstream skill exists in the current environment before usi
 
 Why the page-review gate is strict: the editing agent is too close to the layout to judge it reliably. A fresh page-review subagent catches whitespace, overflow, hierarchy drift, and HTML/PDF mismatch that the editor routinely misses.
 
+## Artifact Mode Routing
+
+Choose the artifact mode in `brief.md` before drafting. The same topic can require different products.
+
+Modes:
+
+- `teaching-handout` — the default; concept-first, print-friendly teaching pages
+- `annotated-guide` — coaching copy, worked examples, margin-like notes, explanation of why each move works
+- `submission-paper` — clean formal essay / competition entry / paper-like document with argument-led structure, inline figures/tables, and citation discipline
+
+Routing rules:
+
+- If the user asks for a lecture handout, revision sheet, printable explainer, or concept notes, use `teaching-handout`.
+- If the user asks for a commented exemplar, annotated sample, writing guide, or “explain why this paragraph works”, use `annotated-guide`.
+- If the user asks for a formal essay, competition submission, paper-style article, official formatting, or bibliography-heavy polished prose, use `submission-paper`.
+- If the user wants both a coaching copy and a clean submission copy, strongly prefer two artifacts or two clearly separated variants instead of mixing the modes into one body.
+
+Interaction rule:
+
+- if the artifact mode is ambiguous and multiple modes are genuinely plausible, ask with clickable options when supported instead of asking the user to type the mode name
+- if one mode is clearly the best fit, choose it and continue
+
+Mode discipline:
+
+- Do not let `annotated-guide` process chrome leak into a `submission-paper`.
+- Do not let a `submission-paper` default to hero layouts, decorative covers, or handout-like callout density unless the user explicitly wants a display copy.
+- For `submission-paper`, read `references/academic-paper-mode.md` before outline and drafting.
+
 ## Workflow
 
 ### 1. Normalize the brief
@@ -109,6 +167,7 @@ Convert raw user input into:
 
 - topic slug
 - audience
+- artifact mode
 - reading goal
 - known material
 - missing material
@@ -132,6 +191,7 @@ Split incoming material into:
 - draft prose worth preserving
 - unsupported claims that need checking
 - concepts that deserve visuals
+- whether the artifact is clean submission copy, annotated guidance, or a mixed request that should be split
 
 Save this to `brief.md`.
 
@@ -177,6 +237,16 @@ Default shape:
 8. practical takeaway
 9. references
 
+If the artifact mode is `submission-paper`:
+
+- switch from explainer-first shape to argument-first shape
+- use `references/academic-paper-mode.md`
+- choose headings that match the target genre or competition convention instead of generic “Evidence / Model / Mechanism” boilerplate
+- decide where each figure/table appears near the argument that first needs it
+- reserve space for bibliography/endnotes before drafting full prose
+
+If the draft is likely to exceed 8 A4 pages, contains 3 or more figures/tables, contains 20 or more references, or mixes coaching and submission content, run `references/preflight-density-check.md` before drafting the full article.
+
 ### 5. Draft in Markdown first
 
 `article.md` is the content source of truth unless the user explicitly asks for hand-authored HTML only.
@@ -188,6 +258,13 @@ The article must:
 - keep citations traceable in `research.md` and the final references section, not as learner-facing provenance notes inside the body
 - keep process notes and packaging filler out of the learner-facing body
 
+For citation-heavy or `submission-paper` runs:
+
+- add an optional `citation-map.md` or an equivalent citation-coverage section in `research.md`
+- do not pad the bibliography with uncited items
+- make every listed source traceable to body text, figure/table notes, or endnotes
+- keep coaching language, audience labels, and explanation chrome out of the clean paper copy
+
 ### 6. Add teaching visuals
 
 Prefer explanatory SVGs over decorative artwork.
@@ -198,6 +275,19 @@ Use visuals to teach:
 - mechanism
 - structure
 - comparison
+
+When the artifact mode is `submission-paper`, first classify each visual as one of:
+
+- `explanatory figure` — concept diagram, mechanism sketch, structure map
+- `evidence figure` — chart, table, model diagram, or source-backed exhibit tied to empirical or textual evidence
+
+For `evidence figure` work:
+
+- read `references/evidence-figure-workflow.md`
+- build from source-backed numbers, extracted tables, or explicitly traceable evidence
+- do not use freeform image generation as a substitute for actual chart construction
+- do not leave unrelated decorative labels, poster-like slogans, or non-paper chrome inside a figure meant for a formal paper
+- place the final figure/table near the first argument that discusses it unless the target convention explicitly requires appendices
 
 Full readability rules live in `references/diagram-guardrails.md`.
 
@@ -218,7 +308,9 @@ Built-in presets:
 - `concept-map`
 - `field-guide`
 
-If the user asks to choose a style, show a concise preset menu with the preset name, best use case, and tradeoff. If the user does not choose, pick the best fit from the selection rules in `references/visual-presets.md`.
+If the user asks to choose a style, use clickable preset options when supported. Show only a concise choice set with the preset name, best use case, and tradeoff. If the user does not choose, pick the best fit from the selection rules in `references/visual-presets.md`.
+
+If the artifact mode is `submission-paper`, prefer `refined-minimal` unless the target format or supplied reference pack clearly points elsewhere.
 
 For human visual selection, use the committed preview images at `templates/presets/<preset>/preview.png`. Regenerate them with `python scripts/render_preset_previews.py --no-auto-install` after editing preset HTML/CSS.
 
@@ -254,6 +346,14 @@ The final HTML must be:
 - protected against text overflow inside panels, callouts, table cells, code blocks, tags, and grid children with appropriate `overflow-wrap`, `word-break`, and `hyphens` rules
 - protected against SVG visual enclosure failures: every diagram outer frame / card / 外框 must actually contain the text, pills, icons, and child boxes it visually claims to group
 - protected against compact and medium SVG frame padding failures: inner padding must stay comfortable, the final line or child box must not hug the bottom edge, and spacing should keep visual balance
+
+For `submission-paper` mode, the final HTML must also be:
+
+- free of coaching copy inside the clean submission body
+- free of decorative cover elements that collide with content or paper metadata
+- built with numbered paper-like figures/tables and captions when evidence figures are used
+- arranged so figures/tables appear near the relevant discussion, not dumped at the end by default
+- built so bibliography/endnotes are not decorative; listed sources must be cited somewhere meaningful
 
 Full page-density and chrome rules live in `references/layout-guardrails.md`.
 
@@ -332,6 +432,8 @@ Do not hand off `handout.html` unless all of these are true:
 5. Each page has been reviewed in order by a fresh page-review subagent.
 6. After the last page passes, a final full-document validation run completes.
 7. If the hand-off includes a 图片型 / raster / image-only PDF, it is generated from approximately 300 DPI page images, not the default lower-resolution validation screenshots.
+8. In `submission-paper` mode, bibliography/endnotes are citation-backed rather than decorative.
+9. In `submission-paper` mode, evidence figures/tables are placed near the relevant argument unless the target convention requires an appendix.
 
 If no subagent/delegation tool is available, stop and report that the review gate is blocked. Do not substitute self-approval.
 
@@ -360,6 +462,9 @@ Keep these front-of-mind:
 - no tiny unreadable diagrams
 - no diagram outer frame / 外框 that fails to contain its own labels, pills, icons, or child boxes
 - no learner-facing meta/process text inside the handout body
+- no bibliography inflation without citation coverage
+- no paper-style figures with unrelated decorative labels or non-source chrome
+- no mixed coaching copy inside a clean submission-paper body
 
 Use the reference files for the full rule sets instead of duplicating them in the page.
 
@@ -399,7 +504,11 @@ Do not place those hand-off notes inside the printed teaching body.
 - losing the user's original wording and structure too early → Fix: save the untouched sample to `raw-input.md` before any normalization or classification.
 - doing unstructured broad browsing instead of per-point research → Fix: return to the core knowledge point list and research each point with focused queries.
 - searching only the points that feel uncertain → Fix: research every core knowledge point before drafting, even when the user already supplied a rough explanation.
+- mixing an annotated guide and a clean submission paper in one undifferentiated body → Fix: choose the artifact mode in `brief.md` early and split the outputs when needed.
 - producing stylish pages with weak teaching value → Fix: strengthen the mental model, worked example, and diagram purpose before polishing visuals.
+- using freeform or decorative images where the task really needs a source-backed paper figure → Fix: classify the visual first, then follow `references/evidence-figure-workflow.md`.
+- waiting until layout validation to discover that the draft is too long, too reference-heavy, or too figure-heavy → Fix: run `references/preflight-density-check.md` before full drafting.
+- padding a bibliography without proving where the sources are used → Fix: maintain `citation-map.md` or equivalent citation coverage before final HTML.
 - shrinking diagrams until they stop teaching → Fix: enlarge the figure, simplify labels, or split it into two figures.
 - letting process chrome leak into the learner-facing page → Fix: move provenance/process notes back into `brief.md`, `research.md`, or the final hand-off message.
 - accepting a page with an obvious empty lower half just because it technically fits → Fix: merge blocks, enlarge teaching visuals, add a comparison/worked example, or rebalance neighboring pages.

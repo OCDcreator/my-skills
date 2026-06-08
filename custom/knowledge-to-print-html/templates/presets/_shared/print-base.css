@@ -130,6 +130,8 @@ h3 {
 p,
 li {
   margin-bottom: 0.58em;
+  orphans: 3;
+  widows: 3;
 }
 
 ul,
@@ -159,6 +161,12 @@ th {
   text-align: left;
   background: var(--surface-soft);
   color: var(--ink);
+}
+
+h2,
+h3,
+h4 {
+  page-break-after: avoid;
 }
 
 td,
@@ -318,8 +326,29 @@ figcaption {
     background: #ffffff;
   }
 
+  body {
+    width: var(--page-width);
+    margin: 0 auto;
+  }
+
   .sheet {
     margin: 0;
     box-shadow: none;
+  }
+
+  p,
+  li,
+  blockquote,
+  figcaption {
+    orphans: 3;
+    widows: 3;
+  }
+
+  figure,
+  blockquote,
+  table,
+  tr,
+  pre {
+    page-break-inside: avoid;
   }
 }
