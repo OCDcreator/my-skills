@@ -38,8 +38,15 @@ Typical `doc2x/` files:
 - `export-request.json`
 - `export-result.json`
 - `export/`
+- `export/export.md` when Doc2X produced a markdown export worth keeping for reference
 
 ## Transcript Shape
+
+`source-transcript.md` is the canonical page-level handoff file.
+
+- It must preserve visible page markers.
+- It should be built from page-level parse output.
+- It must not be overwritten by merged export markdown from `doc2x/export/`.
 
 Use visible page markers:
 

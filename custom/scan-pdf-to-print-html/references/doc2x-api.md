@@ -29,6 +29,8 @@ Use this as the primary OCR path for scanned or image-only PDFs.
 - page-level parse results are easy to review and preserve page boundaries
 - export markdown/docx is easier to hand off downstream
 - server-side results expire, so download them promptly
+- keep `source-transcript.md` sourced from page-level parse output
+- keep export markdown under `doc2x/export/` for reference instead of overwriting the canonical transcript
 
 ## Failure Notes
 
@@ -36,3 +38,4 @@ Use this as the primary OCR path for scanned or image-only PDFs.
 - parse quota / concurrency / task limit: surface the API error directly
 - export polling failure: keep parse results and stop with a useful error
 - suspicious OCR: compare against local rendered pages before manual fixes
+- if the export archive contains markdown, preserve it as a supplemental file only; do not collapse page markers by replacing `source-transcript.md`
