@@ -28,6 +28,7 @@ my-skills/
 │   ├── opencode-source-compass/               # OpenCode 源码架构导航与 SDK 兼容诊断
 │   ├── pdf-toc-bookmarker/                    # 扫描 PDF 目录页生成可点击书签
 │   ├── project-level-tools/                   # 项目级 GitNexus + lean-ctx 配置教程
+│   ├── scan-pdf-to-print-html/                # 扫描型 PDF 保真转录为 A4 HTML/PDF
 │   ├── searxng/                               # SearXNG 联网搜索
 │   ├── skill-catalog-maintainer/              # 技能目录/README/AGENTS 维护
 │   ├── skill-router/                          # 任务先路由到 my-skills 中合适技能
@@ -87,6 +88,7 @@ my-skills/
 | [opencode-source-compass](custom/opencode-source-compass/) | OpenCode 源码架构导航与 SDK 版本兼容性诊断；66 个 SDK API 完整调用链映射、40+ 事件类型目录、Effect Service 依赖图、版本升级检测与迁移指引 |
 | [pdf-toc-bookmarker](custom/pdf-toc-bookmarker/) | 为扫描版或图片目录页 PDF 识别目录并写入可点击 outline/bookmarks |
 | [project-level-tools](custom/project-level-tools/) | 将 GitNexus 和 lean-ctx 从全局配置迁移到项目级（Windows + macOS），含跨平台脚本、WSL 兼容、LadybugDB WAL 处理、auto-update 约束与 verify gate |
+| [scan-pdf-to-print-html](custom/scan-pdf-to-print-html/) | 将扫描型或图片型 PDF 通过 Doc2X API 做高保真 OCR，再整理为 A4 HTML/PDF；强调原文内容不改写，并保留本地渲染、清理、图像复用脚本作为审阅和兜底工具 |
 | [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
 | [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
 | [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |
