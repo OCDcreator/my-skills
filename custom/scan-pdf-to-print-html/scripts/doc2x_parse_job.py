@@ -215,6 +215,15 @@ def find_first_markdown(root: Path) -> Path | None:
     return candidates[0] if candidates else None
 
 
+def preserve_export_markdown(markdown_path: Path, export_dir: Path) -> Path | None:
+    if not markdown_path.exists():
+        return None
+    export_dir.mkdir(parents=True, exist_ok=True)
+    preserved_path = export_dir / "export.md"
+    shutil.copyfile(markdown_path, preserved_path)
+    return preserved_path
+
+
 def maybe_render_pages(job_dir: Path, pdf_path: Path, dpi: int) -> None:
     command = [
         sys.executable,
@@ -316,7 +325,7 @@ def main() -> int:
         if extracted_dir:
             markdown_path = find_first_markdown(extracted_dir)
             if markdown_path:
-                shutil.copyfile(markdown_path, job_dir / "source-transcript.md")
+                preserve_export_markdown(markdown_path, export_dir)
 
     if args.render_pages:
         maybe_render_pages(job_dir, pdf_path, args.render_dpi)
