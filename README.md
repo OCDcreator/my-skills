@@ -67,62 +67,72 @@ my-skills/
 
 ## 自有技能 (custom/)
 
+<!-- BEGIN GENERATED CUSTOM_SKILLS -->
 | 技能 | 说明 |
 |------|------|
-| [codex-autopilot-scaffold](custom/codex-autopilot-scaffold/) | 把 Codex 风格 repo-local 无人值守 autopilot 脚手架注入任意项目，含 `maintainability`、`quality-gate recovery`、`bugfix/backlog` 三类 preset；支持已批准 plan/spec 种子、远端 Mac rollout 提示、版本感知和预算误杀防护 |
-| [design-reference-router](custom/design-reference-router/) | 先选真实品牌/产品设计参考，再把约束交给 `frontend-design` 实现 |
-| [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南 |
-| [fork-upstream-workflow](custom/fork-upstream-workflow/) | 个人 fork 仓库的 `origin` / `upstream` / `main` / `feat/*` 维护策略与同步上游工作流 |
-| [kimi-code-review](custom/kimi-code-review/) | 让其他 Agent 通过 Shell 或 ACP 调用 Kimi Code CLI 进行代码审查；内置 general/security/performance/architecture/style 五类审查模板与 `scripts/review.py` 封装脚本 |
-| [knowledge-to-print-html](custom/knowledge-to-print-html/) | 把知识点、草稿和研究资料整理成适合打印 PDF 的 HTML 讲义，内置版式约束、打印验证与逐页子代理审版循环 |
-| [lean-ctx-opencode-plugin](custom/lean-ctx-opencode-plugin/) | lean-ctx token 优化在 Claude Code、OpenCode、Codex 等 Agent 中的项目级部署与验证指南 |
-| [liquid-glass-compose](custom/liquid-glass-compose/) | Apple Liquid Glass 风格 UI 效果（Kotlin Compose） |
-| [math-to-obsidian-note](custom/math-to-obsidian-note/) | 把数学题目、答案、解答和知识点从图片或文字整理成 Obsidian Markdown 笔记；必要时用 `gpt-image-2` 重绘图形，并调用 `obsidian-markdown` 审查格式 |
-| [module-doc-guard-kit](custom/module-doc-guard-kit/) | 为任意仓库接入 `docs/modules` 一对一模块文档、覆盖检查和 diff 硬约束，防止新增/修改/删除源码时文档不同步 |
-| [obsidian-plugin-autodebug](custom/obsidian-plugin-autodebug/) | 通用 Obsidian 插件 build → deploy → clean-vault bootstrap → reload → log watch → screenshot/DOM check 全自动调试开发循环，含 Node/WebSocket/CDP doctor、watch on save、state reset、baseline、playbook、多轮 profile、断言、对比、HTML 报告、native smoke fixture 与 vault 状态恢复 |
-| [obsidian-plugin-debug-logging](custom/obsidian-plugin-debug-logging/) | Obsidian 插件调试日志、诊断报告、BUILD_ID 与 Windows/macOS 日志导出治理 |
-| [obsidian-plugin-release-manager](custom/obsidian-plugin-release-manager/) | Obsidian plugin 的 semver + codename、BUILD_ID、release build 自动 patch bump 与 test vault deploy |
-| [open-source-projects](custom/open-source-projects/) | 本地 open-source-project 仓库索引查询，优先查 SQLite/JSON manifest 而不是全盘搜索 |
-| [opencode-cli-handbook](custom/opencode-cli-handbook/) | OpenCode CLI 速查手册；覆盖 `opencode run` 非交互执行（代码审查/辅助/CI 自动化）、服务器模式、会话管理、模型切换、调试诊断等全部 CLI 命令与参数 |
-| [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
-| [opencode-mcp-delegate](custom/opencode-mcp-delegate/) | 通过 `opencode-mcp` MCP 服务把编码/审查任务分发给 OpenCode，强调 workflow 工具、会话续接和本地 MCP 配置约束 |
-| [opencode-plugin-builder](custom/opencode-plugin-builder/) | OpenCode 插件开发完整指南；覆盖 @opencode-ai/plugin TypeScript API、全部 Hooks、自定义 tool 注册、opencode.json 配置、跨平台踩坑与 npm 发布流程 |
-| [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
-| [opencode-source-compass](custom/opencode-source-compass/) | OpenCode 源码架构导航与 SDK 版本兼容性诊断；66 个 SDK API 完整调用链映射、40+ 事件类型目录、Effect Service 依赖图、版本升级检测与迁移指引 |
-| [pdf-toc-bookmarker](custom/pdf-toc-bookmarker/) | 为扫描版或图片目录页 PDF 识别目录并写入可点击 outline/bookmarks |
-| [project-level-tools](custom/project-level-tools/) | 将 GitNexus 和 lean-ctx 从全局配置迁移到项目级（Windows + macOS），含跨平台脚本、WSL 兼容、LadybugDB WAL 处理、auto-update 约束与 verify gate |
-| [rewrite-doc2x-markdown](custom/rewrite-doc2x-markdown/) | 把 Doc2X OCR 输出重写为高质量 canonical Markdown，含 auto-fix、proofreading checklist、长文档并行分块工作流和 validator（支持 --fix / --check-proofreading） |
-| [scan-pdf-to-print-html](custom/scan-pdf-to-print-html/) | 将扫描型或图片型 PDF 通过 Doc2X API 做高保真 OCR，再整理为 A4 HTML/PDF；强调原文内容不改写，并保留本地渲染、清理、图像复用脚本作为审阅和兜底工具 |
-| [searxng](custom/searxng/) | SearXNG 联网搜索（支持多引擎聚合） |
-| [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | 技能目录维护、来源审计、`README.md`/`AGENTS.md`/`SKILLS.md` 规则同步 |
-| [skill-router](custom/skill-router/) | 先到 `my-skills` 源仓库检索候选技能，再明确指向下一步该加载哪个技能 |
-| [sub](custom/sub/) | OpenClash、`sub-web`、`subconverter`、`wallrule` 本地订阅转换链路排障与模板同步，覆盖 `emoji=true` 命名副作用、`IPRoyal` 端口区分、运行中模板与仓库源码分离等问题 |
-| [ssh](custom/ssh/) | SSH/SCP 远程操作全设备（Mac Mini、Windows、Unraid、QWRT 路由器、飞牛 fnOS），含设备清单、引号安全、base64 跨平台脚本、文件传输与后台任务 |
-| [syncthing](custom/syncthing/) | Syncthing 同步排障、Windows/macOS 保留名、`.stignore` 顺序与官方 REST API 诊断 |
-| [x-reader](custom/x-reader/) | 内容转录与分析套件（含 [analyzer](custom/x-reader/analyzer/) 多维内容分析、[browser-fetch](custom/x-reader/browser-fetch/) 浏览器抓取兜底、[douyin](custom/x-reader/douyin/) 抖音短视频转写、[video](custom/x-reader/video/) 视频/播客转录） |
+| [codex-autopilot-scaffold](custom/codex-autopilot-scaffold/) | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrad... |
+| [design-reference-router](custom/design-reference-router/) | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. |
+| [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南。涵盖目录结构、manifest 配置、生命周期脚本、用户向导、权限管理、resource 资源声明和桌面图标配置。Use when developing fnOS FPK packages, creating fnOS apps, writing cmd scripts, configuring wizard/manifest/privilege/resource, desktop icons, ui/config, or when the user mentions 飞牛、fnOS、fpk。 |
+| [fork-upstream-workflow](custom/fork-upstream-workflow/) | Use when the user is maintaining a personal Git fork and needs to keep their own changes while following updates from the original repository. Trigger for requests about `origin` vs `upstream`, syncing a fork with the original author, managing `main` plus feature branches, choosing merge vs rebas... |
+| [kimi-code-review](custom/kimi-code-review/) | Enable external AI agents and automated systems to invoke Kimi Code CLI for code review, quality analysis, and automated auditing. Use when (1) another agent or CI pipeline needs to delegate code review to Kimi Code CLI programmatically, (2) an external system wants to leverage Kimi Code CLI revi... |
+| [knowledge-to-print-html](custom/knowledge-to-print-html/) | Use when the user wants notes, keywords, drafts, lesson content, or research findings turned into a print-ready HTML/PDF teaching handout. Trigger aggressively for requests like “知识点整理成讲义”, “把这些笔记整理成讲义”, “可打印 HTML”, “打印成 PDF”, “教学页”, “复习手册”, “make it printable”, “knowledge handout”, “teaching han... |
+| [lean-ctx-deploy](custom/lean-ctx-opencode-plugin/) | Guide for deploying lean-ctx token optimization into AI coding agents. Covers three integration modes — MCP server mode (Claude Code, Kiro, OpenCode, Cursor), CLI-redirect plugin mode (OpenCode), and Hybrid mode with shell hooks (Codex) — with project-level setup, cross-platform debugging (Window... |
+| [liquid-glass-compose](custom/liquid-glass-compose/) | Implement Apple-style Liquid Glass / glassmorphism UI effects in Kotlin Compose Multiplatform projects using the `io.github.fletchmckee.liquid:liquid` library. Use this skill whenever the user asks to create frosted glass, glassmorphism, liquid glass, blur glass, translucent navigation bars, glas... |
+| [math-to-obsidian-note](custom/math-to-obsidian-note/) | Convert uploaded math-related images or text into a polished Obsidian Markdown note under the user's math vault. Use when the user provides math problems, answers, solution steps, exam screenshots, handwritten notes, diagrams, formulas, or knowledge points and wants them organized as a Markdown d... |
+| [module-doc-guard-kit](custom/module-doc-guard-kit/) | Use when a repo needs per-module documentation under docs/modules, hard CI/local checks that fail on source-doc drift, or a reusable package so another agent can keep module docs synchronized when files are added, changed, renamed, or deleted. Trigger on 模块文档, module docs, docs/modules, doc cover... |
+| [obsidian-plugin-autodebug](custom/obsidian-plugin-autodebug/) | Use when Obsidian plugin work turns into debugging, smoke testing, or release validation. Triggers include white screens after reload, slow startup, stale UI after deploy, fresh-vault install failures, console/DevTools capture, screenshots, DOM/CSS assertions, locale/i18n checks, watch-on-save lo... |
+| [obsidian-plugin-debug-logging](custom/obsidian-plugin-debug-logging/) | Use this when developing or retrofitting an Obsidian plugin and the user mentions 调试日志, debug logging, 控制台日志, console logs, diagnostic report, 诊断报告, 日志开关, 日志分级, 默认静默, 模块日志开关, 子模块调试开关, 高频日志刷新频率, 故障排查, 最近日志缓存, 日志导出, 环境快照, BUILD_ID, version/build logs, or wants a maintainable logging/diagnostics sys... |
+| [obsidian-plugin-release-manager](custom/obsidian-plugin-release-manager/) | Create or retrofit a complete release-management workflow for Obsidian plugins. Use this whenever the user mentions Obsidian plugin versioning, manifest/package version sync, release codename, display version, BUILD_ID, release build automation, test vault deployment, or wants an existing Obsidia... |
+| [open-source-projects](custom/open-source-projects/) | 本地开源项目索引。当用户提到任何开源项目名称（中英文均可）、询问项目在哪里、 想看某个项目、问项目是做什么的、提到 repo/repository/项目/仓库/open-source-project、 问"我收藏了什么项目"、或者用户提到任何可能在 open-source-project 目录下的项目时， 都必须使用这个 skill。永远不要全盘搜索文件系统来猜测项目位置， 而是先查数据库。 |
+| [opencode-cli-handbook](custom/opencode-cli-handbook/) | OpenCode CLI 速查手册 —— 让任意 agent 快速掌握 opencode 命令行的调用方式， 用于代码审查、代码辅助、调试诊断、会话管理、模型切换等自动化场景。 触发场景（满足任一即应加载此技能）： - agent 需要通过命令行调用 opencode 来完成代码审查、代码生成、bug 修复 - 用户说"用 opencode run"、"opencode CLI"、"opencode 命令行"、"非交互模式" - 需要在脚本/CI/子 agent 中调用 opencode（不需要 TUI） - 用户问"opencode 怎么跑一条命令"、"怎么用 opencode 审查代... |
+| [opencode-loop](custom/opencode-loop/) | Use when the user wants opencode-loop unattended or self-running multi-iteration coding over a target project: run build-verify-fix cycles, optimize/refactor repos, fix test/lint/type failures, bootstrap projects, or watch a live human dashboard for long runs. Trigger on phrases like 无人值守, 自动循环,... |
+| [opencode-mcp-delegate](custom/opencode-mcp-delegate/) | Use when an AI coding agent (Codex, Claude Code, etc.) needs to delegate coding or review tasks to OpenCode via the opencode-mcp MCP server. Trigger on requests to use opencode MCP tools, run long background jobs, continue OpenCode sessions, or avoid direct bash `opencode run`. Prefer workflow to... |
+| [opencode-plugin-builder](custom/opencode-plugin-builder/) | Guide LLMs through writing, testing, and configuring OpenCode plugins using the @opencode-ai/plugin TypeScript API. Use when the user wants to create, modify, or debug an OpenCode plugin (.ts/.js), register custom tools via the tool() helper, hook into OpenCode lifecycle events (tool.execute.befo... |
+| [opencode-provider-config](custom/opencode-provider-config/) | Configure complete model parameters (context window, output tokens, capabilities, cost) for custom providers in OpenCode via cc-Switch. Use this skill whenever the user mentions configuring a new provider in OpenCode or cc-Switch, when a custom model lacks context window information, when the use... |
+| [opencode-source-compass](custom/opencode-source-compass/) | OpenCode 源码架构导航与版本兼容性诊断技能。 为接入 OpenCode SDK 的插件/应用提供源码快速定位、故障诊断路径和版本差异检测。 触发场景（只要有以下任何一条就应该加载此技能）： - 用户提到 OpenCode SDK、opencode-ai、OpencodeClient、createOpencodeClient - 用户在开发接入 OpenCode 的插件（Obsidian 插件、VSCode 插件、Web 应用等） - 用户遇到 OpenCode SDK 调用错误、HTTP 请求失败、SSE 事件问题 - 用户提到 opencode serve、opencode s... |
+| [pdf-toc-bookmarker](custom/pdf-toc-bookmarker/) | Create a new PDF with clickable bookmarks/outline from scanned or image-only table-of-contents pages. Use when Codex needs to add PDF bookmarks from TOC screenshots/pages, especially for scanned Chinese books where local OCR is unreliable. Requires the user to provide a PDF file path, the TOC pag... |
+| [project-level-tools](custom/project-level-tools/) | Use when the user wants GitNexus and/or lean-ctx configured for one repository instead of globally, including project-level MCP setup, repo-local Codex hooks, trusted-project setup, local templates, or Windows/macOS per-project tool isolation. |
+| [rewrite-doc2x-markdown](custom/rewrite-doc2x-markdown/) | Use when Doc2X OCR markdown, Doc2X export.md, page-transcript.raw.md, or source-transcript.md is messy, too long, poorly structured, or must be rewritten into a high-quality canonical Markdown transcript before downstream use. |
+| [scan-pdf-to-print-html](custom/scan-pdf-to-print-html/) | Use when scanned or image-only PDFs need Doc2X OCR into a faithful, auditable page transcript and then A4 HTML/PDF. Best for textbooks, notes, worksheets, formulas, tables, diagrams, and question pages where content must stay source-faithful and `source-transcript.md` must be audited before HTML... |
+| [searxng](custom/searxng/) | Search the internet using your self-hosted SearXNG instance. Use this when you need to search for current information, news, documentation, or any web content. Triggers: "search for", "look up", "find information about", "what is", "how to" when web search is needed. |
+| [skill-catalog-maintainer](custom/skill-catalog-maintainer/) | Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, rename, or maintain skills and their metadata, or to update `SKILLS.md`, `README.md`, `AGENTS.md`, `update.sh`, or `update.ps1` after skill changes. |
+| [skill-router](custom/skill-router/) | Use when the immediate job is to decide which skills should be loaded from the `my-skills` repository before doing real work, especially if the user asks for skill recommendations, says to search their skill repo, references `my-skills`, or invokes a path-based skill prompt to bootstrap another t... |
+| [ssh](custom/ssh/) | Use when the user mentions SSH, SCP, remote shell, "SSH 连接", "连 mac", "连 unraid", "连路由器", "连飞牛", "远程执行", "远程命令", "scp 传文件", "连服务器", or any device connection via OpenSSH. Triggers on connecting to any known device (Mac, Windows, Unraid, router, NAS) or general SSH/SCP operations. Includes device i... |
+| [sub](custom/sub/) | Diagnose and maintain the local OpenClash subscription-conversion chain built from OpenClash, `sub-web`, `subconverter`, and the `wallrule` preset on this machine. Use when requests mention OpenClash, 订阅转换, `sub-web`, `subconverter`, `wallrule`, 自定义模板, `25500`, `25502`, `IPRoyal`, `dialer-proxy`,... |
+| [syncthing](custom/syncthing/) | Use when diagnosing Syncthing sync failures: stuck syncing, out of sync, 0% completion between Windows and macOS, folder errors, `.stignore` ignore rule surprises, Windows reserved names such as aux/con/prn/nul/com/lpt, delete-dir not-empty loops, permission denied, or device connection problems. |
+| [x-reader](custom/x-reader/) | Use when user shares media URLs, Douyin/抖音, web pages, blocked or JavaScript-rendered URLs, direct audio/video links, or requests transcription, digest, summary, browser extraction, or content analysis. |
+| [x-reader/analyzer](custom/x-reader/analyzer/) | Multi-dimensional content analysis with actionable insights. Triggers when user sends content (URL, text, or transcript) with analysis intent - commands like '/analyze [URL]', 'Analyze this article', 'What are the key takeaways?', or auto-triggered after video/podcast transcription. Outputs struc... |
+| [x-reader/browser-fetch](custom/x-reader/browser-fetch/) | Use when a web URL cannot be read by normal fetch tools, appears blocked by Cloudflare/reCAPTCHA/bot detection, needs JavaScript rendering, login state, browser interaction, or a stealth browser fallback before analysis. |
+| [x-reader/douyin](custom/x-reader/douyin/) | Use when user sends Douyin or 抖音 share text, v.douyin.com links, douyin.com video links, or asks to transcribe, summarize, digest, download, or save a Douyin short video. |
+| [x-reader/video](custom/x-reader/video/) | Video and podcast transcription with structured summaries. Auto-triggered when a media URL is detected (YouTube, Bilibili, X/Twitter, Xiaoyuzhou, Apple Podcasts, or direct mp3/mp4/m3u8 links). Extracts subtitles or transcribes via Whisper, then outputs formatted digest with key points and timesta... |
+<!-- END GENERATED CUSTOM_SKILLS -->
 
 ## 外部技能来源 (external/)
 
+<!-- BEGIN GENERATED EXTERNAL_SKILL_SOURCES -->
 | 本地目录 | 源仓库 | 说明 |
 |----------|--------|------|
-| `external/anthropics-skills/` | [anthropics/skills](https://github.com/anthropics/skills) | Anthropic 官方技能 |
-| `external/awesome-claude-skills/` | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills) | ComposioHQ 社区技能 |
-| `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills) | 宝玉的中文技能 |
-| `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) | Anthropic 官方插件技能 |
-| `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills) | Obsidian 可视化技能 |
-| `external/deep-research-skills/` | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills) | 结构化深度调研工作流技能，保留 `research-*` 语言/平台分组和配套 agents/scripts |
-| `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) | Obsidian 官方 Markdown/Bases/Canvas/CLI 技能 |
-| `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill) | 高级前端设计技能（多风格、参数可调） |
-| `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill) | HTML PPT 演示文稿生成技能（多主题/布局/动画） |
-| `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) | UI/UX Pro Max 设计智能工具包（banner-design、brand、design、design-system、slides、ui-styling、ui-ux-pro-max 共 7 个技能） |
-| `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill) | CodeX 创业想法压力测试技能（6 种模式，BUILD/KILL/PIVOT 裁決） |
-| `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills) | Matt Pocock 工程技能集（grill-me、tdd、improve-codebase-architecture、triage、diagnose、to-issues 等 29 个技能） |
+| `external/anthropics-skills/` | [anthropics/skills](https://github.com/anthropics/skills.git) | 17 个技能（core：高质量官方/精选源） |
+| `external/awesome-claude-skills/` | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills.git) | 863 个技能（bulk：完整索引见 docs/full-catalog.md） |
+| `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills.git) | 3 个技能 |
+| `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills.git) | 21 个技能 |
+| `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official.git) | 22 个技能（core：高质量官方/精选源） |
+| `external/deep-research-skills/` | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills.git) | 20 个技能 |
+| `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill.git) | 0 个技能 |
+| `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills.git) | 5 个技能（core：高质量官方/精选源） |
+| `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills.git) | 29 个技能（core：高质量官方/精选源） |
+| `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git) | 0 个技能 |
+| `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill.git) | 13 个技能 |
+| `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git) | 7 个技能 |
+<!-- END GENERATED EXTERNAL_SKILL_SOURCES -->
 
 ## 外部设计参考来源 (external/)
 
+<!-- BEGIN GENERATED EXTERNAL_REFERENCE_SOURCES -->
 | 本地目录 | 源仓库 | 说明 |
 |----------|--------|------|
-| `external/awesome-design-md/` | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) | 品牌/产品风格参考索引；本地保留品牌 slug 与跳转链接，详细 DESIGN.md 通过 `getdesign.md` 按需读取 |
+| `external/awesome-design-md/` | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md.git) | 设计参考索引 |
+<!-- END GENERATED EXTERNAL_REFERENCE_SOURCES -->
 
 ## 一键脚本
 

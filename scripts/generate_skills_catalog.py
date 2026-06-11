@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
-"""Generate SKILLS.md from SKILL.md files and update.sh source metadata."""
+"""Generate curated SKILLS.md and full docs/full-catalog.md from SKILL.md files."""
 
 from __future__ import annotations
 
 import re
+import sys
 from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
+try:
+    import yaml
+except ImportError:
+    print("ERROR: PyYAML is required. Install with: pip install pyyaml")
+    sys.exit(1)
+
 
 ROOT = Path(__file__).resolve().parents[1]
-UPDATE_SH = ROOT / "update.sh"
+SOURCES_YAML = ROOT / "config" / "sources.yaml"
 CATALOG = ROOT / "SKILLS.md"
+FULL_CATALOG = ROOT / "docs" / "full-catalog.md"
+README = ROOT / "README.md"
 
 
 def read(path: Path) -> str:
@@ -62,25 +71,30 @@ def frontmatter(path: Path) -> tuple[str, str]:
     return name, one_line(description)
 
 
-def parse_sources() -> dict[str, dict[str, str]]:
-    sources: dict[str, dict[str, str]] = {}
-    text = read(UPDATE_SH)
-    in_block = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped == "SKILL_SOURCES=(":
-            in_block = True
-            continue
-        if in_block and stripped == ")":
-            break
-        if not in_block or not stripped.startswith('"'):
-            continue
-        name, url, branch, source_dir, *rest = stripped.strip('"').split("|")
-        sources[name] = {
-            "repo": url,
-            "branch": branch,
-            "source_dir": source_dir,
-            "mode": rest[0] if rest else "",
+def parse_sources_yaml() -> dict[str, dict[str, str | bool]]:
+    """Read config/sources.yaml as the single source of truth."""
+    if not SOURCES_YAML.exists():
+        print(f"ERROR: {SOURCES_YAML} not found. Run from repo root.")
+        sys.exit(1)
+    data = yaml.safe_load(read(SOURCES_YAML))
+    sources: dict[str, dict[str, str | bool]] = {}
+    for src in data.get("skill_sources", []):
+        sources[src["name"]] = {
+            "repo": src.get("repo", ""),
+            "branch": src.get("branch", ""),
+            "subdir": src.get("subdir", ""),
+            "mode": src.get("mode", ""),
+            "tier": src.get("tier", "community"),
+            "include_in_main_catalog": src.get("include_in_main_catalog", True),
+        }
+    for src in data.get("reference_sources", []):
+        sources[src["name"]] = {
+            "repo": src.get("repo", ""),
+            "branch": src.get("branch", ""),
+            "subdir": src.get("subdir", ""),
+            "mode": src.get("mode", ""),
+            "tier": src.get("tier", "reference"),
+            "include_in_main_catalog": src.get("include_in_main_catalog", False),
         }
     return sources
 
@@ -116,11 +130,12 @@ def install_hint(path: str, source_repo: str, branch: str, source_subdir: str) -
     )
 
 
-def external_source_subdir(rel: str, source: dict[str, str]) -> str:
+def external_source_subdir(rel: str, source: dict[str, str | bool]) -> str:
     parts = rel.split("/")
     remainder = "/".join(parts[2:])
-    base = source["source_dir"]
-    if source["mode"] == "preserve":
+    base = str(source.get("subdir", ""))
+    mode = str(source.get("mode", ""))
+    if mode == "preserve":
         return remainder
     if not remainder:
         return base
@@ -129,33 +144,30 @@ def external_source_subdir(rel: str, source: dict[str, str]) -> str:
     return f"{base}/{remainder}"
 
 
-def main() -> None:
-    sources = parse_sources()
-    skill_paths = sorted(
-        path.parent.relative_to(ROOT).as_posix()
-        for path in ROOT.rglob("SKILL.md")
-        if ".git" not in path.parts
-    )
-
+def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]) -> list[dict[str, str]]:
     rows = []
-    duplicates: dict[str, list[str]] = defaultdict(list)
     for rel in skill_paths:
         name, description = frontmatter(ROOT / rel / "SKILL.md")
-        duplicates[name].append(rel)
         if rel.startswith("custom/"):
             source_repo = "git@github.com:OCDcreator/my-skills.git"
             branch = "main"
             source_subdir = rel
+            tier = "custom"
+            include_in_main = True
         elif rel.startswith("external/"):
             source_name = rel.split("/")[1]
             source = sources.get(source_name, {})
-            source_repo = source.get("repo", "Needs source review")
-            branch = source.get("branch", "Needs source review")
+            source_repo = str(source.get("repo", "Needs source review"))
+            branch = str(source.get("branch", "Needs source review"))
             source_subdir = external_source_subdir(rel, source) if source else "Needs source review"
+            tier = str(source.get("tier", "community"))
+            include_in_main = bool(source.get("include_in_main_catalog", True))
         else:
             source_repo = "git@github.com:OCDcreator/my-skills.git"
             branch = "main"
             source_subdir = rel
+            tier = "custom"
+            include_in_main = True
         category = category_for(rel, name, description)
         rows.append(
             {
@@ -167,25 +179,27 @@ def main() -> None:
                 "branch": branch,
                 "source_subdir": source_subdir,
                 "install": install_hint(rel, source_repo, branch, source_subdir),
+                "tier": tier,
+                "include_in_main": include_in_main,
             }
         )
+    return rows
 
+
+def generate_curated_catalog(rows: list[dict[str, str]]) -> list[str]:
+    """Generate the curated SKILLS.md (Quick Picker + Custom + curated External)."""
     custom_rows = [row for row in rows if row["path"].startswith("custom/")]
+    curated_external = [row for row in rows if row["path"].startswith("external/") and row["include_in_main"]]
     external_groups: dict[str, list[dict[str, str]]] = defaultdict(list)
-    for row in rows:
-        if row["path"].startswith("external/"):
-            external_groups[row["path"].split("/")[1]].append(row)
-
-    duplicate_lines = [
-        f"- `{name}`: " + ", ".join(f"`{path}`" for path in paths)
-        for name, paths in sorted(duplicates.items())
-        if len(paths) > 1
-    ]
+    for row in curated_external:
+        external_groups[row["path"].split("/")[1]].append(row)
 
     lines: list[str] = [
         "# Skills Catalog",
         "",
         f"Generated from repository state on {date.today().isoformat()}.",
+        "",
+        "This is the **curated** quick-reference index. For the complete list of all 1000+ skills, see [`docs/full-catalog.md`](docs/full-catalog.md).",
         "",
         "## Quick Picker",
         "",
@@ -214,36 +228,216 @@ def main() -> None:
     for row in custom_rows:
         lines.append(f"| `{row['path']}` | `{row['name']}` | {md_cell(row['description'], limit=420)} |")
 
-    lines.extend(["", "## External Skills", "", "| Source | Notable skills | Use when |", "|---|---|---|"])
+    if external_groups:
+        lines.extend(["", "## External Skills (Curated)", "", "| Source | Notable skills | Use when |", "|---|---|---|"])
+        for source_name, group in sorted(external_groups.items()):
+            notable = ", ".join(f"`{row['name']}`" for row in group[:8])
+            if len(group) > 8:
+                notable += f", ... ({len(group)} total)"
+            use_when = f"Mirrored from `{group[0]['repo']}`."
+            lines.append(f"| `{source_name}` | {notable} | {use_when} |")
+
+    lines.extend([
+        "",
+        "## Bulk / Archive Sources",
+        "",
+        "These sources are mirrored but excluded from the main catalog to reduce noise. See [`docs/full-catalog.md`](docs/full-catalog.md) for the complete index.",
+        "",
+        "| Source | Tier | Why hidden |",
+        "|---|---|---|",
+        "| `awesome-claude-skills` | bulk | 863 low-signal automation skills (`Automate X via Rube MCP`). Available in full catalog. |",
+        "",
+    ])
+
+    return lines
+
+
+def generate_full_catalog(rows: list[dict[str, str]]) -> list[str]:
+    """Generate the complete docs/full-catalog.md with all skills."""
+    custom_rows = [row for row in rows if row["path"].startswith("custom/")]
+    external_rows = [row for row in rows if row["path"].startswith("external/")]
+    external_groups: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in external_rows:
+        external_groups[row["path"].split("/")[1]].append(row)
+
+    duplicates: dict[str, list[str]] = defaultdict(list)
+    for row in rows:
+        duplicates[row["name"]].append(row["path"])
+
+    duplicate_lines = [
+        f"- `{name}`: " + ", ".join(f"`{path}`" for path in paths)
+        for name, paths in sorted(duplicates.items())
+        if len(paths) > 1
+    ]
+
+    lines: list[str] = [
+        "# Full Skills Catalog",
+        "",
+        f"Generated from repository state on {date.today().isoformat()}.",
+        "",
+        "This file contains the **complete** index of all skills in the repository, including bulk sources. For the curated quick-reference, see [`SKILLS.md`](../SKILLS.md).",
+        "",
+        "## Stats",
+        "",
+        f"- **Total skills**: {len(rows)}",
+        f"- **Custom skills**: {len(custom_rows)}",
+        f"- **External sources**: {len(external_groups)}",
+        f"- **External skills**: {len(external_rows)}",
+        "",
+        "## Custom Skills",
+        "",
+        "| Path | Name | Category | Use when |",
+        "|---|---|---|---|",
+    ]
+
+    for row in custom_rows:
+        lines.append(f"| `{row['path']}` | `{row['name']}` | {row['category']} | {md_cell(row['description'], limit=360)} |")
+
+    lines.extend(["", "## External Skills by Source", ""])
     for source_name, group in sorted(external_groups.items()):
-        notable = ", ".join(f"`{row['name']}`" for row in group[:8])
-        if len(group) > 8:
-            notable += f", ... ({len(group)} total)"
-        source = sources.get(source_name, {})
-        use_when = f"Mirrored from `{source.get('repo', 'Needs source review')}`."
-        lines.append(f"| `{source_name}` | {notable} | {use_when} |")
+        lines.extend([
+            f"### `{source_name}` ({len(group)} skills)",
+            "",
+            "| Path | Name | Category | Use when |",
+            "|---|---|---|---|",
+        ])
+        for row in group:
+            lines.append(f"| `{row['path']}` | `{row['name']}` | {row['category']} | {md_cell(row['description'], limit=360)} |")
+        lines.append("")
 
     if duplicate_lines:
         lines.extend(["", "## Duplicate Names", "", "Duplicate names are expected for external sources; select by path and source, not name alone.", ""])
         lines.extend(duplicate_lines)
 
-    lines.extend(
-        [
-            "",
-            "## Full Index",
-            "",
-            "| Path | Name | Category | Use when | Source repo | Source branch | Source subdir | Install hint |",
-            "|---|---|---|---|---|---|---|---|",
-        ]
-    )
+    lines.extend([
+        "",
+        "## Full Index",
+        "",
+        "| Path | Name | Category | Tier | Use when | Source repo | Source branch | Source subdir | Install hint |",
+        "|---|---|---|---|---|---|---|---|---|",
+    ])
     for row in rows:
         lines.append(
-            f"| `{row['path']}` | `{row['name']}` | {row['category']} | {md_cell(row['description'], limit=360)} | "
+            f"| `{row['path']}` | `{row['name']}` | {row['category']} | {row['tier']} | {md_cell(row['description'], limit=360)} | "
             f"`{row['repo']}` | `{row['branch']}` | `{row['source_subdir']}` | {row['install']} |"
         )
 
-    CATALOG.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"Wrote {CATALOG.relative_to(ROOT)} with {len(rows)} skills.")
+    return lines
+
+
+def generate_readme_blocks(rows: list[dict[str, str]], sources: dict[str, dict[str, str | bool]]) -> dict[str, str]:
+    """Generate auto-updatable blocks for README.md."""
+    blocks: dict[str, str] = {}
+
+    # 1. Custom skills table
+    custom_rows = [row for row in rows if row["path"].startswith("custom/")]
+    custom_lines = [
+        "| 技能 | 说明 |",
+        "|------|------|",
+    ]
+    for row in custom_rows:
+        desc = md_cell(row["description"], limit=300)
+        custom_lines.append(f"| [{row['name']}]({row['path']}/) | {desc} |")
+    blocks["CUSTOM_SKILLS"] = "\n".join(custom_lines)
+
+    # 2. External skill sources table
+    skill_sources = {k: v for k, v in sources.items() if v.get("tier") != "reference"}
+    external_skill_lines = [
+        "| 本地目录 | 源仓库 | 说明 |",
+        "|----------|--------|------|",
+    ]
+    for name, meta in sorted(skill_sources.items()):
+        repo = str(meta.get("repo", ""))
+        # Extract owner/repo from URL
+        repo_link = repo.replace("https://github.com/", "").replace(".git", "")
+        tier = str(meta.get("tier", "community"))
+        tier_note = ""
+        if tier == "bulk":
+            tier_note = "（bulk：完整索引见 docs/full-catalog.md）"
+        elif tier == "core":
+            tier_note = "（core：高质量官方/精选源）"
+        # Count skills for this source
+        count = len([r for r in rows if r["path"].startswith(f"external/{name}/")])
+        desc = f"{count} 个技能{tier_note}"
+        external_skill_lines.append(
+            f"| `external/{name}/` | [{repo_link}]({repo}) | {desc} |"
+        )
+    blocks["EXTERNAL_SKILL_SOURCES"] = "\n".join(external_skill_lines)
+
+    # 3. External reference sources table
+    ref_sources = {k: v for k, v in sources.items() if v.get("tier") == "reference"}
+    ref_lines = [
+        "| 本地目录 | 源仓库 | 说明 |",
+        "|----------|--------|------|",
+    ]
+    for name, meta in sorted(ref_sources.items()):
+        repo = str(meta.get("repo", ""))
+        repo_link = repo.replace("https://github.com/", "").replace(".git", "")
+        ref_lines.append(
+            f"| `external/{name}/` | [{repo_link}]({repo}) | 设计参考索引 |"
+        )
+    blocks["EXTERNAL_REFERENCE_SOURCES"] = "\n".join(ref_lines)
+
+    return blocks
+
+
+def update_readme(blocks: dict[str, str]) -> None:
+    """Replace marked sections in README.md with generated blocks."""
+    if not README.exists():
+        print(f"WARNING: {README} not found, skipping README update.")
+        return
+
+    content = read(README)
+    updated = content
+
+    for block_name, block_content in blocks.items():
+        start_marker = f"<!-- BEGIN GENERATED {block_name} -->"
+        end_marker = f"<!-- END GENERATED {block_name} -->"
+
+        if start_marker not in updated or end_marker not in updated:
+            print(f"WARNING: README.md markers for {block_name} not found. Skipping.")
+            continue
+
+        # Replace content between markers
+        pattern = re.compile(
+            re.escape(start_marker) + r".*?" + re.escape(end_marker),
+            re.DOTALL,
+        )
+        replacement = f"{start_marker}\n{block_content}\n{end_marker}"
+        updated = pattern.sub(replacement, updated)
+
+    if updated != content:
+        README.write_text(updated, encoding="utf-8")
+        print(f"Updated {README.relative_to(ROOT)} auto-generated blocks.")
+    else:
+        print(f"No changes needed in {README.relative_to(ROOT)}.")
+
+
+def main() -> None:
+    sources = parse_sources_yaml()
+    skill_paths = sorted(
+        path.parent.relative_to(ROOT).as_posix()
+        for path in ROOT.rglob("SKILL.md")
+        if ".git" not in path.parts
+    )
+
+    rows = build_rows(skill_paths, sources)
+
+    # Write curated catalog
+    curated_lines = generate_curated_catalog(rows)
+    CATALOG.write_text("\n".join(curated_lines) + "\n", encoding="utf-8")
+    curated_count = len([r for r in rows if r["include_in_main"] == "True" or r["path"].startswith("custom/")])
+    print(f"Wrote {CATALOG.relative_to(ROOT)} with curated view ({curated_count} skills).")
+
+    # Write full catalog
+    FULL_CATALOG.parent.mkdir(parents=True, exist_ok=True)
+    full_lines = generate_full_catalog(rows)
+    FULL_CATALOG.write_text("\n".join(full_lines) + "\n", encoding="utf-8")
+    print(f"Wrote {FULL_CATALOG.relative_to(ROOT)} with full index ({len(rows)} skills).")
+
+    # Update README auto-generated blocks
+    readme_blocks = generate_readme_blocks(rows, sources)
+    update_readme(readme_blocks)
 
 
 if __name__ == "__main__":
