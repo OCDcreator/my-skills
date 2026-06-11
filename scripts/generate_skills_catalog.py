@@ -39,16 +39,17 @@ def md_cell(text: str, *, limit: int | None = None) -> str:
     return value
 
 
-def frontmatter(path: Path) -> tuple[str, str, list[str], list[str]]:
+def frontmatter(path: Path) -> tuple[str, str, list[str], list[str], str]:
     text = read(path)
     if not text.startswith("---"):
-        return path.parent.name, "", [], []
+        return path.parent.name, "", [], [], ""
     end = text.find("\n---", 3)
     if end == -1:
-        return path.parent.name, "", [], []
+        return path.parent.name, "", [], [], ""
     block = text[3:end].splitlines()
     name = path.parent.name
     description = ""
+    category = ""
     tags: list[str] = []
     triggers: list[str] = []
     collecting_description = False
@@ -119,6 +120,9 @@ def frontmatter(path: Path) -> tuple[str, str, list[str], list[str]]:
             else:
                 collecting_triggers = True
             continue
+        if line.startswith("category:"):
+            category = line.split(":", 1)[1].strip().strip('"')
+            continue
         if line.startswith("description:"):
             value = line.split(":", 1)[1].strip()
             collecting_description = value in {">", ">-", "|", "|-"} or not value
@@ -127,7 +131,7 @@ def frontmatter(path: Path) -> tuple[str, str, list[str], list[str]]:
             continue
     if collected:
         description = " ".join(part for part in collected if part)
-    return name, one_line(description), tags, triggers
+    return name, one_line(description), tags, triggers, category
 
 
 def parse_sources_yaml() -> dict[str, dict[str, str | bool]]:
@@ -159,25 +163,31 @@ def parse_sources_yaml() -> dict[str, dict[str, str | bool]]:
 
 
 def category_for(path: str, name: str, description: str) -> str:
-    haystack = f"{path} {name} {description}".lower()
-    if any(
-        token in haystack
-        for token in ["openclash", "subconverter", "sub-web", "wallrule", "proxy", "router", "qwrt"]
-    ):
+    """Classify a skill by keyword heuristics using word-boundary matching.
+
+    Uses \\b regex word boundaries to avoid substring false positives
+    (e.g. 'ui' matching 'guide', 'tui', 'build').
+    """
+    haystack = f"{path} {name} {description}"
+
+    def _has(tokens: list[str]) -> bool:
+        return any(re.search(rf"\\b{re.escape(token)}\\b", haystack, re.IGNORECASE) for token in tokens)
+
+    if _has(["openclash", "subconverter", "sub-web", "wallrule", "proxy", "router", "qwrt"]):
         return "DevOps/Config"
-    if any(token in haystack for token in ["obsidian", "canvas", "bases", "vault"]):
+    if _has(["obsidian", "canvas", "bases", "vault"]):
         return "Obsidian"
-    if any(token in haystack for token in ["pdf", "docx", "ppt", "xlsx", "print", "markdown", "slide"]):
+    if _has(["pdf", "docx", "ppt", "xlsx", "print", "markdown", "slide"]):
         return "Documents"
-    if any(token in haystack for token in ["frontend", "ui", "design", "brand", "css", "html"]):
+    if _has(["frontend", "ui", "design", "brand", "css", "html"]):
         return "Frontend/UI"
-    if any(token in haystack for token in ["search", "research", "url", "transcript", "youtube", "web"]):
+    if _has(["search", "research", "url", "transcript", "youtube", "web"]):
         return "Web/Research"
-    if any(token in haystack for token in ["image", "video", "audio", "media", "comic"]):
+    if _has(["image", "video", "audio", "media", "comic"]):
         return "Media"
-    if any(token in haystack for token in ["agent", "mcp", "plugin", "automation", "loop", "codex", "opencode", "claude"]):
+    if _has(["agent", "mcp", "plugin", "automation", "loop", "codex", "opencode", "claude"]):
         return "Automation/Agents"
-    if any(token in haystack for token in ["ssh", "sync", "provider", "config", "release", "deploy", "git", "fork"]):
+    if _has(["ssh", "sync", "provider", "config", "release", "deploy", "git", "fork"]):
         return "DevOps/Config"
     return "Content/Publishing"
 
@@ -206,7 +216,7 @@ def external_source_subdir(rel: str, source: dict[str, str | bool]) -> str:
 def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]) -> list[dict[str, str]]:
     rows = []
     for rel in skill_paths:
-        name, description, tags, triggers = frontmatter(ROOT / rel / "SKILL.md")
+        name, description, tags, triggers, declared_category = frontmatter(ROOT / rel / "SKILL.md")
         if rel.startswith("custom/"):
             source_repo = "git@github.com:OCDcreator/my-skills.git"
             branch = "main"
@@ -237,7 +247,7 @@ def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]
             source_subdir = rel
             tier = "custom"
             include_in_main = True
-        category = category_for(rel, name, description)
+        category = declared_category if declared_category else category_for(rel, name, description)
         rows.append(
             {
                 "path": rel,

@@ -13,6 +13,7 @@ description: |
   - 需要查看/管理 opencode 的 session、provider、model、MCP、agent
   - 需要用 opencode debug 诊断配置、技能、路径等问题
   - 需要 opencode serve 启动 headless 服务器供 SDK 调用
+category: Automation/Agents
 ---
 
 # OpenCode CLI Handbook

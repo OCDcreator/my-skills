@@ -1,6 +1,7 @@
 ---
 name: design-reference-router
 description: Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation.
+category: Frontend/UI
 ---
 
 # Design Reference Router

@@ -1,6 +1,7 @@
 ---
 name: lean-ctx-deploy
 description: Guide for deploying lean-ctx token optimization into AI coding agents. Covers three integration modes — MCP server mode (Claude Code, Kiro, OpenCode, Cursor), CLI-redirect plugin mode (OpenCode), and Hybrid mode with shell hooks (Codex) — with project-level setup, cross-platform debugging (Windows + macOS), and verification. Includes battle-tested examples and test reports. This skill should be used when setting up lean-ctx in any agent, choosing between MCP vs plugin vs hybrid integration, writing OpenCode plugins that wrap CLI tools, deploying Codex hooks, or debugging lean-ctx integration issues on any platform.
+category: Automation/Agents
 ---
 
 # lean-ctx Deployment Guide
