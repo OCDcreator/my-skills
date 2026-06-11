@@ -1,6 +1,6 @@
 ---
 name: sub
-description: Diagnose and maintain the local OpenClash subscription-conversion chain built from OpenClash, `sub-web`, `subconverter`, and the `wallrule` preset on this machine. Use when requests mention OpenClash, 订阅转换, `sub-web`, `subconverter`, `wallrule`, 自定义模板, `25500`, `25502`, `IPRoyal`, `emoji=true`, `No nodes were found!`, `proxy group ... not found`, or when you need to confirm which template, proxy definitions, and generated config are actually active.
+description: Diagnose and maintain the local OpenClash subscription-conversion chain built from OpenClash, `sub-web`, `subconverter`, and the `wallrule` preset on this machine. Use when requests mention OpenClash, 订阅转换, `sub-web`, `subconverter`, `wallrule`, 自定义模板, `25500`, `25502`, `IPRoyal`, `dialer-proxy`, 链式代理, `IPRoyal-中转`, `emoji=true`, `No nodes were found!`, `proxy group ... not found`, `loop is detected`, or when you need to confirm which template, proxy definitions, and generated config are actually active.
 ---
 
 # Sub
@@ -64,6 +64,59 @@ services:
 - If bind mounts are undesirable, keep a small sync script that copies the repo preset into `/Users/dht/sub-service/subconverter/base/config/custom/` and then recreates `subconverter`
 - This is safer than ad hoc manual copying, but it is still not automatic in the same sense as bind mounts
 
+## Chain Proxy Architecture (链式代理)
+
+The IPRoyal SOCKS5 proxy uses a **dialer-proxy chain** to route through subscription nodes for better reliability and IP diversity.
+
+### Proxy Chain Flow
+
+```
+🔒 IPRoyal (socks5 proxy)
+  └─ dialer-proxy → IPRoyal-中转 (fallback group)
+       └─ regex-matched subscription nodes (香港 01, 日本 01, 新加坡 01, ...)
+```
+
+### Template Definitions
+
+**iproyal_proxy.yaml** — the SOCKS5 proxy with chain:
+```yaml
+proxies:
+  - name: "IPRoyal"
+    type: socks5
+    server: 86.104.161.165
+    port: 12324
+    username: <redacted>
+    password: <redacted>
+    udp: true
+    dialer-proxy: "IPRoyal-中转"
+```
+
+**wallrule_hybrid_main.ini** — the select group and fallback group:
+```ini
+custom_proxy_group=🛡️ IPRoyal代理`select`[]🔒 IPRoyal
+custom_proxy_group=IPRoyal-中转`fallback`(香港 0[123]|台湾 0[123]|新加坡 0[123]|日本 0[123]|美国 0[123]|俄罗斯 01|加拿大 01|印尼 01|印度 01|土耳其 01|巴西 01|德国 01|泰国 01|澳大利亚 01|英国 01|荷兰 01|菲律宾 01|韩国 01|马来西亚 01)`http://www.gstatic.com/generate_204`300,,50
+```
+
+### Naming Convention (Critical)
+
+When `emoji=true` (the QWRT default), subconverter renames the proxy:
+- Source name in `iproyal_proxy.yaml`: `IPRoyal` (no emoji)
+- Output name after emoji processing: `🔒 IPRoyal` (with lock emoji)
+
+**The select group MUST use a different name from the proxy node to avoid circular references.** Current convention:
+- Proxy node (after emoji): `🔒 IPRoyal`
+- Select group: `🛡️ IPRoyal代理`
+- Fallback group: `IPRoyal-中转` (no emoji, referenced by `dialer-proxy` field)
+
+### IPRoyal-中转 Fallback Regex
+
+The regex matches subscription node names containing region keywords:
+- `香港 0[123]` matches `🇭🇰 香港 01`, `🇭🇰 香港 02`, `🇭🇰 香港 03`
+- Same pattern for 台湾, 新加坡, 日本, 美国 (numbered 01-03)
+- Single nodes for other regions: `俄罗斯 01`, `加拿大 01`, etc.
+
+When subscription is expired or empty, the group falls back to `DIRECT` only — the chain proxy becomes non-functional. User must reopen the upstream subscription window.
+
 ## Known Failure Patterns
 
 ### `proxy group ... 'IPRoyal' not found`
@@ -72,16 +125,26 @@ services:
 - Fix the runtime template, not just the repo preset
 - Re-check generated names in the landed router config after refresh
 
+### `loop is detected in ProxyGroup`
+
+- The select group name is the same as the proxy node name (both `🔒 IPRoyal`)
+- `emoji=true` adds emoji to the proxy name, which collides with a group using the same name
+- **Fix:** Rename the select group to something different (e.g. `🛡️ IPRoyal代理`)
+- Ensure the group references the emoji-ed proxy name (`[]🔒 IPRoyal`), not the raw name
+
 ### IPRoyal timeout or test failure
 
 - Confirm the SOCKS5 port is `12324`
 - Do not confuse it with the HTTP/HTTPS port `12323`
 - Verify both the repo config and the runtime `iproyal_proxy.yaml`
+- If `IPRoyal-中转` group only has `DIRECT`, the upstream subscription has expired — ask user to reopen it
 
 ### OpenClash says download succeeded but kernel test failed
 
 - The YAML was downloaded, but the active template or runtime proxy fragment is inconsistent
+- Most common cause: proxy name mismatch between group references and actual node names after emoji processing
 - Check proxy names, ports, and group references before blaming the upstream subscription
+- Run `/etc/openclash/core/clash_meta -t -f <config>` on the router for the exact error message
 
 ### `No nodes were found!` or region groups collapse to one node or `DIRECT`
 
@@ -139,6 +202,9 @@ ssh root@192.168.31.204 "grep -n 'IPRoyal\\|12323\\|12324\\|🧠 Claude\\|🤖 O
 
 - Do not claim the GitHub raw template is active unless the log shows OpenClash is fetching that URL directly
 - Do not assume the repo file and the runtime file are the same; verify both
-- Do not call bind-mounted native files “GitHub raw mode”; they are still the built-in native path
+- Do not call bind-mounted native files "GitHub raw mode"; they are still the built-in native path
 - Do not blame `wallrule` first when the generator returns no nodes
 - Do not assume fnOS or other hosts are automatically proxied; test the actual network path when upstream fetches are flaky
+- Do not give a select group the same name as a proxy node — Mihomo will detect a loop and reject the config
+- Do not reference proxy nodes by their raw name when `emoji=true` — always use the emoji-ed name in group references
+- Do not test chain proxy functionality when the upstream subscription is expired — the fallback group will only contain `DIRECT`
