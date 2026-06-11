@@ -31,6 +31,7 @@ Use this as the primary OCR path for scanned or image-only PDFs.
 - server-side results expire, so download them promptly
 - keep `source-transcript.md` sourced from page-level parse output
 - keep export markdown under `doc2x/export/` for reference instead of overwriting the canonical transcript
+- when the export zip already contains local `images/`, localize `doc2x/export/export.md` to those sibling assets instead of leaving matching crop URLs on the Doc2X CDN
 
 ## Failure Notes
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Rewrite Doc2X Markdown"
+  short_description: "Turn Doc2X OCR into canonical markdown"
+  default_prompt: "Use $rewrite-doc2x-markdown to turn Doc2X export markdown and page transcript artifacts into a clean, page-level source-transcript.md."

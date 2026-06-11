@@ -30,3 +30,11 @@ If you redraw a figure, preserve:
 ## Practical Rule
 
 For math figures, "looks cleaner" is not enough reason to redraw. Redraw only when fidelity improves.
+
+## Layout Hard Constraints
+
+These are builder-enforced output constraints, not soft review suggestions:
+
+- Tiny Doc2X crop figures must not render as raw full-width body images in final HTML.
+- Consecutive crop-only figures that belong to one logical side-by-side source figure must render as one clustered row or grid, not as a vertical stack of unrelated block images.
+- If two or more crop images are required to preserve one logical source figure, keep them adjacent all the way through transcript and fragment generation so the local builder can normalize them deterministically.

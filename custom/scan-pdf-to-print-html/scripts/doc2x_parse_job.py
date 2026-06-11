@@ -6,18 +6,26 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
 import zipfile
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
 
 DEFAULT_BASE_URL = "https://v2.doc2x.noedgeai.com"
+RAW_TRANSCRIPT_REL_PATH = Path("doc2x") / "page-transcript.raw.md"
+CANONICAL_TRANSCRIPT_REL_PATH = Path("source-transcript.md")
+DOC2X_CDN_HOST = "cdn.noedgeai.com"
+DOC2X_REMOTE_IMAGE_PATTERN = re.compile(
+    r"https://cdn\.noedgeai\.com/(?P<name>[^?\s\"')]+)\?(?P<query>[^\"\s')]*)",
+    re.IGNORECASE,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -37,6 +45,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-export", action="store_true", help="Keep page-level parse results only")
     parser.add_argument("--render-pages", action="store_true", help="Also render source pages locally for review")
     parser.add_argument("--render-dpi", type=int, default=260)
+    parser.add_argument(
+        "--no-pre-crop-body",
+        dest="pre_crop_body",
+        action="store_false",
+        help="Upload the original PDF to Doc2X instead of a locally body-cropped PDF",
+    )
+    parser.set_defaults(pre_crop_body=True)
     return parser
 
 
@@ -215,12 +230,66 @@ def find_first_markdown(root: Path) -> Path | None:
     return candidates[0] if candidates else None
 
 
+def find_nearest_images_dir(markdown_path: Path) -> Path | None:
+    for current_dir in [markdown_path.parent, *markdown_path.parent.parents]:
+        candidate = current_dir / "images"
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def local_image_name_from_doc2x_url(remote_url: str) -> str | None:
+    parsed = urlparse(remote_url)
+    if parsed.netloc.lower() != DOC2X_CDN_HOST:
+        return None
+
+    image_name = Path(parsed.path).name
+    if not image_name:
+        return None
+
+    query = parse_qs(parsed.query, keep_blank_values=True)
+    required_keys = ("x", "y", "w", "h", "r")
+    if any(not query.get(key) or not query[key][0] for key in required_keys):
+        return None
+
+    stem = Path(image_name).stem
+    suffix = Path(image_name).suffix or ".jpg"
+    return (
+        f"{stem}_{query['x'][0]}_{query['y'][0]}_{query['w'][0]}_"
+        f"{query['h'][0]}_{query['r'][0]}{suffix}"
+    )
+
+
+def localize_doc2x_export_markdown(markdown_text: str, image_dir: Path | None) -> str:
+    if image_dir is None or not image_dir.is_dir():
+        return markdown_text
+
+    available_images = {path.name for path in image_dir.iterdir() if path.is_file()}
+
+    def replace_remote_url(match: re.Match[str]) -> str:
+        remote_url = match.group(0)
+        local_name = local_image_name_from_doc2x_url(remote_url)
+        if not local_name or local_name not in available_images:
+            return remote_url
+        return f"images/{local_name}"
+
+    return DOC2X_REMOTE_IMAGE_PATTERN.sub(replace_remote_url, markdown_text)
+
+
 def preserve_export_markdown(markdown_path: Path, export_dir: Path) -> Path | None:
     if not markdown_path.exists():
         return None
     export_dir.mkdir(parents=True, exist_ok=True)
+    source_images_dir = find_nearest_images_dir(markdown_path)
+    if source_images_dir is not None:
+        shutil.copytree(source_images_dir, export_dir / "images", dirs_exist_ok=True)
+
     preserved_path = export_dir / "export.md"
-    shutil.copyfile(markdown_path, preserved_path)
+    localized_markdown = localize_doc2x_export_markdown(
+        markdown_path.read_text(encoding="utf-8"),
+        source_images_dir,
+    )
+    write_text(preserved_path, localized_markdown)
     return preserved_path
 
 
@@ -239,15 +308,93 @@ def maybe_render_pages(job_dir: Path, pdf_path: Path, dpi: int) -> None:
     (job_dir / "pages-clean").mkdir(parents=True, exist_ok=True)
 
 
+def run_local_script(
+    script_name: str,
+    *args: str,
+    runner=subprocess.run,
+) -> None:
+    command = [
+        sys.executable,
+        str(Path(__file__).with_name(script_name)),
+        *args,
+    ]
+    runner(command, check=True)
+
+
+def prepare_doc2x_input_pdf(
+    *,
+    job_dir: Path,
+    pdf_path: Path,
+    render_dpi: int,
+    runner=subprocess.run,
+) -> Path:
+    pages_dir = job_dir / "pages"
+    pages_manifest = pages_dir / "manifest.json"
+    body_pages_dir = job_dir / "pages-body"
+    body_pdf = job_dir / "doc2x" / "body-only.pdf"
+
+    run_local_script(
+        "render_pdf_pages.py",
+        "--pdf",
+        str(pdf_path),
+        "--out-dir",
+        str(pages_dir),
+        "--dpi",
+        str(render_dpi),
+        runner=runner,
+    )
+    run_local_script(
+        "crop_page_bodies.py",
+        "--manifest",
+        str(pages_manifest),
+        "--out-dir",
+        str(body_pages_dir),
+        "--out-pdf",
+        str(body_pdf),
+        runner=runner,
+    )
+
+    if not body_pdf.exists():
+        raise RuntimeError(f"Body-only PDF was not created: {body_pdf}")
+
+    (job_dir / "pages-clean").mkdir(parents=True, exist_ok=True)
+    return body_pdf
+
+
 def initialize_job_files(job_dir: Path, payload: dict[str, object]) -> None:
     write_json(job_dir / "job.json", payload)
     write_text(
         job_dir / "layout-brief.md",
-        "# Layout Brief\n\n- Paper size: A4\n- Goal: print-first faithful reproduction\n- Allowed changes: layout, typography, spacing, figure placement\n- Forbidden changes: rewriting or summarizing content\n- OCR backend: Doc2X API\n",
+        "# Layout Brief\n\n- Paper size: A4\n- Goal: print-first faithful reproduction\n- Allowed changes: layout, typography, spacing, figure placement\n- Forbidden changes: rewriting or summarizing content\n- OCR backend: Doc2X API\n- Transcript gate: audit source-transcript.md before HTML assembly\n",
     )
     write_text(
         job_dir / "handoff-notes.md",
-        "# Handoff Notes\n\n- Review Doc2X formula and table output against the source before making manual fixes.\n- Keep unresolved OCR issues here.\n- If source figures need exact visual fidelity, note whether they were reused, cleaned, or redrawn.\n",
+        "# Handoff Notes\n\n- Review Doc2X formula and table output against the source before making manual fixes.\n- Keep unresolved OCR issues here.\n- If source figures need exact visual fidelity, note whether they were reused, cleaned, or redrawn.\n- Do not approve HTML build until source-transcript.md has passed the transcript audit.\n",
+    )
+
+
+def update_job_file(job_dir: Path, **updates: object) -> None:
+    job_path = job_dir / "job.json"
+    payload = json.loads(job_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Invalid job.json payload at {job_path}")
+    payload.update(updates)
+    write_json(job_path, payload)
+
+
+def materialize_doc2x_transcripts(job_dir: Path, parse_result: dict[str, object]) -> None:
+    raw_transcript = build_page_transcript(parse_result)
+    raw_transcript_path = job_dir / RAW_TRANSCRIPT_REL_PATH
+    canonical_transcript_path = job_dir / CANONICAL_TRANSCRIPT_REL_PATH
+
+    write_text(raw_transcript_path, raw_transcript)
+    write_text(canonical_transcript_path, raw_transcript)
+    update_job_file(
+        job_dir,
+        raw_transcript_path=RAW_TRANSCRIPT_REL_PATH.as_posix(),
+        canonical_transcript_path=CANONICAL_TRANSCRIPT_REL_PATH.as_posix(),
+        transcript_audit_status="pending",
+        transcript_structure_lint_status="pending",
     )
 
 
@@ -266,6 +413,10 @@ def main() -> int:
     job_dir.mkdir(parents=True, exist_ok=True)
     doc2x_dir.mkdir(parents=True, exist_ok=True)
 
+    upload_pdf = pdf_path
+    if args.pre_crop_body:
+        upload_pdf = prepare_doc2x_input_pdf(job_dir=job_dir, pdf_path=pdf_path, render_dpi=args.render_dpi)
+
     initialize_job_files(
         job_dir,
         {
@@ -277,14 +428,16 @@ def main() -> int:
             "formula_mode": args.formula_mode,
             "formula_level": args.formula_level,
             "merge_cross_page_forms": bool(args.merge_cross_page_forms),
-            "render_pages": bool(args.render_pages),
+            "render_pages": bool(args.render_pages or args.pre_crop_body),
+            "pre_crop_body": bool(args.pre_crop_body),
+            "doc2x_input_pdf": str(upload_pdf),
         },
     )
 
     base_url = args.base_url.rstrip("/")
     preupload_result = preupload(pdf_path, base_url, api_key, args.model)
     write_json(doc2x_dir / "preupload.json", preupload_result["raw"])
-    upload_file(pdf_path, str(preupload_result["data"]["url"]))
+    upload_file(upload_pdf, str(preupload_result["data"]["url"]))
 
     parse_status = poll_parse_status(
         str(preupload_result["data"]["uid"]),
@@ -298,7 +451,7 @@ def main() -> int:
     if not isinstance(parse_result, dict):
         raise RuntimeError(f"Doc2X parse result missing or malformed: {json.dumps(parse_status['raw'], ensure_ascii=False)}")
     write_json(doc2x_dir / "parse-result.json", parse_result)
-    write_text(job_dir / "source-transcript.md", build_page_transcript(parse_result))
+    materialize_doc2x_transcripts(job_dir, parse_result)
 
     if not args.skip_export:
         export_request = trigger_export(
@@ -327,8 +480,10 @@ def main() -> int:
             if markdown_path:
                 preserve_export_markdown(markdown_path, export_dir)
 
-    if args.render_pages:
+    if args.render_pages and not args.pre_crop_body:
         maybe_render_pages(job_dir, pdf_path, args.render_dpi)
+
+    update_job_file(job_dir, doc2x_input_pdf=str(upload_pdf))
 
     print(str(job_dir))
     return 0

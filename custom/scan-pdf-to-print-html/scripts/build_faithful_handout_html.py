@@ -13,6 +13,45 @@ from markdown_it import MarkdownIt
 
 PAGE_SPLIT_PATTERN = re.compile(r"^##\s+Page\s+(\d+)\s*$", re.MULTILINE)
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+MATH_SEGMENT_PATTERN = re.compile(r"\$\$.*?\$\$|\$.*?\$", re.DOTALL)
+FENCED_CODE_BLOCK_PATTERN = re.compile(r"(^```[^\n]*\n.*?^```[ \t]*$)", re.MULTILINE | re.DOTALL)
+INLINE_CODE_SPAN_PATTERN = re.compile(r"(`+)([^`\n]*?)\1")
+FORBIDDEN_FRAGMENT_PATTERN = re.compile(
+    r"<!DOCTYPE|<html\b|</html>|<head\b|</head>|<body\b|</body>|<style\b|</style>|<script\b|</script>",
+    re.IGNORECASE,
+)
+RENDERED_HTML_TAG_PATTERN = re.compile(r"<[A-Za-z][^>]*>|</[A-Za-z][^>]*>")
+IMG_TAG_PATTERN = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+IMG_ONLY_PARAGRAPH_PATTERN = re.compile(r"<p>\s*(<img\b[^>]*>)\s*</p>", re.IGNORECASE)
+IMG_SEQUENCE_PATTERN = re.compile(r"(?P<sequence>(?:<img\b[^>]*>\s*(?:<br\s*/?>\s*)?){2,})", re.IGNORECASE)
+IMG_SRC_PATTERN = re.compile(r"""\bsrc=(?:"([^"]+)"|'([^']+)')""", re.IGNORECASE)
+DOC2X_CROP_PATTERN = re.compile(r"[?&]w=(\d+)&h=(\d+)(?:&|$)", re.IGNORECASE)
+PAGE_WRAPPER_PATTERN = re.compile(
+    r"^\s*<(section|article|div)\b(?P<attrs>[^>]*)>(?P<body>.*)</\1>\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+PAGE_WRAPPER_HINT_PATTERN = re.compile(
+    r'(?:\bdata-source-page\s*=|\bclass\s*=\s*(?:"[^"]*\b(?:source-page-fragment|source-page|source-fragment)\b[^"]*"|\'[^\']*\b(?:source-page-fragment|source-page|source-fragment)\b[^\']*\'))',
+    re.IGNORECASE,
+)
+FILL_BLANK_PATTERN = re.compile(r"(?<!_)_{3,}(?!_)|＿{2,}|﹍{2,}|‗{2,}")
+PARAGRAPH_PATTERN = re.compile(r"<p(?P<attrs>[^>]*)>(?P<body>.*?)</p>", re.DOTALL)
+LIST_ITEM_PATTERN = re.compile(r"<li(?P<attrs>[^>]*)>(?P<body>.*?)</li>", re.DOTALL)
+BLOCKQUOTE_PATTERN = re.compile(r"<blockquote(?P<attrs>[^>]*)>(?P<body>.*?)</blockquote>", re.DOTALL)
+CHOICE_LIST_PATTERN = re.compile(r"<ul>(?P<body>.*?)</ul>", re.DOTALL)
+CHOICE_OPTION_GROUP_PATTERN = re.compile(
+    r"(?P<group>(?:<p>\s*[A-FＡ-Ｆ][\.\uFF0E、:：].*?</p>\s*){2,6})",
+    re.DOTALL,
+)
+CHOICE_LABEL_PATTERN = re.compile(r"^[A-FＡ-Ｆ][\.\uFF0E、:：]")
+FRACTION_COMPLEXITY_PATTERN = re.compile(
+    r"\\(?:frac|dfrac|tfrac|sqrt|sum|prod|int|lim|left|right)\b|[+\-*/=<>]"
+)
+EXPLICIT_MARGIN_NOISE_PATTERNS = (
+    re.compile(r"^MST高中基础知识与二级结论$"),
+    re.compile(r"^老唐说题$"),
+    re.compile(r"^第\s*\d+\s*章\s*立体几何$"),
+)
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "assets"
 
 
@@ -21,6 +60,7 @@ def read_asset_text(name: str) -> str:
 
 
 KAMI_KERNEL_CSS = read_asset_text("kami-default-kernel.css")
+PHYCAT_BLOCKQUOTE_CSS = read_asset_text("phycat-blockquote.css")
 
 PRINT_BASE_CSS = """
 @page {
@@ -54,33 +94,63 @@ body {
 }
 
 .sheet {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   width: var(--page-width);
   min-height: var(--page-height);
+  height: var(--page-height);
   margin: 0 auto 12mm;
   padding: 14mm 13mm 15mm;
   background: var(--paper);
   box-shadow: 0 16px 40px rgba(33, 41, 53, 0.16);
   page-break-after: always;
   break-after: page;
+  overflow: hidden;
 }
 
 .sheet:last-child {
   margin-bottom: 0;
 }
 
-.sheet-header,
+#handout-source {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: calc(var(--page-width) - 26mm);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#handout-print-root {
+  padding: 12mm 0;
+}
+
+html[data-handout-ready="loading"] #handout-print-root {
+  visibility: hidden;
+}
+
+@media print {
+  html,
+  body {
+    background: none;
+  }
+
+  #handout-print-root {
+    padding: 0;
+  }
+
+  .sheet {
+    margin: 0;
+    box-shadow: none;
+  }
+}
+
 .sheet-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 6mm;
   color: var(--muted);
   font-size: 9px;
-}
-
-.sheet-header {
-  padding-bottom: 3mm;
-  margin-bottom: 4mm;
-  border-bottom: 1px solid var(--line);
 }
 
 .sheet-footer {
@@ -97,39 +167,48 @@ body {
   letter-spacing: -0.02em;
 }
 
-.transcript-body > :first-child {
+.sheet-body {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sheet[data-fit-state="overflow"] {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.transcript-flow > :first-child {
   margin-top: 0;
 }
 
-.transcript-body h1,
-.transcript-body h2,
-.transcript-body h3,
-.transcript-body h4 {
+.transcript-flow h1,
+.transcript-flow h2,
+.transcript-flow h3,
+.transcript-flow h4 {
   margin: 0 0 3mm;
   font-family: var(--font-display);
   line-height: 1.22;
   color: var(--ink);
 }
 
-.transcript-body h1 { font-size: 22px; }
-.transcript-body h2 { font-size: 18px; }
-.transcript-body h3 { font-size: 15px; }
-.transcript-body h4 { font-size: 13px; }
+.transcript-flow h1 { font-size: 22px; }
+.transcript-flow h2 { font-size: 18px; }
+.transcript-flow h3 { font-size: 15px; }
+.transcript-flow h4 { font-size: 13px; }
 
-.transcript-body p,
-.transcript-body li {
+.transcript-flow p,
+.transcript-flow li {
   margin-top: 0;
   margin-bottom: 0.62em;
 }
 
-.transcript-body ul,
-.transcript-body ol {
+.transcript-flow ul,
+.transcript-flow ol {
   margin-top: 0;
   margin-bottom: 0.8em;
   padding-left: 1.3em;
 }
 
-.transcript-body table {
+.transcript-flow table {
   width: 100%;
   border-collapse: collapse;
   margin: 3mm 0 4mm;
@@ -137,56 +216,120 @@ body {
   background: var(--surface);
 }
 
-.transcript-body th,
-.transcript-body td {
+.transcript-flow th,
+.transcript-flow td {
   padding: 2.4mm 2.6mm;
   border: 1px solid var(--line);
   text-align: center;
   vertical-align: middle;
 }
 
-.transcript-body th {
+.transcript-flow th {
   background: var(--surface-soft);
 }
 
-.transcript-body td img,
-.transcript-body td mjx-container[display="true"][jax="SVG"],
-.transcript-body td .mjx-container[display="true"][jax="SVG"] {
+.transcript-flow td img,
+.transcript-flow td mjx-container[display="true"][jax="SVG"],
+.transcript-flow td .mjx-container[display="true"][jax="SVG"] {
   display: block;
   margin: 0 auto;
 }
 
-.transcript-body td mjx-container[display="true"][jax="SVG"],
-.transcript-body td .mjx-container[display="true"][jax="SVG"] {
+.transcript-flow td mjx-container[display="true"][jax="SVG"],
+.transcript-flow td .mjx-container[display="true"][jax="SVG"] {
   max-width: 100%;
 }
 
-.transcript-body blockquote,
-.transcript-body pre {
+.transcript-flow blockquote {
   margin: 3mm 0 4mm;
   padding: 3mm 3.2mm;
   background: var(--surface-soft);
   border: 1px solid var(--line);
 }
 
-.transcript-body code,
-.transcript-body pre {
+.transcript-flow pre {
+  margin: 3mm auto 4mm;
+  padding: 3mm 3.2mm;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  width: fit-content;
+  max-width: 100%;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.transcript-flow code,
+.transcript-flow pre {
   font-family: var(--font-mono);
 }
 
-.transcript-body img {
+.transcript-flow pre code {
   display: block;
-  max-width: 100%;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.transcript-flow img {
+  display: block;
+  max-width: min(100%, 72mm);
   height: auto;
   margin: 3mm auto;
   border: none;
   background: transparent;
 }
 
-.transcript-body hr {
+.transcript-flow .ocr-crop-image--small {
+  max-width: min(100%, 34mm);
+}
+
+.transcript-flow .ocr-crop-image--medium {
+  max-width: min(100%, 48mm);
+}
+
+.transcript-flow .ocr-crop-image--wide {
+  max-width: min(100%, 64mm);
+}
+
+.transcript-flow .ocr-image-cluster {
+  display: grid;
+  gap: 2.4mm;
+  justify-items: center;
+  align-items: start;
+  width: min(100%, 92mm);
+  margin: 3mm auto;
+}
+
+.transcript-flow .ocr-image-cluster--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.transcript-flow .ocr-image-cluster--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.transcript-flow .ocr-image-cluster--4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.transcript-flow .ocr-image-cluster > img {
+  margin: 0;
+  max-width: 100%;
+}
+
+.transcript-flow td .ocr-image-cluster {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.transcript-flow hr {
   border: 0;
   border-top: 1px dashed var(--line-strong);
   margin: 5mm 0;
+}
+
+.flow-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .mjx-container {
@@ -197,6 +340,36 @@ body {
 
 .mjx-container[display="true"] {
   margin: 3mm 0;
+}
+
+.transcript-flow .choice-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.6mm 4mm;
+  list-style: none;
+  padding-left: 0;
+  margin: 2.6mm 0 0;
+}
+
+.transcript-flow .choice-option {
+  margin: 0;
+  min-width: 0;
+}
+
+.transcript-flow .choice-option p {
+  margin: 0;
+}
+
+.transcript-flow .choice-options > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.transcript-flow .ocr-analysis {
+  margin: 3.2mm 0 4mm;
+  padding: 2.6mm 3mm;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--surface-soft) 78%, white 22%);
+  font-size: 11.4px;
 }
 """
 
@@ -215,6 +388,185 @@ window.MathJax = {
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 """
 
+PAGINATION_SCRIPT = """
+<script>
+function nextHandoutFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
+function normalizeFlowNode(node) {
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    return node;
+  }
+  if (node.nodeType === Node.TEXT_NODE && node.textContent && node.textContent.trim()) {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = node.textContent.trim();
+    return paragraph;
+  }
+  return null;
+}
+
+function createFlowBlock(node, sourcePage) {
+  const block = document.createElement('div');
+  block.className = 'flow-block';
+  block.dataset.sourcePage = sourcePage;
+  block.appendChild(node);
+  return block;
+}
+
+function collectFlowBlocks(sourceRoot) {
+  const blocks = [];
+  const fragments = Array.from(sourceRoot.querySelectorAll('.source-fragment'));
+  for (const fragment of fragments) {
+    const sourcePage = fragment.dataset.sourcePage || '';
+    for (const child of Array.from(fragment.childNodes)) {
+      const normalized = normalizeFlowNode(child);
+      if (!normalized) {
+        continue;
+      }
+      blocks.push(createFlowBlock(normalized, sourcePage));
+    }
+  }
+  return blocks;
+}
+
+async function waitForHandoutAssets(root) {
+  const images = Array.from(root.querySelectorAll('img'));
+  await Promise.all(images.map((img) => {
+    if (img.complete) {
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const done = () => resolve();
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+  }));
+
+  if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
+    try {
+      await window.MathJax.typesetPromise([root]);
+    } catch (_err) {
+      // Keep print flow alive even if MathJax reports a typeset issue.
+    }
+  }
+  await nextHandoutFrame();
+}
+
+function createSheet(pageNumber, title, sourceLabel, showTitle) {
+  const sheet = document.createElement('article');
+  sheet.className = 'sheet';
+  sheet.dataset.pageNumber = String(pageNumber);
+  sheet.dataset.fitState = 'ready';
+
+  const body = document.createElement('section');
+  body.className = 'sheet-body transcript-flow';
+  if (showTitle && title) {
+    const titleNode = document.createElement('h1');
+    titleNode.className = 'doc-title';
+    titleNode.textContent = title;
+    body.appendChild(titleNode);
+  }
+
+  const footer = document.createElement('footer');
+  footer.className = 'sheet-footer';
+  const footerPage = document.createElement('span');
+  footerPage.className = 'sheet-page-label';
+  footerPage.textContent = `第 ${pageNumber} 页`;
+  footer.append(footerPage);
+
+  sheet.append(body, footer);
+  return sheet;
+}
+
+function sheetBody(sheet) {
+  return sheet.querySelector('.sheet-body');
+}
+
+function sheetOverflows(sheet) {
+  const body = sheetBody(sheet);
+  if (!body) {
+    return false;
+  }
+  return body.scrollHeight > body.clientHeight + 1;
+}
+
+function setSheetState(sheet) {
+  sheet.dataset.fitState = sheetOverflows(sheet) ? 'overflow' : 'ready';
+}
+
+function appendBlockToSheet(sheet, block) {
+  const body = sheetBody(sheet);
+  if (!body) {
+    return true;
+  }
+  body.appendChild(block);
+  const overflow = sheetOverflows(sheet);
+  const blockCount = body.querySelectorAll(':scope > .flow-block').length;
+  if (overflow && blockCount > 1) {
+    body.removeChild(block);
+    setSheetState(sheet);
+    return false;
+  }
+  setSheetState(sheet);
+  return true;
+}
+
+function renumberSheets(root) {
+  const sheets = Array.from(root.querySelectorAll('.sheet'));
+  sheets.forEach((sheet, index) => {
+    const pageNumber = index + 1;
+    sheet.dataset.pageNumber = String(pageNumber);
+    sheet.querySelectorAll('.sheet-page-label').forEach((node) => {
+      node.textContent = `第 ${pageNumber} 页`;
+    });
+  });
+}
+
+async function paginateHandout() {
+  const sourceRoot = document.getElementById('handout-source');
+  const printRoot = document.getElementById('handout-print-root');
+  if (!sourceRoot || !printRoot) {
+    return;
+  }
+
+  document.documentElement.dataset.handoutReady = 'loading';
+  await waitForHandoutAssets(sourceRoot);
+
+  const title = printRoot.dataset.title || '';
+  const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
+  const blocks = collectFlowBlocks(sourceRoot);
+  printRoot.replaceChildren();
+
+  let pageNumber = 1;
+  let sheet = createSheet(pageNumber, title, sourceLabel, true);
+  printRoot.appendChild(sheet);
+
+  for (const block of blocks) {
+    if (appendBlockToSheet(sheet, block)) {
+      continue;
+    }
+    pageNumber += 1;
+    sheet = createSheet(pageNumber, title, sourceLabel, false);
+    printRoot.appendChild(sheet);
+    appendBlockToSheet(sheet, block);
+  }
+
+  renumberSheets(printRoot);
+  sourceRoot.remove();
+  document.documentElement.dataset.handoutReady = 'true';
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    void paginateHandout();
+  }, { once: true });
+} else {
+  void paginateHandout();
+}
+</script>
+"""
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -226,8 +578,122 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def clean_markdown(text: str) -> str:
-    without_comments = HTML_COMMENT_PATTERN.sub("", text)
-    return without_comments.replace("\r\n", "\n").strip()
+    normalized = text.replace("\r\n", "\n").strip()
+    literal_segments: list[str] = []
+
+    def protect_literal_segment(match: re.Match[str]) -> str:
+        token = f"@@LITERALSEGMENT{len(literal_segments)}@@"
+        literal_segments.append(match.group(0))
+        return token
+
+    normalized = FENCED_CODE_BLOCK_PATTERN.sub(protect_literal_segment, normalized)
+    normalized = INLINE_CODE_SPAN_PATTERN.sub(protect_literal_segment, normalized)
+    normalized = HTML_COMMENT_PATTERN.sub("", normalized)
+    # Doc2X emits TeX with \( ... \) / \[ ... \] delimiters, but MarkdownIt
+    # strips the backslashes in plain paragraph text. Normalize before render so
+    # MathJax still receives intact delimiters across both Markdown and raw HTML.
+    normalized = normalized.replace(r"\[", "$$").replace(r"\]", "$$")
+    normalized = normalized.replace(r"\(", "$").replace(r"\)", "$")
+
+    for index, segment in enumerate(literal_segments):
+        normalized = normalized.replace(f"@@LITERALSEGMENT{index}@@", segment)
+    return normalized
+
+
+def protect_math_segments(text: str) -> tuple[str, list[str]]:
+    segments: list[str] = []
+
+    def replacer(match: re.Match[str]) -> str:
+        token = f"@@MATHSEGMENT{len(segments)}@@"
+        segments.append(normalize_math_segment(match.group(0)))
+        return token
+
+    return MATH_SEGMENT_PATTERN.sub(replacer, text), segments
+
+
+def restore_math_segments(text: str, segments: list[str]) -> str:
+    restored = text
+    for index, segment in enumerate(segments):
+        restored = restored.replace(f"@@MATHSEGMENT{index}@@", segment)
+    return restored
+
+
+def is_explicit_margin_noise(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+    return any(pattern.fullmatch(stripped) for pattern in EXPLICIT_MARGIN_NOISE_PATTERNS)
+
+
+def edge_line_key(line: str) -> str | None:
+    stripped = line.strip()
+    if not stripped:
+        return None
+    if len(stripped) > 40:
+        return None
+    if "<" in stripped or ">" in stripped:
+        return None
+    return stripped
+
+
+def first_nonempty_line(lines: list[str]) -> str | None:
+    for line in lines:
+        if line.strip():
+            return line.strip()
+    return None
+
+
+def last_nonempty_line(lines: list[str]) -> str | None:
+    for line in reversed(lines):
+        if line.strip():
+            return line.strip()
+    return None
+
+
+def strip_page_margin_noise(contents: list[str]) -> list[str]:
+    top_counts: dict[str, int] = {}
+    bottom_counts: dict[str, int] = {}
+
+    for content in contents:
+        lines = content.splitlines()
+        top = edge_line_key(first_nonempty_line(lines) or "")
+        bottom = edge_line_key(last_nonempty_line(lines) or "")
+        if top:
+            top_counts[top] = top_counts.get(top, 0) + 1
+        if bottom:
+            bottom_counts[bottom] = bottom_counts.get(bottom, 0) + 1
+
+    cleaned_contents: list[str] = []
+    for content in contents:
+        lines = content.splitlines()
+        start = 0
+        end = len(lines)
+
+        while start < end:
+            stripped = lines[start].strip()
+            if not stripped:
+                start += 1
+                continue
+            repeated_top = top_counts.get(stripped, 0) >= 2 and len(stripped) <= 40
+            if is_explicit_margin_noise(stripped) or repeated_top:
+                start += 1
+                continue
+            break
+
+        while end > start:
+            stripped = lines[end - 1].strip()
+            if not stripped:
+                end -= 1
+                continue
+            repeated_bottom = bottom_counts.get(stripped, 0) >= 2 and len(stripped) <= 40
+            if is_explicit_margin_noise(stripped) or repeated_bottom:
+                end -= 1
+                continue
+            break
+
+        cleaned_contents.append("\n".join(lines[start:end]).strip())
+
+    return cleaned_contents
 
 
 def split_pages(markdown_text: str) -> list[tuple[str, str]]:
@@ -239,14 +705,19 @@ def split_pages(markdown_text: str) -> list[tuple[str, str]]:
     if not matches:
         return [("1", text.strip())]
 
-    pages: list[tuple[str, str]] = []
+    raw_pages: list[tuple[str, str]] = []
     for index, match in enumerate(matches):
         page_number = match.group(1)
         start = match.end()
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         content = text[start:end].strip()
-        pages.append((page_number, content))
-    return pages
+        raw_pages.append((page_number, content))
+
+    cleaned_contents = strip_page_margin_noise([content for _page_number, content in raw_pages])
+    return [
+        (page_number, cleaned_contents[index])
+        for index, (page_number, _content) in enumerate(raw_pages)
+    ]
 
 
 def default_title(pages: list[tuple[str, str]], explicit_title: str | None) -> str:
@@ -257,36 +728,315 @@ def default_title(pages: list[tuple[str, str]], explicit_title: str | None) -> s
     first_page_content = pages[0][1].strip().splitlines()
     for line in first_page_content:
         stripped = line.strip()
-        if stripped and not stripped.startswith(("#", "|", "!", "[")):
-            return stripped
+        if stripped and not stripped.startswith(("#", "|", "!", "[", ">", "`")):
+            protected_title, math_segments = protect_math_segments(stripped)
+            return restore_math_segments(protected_title, math_segments)
     return "OCR Handout"
 
 
-def build_html_document(pages: list[tuple[str, str]], title: str, source_label: str) -> str:
-    md = MarkdownIt("commonmark").enable("table")
-    sheet_html: list[str] = []
-
-    for index, (page_number, page_markdown) in enumerate(pages, start=1):
-        page_body = md.render(page_markdown)
-        title_html = f'<h1 class="doc-title">{html.escape(title)}</h1>' if index == 1 else ""
-        sheet_html.append(
-            "\n".join(
-                [
-                    '<article class="sheet">',
-                    '  <header class="sheet-header">',
-                    f'    <span>{html.escape(source_label)}</span>',
-                    f'    <span>源页 {html.escape(page_number)}</span>',
-                    "  </header>",
-                    f"  {title_html}" if title_html else "",
-                    f'  <section class="transcript-body">{page_body}</section>',
-                    '  <footer class="sheet-footer">',
-                    f'    <span>{html.escape(title)}</span>',
-                    f'    <span>第 {index} 页</span>',
-                    "  </footer>",
-                    "</article>",
-                ]
-            )
+def validate_fragment_html(page_number: str, fragment_html: str) -> str:
+    normalized_fragment = fragment_html.strip()
+    if not normalized_fragment:
+        raise ValueError(f"Fragment for page {page_number} must not be empty.")
+    match = FORBIDDEN_FRAGMENT_PATTERN.search(fragment_html)
+    if match:
+        token = match.group(0)
+        if token.startswith("<") and not token.endswith(">") and not token.startswith("</"):
+            token = f"{token}>"
+        raise ValueError(
+            f"Fragment for page {page_number} must be body-only HTML; found forbidden markup {token}"
         )
+    if not RENDERED_HTML_TAG_PATTERN.search(normalized_fragment):
+        raise ValueError(f"Fragment for page {page_number} must contain rendered HTML markup.")
+    return normalized_fragment
+
+
+def extract_img_src(img_tag: str) -> str | None:
+    match = IMG_SRC_PATTERN.search(img_tag)
+    if not match:
+        return None
+    return match.group(1) or match.group(2)
+
+
+def classify_crop_image(src: str | None) -> str:
+    if not src:
+        return "ocr-crop-image"
+    match = DOC2X_CROP_PATTERN.search(src)
+    if not match:
+        return "ocr-crop-image"
+
+    width = int(match.group(1))
+    height = int(match.group(2))
+    classes = ["ocr-crop-image"]
+    aspect_ratio = width / max(height, 1)
+
+    if max(width, height) <= 280:
+        classes.append("ocr-crop-image--small")
+    elif max(width, height) <= 420:
+        classes.append("ocr-crop-image--medium")
+
+    if aspect_ratio >= 2.0:
+        classes.append("ocr-crop-image--wide")
+
+    return " ".join(classes)
+
+
+def add_img_class(img_tag: str, classes: str) -> str:
+    class_pattern = re.compile(r"""\bclass=(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
+    match = class_pattern.search(img_tag)
+    if match:
+        existing = match.group(1) or match.group(2) or ""
+        merged = " ".join(part for part in [existing.strip(), classes.strip()] if part).strip()
+        quote = '"' if match.group(1) is not None else "'"
+        replacement = f'class={quote}{merged}{quote}'
+        return class_pattern.sub(replacement, img_tag, count=1)
+    return img_tag.replace("<img", f'<img class="{classes}"', 1)
+
+
+def decorate_img_tag(img_tag: str) -> str:
+    return add_img_class(img_tag, classify_crop_image(extract_img_src(img_tag)))
+
+
+def build_image_cluster(sequence_html: str) -> str:
+    images = [match.group(0) for match in IMG_TAG_PATTERN.finditer(sequence_html)]
+    image_count = len(images)
+    if image_count < 2:
+        return sequence_html
+    cluster_class = min(image_count, 4)
+    return f'<span class="ocr-image-cluster ocr-image-cluster--{cluster_class}">{"".join(images)}</span>'
+
+
+def normalize_fragment_media(fragment_html: str) -> str:
+    normalized = IMG_ONLY_PARAGRAPH_PATTERN.sub(r"\1", fragment_html)
+    normalized = IMG_SEQUENCE_PATTERN.sub(lambda match: build_image_cluster(match.group("sequence")), normalized)
+    normalized = IMG_TAG_PATTERN.sub(lambda match: decorate_img_tag(match.group(0)), normalized)
+    return normalized
+
+
+def strip_html_tags(value: str) -> str:
+    return re.sub(r"<[^>]+>", "", value)
+
+
+def paragraph_starts_with_analysis_label(body_html: str) -> bool:
+    plain_text = strip_html_tags(body_html).strip()
+    return plain_text.startswith(("解析：", "解析:", "【解析】"))
+
+
+def normalize_fill_blank_markers(fragment_html: str) -> str:
+    def replace_in_tag(match: re.Match[str]) -> str:
+        attrs = match.group("attrs")
+        body = FILL_BLANK_PATTERN.sub("__________", match.group("body"))
+        return f"<p{attrs}>{body}</p>"
+
+    normalized = PARAGRAPH_PATTERN.sub(replace_in_tag, fragment_html)
+    normalized = re.sub(
+        r"<li(?P<attrs>[^>]*)>(?P<body>.*?)</li>",
+        lambda match: (
+            f'<li{match.group("attrs")}>'
+            f'{FILL_BLANK_PATTERN.sub("__________", match.group("body"))}'
+            "</li>"
+        ),
+        normalized,
+        flags=re.DOTALL,
+    )
+    return normalized
+
+
+def decorate_analysis_paragraphs(fragment_html: str) -> str:
+    def replace_paragraph(match: re.Match[str]) -> str:
+        attrs = match.group("attrs")
+        body = match.group("body")
+        if not paragraph_starts_with_analysis_label(body):
+            return match.group(0)
+
+        if 'class="' in attrs or "class='" in attrs:
+            class_pattern = re.compile(r"""\bclass=(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
+            class_match = class_pattern.search(attrs)
+            if class_match:
+                existing = class_match.group(1) or class_match.group(2) or ""
+                merged = " ".join(part for part in [existing.strip(), "ocr-analysis"] if part).strip()
+                quote = '"' if class_match.group(1) is not None else "'"
+                new_attrs = class_pattern.sub(f'class={quote}{merged}{quote}', attrs, count=1)
+                return f"<p{new_attrs}>{body}</p>"
+
+        return f'<p{attrs} class="ocr-analysis">{body}</p>'
+
+    return PARAGRAPH_PATTERN.sub(replace_paragraph, fragment_html)
+
+
+def choice_item_is_option_html(item_html: str) -> bool:
+    plain_text = strip_html_tags(item_html).strip()
+    return bool(CHOICE_LABEL_PATTERN.match(plain_text))
+
+
+def decorate_choice_list(list_html: str) -> str:
+    items = list(LIST_ITEM_PATTERN.finditer(list_html))
+    if not items:
+        return list_html
+    if not all(choice_item_is_option_html(match.group("body")) for match in items):
+        return list_html
+
+    decorated_items = []
+    for item in items:
+        attrs = item.group("attrs")
+        body = item.group("body")
+        if 'class="' in attrs or "class='" in attrs:
+            class_pattern = re.compile(r"""\bclass=(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
+            class_match = class_pattern.search(attrs)
+            if class_match:
+                existing = class_match.group(1) or class_match.group(2) or ""
+                merged = " ".join(part for part in [existing.strip(), "choice-option"] if part).strip()
+                quote = '"' if class_match.group(1) is not None else "'"
+                attrs = class_pattern.sub(f'class={quote}{merged}{quote}', attrs, count=1)
+        else:
+            attrs = f'{attrs} class="choice-option"'
+        decorated_items.append(f"<li{attrs}>{body}</li>")
+
+    return f'<ul class="choice-options">{"".join(decorated_items)}</ul>'
+
+
+def decorate_choice_paragraph_group(group_html: str) -> str:
+    paragraphs = re.findall(r"<p>(.*?)</p>", group_html, flags=re.DOTALL)
+    items = [f'<p class="choice-option">{body}</p>' for body in paragraphs]
+    return f'<div class="choice-options">{"".join(items)}</div>'
+
+
+def decorate_choice_content(body_html: str) -> str:
+    normalized = CHOICE_LIST_PATTERN.sub(lambda match: decorate_choice_list(match.group(0)), body_html)
+    normalized = CHOICE_OPTION_GROUP_PATTERN.sub(
+        lambda match: decorate_choice_paragraph_group(match.group("group")),
+        normalized,
+    )
+    return normalized
+
+
+def decorate_blockquotes(fragment_html: str) -> str:
+    def replace_blockquote(match: re.Match[str]) -> str:
+        attrs = match.group("attrs")
+        body = decorate_choice_content(match.group("body"))
+        if 'class="' in attrs or "class='" in attrs:
+            class_pattern = re.compile(r"""\bclass=(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
+            class_match = class_pattern.search(attrs)
+            if class_match:
+                existing = class_match.group(1) or class_match.group(2) or ""
+                merged = " ".join(part for part in [existing.strip(), "phycat-blockquote"] if part).strip()
+                quote = '"' if class_match.group(1) is not None else "'"
+                attrs = class_pattern.sub(f'class={quote}{merged}{quote}', attrs, count=1)
+        else:
+            attrs = f'{attrs} class="phycat-blockquote"'
+        return f"<blockquote{attrs}>{body}</blockquote>"
+
+    return BLOCKQUOTE_PATTERN.sub(replace_blockquote, fragment_html)
+
+
+def fraction_argument_is_complex(expr: str) -> bool:
+    compact = expr.strip()
+    if not compact:
+        return False
+    if FRACTION_COMPLEXITY_PATTERN.search(compact):
+        return True
+    return False
+
+
+def read_braced_tex_argument(source: str, start: int) -> tuple[str, int] | None:
+    if start >= len(source) or source[start] != "{":
+        return None
+
+    depth = 0
+    for index in range(start, len(source)):
+        char = source[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start + 1 : index], index + 1
+    return None
+
+
+def normalize_fraction_commands(tex: str) -> str:
+    parts: list[str] = []
+    index = 0
+
+    while index < len(tex):
+        if not tex.startswith(r"\frac", index):
+            parts.append(tex[index])
+            index += 1
+            continue
+
+        numerator_result = read_braced_tex_argument(tex, index + len(r"\frac"))
+        if numerator_result is None:
+            parts.append(tex[index])
+            index += 1
+            continue
+
+        numerator_raw, denominator_start = numerator_result
+        denominator_result = read_braced_tex_argument(tex, denominator_start)
+        if denominator_result is None:
+            parts.append(tex[index])
+            index += 1
+            continue
+
+        denominator_raw, next_index = denominator_result
+        numerator = normalize_fraction_commands(numerator_raw)
+        denominator = normalize_fraction_commands(denominator_raw)
+        command = r"\tfrac" if (
+            fraction_argument_is_complex(numerator) or fraction_argument_is_complex(denominator)
+        ) else r"\dfrac"
+        parts.append(f"{command}{{{numerator}}}{{{denominator}}}")
+        index = next_index
+
+    return "".join(parts)
+
+
+def normalize_math_segment(segment: str) -> str:
+    if segment.startswith("$$") and segment.endswith("$$"):
+        return f"$${normalize_fraction_commands(segment[2:-2])}$$"
+    if segment.startswith("$") and segment.endswith("$"):
+        return f"${normalize_fraction_commands(segment[1:-1])}$"
+    return segment
+
+
+def normalize_fragment_semantics(fragment_html: str) -> str:
+    normalized = normalize_fragment_media(fragment_html)
+    normalized = normalize_fill_blank_markers(normalized)
+    normalized = decorate_analysis_paragraphs(normalized)
+    normalized = decorate_blockquotes(normalized)
+    return normalized
+
+
+def unwrap_page_wrapper_fragment(fragment_html: str) -> str:
+    stripped = fragment_html.strip()
+    match = PAGE_WRAPPER_PATTERN.match(stripped)
+    if not match:
+        return fragment_html
+
+    attrs = match.group("attrs") or ""
+    if not PAGE_WRAPPER_HINT_PATTERN.search(attrs):
+        return fragment_html
+
+    body = match.group("body").strip()
+    return body or fragment_html
+
+
+def build_source_fragment_html(page_number: str, page_body_html: str) -> str:
+    return (
+        f'<section class="source-fragment" data-source-page="{html.escape(page_number)}">'
+        f"{page_body_html}"
+        "</section>"
+    )
+
+
+def build_html_document_from_fragments(
+    pages: list[tuple[str, str]],
+    title: str,
+    source_label: str,
+) -> str:
+    source_fragments_html: list[str] = []
+    for page_number, page_markdown in pages:
+        page_body_html = normalize_fragment_semantics(validate_fragment_html(page_number, page_markdown))
+        page_body_html = unwrap_page_wrapper_fragment(page_body_html)
+        source_fragments_html.append(build_source_fragment_html(page_number, page_body_html))
 
     return "\n".join(
         [
@@ -299,18 +1049,37 @@ def build_html_document(pages: list[tuple[str, str]], title: str, source_label: 
             "  <style>",
             "/* Vendored Kami tokens define the document language. */",
             KAMI_KERNEL_CSS,
+            "/* Vendored blockquote template styles example-callout rendering. */",
+            PHYCAT_BLOCKQUOTE_CSS,
             "/* OCR-specific CSS keeps scan-specific pagination, table, and media behavior local to this skill. */",
             PRINT_BASE_CSS,
             "  </style>",
             MATHJAX_BOOTSTRAP,
+            PAGINATION_SCRIPT,
             "</head>",
             "<body>",
-            "\n".join(sheet_html),
+            f'  <div id="handout-source" class="transcript-flow">{"".join(source_fragments_html)}</div>',
+            (
+                f'  <div id="handout-print-root" data-title="{html.escape(title, quote=True)}" '
+                f'data-source-label="{html.escape(source_label, quote=True)}"></div>'
+            ),
             "</body>",
             "</html>",
             "",
         ]
     )
+
+
+def build_html_document(pages: list[tuple[str, str]], title: str, source_label: str) -> str:
+    md = MarkdownIt("commonmark").enable("table")
+    rendered_pages: list[tuple[str, str]] = []
+
+    for page_number, page_markdown in pages:
+        protected_markdown, math_segments = protect_math_segments(page_markdown)
+        page_body = restore_math_segments(md.render(protected_markdown), math_segments)
+        rendered_pages.append((page_number, page_body))
+
+    return build_html_document_from_fragments(rendered_pages, title=title, source_label=source_label)
 
 
 def main() -> int:
