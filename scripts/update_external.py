@@ -263,6 +263,44 @@ def git_commit_and_push() -> tuple[str, str]:
         return "ERROR", f"git push failed: {e.stderr.strip()}"
 
 
+def run_validation() -> tuple[bool, str]:
+    """Run structure verification and catalog generation before commit.
+    
+    Returns (success, error_message).
+    """
+    print("\n[Validate] Running structure verification...")
+    try:
+        result = subprocess.run(
+            ["python3", "scripts/verify_structure.py"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return False, f"verify_structure.py failed:\n{result.stdout}\n{result.stderr}"
+        print("[Validate] Structure verification passed.")
+    except Exception as e:
+        return False, f"verify_structure.py could not run: {e}"
+    
+    print("[Validate] Running catalog generation...")
+    try:
+        result = subprocess.run(
+            ["python3", "scripts/generate_skills_catalog.py"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return False, f"generate_skills_catalog.py failed:\n{result.stdout}\n{result.stderr}"
+        print("[Validate] Catalog generation passed.")
+    except Exception as e:
+        return False, f"generate_skills_catalog.py could not run: {e}"
+    
+    return True, ""
+
+
 def main() -> int:
     print("=" * 60)
     print("my-skills external resource updater (Python)")
@@ -369,6 +407,13 @@ def main() -> int:
         print("\n[OK] Temporary directory cleaned")
 
     if processing_error:
+        return 1
+
+    # Run validation before committing
+    valid, error = run_validation()
+    if not valid:
+        print(f"\n[ERROR] Validation failed: {error}")
+        print("[ERROR] Commit aborted due to validation failure.")
         return 1
 
     # Commit and push
