@@ -24,6 +24,7 @@ my-skills/
 │   ├── opencode-cli-handbook/                 # OpenCode CLI 速查手册（agent 非交互调用）
 │   ├── opencode-loop/                         # OpenCode Loop 无人值守编码
 │   ├── opencode-mcp-delegate/                 # OpenCode MCP 分发与会话协同
+│   ├── opencode-plugin-builder/               # OpenCode 插件开发完整指南（API + 模板 + 踩坑）
 │   ├── opencode-provider-config/              # OpenCode 模型配置
 │   ├── opencode-source-compass/               # OpenCode 源码架构导航与 SDK 兼容诊断
 │   ├── pdf-toc-bookmarker/                    # 扫描 PDF 目录页生成可点击书签
@@ -84,6 +85,7 @@ my-skills/
 | [opencode-cli-handbook](custom/opencode-cli-handbook/) | OpenCode CLI 速查手册；覆盖 `opencode run` 非交互执行（代码审查/辅助/CI 自动化）、服务器模式、会话管理、模型切换、调试诊断等全部 CLI 命令与参数 |
 | [opencode-loop](custom/opencode-loop/) | OpenCode Loop 命令行 / TUI 无人值守项目创建、优化与修复 |
 | [opencode-mcp-delegate](custom/opencode-mcp-delegate/) | 通过 `opencode-mcp` MCP 服务把编码/审查任务分发给 OpenCode，强调 workflow 工具、会话续接和本地 MCP 配置约束 |
+| [opencode-plugin-builder](custom/opencode-plugin-builder/) | OpenCode 插件开发完整指南；覆盖 @opencode-ai/plugin TypeScript API、全部 Hooks、自定义 tool 注册、opencode.json 配置、跨平台踩坑与 npm 发布流程 |
 | [opencode-provider-config](custom/opencode-provider-config/) | OpenCode 自定义模型参数配置 |
 | [opencode-source-compass](custom/opencode-source-compass/) | OpenCode 源码架构导航与 SDK 版本兼容性诊断；66 个 SDK API 完整调用链映射、40+ 事件类型目录、Effect Service 依赖图、版本升级检测与迁移指引 |
 | [pdf-toc-bookmarker](custom/pdf-toc-bookmarker/) | 为扫描版或图片目录页 PDF 识别目录并写入可点击 outline/bookmarks |
