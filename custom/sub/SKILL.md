@@ -83,7 +83,7 @@ The IPRoyal SOCKS5 proxy uses a **dialer-proxy chain** to route through subscrip
 proxies:
   - name: "IPRoyal"
     type: socks5
-    server: 86.104.161.165
+    server: <server-ip>
     port: 12324
     username: <redacted>
     password: <redacted>
