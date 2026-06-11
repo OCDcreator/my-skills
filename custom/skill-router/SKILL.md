@@ -37,7 +37,7 @@ Do not use this skill to edit `README.md`, `AGENTS.md`, `SKILLS.md`, or update s
 
 1. Resolve the source-of-truth repo path or remote
 2. Read `README.md` and `AGENTS.md` there first
-3. Find skills with `custom/**/SKILL.md` and `external/**/SKILL.md`; treat leaf dirs containing `SKILL.md` as skills
+3. Read `docs/skills-index.json` — this is the machine-readable index of all skills with metadata (name, description, category, tier, tags, triggers). If it doesn't exist, fall back to `rglob("SKILL.md")`.
 4. Extract frontmatter `name` and `description` before reading full skill bodies
 5. Translate the user request into a concrete job to be done
 6. Match the job against the discovered skills; prefer direct trigger matches
@@ -53,6 +53,27 @@ Never stop at “here are some possible skills.” The output must end with the 
 - When the task is repository maintenance, route to `skill-catalog-maintainer`
 - When the task is discovery-only, do not drift into implementation advice
 - If no direct match exists, return the closest skills and clearly state the gap
+
+## JSON Index Matching
+
+When `docs/skills-index.json` is available, use this priority for matching:
+
+1. **Exact trigger match**: If any skill's `triggers` array contains the user's task keyword, that skill is top priority
+2. **Tag match**: If the user's task matches any skill's `tags`, rank highly
+3. **Category filter**: Use `category` to narrow the candidate set (e.g., "frontend" tasks → only Frontend/UI skills)
+4. **Tier boost**: `core` tier skills rank above `community`, which rank above `bulk`
+5. **Description keyword match**: Fall back to substring matching in `description`
+
+The JSON index contains these fields per skill:
+- `path`: Source path (e.g., `external/last30days-skill/last30days`)
+- `name`: Skill name
+- `description`: One-line description
+- `category`: Auto-detected or author-declared category
+- `tier`: `custom`, `core`, `community`, `bulk`, or `reference`
+- `tags`: Author-declared tags (empty until skills add them)
+- `triggers`: Author-declared trigger phrases (empty until skills add them)
+- `source`: Source name (e.g., `last30days-skill`)
+- `repo`: Upstream repository URL
 
 ## Output Format
 
@@ -88,6 +109,14 @@ Load next: `<skill-name>`
 | OpenCode provider/model config | `opencode-provider-config` |
 | Search the live web | `searxng` |
 | Fork/upstream sync workflow | `fork-upstream-workflow` |
+| AI-led research across social platforms | `last30days-skill` |
+| Chinese social media research | `last30days-skill-cn` |
+| Real-time unified search | `anysearch-skill` |
+| Agent internet access / social channels | `agent-reach` (reference) |
+
+## Fallback
+
+If `docs/skills-index.json` is missing or stale, fall back to the legacy discovery workflow (rglob + frontmatter parsing). Always prefer the JSON index when available.
 
 ## Common Mistakes
 

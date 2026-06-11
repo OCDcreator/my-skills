@@ -3,10 +3,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from collections import defaultdict
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 try:
@@ -38,22 +39,85 @@ def md_cell(text: str, *, limit: int | None = None) -> str:
     return value
 
 
-def frontmatter(path: Path) -> tuple[str, str]:
+def frontmatter(path: Path) -> tuple[str, str, list[str], list[str]]:
     text = read(path)
     if not text.startswith("---"):
-        return path.parent.name, ""
+        return path.parent.name, "", [], []
     end = text.find("\n---", 3)
     if end == -1:
-        return path.parent.name, ""
+        return path.parent.name, "", [], []
     block = text[3:end].splitlines()
     name = path.parent.name
     description = ""
+    tags: list[str] = []
+    triggers: list[str] = []
     collecting_description = False
+    collecting_tags = False
+    collecting_triggers = False
     collected: list[str] = []
     for line in block:
+        # Handle continuation of multiline description blocks
+        if collecting_description:
+            if line and not line.startswith((" ", "\t")) and re.match(r"^[A-Za-z0-9_-]+:", line):
+                collecting_description = False
+                # Fall through to handle the new key (e.g. tags:, triggers:)
+            else:
+                collected.append(line.strip())
+                continue
+        # Handle continuation of block-list tags
+        if collecting_tags:
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                tag = stripped[2:].strip().strip('"').strip("'")
+                if tag:
+                    tags.append(tag)
+                continue
+            elif stripped and re.match(r"^[A-Za-z0-9_-]+:", line):
+                collecting_tags = False
+                # Fall through
+            else:
+                continue
+        # Handle continuation of block-list triggers
+        if collecting_triggers:
+            stripped = line.strip()
+            if stripped.startswith("- "):
+                trigger = stripped[2:].strip().strip('"').strip("'")
+                if trigger:
+                    triggers.append(trigger)
+                continue
+            elif stripped and re.match(r"^[A-Za-z0-9_-]+:", line):
+                collecting_triggers = False
+                # Fall through
+            else:
+                continue
+
+        # Parse keys
         if line.startswith("name:"):
             name = line.split(":", 1)[1].strip().strip('"')
-            collecting_description = False
+            continue
+        if line.startswith("tags:"):
+            value = line.split(":", 1)[1].strip()
+            if value.startswith("[") and value.endswith("]"):
+                # Inline YAML list: tags: [search, research, web]
+                inner = value[1:-1]
+                tags = [t.strip().strip('"').strip("'") for t in inner.split(",") if t.strip()]
+            elif value:
+                # Single value: tags: search
+                tags = [value.strip().strip('"').strip("'")]
+            else:
+                collecting_tags = True
+            continue
+        if line.startswith("triggers:"):
+            value = line.split(":", 1)[1].strip()
+            if value.startswith("[") and value.endswith("]"):
+                # Inline YAML list: triggers: ["search the web", "find information"]
+                inner = value[1:-1]
+                triggers = [t.strip().strip('"').strip("'") for t in inner.split(",") if t.strip()]
+            elif value:
+                # Single value: triggers: search the web
+                triggers = [value.strip().strip('"').strip("'")]
+            else:
+                collecting_triggers = True
             continue
         if line.startswith("description:"):
             value = line.split(":", 1)[1].strip()
@@ -61,14 +125,9 @@ def frontmatter(path: Path) -> tuple[str, str]:
             if value and not collecting_description:
                 description = value.strip().strip('"')
             continue
-        if collecting_description:
-            if line and not line.startswith((" ", "\t")) and re.match(r"^[A-Za-z0-9_-]+:", line):
-                collecting_description = False
-                continue
-            collected.append(line.strip())
     if collected:
         description = " ".join(part for part in collected if part)
-    return name, one_line(description)
+    return name, one_line(description), tags, triggers
 
 
 def parse_sources_yaml() -> dict[str, dict[str, str | bool]]:
@@ -147,7 +206,7 @@ def external_source_subdir(rel: str, source: dict[str, str | bool]) -> str:
 def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]) -> list[dict[str, str]]:
     rows = []
     for rel in skill_paths:
-        name, description = frontmatter(ROOT / rel / "SKILL.md")
+        name, description, tags, triggers = frontmatter(ROOT / rel / "SKILL.md")
         if rel.startswith("custom/"):
             source_repo = "git@github.com:OCDcreator/my-skills.git"
             branch = "main"
@@ -184,6 +243,8 @@ def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]
                 "path": rel,
                 "name": name,
                 "description": description or "Needs review",
+                "tags": tags,
+                "triggers": triggers,
                 "category": category,
                 "repo": source_repo,
                 "branch": branch,
@@ -425,6 +486,82 @@ def update_readme(blocks: dict[str, str]) -> None:
         print(f"No changes needed in {README.relative_to(ROOT)}.")
 
 
+def generate_skills_index(rows: list[dict[str, str]], sources: dict[str, dict[str, str | bool]]) -> Path:
+    """Generate a machine-readable JSON index at docs/skills-index.json."""
+    index_path = ROOT / "docs" / "skills-index.json"
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+
+    custom_rows = [r for r in rows if r["path"].startswith("custom/")]
+    external_rows = [r for r in rows if r["path"].startswith("external/")]
+
+    # Build skills array
+    skills = []
+    for row in rows:
+        if row["path"].startswith("custom/"):
+            source_name = "custom"
+        else:
+            source_name = row["path"].split("/")[1]
+
+        skills.append(
+            {
+                "path": row["path"],
+                "name": row["name"],
+                "description": row["description"],
+                "category": row["category"],
+                "tier": row["tier"],
+                "source": source_name,
+                "repo": row["repo"],
+                "branch": row["branch"],
+                "include_in_main": row["include_in_main"],
+                "tags": row.get("tags", []),
+                "triggers": row.get("triggers", []),
+            }
+        )
+
+    # Build sources summary
+    sources_summary: dict[str, dict[str, object]] = {}
+    # External sources from rows
+    for source_name in sorted({s["source"] for s in skills if s["source"] != "custom"}):
+        source_skills = [s for s in skills if s["source"] == source_name]
+        src_config = sources.get(source_name, {})
+        sources_summary[source_name] = {
+            "repo": str(src_config.get("repo", "")),
+            "branch": str(src_config.get("branch", "")),
+            "tier": str(src_config.get("tier", "")),
+            "skill_count": len(source_skills),
+        }
+    # Custom source
+    sources_summary["custom"] = {
+        "repo": "git@github.com:OCDcreator/my-skills.git",
+        "branch": "main",
+        "tier": "custom",
+        "skill_count": len(custom_rows),
+    }
+
+    # Build categories count
+    categories: dict[str, int] = {}
+    for row in rows:
+        cat = row["category"]
+        categories[cat] = categories.get(cat, 0) + 1
+    categories = dict(sorted(categories.items(), key=lambda item: (-item[1], item[0])))
+
+    index = {
+        "meta": {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "total_skills": len(rows),
+            "custom_skills": len(custom_rows),
+            "external_skills": len(external_rows),
+            "sources_count": len(sources_summary),
+        },
+        "skills": skills,
+        "sources": sources_summary,
+        "categories": categories,
+    }
+
+    index_path.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
+    return index_path
+
+
 def main() -> None:
     sources = parse_sources_yaml()
     skill_paths = sorted(
@@ -450,6 +587,10 @@ def main() -> None:
     # Update README auto-generated blocks
     readme_blocks = generate_readme_blocks(rows, sources)
     update_readme(readme_blocks)
+
+    # Generate machine-readable index
+    index_path = generate_skills_index(rows, sources)
+    print(f"Wrote {index_path.relative_to(ROOT)} with {len(rows)} skills.")
 
 
 if __name__ == "__main__":
