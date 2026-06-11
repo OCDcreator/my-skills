@@ -113,6 +113,7 @@ my-skills/
 | 本地目录 | 源仓库 | 说明 |
 |----------|--------|------|
 | `external/anthropics-skills/` | [anthropics/skills](https://github.com/anthropics/skills.git) | 17 个技能（core：高质量官方/精选源） |
+| `external/anysearch-skill/` | [anysearch-ai/anysearch-skill](https://github.com/anysearch-ai/anysearch-skill.git) | 0 个技能 |
 | `external/awesome-claude-skills/` | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills.git) | 863 个技能（bulk：完整索引见 docs/full-catalog.md） |
 | `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills.git) | 3 个技能 |
 | `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills.git) | 21 个技能 |
@@ -120,8 +121,10 @@ my-skills/
 | `external/deep-research-skills/` | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills.git) | 20 个技能 |
 | `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill.git) | 0 个技能 |
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills.git) | 5 个技能（core：高质量官方/精选源） |
+| `external/last30days-skill/` | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill.git) | 1 个技能（core：高质量官方/精选源） |
+| `external/last30days-skill-cn/` | [Jesseovo/last30days-skill-cn](https://github.com/Jesseovo/last30days-skill-cn.git) | 1 个技能 |
 | `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills.git) | 29 个技能（core：高质量官方/精选源） |
-| `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git) | 0 个技能 |
+| `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git) | 1 个技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill.git) | 13 个技能 |
 | `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git) | 7 个技能 |
 <!-- END GENERATED EXTERNAL_SKILL_SOURCES -->
@@ -131,6 +134,7 @@ my-skills/
 <!-- BEGIN GENERATED EXTERNAL_REFERENCE_SOURCES -->
 | 本地目录 | 源仓库 | 说明 |
 |----------|--------|------|
+| `external/agent-reach/` | [Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach.git) | 设计参考索引 |
 | `external/awesome-design-md/` | [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md.git) | 设计参考索引 |
 <!-- END GENERATED EXTERNAL_REFERENCE_SOURCES -->
 

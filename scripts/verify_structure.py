@@ -269,6 +269,11 @@ def main() -> int:
             failures.append(f"README.md does not mention custom skill path: {rel}/")
         if not full_catalog:
             continue
+        # Skip reference sources — they are not indexed as skills
+        if rel.startswith("external/"):
+            source_name = rel.split("/")[1]
+            if source_name in sources_map and sources_map[source_name].get("tier") == "reference":
+                continue
         if f"| `{rel}` |" not in full_catalog:
             failures.append(f"docs/full-catalog.md does not index skill path: {rel}")
 

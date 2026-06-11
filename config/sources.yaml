@@ -100,11 +100,43 @@ skill_sources:
     tier: core
     include_in_main_catalog: true
 
+  - name: anysearch-skill
+    repo: https://github.com/anysearch-ai/anysearch-skill.git
+    branch: main
+    subdir: .
+    mode: flatten
+    tier: community
+    include_in_main_catalog: true
+
+  - name: last30days-skill
+    repo: https://github.com/mvanhorn/last30days-skill.git
+    branch: main
+    subdir: skills
+    mode: flatten
+    tier: core
+    include_in_main_catalog: true
+
+  - name: last30days-skill-cn
+    repo: https://github.com/Jesseovo/last30days-skill-cn.git
+    branch: main
+    subdir: skills
+    mode: flatten
+    tier: community
+    include_in_main_catalog: true
+
 reference_sources:
   - name: awesome-design-md
     repo: https://github.com/VoltAgent/awesome-design-md.git
     branch: main
     subdir: design-md
+    mode: flatten
+    tier: reference
+    include_in_main_catalog: false
+
+  - name: agent-reach
+    repo: https://github.com/Panniantong/Agent-Reach.git
+    branch: main
+    subdir: .
     mode: flatten
     tier: reference
     include_in_main_catalog: false

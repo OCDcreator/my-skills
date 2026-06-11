@@ -160,6 +160,9 @@ def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]
                 print(f"WARNING: external/{source_name}/ is not configured in sources.yaml. Skipping.")
                 continue
             source = sources[source_name]
+            # Skip reference sources — they are not skills
+            if source.get("tier") == "reference":
+                continue
             source_repo = str(source.get("repo", "Needs source review"))
             branch = str(source.get("branch", "Needs source review"))
             source_subdir = external_source_subdir(rel, source) if source else "Needs source review"

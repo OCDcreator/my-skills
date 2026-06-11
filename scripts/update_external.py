@@ -51,7 +51,14 @@ def read_sources() -> tuple[list[dict], list[dict], list[str]]:
 def clone_repo(url: str, branch: str, dest: Path) -> bool:
     """Clone a git repo. Returns True on success."""
     if dest.exists():
-        shutil.rmtree(dest)
+        def _onexc(func, filepath, exc_info):
+            import stat
+            try:
+                os.chmod(filepath, stat.S_IWRITE)
+                func(filepath)
+            except Exception:
+                pass
+        shutil.rmtree(dest, onexc=_onexc)
     try:
         run(["git", "clone", "--depth", "1", "--branch", branch, url, str(dest)])
         return True
@@ -61,10 +68,21 @@ def clone_repo(url: str, branch: str, dest: Path) -> bool:
 
 
 def remove_git_dir(path: Path) -> None:
-    """Remove .git directory from cloned repo."""
+    """Remove .git directory from cloned repo, handling read-only files on Windows."""
     git_dir = path / ".git"
-    if git_dir.exists():
-        shutil.rmtree(git_dir)
+    if not git_dir.exists():
+        return
+    
+    def onexc(func, filepath, exc_info):
+        """Handle read-only files by changing permissions and retrying."""
+        import stat
+        try:
+            os.chmod(filepath, stat.S_IWRITE)
+            func(filepath)
+        except Exception:
+            pass
+    
+    shutil.rmtree(git_dir, onexc=onexc)
 
 
 def should_exclude(name: str, exclude_names: list[str]) -> bool:
@@ -264,26 +282,14 @@ def git_commit_and_push() -> tuple[str, str]:
 
 
 def run_validation() -> tuple[bool, str]:
-    """Run structure verification and catalog generation before commit.
+    """Run catalog generation and structure verification before commit.
+    
+    Order matters: generate_skills_catalog.py must run FIRST to update
+    catalog files, then verify_structure.py checks the updated state.
     
     Returns (success, error_message).
     """
-    print("\n[Validate] Running structure verification...")
-    try:
-        result = subprocess.run(
-            ["python3", "scripts/verify_structure.py"],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            return False, f"verify_structure.py failed:\n{result.stdout}\n{result.stderr}"
-        print("[Validate] Structure verification passed.")
-    except Exception as e:
-        return False, f"verify_structure.py could not run: {e}"
-    
-    print("[Validate] Running catalog generation...")
+    print("\n[Validate] Running catalog generation...")
     try:
         result = subprocess.run(
             ["python3", "scripts/generate_skills_catalog.py"],
@@ -297,6 +303,21 @@ def run_validation() -> tuple[bool, str]:
         print("[Validate] Catalog generation passed.")
     except Exception as e:
         return False, f"generate_skills_catalog.py could not run: {e}"
+    
+    print("[Validate] Running structure verification...")
+    try:
+        result = subprocess.run(
+            ["python3", "scripts/verify_structure.py"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return False, f"verify_structure.py failed:\n{result.stdout}\n{result.stderr}"
+        print("[Validate] Structure verification passed.")
+    except Exception as e:
+        return False, f"verify_structure.py could not run: {e}"
     
     return True, ""
 
@@ -401,9 +422,16 @@ def main() -> int:
         traceback.print_exc()
         processing_error = True
     finally:
-        # P2-1: Always clean up temp directory
+        # P2-1: Always clean up temp directory (handle Windows read-only files)
         if TMP_DIR.exists():
-            shutil.rmtree(TMP_DIR)
+            def _onexc(func, filepath, exc_info):
+                import stat
+                try:
+                    os.chmod(filepath, stat.S_IWRITE)
+                    func(filepath)
+                except Exception:
+                    pass
+            shutil.rmtree(TMP_DIR, onexc=_onexc)
         print("\n[OK] Temporary directory cleaned")
 
     if processing_error:
