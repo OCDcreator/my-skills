@@ -134,33 +134,18 @@ def main() -> int:
     # 1. Check sources.yaml exists
     if not SOURCES_YAML.exists():
         failures.append("config/sources.yaml is missing — it is the single source of truth for external sources.")
-    else:
-        # 2. Check that update.sh / update.ps1 sources match sources.yaml
-        sh_sources = parse_sh_skill_sources(update_sh)
-        ps1_sources = parse_ps1_skill_sources(update_ps1)
-        
-        yaml_skill_sources = {k: v for k, v in sources_yaml.items() if v.get("tier") != "reference"}
-        
-        # Compare by name presence (full migration to sources.yaml will happen later)
-        sh_names = set(sh_sources.keys())
-        ps1_names = set(ps1_sources.keys())
-        yaml_names = set(yaml_skill_sources.keys())
-        
-        if sh_names != yaml_names:
-            missing_in_yaml = sh_names - yaml_names
-            missing_in_sh = yaml_names - sh_names
-            if missing_in_yaml:
-                failures.append(f"update.sh sources not in sources.yaml: {missing_in_yaml}")
-            if missing_in_sh:
-                failures.append(f"sources.yaml sources not in update.sh: {missing_in_sh}")
-        
-        if ps1_names != yaml_names:
-            missing_in_yaml = ps1_names - yaml_names
-            missing_in_ps1 = yaml_names - ps1_names
-            if missing_in_yaml:
-                failures.append(f"update.ps1 sources not in sources.yaml: {missing_in_yaml}")
-            if missing_in_ps1:
-                failures.append(f"sources.yaml sources not in update.ps1: {missing_in_ps1}")
+    
+    # 2. Check that update.sh / update.ps1 are thin wrappers (not manual source lists)
+    if "scripts/update_external.py" not in update_sh:
+        failures.append("update.sh should delegate to scripts/update_external.py")
+    if "scripts/update_external.py" not in update_ps1:
+        failures.append("update.ps1 should delegate to scripts/update_external.py")
+    
+    # Check they no longer contain manual SKILL_SOURCES arrays
+    if "SKILL_SOURCES=(" in update_sh:
+        failures.append("update.sh still contains manual SKILL_SOURCES array — should use sources.yaml")
+    if "$SkillSources = @(" in update_ps1:
+        failures.append("update.ps1 still contains manual $SkillSources array — should use sources.yaml")
 
     # 3. Check EXCLUDE_NAMES match
     sh_excludes = parse_sh_excludes(update_sh)

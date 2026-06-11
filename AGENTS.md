@@ -5,6 +5,25 @@
 my-skills is a Git-based collection of AI agent skills and external reference libraries. No build/test/lint steps.
 The two main skill trees are `custom/` (self-authored skills) and `external/` (cloned upstream skill sources and reference sources). Repo-local automation and status docs live in `automation/` and `docs/`; utility scripts live in `scripts/`.
 
+## Architecture
+
+```
+config/sources.yaml          # Single source of truth for all external sources
+scripts/update_external.py   # Core sync logic (replaces duplicated sh/ps1)
+scripts/generate_skills_catalog.py  # Generates SKILLS.md + docs/full-catalog.md + README blocks
+scripts/verify_structure.py  # Governance gate: checks catalog invariants
+update.sh / update.ps1     # Thin wrappers → scripts/update_external.py
+```
+
+### Source governance tiers
+
+| Tier | Meaning | In main catalog? |
+|------|---------|-----------------|
+| `core` | Official/high-quality curated sources (anthropics, mattpocock, kepano) | Yes |
+| `community` | Community-contributed sources (baoyu, taste-skill, axton) | Yes |
+| `bulk` | High-volume, low-signal sources (awesome-claude-skills: 863 automation skills) | No — only in `docs/full-catalog.md` |
+| `reference` | Non-skill reference libraries (awesome-design-md) | No |
+
 ## When adding a new skill
 
 ### Custom skill (`custom/`)
@@ -12,44 +31,50 @@ The two main skill trees are `custom/` (self-authored skills) and `external/` (c
 1. Create a leaf skill directory anywhere under `custom/` and put `SKILL.md` at that leaf
 2. `custom/` can contain grouped paths, but keep single-purpose skills at the leaf path the user expects; nested families like `custom/x-reader/*` already exist
 3. If the immediate job is to choose which skill from this repo should be loaded for real work, use `custom/skill-router` first; it should inspect this repo as the source of truth, not an installed mirror
-4. Update `README.md`: add entry to directory tree + custom skill table
-5. If `SKILLS.md` exists or the user asks for a skill catalog or catalog maintenance, use `custom/skill-catalog-maintainer` and include source repo/subdir/install hints in the catalog
-   - For project-specific recommendations, install hints should name target paths for Claude Code (`.claude/skills`), OpenCode (`.opencode/skills`), and/or Codex (`.agents/skills`)
-6. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
-7. Commit and push
+4. **Run `python3 scripts/generate_skills_catalog.py`** — this auto-updates:
+   - `SKILLS.md` curated index
+   - `docs/full-catalog.md` full index
+   - `README.md` auto-generated blocks (custom skills table + external sources table)
+5. Run `python3 scripts/verify_structure.py`
+6. Commit and push
 
 ### External skill (`external/`)
 
-When adding a new external source, **all four files** must be updated:
+When adding a new external source, **update these files**:
 
-1. **`external/<name>/`** — clone the repo, remove `.git/`, keep only dirs containing `SKILL.md`
-2. **`update.sh`** — append to `SKILL_SOURCES` array:
+1. **`config/sources.yaml`** — add to `skill_sources`:
+   ```yaml
+   - name: source-name
+     repo: https://github.com/owner/repo.git
+     branch: main
+     subdir: skills          # or "." if skills are at root
+     mode: flatten           # or "preserve" for duplicate leaf names
+     tier: community         # or "core" / "bulk"
+     include_in_main_catalog: true
    ```
-   "name|https://github.com/owner/repo.git|branch|subdir|mode"
-   ```
-   - `subdir`: path inside the cloned repo where skills live (e.g. `skills`, `.` if at root)
-   - `mode`: optional copy mode. Leave blank for flattened leaf skill dirs, use `preserve` when duplicate leaf skill names require keeping the relative source path
-   - Script auto-discovers dirs containing `SKILL.md` under that subdir
-   - Example: `"anthropics-skills|https://github.com/anthropics/skills.git|main|skills"`
-3. **`update.ps1`** — add a matching `$SkillSources` entry and keep copy-mode behavior aligned with `update.sh`
-4. **`README.md`** — update three places:
-   - Directory tree under `external/`
-   - External sources table (columns: local dir, source repo link, description)
-   - Source count in the `update.sh` / `update.ps1` row of the scripts table
-5. **`SKILLS.md`** — if present, update the skill catalog using `custom/skill-catalog-maintainer`; external entries should keep source repo, branch, subdir, and install hints. Project install hints should mention `.claude/skills`, `.agents/skills`, and `.opencode/skills` where relevant.
-6. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
+2. **`external/<name>/`** — run `update.sh` (or `update.ps1`) to sync, or manually clone and copy
+3. **`README.md`** — the external sources table is auto-generated; verify it looks correct after running `generate_skills_catalog.py`
+4. **`SKILLS.md`** — auto-generated; verify curated inclusion
+5. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
 
 ### External reference source (`external/`)
 
 Use this for upstream repositories that are useful to agents but do not contain `SKILL.md` files.
 
-When adding a new external reference source, update all four files:
+When adding a new external reference source:
 
-1. **`external/<name>/`** — clone the repo, remove `.git/`, keep only the reference material the repo intentionally mirrors
-2. **`update.sh`** — append to `REFERENCE_SOURCES` and keep the copy logic aligned with the upstream structure
-3. **`update.ps1`** — add the matching Windows clone+copy block and keep the reference counters consistent
-4. **`README.md`** — update the directory tree, the external reference table, and the update-script description if the wording changes
-5. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
+1. **`config/sources.yaml`** — add to `reference_sources`:
+   ```yaml
+   - name: awesome-design-md
+     repo: https://github.com/VoltAgent/awesome-design-md.git
+     branch: main
+     subdir: design-md
+     tier: reference
+     include_in_main_catalog: false
+   ```
+2. **`external/<name>/`** — run `update.sh` to sync
+3. **`README.md`** — the reference sources table is auto-generated
+4. Run `python3 scripts/generate_skills_catalog.py` and `python3 scripts/verify_structure.py`
 
 Reference-source rules:
 
@@ -59,9 +84,11 @@ Reference-source rules:
 
 ## Gotchas
 
-- **`update.ps1` mirrors `.sh` manually**: there is no code generation; any change to `.sh` must be replicated to `.ps1` by hand.
-- **`EXCLUDE_NAMES` must match in `update.sh` and `update.ps1`**: both scripts filter excluded skill names; keep the arrays and behavior aligned.
-- **`external/<name>/` structure varies by source**: some sources put skill dirs directly under the cloned root (subdir=`.`), others use a `skills/` subdirectory (subdir=`skills`). The `update.sh` `SKILL_SOURCES` `subdir` field controls this.
+- **`config/sources.yaml` is the single source of truth**: `update.sh`, `update.ps1`, `generate_skills_catalog.py`, and `verify_structure.py` all read from this file. Never manually edit `update.sh` or `update.ps1` source lists — they are now thin wrappers.
+- **`update.sh` / `update.ps1` are thin wrappers**: they delegate to `scripts/update_external.py`. The canonical sync logic lives in Python, not shell/PowerShell.
+- **`README.md` tables are auto-generated**: custom skills table and external sources tables are wrapped in `<!-- BEGIN/END GENERATED ... -->` markers. Do not edit between markers manually.
+- **`SKILLS.md` is curated**: only `tier: core` and `tier: community` sources appear in the main catalog. `tier: bulk` sources (like awesome-claude-skills) are hidden from the quick-reference but still available in `docs/full-catalog.md`.
+- **`external/<name>/` structure varies by source**: some sources put skill dirs directly under the cloned root (subdir=`.`), others use a `skills/` subdirectory (subdir=`skills`). The `config/sources.yaml` `subdir` field controls this.
 - **Duplicate leaf skill names need `preserve` mode**: sources like deep-research-skills contain repeated names under language/platform groups, so keep the relative source path instead of flattening.
 - **Duplicate skill names are normal**: catalog external skills by path and source, not by `name` alone.
 
@@ -69,19 +96,20 @@ Reference-source rules:
 
 | Script | Purpose | Key behavior |
 |--------|---------|--------------|
-| `update.sh` / `.ps1` | Sync external skill sources and reference sources | `git clone --depth 1`, copy mirrored content, auto commit+push if changed |
+| `update.sh` / `.ps1` | Thin wrapper | Delegates to `scripts/update_external.py` |
+| `scripts/update_external.py` | Core sync logic | Reads `config/sources.yaml`, clones, copies, commits, pushes |
 | `push.sh` / `.ps1` | Push local changes | `git add -A` + commit + push |
 | `pull.sh` / `.ps1` | Hard reset to remote | `git reset --hard origin/main` (destructive — discards uncommitted work) |
+| `scripts/generate_skills_catalog.py` | Generate indexes | Outputs `SKILLS.md` (curated) + `docs/full-catalog.md` (full) + updates `README.md` blocks |
+| `scripts/verify_structure.py` | Governance gate | Validates `sources.yaml` consistency, catalog invariants, bulk isolation |
 
-- `.sh` is canonical; `.ps1` mirrors for Windows
-- `update.sh` uses `SKILL_SOURCES` and `REFERENCE_SOURCES`; `update.ps1` mirrors them manually with PowerShell clone/copy blocks
 - Temp clone directory: `.tmp-skills/` (gitignored)
-- `scripts/generate_skills_catalog.py` regenerates `SKILLS.md`; `scripts/verify_structure.py` is the lightweight structure gate
+- `config/sources.yaml` is the single source of truth for all external source configuration
 
 ## Conventions
 
 - Only branch: `main`
 - Remote: `origin` → `git@github.com:OCDcreator/my-skills.git`
-- No dependencies, no package manager, no build system
+- Dependencies: Python 3 + PyYAML (for `scripts/update_external.py` and catalog generation)
 - Every skill must contain a `SKILL.md` at its directory root
 - Self-authored skills belong under `custom/`; do not add root-level skill directories

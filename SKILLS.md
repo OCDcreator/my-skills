@@ -64,19 +64,19 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 
 ## External Skills (Curated)
 
-| Source | Notable skills | Use when |
-|---|---|---|
-| `anthropics-skills` | `algorithmic-art`, `brand-guidelines`, `canvas-design`, `claude-api`, `doc-coauthoring`, `docx`, `frontend-design`, `internal-comms`, ... (17 total) | Mirrored from `https://github.com/anthropics/skills.git`. |
-| `axton-obsidian-visual-skills` | `excalidraw-diagram`, `mermaid-visualizer`, `obsidian-canvas-creator` | Mirrored from `https://github.com/axtonliu/axton-obsidian-visual-skills.git`. |
-| `baoyu-skills` | `baoyu-article-illustrator`, `baoyu-comic`, `baoyu-compress-image`, `baoyu-cover-image`, `baoyu-danger-gemini-web`, `baoyu-danger-x-to-markdown`, `baoyu-diagram`, `baoyu-electron-extract`, ... (21 total) | Mirrored from `https://github.com/JimLiu/baoyu-skills.git`. |
-| `claude-plugins-official` | `access`, `agent-development`, `build-mcp-app`, `build-mcp-server`, `build-mcpb`, `cardputer-buddy`, `claude-automation-recommender`, `claude-md-improver`, ... (22 total) | Mirrored from `https://github.com/anthropics/claude-plugins-official.git`. |
-| `deep-research-skills` | `research`, `research-add-fields`, `research-add-items`, `research-deep`, `research-report`, `research`, `research-add-fields`, `research-add-items`, ... (20 total) | Mirrored from `https://github.com/Weizhena/Deep-Research-skills.git`. |
-| `html-ppt-skill` | `html-ppt` | Mirrored from `https://github.com/lewislulu/html-ppt-skill.git`. |
-| `kepano-obsidian-skills` | `defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` | Mirrored from `https://github.com/kepano/obsidian-skills.git`. |
-| `mattpocock-skills` | `caveman`, `design-an-interface`, `diagnose`, `edit-article`, `git-guardrails-claude-code`, `grill-me`, `grill-with-docs`, `handoff`, ... (29 total) | Mirrored from `https://github.com/mattpocock/skills.git`. |
-| `startup-pressure-test` | `startup-pressure-test` | Mirrored from `https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git`. |
-| `taste-skill` | `brandkit`, `industrial-brutalist-ui`, `gpt-taste`, `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `minimalist-ui`, `full-output-enforcement`, ... (13 total) | Mirrored from `https://github.com/Leonxlnx/taste-skill.git`. |
-| `ui-ux-pro-max-skill` | `ckm:banner-design`, `ckm:brand`, `ckm:design`, `ckm:design-system`, `ckm:slides`, `ckm:ui-styling`, `ui-ux-pro-max` | Mirrored from `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git`. |
+| Source | Tier | Notable skills | Use when |
+|---|---|---|---|
+| `anthropics-skills` | `core` | `algorithmic-art`, `brand-guidelines`, `canvas-design`, `claude-api`, `doc-coauthoring`, `docx`, `frontend-design`, `internal-comms`, ... (17 total) | Mirrored from `https://github.com/anthropics/skills.git`. |
+| `axton-obsidian-visual-skills` | `community` | `excalidraw-diagram`, `mermaid-visualizer`, `obsidian-canvas-creator` | Mirrored from `https://github.com/axtonliu/axton-obsidian-visual-skills.git`. |
+| `baoyu-skills` | `community` | `baoyu-article-illustrator`, `baoyu-comic`, `baoyu-compress-image`, `baoyu-cover-image`, `baoyu-danger-gemini-web`, `baoyu-danger-x-to-markdown`, `baoyu-diagram`, `baoyu-electron-extract`, ... (21 total) | Mirrored from `https://github.com/JimLiu/baoyu-skills.git`. |
+| `claude-plugins-official` | `core` | `access`, `agent-development`, `build-mcp-app`, `build-mcp-server`, `build-mcpb`, `cardputer-buddy`, `claude-automation-recommender`, `claude-md-improver`, ... (22 total) | Mirrored from `https://github.com/anthropics/claude-plugins-official.git`. |
+| `deep-research-skills` | `community` | `research`, `research-add-fields`, `research-add-items`, `research-deep`, `research-report`, `research`, `research-add-fields`, `research-add-items`, ... (20 total) | Mirrored from `https://github.com/Weizhena/Deep-Research-skills.git`. |
+| `html-ppt-skill` | `community` | `html-ppt` | Mirrored from `https://github.com/lewislulu/html-ppt-skill.git`. |
+| `kepano-obsidian-skills` | `core` | `defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` | Mirrored from `https://github.com/kepano/obsidian-skills.git`. |
+| `mattpocock-skills` | `core` | `caveman`, `design-an-interface`, `diagnose`, `edit-article`, `git-guardrails-claude-code`, `grill-me`, `grill-with-docs`, `handoff`, ... (29 total) | Mirrored from `https://github.com/mattpocock/skills.git`. |
+| `startup-pressure-test` | `community` | `startup-pressure-test` | Mirrored from `https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git`. |
+| `taste-skill` | `community` | `brandkit`, `industrial-brutalist-ui`, `gpt-taste`, `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `minimalist-ui`, `full-output-enforcement`, ... (13 total) | Mirrored from `https://github.com/Leonxlnx/taste-skill.git`. |
+| `ui-ux-pro-max-skill` | `community` | `ckm:banner-design`, `ckm:brand`, `ckm:design`, `ckm:design-system`, `ckm:slides`, `ckm:ui-styling`, `ui-ux-pro-max` | Mirrored from `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git`. |
 
 ## Bulk / Archive Sources
 

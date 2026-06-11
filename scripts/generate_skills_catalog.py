@@ -229,13 +229,15 @@ def generate_curated_catalog(rows: list[dict[str, str]]) -> list[str]:
         lines.append(f"| `{row['path']}` | `{row['name']}` | {md_cell(row['description'], limit=420)} |")
 
     if external_groups:
-        lines.extend(["", "## External Skills (Curated)", "", "| Source | Notable skills | Use when |", "|---|---|---|"])
+        lines.extend(["", "## External Skills (Curated)", "", "| Source | Tier | Notable skills | Use when |", "|---|---|---|---|"])
         for source_name, group in sorted(external_groups.items()):
             notable = ", ".join(f"`{row['name']}`" for row in group[:8])
             if len(group) > 8:
                 notable += f", ... ({len(group)} total)"
+            tier = group[0].get("tier", "community")
+            tier_badge = f"`{tier}`"
             use_when = f"Mirrored from `{group[0]['repo']}`."
-            lines.append(f"| `{source_name}` | {notable} | {use_when} |")
+            lines.append(f"| `{source_name}` | {tier_badge} | {notable} | {use_when} |")
 
     lines.extend([
         "",
