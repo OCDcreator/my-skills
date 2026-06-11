@@ -156,12 +156,19 @@ def build_rows(skill_paths: list[str], sources: dict[str, dict[str, str | bool]]
             include_in_main = True
         elif rel.startswith("external/"):
             source_name = rel.split("/")[1]
-            source = sources.get(source_name, {})
+            if source_name not in sources:
+                print(f"WARNING: external/{source_name}/ is not configured in sources.yaml. Skipping.")
+                continue
+            source = sources[source_name]
             source_repo = str(source.get("repo", "Needs source review"))
             branch = str(source.get("branch", "Needs source review"))
             source_subdir = external_source_subdir(rel, source) if source else "Needs source review"
             tier = str(source.get("tier", "community"))
-            include_in_main = bool(source.get("include_in_main_catalog", True))
+            raw = source.get("include_in_main_catalog", True)
+            if not isinstance(raw, bool):
+                print(f"WARNING: include_in_main_catalog for {source_name} is not a boolean: {raw!r}. Defaulting to True.")
+                raw = True
+            include_in_main = raw
         else:
             source_repo = "git@github.com:OCDcreator/my-skills.git"
             branch = "main"
@@ -420,7 +427,7 @@ def main() -> None:
     skill_paths = sorted(
         path.parent.relative_to(ROOT).as_posix()
         for path in ROOT.rglob("SKILL.md")
-        if ".git" not in path.parts
+        if ".git" not in path.parts and ".tmp-skills" not in path.parts
     )
 
     rows = build_rows(skill_paths, sources)
@@ -428,7 +435,7 @@ def main() -> None:
     # Write curated catalog
     curated_lines = generate_curated_catalog(rows)
     CATALOG.write_text("\n".join(curated_lines) + "\n", encoding="utf-8")
-    curated_count = len([r for r in rows if r["include_in_main"] == "True" or r["path"].startswith("custom/")])
+    curated_count = len([r for r in rows if r["include_in_main"] is True or r["path"].startswith("custom/")])
     print(f"Wrote {CATALOG.relative_to(ROOT)} with curated view ({curated_count} skills).")
 
     # Write full catalog

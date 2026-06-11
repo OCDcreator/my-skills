@@ -22,6 +22,14 @@ UPDATE_PS1 = ROOT / "update.ps1"
 CATALOG = ROOT / "SKILLS.md"
 FULL_CATALOG = ROOT / "docs" / "full-catalog.md"
 SOURCES_YAML = ROOT / "config" / "sources.yaml"
+EXTERNAL = ROOT / "external"
+TMP_CLONE = ROOT / ".tmp-skills"
+
+VALID_TIERS = frozenset({"core", "community", "bulk", "reference"})
+VALID_MODES = frozenset({"flatten", "preserve"})
+
+# Fields required for every source entry (skill or reference)
+REQUIRED_FIELDS = frozenset({"name", "repo", "branch", "subdir", "mode", "tier", "include_in_main_catalog"})
 
 
 def read(path: Path) -> str:
@@ -29,88 +37,158 @@ def read(path: Path) -> str:
 
 
 def skill_dirs() -> list[Path]:
-    return sorted(path.parent for path in ROOT.rglob("SKILL.md") if ".git" not in path.parts)
-
-
-def parse_sh_skill_sources(text: str) -> dict[str, tuple[str, str, str, str]]:
-    sources: dict[str, tuple[str, str, str, str]] = {}
-    in_block = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped == "SKILL_SOURCES=(":
-            in_block = True
-            continue
-        if in_block and stripped == ")":
-            break
-        if not in_block or not stripped.startswith('"'):
-            continue
-        entry = stripped.strip('"')
-        name, url, branch, source_dir, *rest = entry.split("|")
-        copy_mode = rest[0] if rest else ""
-        sources[name] = (url, branch, source_dir, copy_mode)
-    return sources
-
-
-def parse_ps1_skill_sources(text: str) -> dict[str, tuple[str, str, str, str]]:
-    sources: dict[str, tuple[str, str, str, str]] = {}
-    pattern = re.compile(
-        r'@\{\s*Name\s*=\s*"([^"]+)";\s*Url\s*=\s*"([^"]+)";\s*'
-        r'Branch\s*=\s*"([^"]+)";\s*SourceDir\s*=\s*"([^"]+)"'
-        r'(?:;\s*CopyMode\s*=\s*"([^"]+)")?\s*\}'
+    """Return all SKILL.md parent directories, excluding git and temp dirs."""
+    excluded = {".git", ".tmp-skills"}
+    return sorted(
+        path.parent
+        for path in ROOT.rglob("SKILL.md")
+        if excluded.isdisjoint(path.parts)
     )
-    for match in pattern.finditer(text):
-        name, url, branch, source_dir, copy_mode = match.groups()
-        sources[name] = (url, branch, source_dir, copy_mode or "")
-    return sources
 
 
-def parse_sh_excludes(text: str) -> list[str]:
-    excludes: list[str] = []
-    in_block = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped == "EXCLUDE_NAMES=(":
-            in_block = True
-            continue
-        if in_block and stripped == ")":
-            break
-        if in_block and stripped.startswith('"'):
-            excludes.append(stripped.strip('"'))
-    return sorted(excludes)
+def parse_sources_yaml() -> dict:
+    """Read config/sources.yaml as the single source of truth.
 
-
-def parse_ps1_excludes(text: str) -> list[str]:
-    match = re.search(r"\$ExcludeNames\s*=\s*@\((.*?)\)", text, re.S)
-    if not match:
-        return []
-    return sorted(re.findall(r'"([^"]+)"', match.group(1)))
-
-
-def parse_sources_yaml() -> dict[str, dict[str, str | bool]]:
-    """Read config/sources.yaml as the single source of truth."""
+    Returns a dict with keys:
+        sources: dict[name] -> source metadata
+        exclude_names: list[str]
+        raw: the raw parsed YAML data (for schema validation)
+    """
     if not SOURCES_YAML.exists():
-        return {}
-    data = yaml.safe_load(read(SOURCES_YAML))
-    sources: dict[str, dict[str, str | bool]] = {}
+        return {"sources": {}, "exclude_names": [], "raw": {}}
+
+    data = yaml.safe_load(read(SOURCES_YAML)) or {}
+    sources: dict[str, dict] = {}
+
     for src in data.get("skill_sources", []):
-        sources[src["name"]] = {
-            "repo": src.get("repo", ""),
-            "branch": src.get("branch", ""),
-            "subdir": src.get("subdir", ""),
-            "mode": src.get("mode", ""),
-            "tier": src.get("tier", "community"),
-            "include_in_main_catalog": src.get("include_in_main_catalog", True),
-        }
+        name = src.get("name", "")
+        if name:
+            sources[name] = {
+                "name": name,
+                "repo": src.get("repo", ""),
+                "branch": src.get("branch", ""),
+                "subdir": src.get("subdir", ""),
+                "mode": src.get("mode", ""),
+                "tier": src.get("tier", "community"),
+                "include_in_main_catalog": src.get("include_in_main_catalog", True),
+            }
+
     for src in data.get("reference_sources", []):
-        sources[src["name"]] = {
-            "repo": src.get("repo", ""),
-            "branch": src.get("branch", ""),
-            "subdir": src.get("subdir", ""),
-            "mode": src.get("mode", ""),
-            "tier": src.get("tier", "reference"),
-            "include_in_main_catalog": src.get("include_in_main_catalog", False),
-        }
-    return sources
+        name = src.get("name", "")
+        if name:
+            sources[name] = {
+                "name": name,
+                "repo": src.get("repo", ""),
+                "branch": src.get("branch", ""),
+                "subdir": src.get("subdir", ""),
+                "mode": src.get("mode", ""),
+                "tier": src.get("tier", "reference"),
+                "include_in_main_catalog": src.get("include_in_main_catalog", False),
+            }
+
+    exclude_names: list[str] = []
+    raw_excludes = data.get("exclude_names", [])
+    if isinstance(raw_excludes, list):
+        for item in raw_excludes:
+            if isinstance(item, str):
+                exclude_names.append(item)
+
+    return {
+        "sources": sources,
+        "exclude_names": exclude_names,
+        "raw": data,
+    }
+
+
+def validate_sources_schema(yaml_data: dict) -> list[str]:
+    """Validate sources.yaml schema invariants. Returns a list of failure messages."""
+    failures: list[str] = []
+
+    raw = yaml_data.get("raw", {})
+    if not raw:
+        return failures  # missing file handled elsewhere
+
+    # ── Collect all source entries with their section label ──
+    all_sources: list[tuple[str, str, dict]] = []  # (name, section, entry_dict)
+    for src in raw.get("skill_sources", []):
+        name = src.get("name", "")
+        if name:
+            all_sources.append((name, "skill_sources", src))
+    for src in raw.get("reference_sources", []):
+        name = src.get("name", "")
+        if name:
+            all_sources.append((name, "reference_sources", src))
+
+    # ── Check required fields ──
+    for name, section, entry in all_sources:
+        missing = REQUIRED_FIELDS - set(entry.keys())
+        if missing:
+            failures.append(
+                f"Source '{name}' in {section} is missing required fields: {', '.join(sorted(missing))}"
+            )
+
+    # ── Check for duplicate names ──
+    seen: dict[str, str] = {}
+    for name, section, _entry in all_sources:
+        if name in seen:
+            failures.append(
+                f"Duplicate source name '{name}' in {section} "
+                f"(already defined in {seen[name]})"
+            )
+        else:
+            seen[name] = section
+
+    # ── Validate tier values ──
+    for name, section, entry in all_sources:
+        tier = entry.get("tier")
+        if tier and tier not in VALID_TIERS:
+            failures.append(
+                f"Source '{name}' in {section} has invalid tier '{tier}'. "
+                f"Must be one of: {', '.join(sorted(VALID_TIERS))}"
+            )
+
+    # ── Validate mode values ──
+    for name, section, entry in all_sources:
+        mode = entry.get("mode")
+        if mode and mode not in VALID_MODES:
+            failures.append(
+                f"Source '{name}' in {section} has invalid mode '{mode}'. "
+                f"Must be one of: {', '.join(sorted(VALID_MODES))}"
+            )
+
+    # ── Validate include_in_main_catalog is boolean ──
+    for name, section, entry in all_sources:
+        include = entry.get("include_in_main_catalog")
+        if include is not None and not isinstance(include, bool):
+            failures.append(
+                f"Source '{name}' in {section}: include_in_main_catalog must be a boolean, got {type(include).__name__}: {include!r}"
+            )
+
+    # ── Warn on tier/catalog mismatches ──
+    for name, section, entry in all_sources:
+        tier = entry.get("tier", "")
+        include = entry.get("include_in_main_catalog")
+        if tier in ("bulk", "reference") and include is True:
+            failures.append(
+                f"Source '{name}' in {section}: tier '{tier}' expects include_in_main_catalog: false, but got true"
+            )
+        if tier in ("core", "community") and include is False:
+            failures.append(
+                f"Source '{name}' in {section}: tier '{tier}' expects include_in_main_catalog: true, but got false"
+            )
+
+    return failures
+
+
+def discover_external_skill_dirs() -> list[str]:
+    """Return list of source names found under external/ that contain SKILL.md files."""
+    names: list[str] = []
+    if not EXTERNAL.is_dir():
+        return names
+    for child in EXTERNAL.iterdir():
+        if child.is_dir() and (child / "SKILL.md").exists():
+            names.append(child.name)
+    return sorted(names)
 
 
 def main() -> int:
@@ -121,9 +199,14 @@ def main() -> int:
     update_ps1 = read(UPDATE_PS1)
     catalog = read(CATALOG) if CATALOG.exists() else ""
     full_catalog = read(FULL_CATALOG) if FULL_CATALOG.exists() else ""
-    sources_yaml = parse_sources_yaml()
+
+    parsed = parse_sources_yaml()
+    sources_map = parsed["sources"]
+    exclude_names = parsed["exclude_names"]
 
     skills = skill_dirs()
+
+    # ── 0. Root-level skill guard ──
     root_skills = [path for path in skills if path.parent == ROOT]
     if root_skills:
         failures.append(
@@ -131,34 +214,55 @@ def main() -> int:
             + ", ".join(path.name for path in root_skills)
         )
 
-    # 1. Check sources.yaml exists
+    # ── 1. Check sources.yaml exists ──
     if not SOURCES_YAML.exists():
-        failures.append("config/sources.yaml is missing — it is the single source of truth for external sources.")
-    
-    # 2. Check that update.sh / update.ps1 are thin wrappers (not manual source lists)
+        failures.append(
+            "config/sources.yaml is missing — it is the single source of truth for external sources."
+        )
+
+    # ── 2. Schema validation of sources.yaml ──
+    schema_failures = validate_sources_schema(parsed)
+    failures.extend(schema_failures)
+
+    # ── 3. Check that update.sh / update.ps1 are thin wrappers ──
     if "scripts/update_external.py" not in update_sh:
         failures.append("update.sh should delegate to scripts/update_external.py")
     if "scripts/update_external.py" not in update_ps1:
         failures.append("update.ps1 should delegate to scripts/update_external.py")
-    
-    # Check they no longer contain manual SKILL_SOURCES arrays
+
     if "SKILL_SOURCES=(" in update_sh:
         failures.append("update.sh still contains manual SKILL_SOURCES array — should use sources.yaml")
     if "$SkillSources = @(" in update_ps1:
         failures.append("update.ps1 still contains manual $SkillSources array — should use sources.yaml")
 
-    # 3. Check EXCLUDE_NAMES match
-    sh_excludes = parse_sh_excludes(update_sh)
-    ps1_excludes = parse_ps1_excludes(update_ps1)
-    if sh_excludes != ps1_excludes:
-        failures.append("update.ps1 EXCLUDE_NAMES do not match update.sh")
+    # ── 4. Validate exclude_names from sources.yaml ──
+    if exclude_names:
+        for excluded in exclude_names:
+            excluded_path = EXTERNAL / excluded
+            if excluded_path.exists():
+                # Check if it's a directory containing SKILL.md
+                if excluded_path.is_dir() and (excluded_path / "SKILL.md").exists():
+                    failures.append(
+                        f"Excluded skill is still mirrored: external/{excluded}/ (listed in exclude_names)"
+                    )
+    # Also check that .tmp-skills is excluded from discovery
+    if TMP_CLONE.exists() and TMP_CLONE.is_dir():
+        # Verify no SKILL.md from .tmp-skills leaked into skill_dirs
+        tmp_skills = sorted(path.parent for path in TMP_CLONE.rglob("SKILL.md"))
+        if tmp_skills:
+            failures.append(
+                f".tmp-skills/ contains {len(tmp_skills)} SKILL.md files — should be cleaned up"
+            )
 
-    for excluded in sh_excludes:
-        for path in (ROOT / "external").rglob(excluded):
-            if path.is_dir() and (path / "SKILL.md").exists():
-                failures.append(f"Excluded example/template skill is still mirrored: {path.relative_to(ROOT)}")
+    # ── 5. Reject unconfigured external directories ──
+    external_skill_names = discover_external_skill_dirs()
+    for ext_name in external_skill_names:
+        if ext_name not in sources_map:
+            failures.append(
+                f"external/{ext_name}/ contains SKILL.md but is not configured in config/sources.yaml"
+            )
 
-    # 4. Check all skills are indexed in full catalog
+    # ── 6. Check all skills are indexed in full catalog ──
     for skill in skills:
         rel = skill.relative_to(ROOT).as_posix()
         if rel.startswith("custom/") and f"{rel}/" not in readme:
@@ -168,11 +272,10 @@ def main() -> int:
         if f"| `{rel}` |" not in full_catalog:
             failures.append(f"docs/full-catalog.md does not index skill path: {rel}")
 
-    # 5. Check curated catalog does not contain bulk skills
-    if catalog and sources_yaml:
-        bulk_sources = [name for name, meta in sources_yaml.items() if meta.get("tier") == "bulk"]
+    # ── 7. Check curated catalog does not contain bulk skills ──
+    if catalog and sources_map:
+        bulk_sources = [name for name, meta in sources_map.items() if meta.get("tier") == "bulk"]
         for bulk_source in bulk_sources:
-            # Check if any skill from bulk source appears in curated catalog
             bulk_prefix = f"external/{bulk_source}/"
             if bulk_prefix in catalog:
                 failures.append(
@@ -180,11 +283,11 @@ def main() -> int:
                     f"Bulk sources should only appear in docs/full-catalog.md."
                 )
 
-    # 6. Check curated catalog links to full catalog
+    # ── 8. Check curated catalog links to full catalog ──
     if catalog and "docs/full-catalog.md" not in catalog:
         failures.append("SKILLS.md should link to docs/full-catalog.md for the complete index.")
 
-    # 7. Check stale tokens
+    # ── 9. Check stale tokens ──
     forbidden_readme = ["windows-project-level-tools"]
     for token in forbidden_readme:
         if token in readme:
@@ -194,19 +297,31 @@ def main() -> int:
 
     if "update.bat" in agents:
         failures.append("AGENTS.md still refers to update.bat instead of update.ps1")
-    if "update.bat" in read(ROOT / "custom/skill-catalog-maintainer/SKILL.md"):
+    skill_maintainer = ROOT / "custom/skill-catalog-maintainer/SKILL.md"
+    if skill_maintainer.exists() and "update.bat" in read(skill_maintainer):
         failures.append("skill-catalog-maintainer still refers to update.bat")
 
+    # ── Report ──
     if failures:
         for failure in failures:
             print(f"FAIL: {failure}")
         return 1
 
+    # Accurate curated count: custom skills + external skills from core/community tiers
+    curated_count = sum(
+        1
+        for s in skills
+        if not str(s).startswith(str(EXTERNAL))
+        or any(
+            s.name.startswith(name) and meta.get("include_in_main_catalog", False)
+            for name, meta in sources_map.items()
+        )
+    )
     print(f"OK: {len(skills)} skill directories indexed and structure checks passed.")
-    print(f"     - Curated catalog (SKILLS.md): {len([s for s in skills if not str(s).startswith(str(ROOT / 'external'))])} custom + curated external")
+    print(f"     - Curated catalog (SKILLS.md): {curated_count} custom + curated external skills")
     print(f"     - Full catalog (docs/full-catalog.md): {len(skills)} total skills")
-    if sources_yaml:
-        print(f"     - Sources config (config/sources.yaml): {len(sources_yaml)} sources")
+    if sources_map:
+        print(f"     - Sources config (config/sources.yaml): {len(sources_map)} sources")
     return 0
 
 
