@@ -24,6 +24,10 @@ RENDERED_HTML_TAG_PATTERN = re.compile(r"<[A-Za-z][^>]*>|</[A-Za-z][^>]*>")
 IMG_TAG_PATTERN = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 IMG_ONLY_PARAGRAPH_PATTERN = re.compile(r"<p>\s*(<img\b[^>]*>)\s*</p>", re.IGNORECASE)
 IMG_SEQUENCE_PATTERN = re.compile(r"(?P<sequence>(?:<img\b[^>]*>\s*(?:<br\s*/?>\s*)?){2,})", re.IGNORECASE)
+# Author <figure> blocks carry their own layout (flex/grid, max-width %,
+# captions) and must pass through untouched. Protecting them from the OCR-crop
+# normalizer below prevents intentional figures from collapsing to ~20mm.
+FIGURE_BLOCK_PATTERN = re.compile(r"<figure\b[^>]*>.*?</figure>", re.IGNORECASE | re.DOTALL)
 IMG_SRC_PATTERN = re.compile(r"""\bsrc=(?:"([^"]+)"|'([^']+)')""", re.IGNORECASE)
 DOC2X_CROP_PATTERN = re.compile(r"[?&]w=(\d+)&h=(\d+)(?:&|$)", re.IGNORECASE)
 PAGE_WRAPPER_PATTERN = re.compile(
@@ -807,9 +811,27 @@ def build_image_cluster(sequence_html: str) -> str:
 
 
 def normalize_fragment_media(fragment_html: str) -> str:
-    normalized = IMG_ONLY_PARAGRAPH_PATTERN.sub(r"\1", fragment_html)
+    # Author <figure> blocks carry their own layout (flex/grid, max-width %,
+    # captions). Protect them from the OCR-crop normalizer below so an
+    # intentional figure is not collapsed into a ~20mm cluster row. Later
+    # semantic passes (fill-blank, analysis, blockquote) still run over the
+    # restored figure, which is fine — only the media-specific transforms are
+    # suppressed. Sentinels use Unicode private-use chars so they cannot
+    # collide with real math/text content.
+    stashed_figures: list[str] = []
+
+    def stash_figure(match: re.Match[str]) -> str:
+        stashed_figures.append(match.group(0))
+        return f"\uE000FIGURE{len(stashed_figures) - 1}\uE001"
+
+    protected = FIGURE_BLOCK_PATTERN.sub(stash_figure, fragment_html)
+
+    normalized = IMG_ONLY_PARAGRAPH_PATTERN.sub(r"\1", protected)
     normalized = IMG_SEQUENCE_PATTERN.sub(lambda match: build_image_cluster(match.group("sequence")), normalized)
     normalized = IMG_TAG_PATTERN.sub(lambda match: decorate_img_tag(match.group(0)), normalized)
+
+    for index, figure_html in enumerate(stashed_figures):
+        normalized = normalized.replace(f"\uE000FIGURE{index}\uE001", figure_html)
     return normalized
 
 
@@ -817,9 +839,25 @@ def strip_html_tags(value: str) -> str:
     return re.sub(r"<[^>]+>", "", value)
 
 
+# Solution/note lead-in labels. A label is followed by a boundary (end,
+# whitespace, or punctuation), not by a CJK char that would make it an
+# ordinary word (解析几何, 解决, 注意到). 方案N / 法N carry a numeral
+# (Chinese, Arabic, or Roman) so bare words like 方案案 / 法案 do not match.
+ANALYSIS_LABEL_PATTERN = re.compile(
+    r"\A(?:解析|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
+    r"(?=$|[\s\u3000：:。，,\.（(、])"
+)
+
+
 def paragraph_starts_with_analysis_label(body_html: str) -> bool:
     plain_text = strip_html_tags(body_html).strip()
-    return plain_text.startswith(("解析：", "解析:", "【解析】"))
+    if plain_text.startswith(("解析：", "解析:", "【解析】")):
+        return True
+    # Hand-authored markdown writes the lead-in as '**解析** ...' or '**解**',
+    # which renders to <strong>解析</strong> ...; after tag-stripping the
+    # plain text begins with the bare label. The boundary-guarded pattern
+    # catches it without styling nouns like 解析几何 / 解决.
+    return bool(ANALYSIS_LABEL_PATTERN.match(plain_text))
 
 
 def normalize_fill_blank_markers(fragment_html: str) -> str:
@@ -1070,7 +1108,35 @@ def build_html_document_from_fragments(
     )
 
 
+LEADING_TITLE_HEADING_PATTERN = re.compile(r"\A\s*#\s+(?P<title>.+?)\s*$", re.MULTILINE)
+
+
+def drop_leading_title_heading(
+    pages: list[tuple[str, str]], title: str
+) -> list[tuple[str, str]]:
+    """Drop a page-1 '# Title' heading when it equals the explicit title.
+
+    The title is already rendered as the per-sheet doc-title header, so
+    leaving the matching content H1 in place shows the title twice (once as
+    the sheet header, once as a content H1). Only an exact match is dropped;
+    any other first heading is preserved as source-faithful content.
+    """
+    if not title or not pages:
+        return pages
+    page_number, first_content = pages[0]
+    match = LEADING_TITLE_HEADING_PATTERN.match(first_content)
+    if not match or match.group("title").strip() != title.strip():
+        return pages
+    remainder = first_content[match.end():].lstrip()
+    if not remainder:
+        # The heading is the only page-1 content; dropping it would leave an
+        # empty fragment that fails validation. Keep it as content instead.
+        return pages
+    return [(page_number, remainder), *pages[1:]]
+
+
 def build_html_document(pages: list[tuple[str, str]], title: str, source_label: str) -> str:
+    pages = drop_leading_title_heading(pages, title)
     md = MarkdownIt("commonmark").enable("table")
     rendered_pages: list[tuple[str, str]] = []
 

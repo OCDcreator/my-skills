@@ -1,36 +1,42 @@
-.phycat-blockquote {
+/* Phycat-style example/question blockquote.
+ *
+ * Why this looks the way it does:
+ *   - Blockquotes in this skill wrap example stems, question callouts, and
+ *     choice options. They are the most-scanned blocks, so they need a calm,
+ *     locatable treatment rather than a heavy callout box.
+ *   - Earlier versions drew a large "*" marker in the top-left and reserved
+ *     48px of left padding for it. On dense math handouts that marker read as
+ *     noise, ate horizontal space, and at small block heights collided with
+ *     the first line. It is replaced by a thin accent rule on a warm surface.
+ *   - Selectors are scoped under `.transcript-flow` on purpose: the base
+ *     print CSS ships a `.transcript-flow blockquote` rule (specificity 0,1,1)
+ *     that would otherwise override this styling. `.transcript-flow
+ *     .phycat-blockquote` (0,2,0) wins that cascade and keeps this file
+ *     self-contained regardless of insertion order.
+ *   - Colors are hardcoded (not Kami var()) so this file stays independent
+ *     and matches the Kami palette by value: accent #1b365d, surface #f1efe8.
+ *   - Hover/transition are intentionally absent: this is a print artifact. */
+.transcript-flow .phycat-blockquote {
   position: relative;
-  margin: 20px 0;
-  padding: 18px 20px 18px 48px;
-  background-color: #f5f5f7;
+  margin: 9px 0 11px;
+  padding: 9px 14px 9px 16px;
+  background-color: #f1efe8;
   border: none;
-  border-radius: 16px;
-  color: #555;
+  border-left: 3px solid #1b365d;
+  border-radius: 0 4px 4px 0;
+  color: #2a2a28;
   line-height: 1.6;
-  transition:
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 0.3s ease;
 }
 
-.phycat-blockquote::before {
-  content: "*";
-  position: absolute;
-  left: 16px;
-  top: 18px;
-  font-size: 20px;
-  line-height: 1;
-  font-family: "Segoe UI Symbol", "Apple Symbols", sans-serif;
+.transcript-flow .phycat-blockquote::before {
+  content: none;
 }
 
-.phycat-blockquote p {
+.transcript-flow .phycat-blockquote p {
   color: inherit;
   margin-bottom: 0.5em;
 }
 
-.phycat-blockquote p:last-child {
+.transcript-flow .phycat-blockquote p:last-child {
   margin-bottom: 0;
-}
-
-.phycat-blockquote:hover {
-  transform: scale(1.02);
 }

@@ -845,3 +845,211 @@ def test_code_blocks_use_centered_preformatted_layout(tmp_path: Path) -> None:
     assert ".transcript-flow pre code {" in html
     assert "margin: 3mm auto 4mm;" in html
     assert "width: fit-content;" in html
+
+
+# --- v3 regression tests (problems exposed by the yinlingdian-wenti job) ---
+
+
+def test_does_not_cluster_images_already_inside_an_author_figure() -> None:
+    """Author <figure> elements carry explicit layout (flex, max-width %) and
+    must not be collapsed into the 92mm OCR-crop cluster, which shrinks each
+    image to ~20mm. Figures are passed through untouched."""
+    module = load_module()
+
+    html = module.build_html_document_from_fragments(
+        [
+            (
+                "1",
+                '<figure style="display:flex;justify-content:center;">'
+                '<img src="https://example.com/a.webp" alt="图1" style="max-width:45%;height:auto;"/>'
+                '<img src="https://example.com/b.webp" alt="图2" style="max-width:45%;height:auto;"/>'
+                "</figure>",
+            )
+        ],
+        title="Figure Test",
+        source_label="OCR Transcript",
+    )
+
+    assert '<span class="ocr-image-cluster' not in html  # no cluster span around the figure
+    assert "<figure" in html
+    assert html.count("<img") == 2
+
+
+def test_still_clusters_bare_adjacent_crop_images_not_in_a_figure() -> None:
+    """Figure protection must not disable clustering for genuine side-by-side
+    Doc2X crops (the original purpose per references/figure-policy.md)."""
+    module = load_module()
+
+    html = module.build_html_document_from_fragments(
+        [
+            (
+                "1",
+                '<img src="https://cdn.noedgeai.com/example.jpg?x=465&y=118&w=157&h=170&r=0"/>'
+                '<img src="https://cdn.noedgeai.com/example.jpg?x=741&y=106&w=164&h=186&r=0"/>',
+            )
+        ],
+        title="Crop Cluster",
+        source_label="OCR Transcript",
+    )
+
+    assert 'class="ocr-image-cluster ocr-image-cluster--2"' in html
+
+
+def test_marks_bold_label_analysis_paragraphs(tmp_path: Path) -> None:
+    """Hand-authored markdown writes the solution lead-in as '**解析** ...'
+    (bold label + space). The detector must catch this, not only '解析：'."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("## Page 1\n\n**解析** 由题意可知 $a > 0$。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert 'class="ocr-analysis"' in html
+
+
+def test_does_not_style_words_that_only_start_with_a_label_prefix(tmp_path: Path) -> None:
+    """'解析几何' starts with '解析' but is a noun, not a solution label.
+    The boundary check must reject word-continuation false positives."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("## Page 1\n\n解析几何是高中数学的重要内容。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert 'class="ocr-analysis"' not in html
+
+
+def test_dedupes_content_h1_when_it_equals_the_explicit_title(tmp_path: Path) -> None:
+    """When --title is passed AND the content opens with a matching '# Title',
+    the content H1 must be dropped so the doc-title page header is not
+    duplicated (the observed bug: title rendered on two lines)."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("# 隐零点问题\n\n正文开始。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--md",
+            str(source_md),
+            "--out-html",
+            str(out_html),
+            "--title",
+            "隐零点问题",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert "<h1>隐零点问题</h1>" not in html  # content H1 dropped
+    assert 'data-title="隐零点问题"' in html  # still in the page header
+    assert "正文开始。" in html
+
+
+def test_keeps_title_heading_when_it_is_the_only_page_content(tmp_path: Path) -> None:
+    """If '# Title' is the ONLY page-1 content, dropping it would leave an
+    empty fragment that fails validation. Keep the heading instead."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("# 只有标题\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--md",
+            str(source_md),
+            "--out-html",
+            str(out_html),
+            "--title",
+            "只有标题",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert "<h1>只有标题</h1>" in html  # heading kept so the fragment is non-empty
+    assert 'data-title="只有标题"' in html
+
+
+def test_styles_numbered_method_labels(tmp_path: Path) -> None:
+    """Method lead-ins like '**方案一**' / '**法二（…）**' are solution labels
+    and should get the analysis styling."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text(
+        "## Page 1\n\n**方案一**（朗博构造）由此可得结论。\n", encoding="utf-8"
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert 'class="ocr-analysis"' in html
+
+
+def test_does_not_style_words_after_method_prefix_without_a_numeral(tmp_path: Path) -> None:
+    """'方案设计' / '法案' share the prefix but are not method labels; the
+    numeral guard must reject them."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("## Page 1\n\n方案设计需要考虑多个方面。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert 'class="ocr-analysis"' not in html
+
+
+def test_phycat_blockquote_rule_is_scoped_higher_than_base_blockquote_css(tmp_path: Path) -> None:
+    """The base print CSS ships `.transcript-flow blockquote` (specificity
+    0,1,1). The phycat styling must use a higher-specificity selector
+    (`.transcript-flow .phycat-blockquote`, 0,2,0) or its accent border /
+    warm surface get overridden and the visual fix silently no-ops."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("## Page 1\n\n> 这是一个题干。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert ".transcript-flow .phycat-blockquote {" in html
+    assert "border-left: 3px solid #1b365d;" in html
