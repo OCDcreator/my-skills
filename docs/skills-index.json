@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated_at": "2026-06-11T18:12:39.704537+00:00",
+    "generated_at": "2026-06-13T07:51:10.135878+00:00",
     "total_skills": 1040,
     "custom_skills": 35,
     "external_skills": 1005,
@@ -309,7 +309,7 @@
     {
       "path": "custom/rewrite-doc2x-markdown",
       "name": "rewrite-doc2x-markdown",
-      "description": "Use when Doc2X OCR markdown, Doc2X export.md, page-transcript.raw.md, or source-transcript.md is messy, too long, poorly structured, or must be rewritten into a high-quality canonical Markdown transcript before downstream use.",
+      "description": "Use when Doc2X OCR markdown, Doc2X export.md, page-transcript.raw.md, or source-transcript.md is messy, too long, poorly structured, or must be rewritten into a high-quality canonical Markdown transcript before downstream use. Also use when the user provides a PDF file alongside or instead of Markdown — this skill can extract specified PDF pages as proofreading images to verify transcription quality.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",

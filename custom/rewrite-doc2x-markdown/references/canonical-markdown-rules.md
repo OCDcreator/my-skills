@@ -11,7 +11,7 @@ Regenerate Markdown structure, not source meaning. Fix broken OCR layout, headin
 - Start with a real title that describes the document or knowledge area.
 - Never use `# Source Transcript` as the final title.
 - Do not emit visible generic page headings such as `## Page 274`.
-- Preserve source page provenance with non-heading markers when useful, for example `<!-- source-page: 274 -->`.
+- Remove `<!-- source-page: N -->` markers; they are internal metadata and must not appear in the final transcript.
 - Use real headings for titles and sections, based on the actual content structure.
 - Remove numeric outline prefixes such as `1.`, `1.1`, and `1.1.1` from headings and body structure labels.
 - Question subpart labels such as `(1)` and `(2)` may stay inside a question callout when they are part of the original problem.
