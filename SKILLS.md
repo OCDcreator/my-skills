@@ -1,6 +1,6 @@
 # Skills Catalog
 
-Generated from repository state on 2026-06-12.
+Generated from repository state on 2026-06-13.
 
 This is the **curated** quick-reference index. For the complete list of all 1000+ skills, see [`docs/full-catalog.md`](docs/full-catalog.md).
 
@@ -48,7 +48,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 | `custom/opencode-source-compass` | `opencode-source-compass` | OpenCode 源码架构导航与版本兼容性诊断技能。 为接入 OpenCode SDK 的插件/应用提供源码快速定位、故障诊断路径和版本差异检测。 触发场景（只要有以下任何一条就应该加载此技能）： - 用户提到 OpenCode SDK、opencode-ai、OpencodeClient、createOpencodeClient - 用户在开发接入 OpenCode 的插件（Obsidian 插件、VSCode 插件、Web 应用等） - 用户遇到 OpenCode SDK 调用错误、HTTP 请求失败、SSE 事件问题 - 用户提到 opencode serve、opencode server、OpenCode HTTP API - 用户需要定位 OpenCode 源码中的某个功能实现（如 session、provider、mcp、lsp、agent、tool） - 用户提到 SDK 版本不匹配、API 不存在、响应格... |
 | `custom/pdf-toc-bookmarker` | `pdf-toc-bookmarker` | Create a new PDF with clickable bookmarks/outline from scanned or image-only table-of-contents pages. Use when Codex needs to add PDF bookmarks from TOC screenshots/pages, especially for scanned Chinese books where local OCR is unreliable. Requires the user to provide a PDF file path, the TOC page range, and the actual PDF page where printed page 1 begins before rendering or writing bookmarks. |
 | `custom/project-level-tools` | `project-level-tools` | Use when the user wants GitNexus and/or lean-ctx configured for one repository instead of globally, including project-level MCP setup, repo-local Codex hooks, trusted-project setup, local templates, or Windows/macOS per-project tool isolation. |
-| `custom/rewrite-doc2x-markdown` | `rewrite-doc2x-markdown` | Use when Doc2X OCR markdown, Doc2X export.md, page-transcript.raw.md, or source-transcript.md is messy, too long, poorly structured, or must be rewritten into a high-quality canonical Markdown transcript before downstream use. |
+| `custom/rewrite-doc2x-markdown` | `rewrite-doc2x-markdown` | Use when Doc2X OCR markdown, Doc2X export.md, page-transcript.raw.md, or source-transcript.md is messy, too long, poorly structured, or must be rewritten into a high-quality canonical Markdown transcript before downstream use. Also use when the user provides a PDF file alongside or instead of Markdown — this skill can extract specified PDF pages as proofreading images to verify transcription quality. |
 | `custom/scan-pdf-to-print-html` | `scan-pdf-to-print-html` | Use when scanned or image-only PDFs need Doc2X OCR into a faithful, auditable page transcript and then A4 HTML/PDF. Best for textbooks, notes, worksheets, formulas, tables, diagrams, and question pages where content must stay source-faithful and `source-transcript.md` must be audited before HTML assembly. |
 | `custom/searxng` | `searxng` | Search the internet using your self-hosted SearXNG instance. Use this when you need to search for current information, news, documentation, or any web content. Triggers: "search for", "look up", "find information about", "what is", "how to" when web search is needed. |
 | `custom/skill-catalog-maintainer` | `skill-catalog-maintainer` | Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, rename, or maintain skills and their metadata, or to update `SKILLS.md`, `README.md`, `AGENTS.md`, `update.sh`, or `update.ps1` after skill changes. |
