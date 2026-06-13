@@ -14,6 +14,7 @@ Read these before starting work:
 - `references/auto-fix-rules.md` — mechanical text transformations to apply first
 - `references/proofreading-checklist.md` — quality verification against source page images
 - `references/canonical-markdown-rules.md` — structural formatting rules for the final Markdown
+- `references/analysis-retypesetting.md` — detailed rules and subagent template for Step 2.5 analysis re-typesetting
 
 Also read the local Obsidian Markdown syntax skill for syntax compatibility reference:
 `C:\Users\lt\Desktop\Write\custom-project\my-skills\external\kepano-obsidian-skills\obsidian-markdown\SKILL.md`.
@@ -47,6 +48,44 @@ Accept any of these inputs:
 
 If only one Doc2X markdown file is provided, still apply this skill and write a new canonical markdown file beside it unless the user gives a different destination.
 
+## Forbidden Patterns (LESSONS LEARNED)
+
+These patterns caused critical failures in past sessions. Violating them is a critical error.
+
+### F1 — No regex for semantic rewrites
+
+**NEVER** use Python `re.sub()`, `str.replace()`, or any script to perform:
+- Fused formula splitting (Rule 4) — requires understanding which commas separate independent formulas
+- Paragraph splitting — requires understanding logical break points
+- Structural formatting (callouts, bold markers) — requires understanding document structure
+- Analysis block re-typesetting — requires understanding reasoning flow
+
+These transformations need **semantic understanding**. Use subagents to read and edit manually, chunk by chunk.
+
+**Scripts are ONLY allowed for**: pure mechanical substitution (`\(` → `$`), noise tag deletion, `\frac` → `\dfrac`, and other single-pattern replacements that cannot misfire.
+
+### F2 — No `\$` in regex replacement strings
+
+**NEVER** write `re.sub(pattern, r'\$', text)` or `re.sub(pattern, '\\$', text)`. In Python, the replacement string `r'\$'` inserts a literal backslash + dollar sign (`\$`), corrupting every `$` in the document.
+
+**Correct way** to strip boundary spaces from `$ a $`:
+```python
+text = re.sub(r'\$ +', '$', text)   # plain string, NOT raw string with backslash
+text = re.sub(r' +\$', '$', text)
+```
+
+### F3 — No unauthorized format conversions
+
+**NEVER** convert `\begin{array}` to `\begin{cases}`, `\left\{` to other brace constructs, or change any LaTeX structural macro from Doc2X output. The Doc2X formulas are authoritative — only split fused formulas and move punctuation; never alter the internal LaTeX structure.
+
+### F4 — No dismissing user complaints without byte-level verification
+
+When a user reports a problem (e.g., "the formulas look wrong"):
+1. **Immediately check the actual file bytes** — use `Read` tool or `grep` on the file, not reasoning
+2. If the problem exists, fix it
+3. If you believe it doesn't exist, **show the evidence** (actual byte content) and let the user judge
+4. **NEVER** claim "it's just a rendering issue" without checking the raw file content first
+
 ## Workflow
 
 ### Step 0 — Assess & Plan
@@ -54,8 +93,12 @@ If only one Doc2X markdown file is provided, still apply this skill and write a 
 1. **Determine document size**: count `## Page N` markers, total lines, and total characters.
 2. **Decide execution mode**:
    - Small (≤ 6 pages or ≤ 300 lines): single-thread, full-file processing.
-   - Large (> 6 pages or > 300 lines): use the Parallel Chunking Workflow (see below), then continue with Steps 1-6 on the assembled result.
+   - Large (> 6 pages or > 300 lines): use the Parallel Chunking Workflow (see below), then continue with Steps 1-7 on the assembled result.
 3. **Gather inputs**: confirm you have access to the raw transcript, page images for visual comparison, and any existing `source-transcript.md`.
+4. **Verify upstream OCR quality** (GATE — if this fails, stop and inform the user):
+   - Scan the raw transcript for signs of poor OCR parameters: broken `\frac` commands, missing `\` before LaTeX commands, garbled formula fragments, or unusually low formula count for a math document.
+   - If formulas are systematically garbled (not just occasional typos), the OCR parameters were likely wrong (e.g., `formula_level=0` instead of `formula_level=1`). STOP and tell the user the raw input quality is too poor — do not attempt to rewrite garbage.
+   - This is a **pre-condition gate**: rewriting cannot fix systematic OCR parameter errors.
 
 ### Step 0-A — Extract PDF Pages (optional)
 
@@ -92,6 +135,43 @@ Rules are applied in order: remove residual symbols → remove noise → normali
 - **Fraction standardization**: `\frac` → `\dfrac` for display-level formulas; use `\tfrac` only when numerator/denominator contains operators or nested fractions. Inline math (`$...$`) should prefer `\tfrac` to avoid line-height disruption.
 - **Callout syntax check**: after auto-fix, verify every `[!question]` or `[!example]` or `[!note]` has a `> ` prefix. The pattern `> [!question]` is required; bare `[!question]` without `>` is a syntax error.
 
+### Step 1-GATE — Auto-Fix Stop-Gate (MANDATORY)
+
+Before proceeding to Step 2, run these **mandatory verification checks**. If ANY check fails, go back and fix before continuing. Do NOT skip this gate.
+
+```bash
+# Check 1: No fused formulas remain (Rule 4)
+# Look for commas between independent relations inside $...$
+rg -n '\$[^$]*[，,][^$]*[=<>≥≤][^$]*\$' source-transcript.md
+# If any results appear that contain TWO independent relations split by a comma, they must be split.
+# Exception: a single relation with a comma in a function argument like $f(x,y)$ is NOT fused.
+
+# Check 2: No boundary spaces in inline math (Rule 2)
+rg -n '\$ +[^\$]' source-transcript.md   # opening $ followed by space
+rg -n '[^\$] +\$' source-transcript.md   # closing $ preceded by space
+# Both should return 0 results (excluding $$ display blocks).
+
+# Check 3: No \$ corruption (Forbidden Pattern F2)
+rg -n '\\\$' source-transcript.md
+# Must return 0 results.
+
+# Check 4: \begin{array} count unchanged (Forbidden Pattern F3)
+# Count in source-transcript.md should match raw transcript
+rg -c '\\begin\{array\}' source-transcript.md
+rg -c '\\begin\{array\}' doc2x/page-transcript.raw.md
+# Counts must be equal.
+
+# Check 5: No \begin{cases} introduced
+rg -c '\\begin\{cases\}' source-transcript.md
+# Must be 0 unless raw transcript already had cases.
+
+# Check 6: Every 例/例题 has a callout (structural rule)
+rg -c '> \[!question\]' source-transcript.md
+# Should match the number of examples in the document.
+```
+
+If any check fails, fix the issue and re-run the check before proceeding.
+
 ### Step 2 — Proofread (Quality Verification)
 
 Apply `references/proofreading-checklist.md`. Compare the auto-fixed transcript against source page images page by page.
@@ -114,6 +194,19 @@ Key checks in order:
 4. Cross-page integrity (cross-page callouts, tables, formulas, heading consistency)
 5. `[TO VERIFY: ...]` marker management — resolve or leave with a count
 6. **Paragraph length check**: verify no analysis paragraph exceeds 300 characters
+
+### Step 2.5 — Analysis Block Re-typesetting (Subagent-Driven)
+
+**This step is MANDATORY for documents with analysis/solution sections (解析/解/证明).**
+
+Doc2X dumps each analysis section as one massive unbroken paragraph. Use subagents to re-typeset each block into clean paragraphs and fix OCR typos.
+
+**Full rules, subagent template, and verification commands**: see `references/analysis-retypesetting.md`.
+
+Quick reference:
+- ≤ 3 examples: do it inline (read and edit each block yourself)
+- > 3 examples: dispatch subagents (3-5 examples per subagent)
+- After completion: verify `$` count, `\begin{array}` count, and callout count are unchanged
 
 ### Step 3 — Structural Format (Canonical Markdown)
 
@@ -165,20 +258,34 @@ Fix all other reported issues (unclosed formulas, heading jumps, missing options
 
 ### Step 6 — Self-Check (LESSONS LEARNED CHECKLIST)
 
-Before reporting, run through this checklist to catch the most common failures:
+Before reporting, run through this checklist. **For every command-based check, paste the actual command output into your report** — do not just tick the box. Claims without evidence are treated as failures.
 
-- [ ] **Callout syntax**: every `[!question]`, `[!example]`, `[!note]`, `[!warning]` is preceded by `> ` (e.g., `> [!question]`, never bare `[!question]`).
-- [ ] **Paragraph splitting**: no analysis paragraph exceeds 300 characters. Each logical step is its own paragraph.
-- [ ] **Content preservation**: ALL derivation steps preserved. No summarizing or condensing of 法一/法二/法三 sections.
-- [ ] **Doc2X primacy**: content matches Doc2X raw output in scope. No detail removed compared to `doc2x/page-transcript.raw.md`.
-- [ ] **Noise removal**: no `<!-- doc2x score -->`, `<!-- Meanless -->`, `__________` artifacts, stray "老唐说题" page numbers, or chapter header lines remain.
-- [ ] **Fraction rules**: display formulas use `\dfrac`, inline math uses `\tfrac` where denominator has operators. No bare `\frac`.
-- [ ] **Long formulas**: display formulas longer than ~60 characters use `\begin{aligned}` with line breaks.
-- [ ] **Horizontal rules**: check `---` separators weren't auto-fixed to `__________`.
-- [ ] **`--fix` pass**: `validate_canonical_markdown.py --fix` returns PASS.
-- [ ] **Proofreading**: only known false positives remain, or actual issues are fixed.
+#### Evidence-based checks (run command, paste output)
 
-### Step 6 — Report
+Run each command and include the output in your report:
+
+1. **No \$ corruption**: `rg -c '\\\$' source-transcript.md` → must be 0
+2. **No \begin{cases} introduced**: `rg -c '\\begin\{cases\}' source-transcript.md` → must match raw transcript count
+3. **\begin{array} preserved**: `rg -c '\\begin\{array\}' source-transcript.md` vs `rg -c '\\begin\{array\}' doc2x/page-transcript.raw.md` → source must be >= raw
+4. **Fused formulas split**: `rg -n '\$[^$]*[，,][^$]*[=<>≥≤][^$]*\$' source-transcript.md` → no independent relations fused
+5. **Paragraph length**: `rg -n '.{300,}' source-transcript.md` → remaining long lines must be pure formula blocks only
+6. **HTML comment integrity**: `rg -n '<!_' source-transcript.md` → must be 0 (Rule 5 corruption check)
+7. **`--fix` pass**: `validate_canonical_markdown.py --fix` → PASS
+8. **Proofreading**: `validate_canonical_markdown.py --check-proofreading` → only known false positives remain
+
+#### Judgment-based checks (verify, mark pass/fail)
+
+- [ ] **Callout syntax**: every `[!question]`, `[!example]`, `[!note]`, `[!warning]` has `> ` prefix
+- [ ] **解析 bold**: every analysis section has `**解析**` or `**解**` in bold
+- [ ] **Content preservation**: ALL derivation steps preserved — no summarizing of 法一/法二/法三
+- [ ] **Doc2X primacy**: content scope matches `doc2x/page-transcript.raw.md` — no detail removed
+- [ ] **Noise removal**: no `<!-- doc2x score -->`, `<!-- Meanless -->`, `__________` artifacts, stray page numbers
+- [ ] **Fraction rules**: display `\dfrac`, inline `\tfrac` where needed, no bare `\frac`
+- [ ] **Long formulas**: display formulas > 60 chars use `\begin{aligned}` with line breaks
+- [ ] **Horizontal rules**: `---` separators not corrupted to `__________`
+- [ ] **OCR typos fixed**: confusable characters (已/己, 人/入, 末/未) verified in analysis blocks
+
+### Step 7 — Report
 
 Report only Markdown status:
 
@@ -225,8 +332,9 @@ Use this when the document exceeds a single-context threshold (> 6 pages, > 300 
 For each chunk, dispatch a subagent with:
 - The chunk's raw transcript (page range)
 - The chunk's page images
-- Instructions: execute Steps 1-3 (auto-fix → proofread → format) on this chunk only
-- The current `canonical-markdown-rules.md` as reference
+- Instructions: execute Steps 1 through 2.5 (auto-fix → stop-gate → proofread → **analysis block re-typesetting**) on this chunk only, then apply Step 3 (structural format) formatting rules
+- The current `canonical-markdown-rules.md`, `auto-fix-rules.md`, and `analysis-retypesetting.md` as reference
+- **CRITICAL**: subagent must split fused formulas (Rule 4), re-typeset analysis blocks into logical paragraphs, and fix OCR typos — these are the most commonly missed steps
 - Output: cleaned Markdown for the chunk + `[TO VERIFY]` markers encountered
 
 After each batch completes, check for failed chunks (subagent error or timeout > 5 min). Mark failed chunks in `markdown-rewrite-plan.md` and re-dispatch them in the next batch.
@@ -239,8 +347,10 @@ After each batch completes, check for failed chunks (subagent error or timeout >
    - Heading level consistency across chunks (adjacent chunks must not jump levels).
    - Duplicate or missing `## Page N` markers.
 3. Merge all `[TO VERIFY: ...]` markers from subagent reports into a single list.
-4. Run Steps 4-5 (validate --fix → validate --check-proofreading) on the assembled document.
-5. Run a final read-through pass to verify callouts, analysis blocks, tables, formulas, and image references did not break during concatenation.
+4. Run Step 1-GATE checks on the assembled document (fused formulas, `\$` corruption, `\begin{array}` count, callout count).
+5. Run Steps 4-5 (validate --fix → validate --check-proofreading) on the assembled document.
+6. Run Step 6 (self-check) on the assembled document.
+7. Run a final read-through pass to verify callouts, analysis blocks, tables, formulas, and image references did not break during concatenation.
 
 ---
 

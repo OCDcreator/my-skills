@@ -87,8 +87,9 @@ Hard rules:
 - Keep punctuation outside math delimiters when possible.
 - Prefer KaTeX-safe simple notation.
 - Use `\parallel` for parallel lines/planes; do not use Doc2X-style `\mathbin{/ \mspace{-4mu}/}`.
-- Avoid fragile macros and environments: `\mspace`, `\left.`, `\begin{array}`, `\end{array}`, and `\overset{\large\frown}{...}`.
-- For condition groups in normal Markdown, prefer `\begin{cases} ... \end{cases}` inside a `$$...$$` block, or rewrite as compact prose. Inside HTML, use MathJax inline SVG for polished braces/cases; use `math-cases` with vertical `case-lines` and MathML fragments only as a fallback when SVG generation is unavailable.
+- Avoid fragile macros and environments: `\mspace`, `\left.`, `\overset{\large\frown}{...}`.
+- **Preserve `\begin{array}` from Doc2X output as-is.** Do NOT convert to `\begin{cases}` or any other construct. The Doc2X `\begin{array}{l}...\end{array}` format is correct and should be kept verbatim. Unauthorized conversions are a critical error.
+- For condition groups in normal Markdown, prefer `\begin{cases} ... \end{cases}` inside a `$$...$$` block **only when the source does not already use `\begin{array}`**. If Doc2X output uses `\begin{array}`, keep it. Inside HTML, use MathJax inline SVG for polished braces/cases; use `math-cases` with vertical `case-lines` and MathML fragments only as a fallback when SVG generation is unavailable.
 - For arcs, prefer a simple notation such as `\widehat{AC}`.
 - Prefer `\dfrac{...}{...}` for simple displayed classroom fractions.
 - Use `\tfrac{...}{...}` when a numerator or denominator contains nested formulas or operators.
@@ -130,6 +131,17 @@ Fallback HTML condition-group example:
   <math xmlns="http://www.w3.org/1998/Math/MathML"><mo>⇒</mo><mi>a</mi><mo>∥</mo><mi>α</mi></math>
 </span>
 ```
+
+## Analysis Block Re-typesetting
+
+Detailed re-typesetting rules, OCR typo fixing procedures, subagent dispatch templates, and formula integrity verification commands are in **`references/analysis-retypesetting.md`**.
+
+Key principles (summary):
+- Doc2X dumps each analysis section as one massive paragraph — you MUST re-typeset into logical paragraphs
+- Split at punctuation, method boundaries, logic transitions, and new formula introductions
+- Maximum 300 characters per paragraph (formula content excluded)
+- Fix OCR typos (已/己/巳, 人/入, 末/未, etc.) during re-typesetting
+- For math-heavy content: use plain Markdown (`**解析**` with `$...$` / `$$...$$`), NOT `<div class="analysis-block">` HTML blocks
 
 ## Tables
 
@@ -184,18 +196,22 @@ For multiple related images:
 
 ## Common Failures To Fix
 
-- Doc2X exported all analysis as one dense paragraph.
+- Doc2X exported all analysis as one dense paragraph — MUST be re-typeset into logical paragraphs.
+- Analysis sections not re-typeset: OCR typos and garbled text remain unfixed within analysis blocks.
 - Choice options are outside the question block.
 - Choice options are vertical lists even though a horizontal A4 grid would save space.
 - A callout contains a naked blank line and breaks into two blocks.
-- Question analysis still uses `> 解析：` instead of the required HTML `analysis-block`.
+- Question analysis still uses `> 解析：` instead of the required `**解析**` bold (for Markdown) or HTML `analysis-block` (for pure text).
 - HTML table, choice grid, span, div, or analysis block contains `$...$` instead of MathML or inline SVG.
 - HTML condition groups collapse into one line because they rely on `<mtable>` instead of MathJax inline SVG or a forced vertical `case-lines` fallback.
 - Inline Markdown math has boundary spaces such as `$ x $`.
 - Generic page headings, numeric outline prefixes, or print headers survive as content.
 - Headings look like plain paragraphs or do not match the real document structure.
-- Formula relations are fused into one unreadable inline formula.
+- Formula relations are fused into one unreadable inline formula — commas between independent relations must be split out.
 - Plain `\frac` appears where `\dfrac` or nested `\tfrac` is required.
 - Tables are converted into broken pipe text or prose.
 - Images use Markdown syntax or lack sizing/centering control.
 - Multiple images in one figure stack vertically because the figure lacks `display:flex`.
+- `\begin{array}` was converted to `\begin{cases}` without authorization — this is a CRITICAL error, always preserve Doc2X's original LaTeX constructs.
+- `\$` corruption: every `$` preceded by `\` due to incorrect regex replacement — verify with `rg '\\\$'` and must be 0.
+- Paragraph splitting was done with regex scripts instead of semantic understanding — resulting in broken formulas or unnatural splits.

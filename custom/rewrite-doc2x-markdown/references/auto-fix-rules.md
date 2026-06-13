@@ -32,18 +32,39 @@ Strip exactly one leading space and one trailing space inside `$...$` delimiters
 
 ## 4. Fused Formula Splitting
 
-Doc2X often merges multiple math relations into one inline formula blob.
+**This is the most commonly missed rule. Read carefully.**
+
+Doc2X often merges multiple math relations into one inline formula blob. Every comma between two independent relations must be moved outside `$...$`.
+
+### What to split
 
 ```
-BEFORE: $a // \alpha , a \subset \beta , \alpha \cap \beta = b \Rightarrow a // b$
-AFTER:  $a \parallel \alpha$，$a \subset \beta$，$\alpha \cap \beta = b \Rightarrow a \parallel b$
+BEFORE: $f(x) = 0, x = 1$
+AFTER:  $f(x) = 0$，$x = 1$
+
+BEFORE: $f\left( x\right) = {e}^{x} + a{x}^{2} + e\left( 1 - x\right) \geq 0,\dfrac{{e}^{x} + e\left( 1 - x\right) }{{x}^{2}} + a \geq 0$
+AFTER:  $f\left( x\right) = {e}^{x} + a{x}^{2} + e\left( 1 - x\right) \geq 0$，$\dfrac{{e}^{x} + e\left( 1 - x\right) }{{x}^{2}} + a \geq 0$
+
+BEFORE: $a = \dfrac{1}{e}, {x}_{0} = e$
+AFTER:  $a = \dfrac{1}{e}$，${x}_{0} = e$
 ```
 
 Rules:
-- Split at commas between complete relations.
-- Move punctuation (commas, periods) outside `$...$` delimiters.
-- Replace `//` with `\parallel` in math context.
+- Split at commas between **complete, independent relations** (two things that each have `=`, `≥`, `≤`, `>`, `<`).
+- Move punctuation (commas, periods) **outside** `$...$` delimiters.
+- Replace the comma with a Chinese comma `，` when in Chinese text context.
 - Keep implication chains together (do not split at `\Rightarrow`).
+- Keep function arguments together: `$f(x, y)$` is NOT fused — the comma is inside a function call.
+
+### How to verify after applying
+
+After applying this rule, run:
+```bash
+rg -n '\$[^$]*[，,][^$]*[=<>≥≤][^$]*\$' source-transcript.md
+```
+Any result that shows TWO independent relations (`=`, `≥`, etc.) separated by a comma inside one `$...$` is a MISSED split. Fix it before proceeding.
+
+**This rule requires semantic understanding — do NOT use regex to apply it.** Use subagents to read and split fused formulas manually.
 
 ## 5. Fill-in-Blank Normalization
 
@@ -53,6 +74,16 @@ AFTER:  __________
 ```
 
 All fill-in blanks become exactly ten underscores with no spaces.
+
+**⚠️ KNOWN BUG — HTML COMMENT CORRUPTION:**
+This rule (or the validator's `--fix` mode) may incorrectly transform `--` inside HTML comments. The pattern `<!-- page 289 -->` contains `--` which gets matched as a fill-in-blank dash, producing `<!__________ page 289 __________>`.
+
+**Prevention:** After applying this rule (or after running `validate_canonical_markdown.py --fix`), ALWAYS check:
+```bash
+rg -n '<!_' source-transcript.md    # Should return 0 results
+rg -n '<!--' source-transcript.md   # HTML comments should start with <!-- not <!_
+```
+If corrupted, restore `<!-- ... -->` format manually.
 
 ## 6. Doc2X OCR Residual Symbol Removal
 
