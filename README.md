@@ -119,6 +119,7 @@ my-skills/
 | `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills.git) | 21 个技能 |
 | `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official.git) | 22 个技能（core：高质量官方/精选源） |
 | `external/deep-research-skills/` | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills.git) | 20 个技能 |
+| `external/doc2x-cli-skills/` | [noedgeai/doc2x-cli-skills](https://github.com/noedgeai/doc2x-cli-skills.git) | 1 个技能 |
 | `external/html-ppt-skill/` | [lewislulu/html-ppt-skill](https://github.com/lewislulu/html-ppt-skill.git) | 0 个技能 |
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills.git) | 5 个技能（core：高质量官方/精选源） |
 | `external/last30days-skill/` | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill.git) | 1 个技能（core：高质量官方/精选源） |

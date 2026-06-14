@@ -1,6 +1,6 @@
 # Skills Catalog
 
-Generated from repository state on 2026-06-13.
+Generated from repository state on 2026-06-14.
 
 This is the **curated** quick-reference index. For the complete list of all 1000+ skills, see [`docs/full-catalog.md`](docs/full-catalog.md).
 
@@ -72,6 +72,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 | `baoyu-skills` | `community` | `baoyu-article-illustrator`, `baoyu-comic`, `baoyu-compress-image`, `baoyu-cover-image`, `baoyu-danger-gemini-web`, `baoyu-danger-x-to-markdown`, `baoyu-diagram`, `baoyu-electron-extract`, ... (21 total) | Mirrored from `https://github.com/JimLiu/baoyu-skills.git`. |
 | `claude-plugins-official` | `core` | `access`, `agent-development`, `build-mcp-app`, `build-mcp-server`, `build-mcpb`, `cardputer-buddy`, `claude-automation-recommender`, `claude-md-improver`, ... (22 total) | Mirrored from `https://github.com/anthropics/claude-plugins-official.git`. |
 | `deep-research-skills` | `community` | `research`, `research-add-fields`, `research-add-items`, `research-deep`, `research-report`, `research`, `research-add-fields`, `research-add-items`, ... (20 total) | Mirrored from `https://github.com/Weizhena/Deep-Research-skills.git`. |
+| `doc2x-cli-skills` | `community` | `doc2x-cli` | Mirrored from `https://github.com/noedgeai/doc2x-cli-skills.git`. |
 | `html-ppt-skill` | `community` | `html-ppt` | Mirrored from `https://github.com/lewislulu/html-ppt-skill.git`. |
 | `kepano-obsidian-skills` | `core` | `defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` | Mirrored from `https://github.com/kepano/obsidian-skills.git`. |
 | `last30days-skill` | `core` | `last30days` | Mirrored from `https://github.com/mvanhorn/last30days-skill.git`. |

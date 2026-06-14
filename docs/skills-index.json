@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generated_at": "2026-06-13T08:24:32.249303+00:00",
-    "total_skills": 1040,
+    "generated_at": "2026-06-14T05:56:06.456482+00:00",
+    "total_skills": 1041,
     "custom_skills": 35,
-    "external_skills": 1005,
-    "sources_count": 16
+    "external_skills": 1006,
+    "sources_count": 17
   },
   "skills": [
     {
@@ -322,7 +322,7 @@
     {
       "path": "custom/scan-pdf-to-print-html",
       "name": "scan-pdf-to-print-html",
-      "description": "Use when scanned or image-only PDFs need Doc2X OCR into a faithful, auditable page transcript and then A4 HTML/PDF. Best for textbooks, notes, worksheets, formulas, tables, diagrams, and question pages where content must stay source-faithful and `source-transcript.md` must be audited before HTML assembly.",
+      "description": "Use when scanned or image-only PDFs need Doc2X OCR into a faithful, auditable page transcript and then A4 HTML/PDF, OR when an already-clean markdown file must become a printable A4 HTML/PDF handout. Best for textbooks, notes, worksheets, formulas, tables, diagrams, and question pages where content must stay source-faithful. For OCR inputs, `source-transcript.md` must be audited before HTML assembly; for clean markdown inputs, skip OCR and assemble directly.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",
@@ -12787,6 +12787,19 @@
       "triggers": []
     },
     {
+      "path": "external/doc2x-cli-skills/doc2x-cli",
+      "name": "doc2x-cli",
+      "description": "Installs and operates @noedgeai-org/doc2x-cli for document parsing, translation, and batch processing. Trigger when user mentions doc2x, doc2x-cli, PDF to Markdown, PDF OCR, document translation, batch PDF conversion, or bilingual PDF. Covers install, update, parse, translate, batch, login, logout, models, and term commands. Do NOT trigger for general PDF viewing, browser-based PDF tools, or non-doc2x workflows.",
+      "category": "Content/Publishing",
+      "tier": "community",
+      "source": "doc2x-cli-skills",
+      "repo": "https://github.com/noedgeai/doc2x-cli-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
       "path": "external/html-ppt-skill",
       "name": "html-ppt",
       "description": "HTML PPT Studio — author professional static HTML presentations in many styles, layouts, and animations, all driven by templates. Use when the user asks for a presentation, PPT, slides, keynote, deck, slideshow, \"幻灯片\", \"演讲稿\", \"做一份 PPT\", \"做一份 slides\", a reveal-style HTML deck, a 小红书 图文, or any kind of multi-slide pitch/report/sharing document that should look tasteful and be usable with keyboard navigation. Triggers include keywords like \"presentation\", \"ppt\", \"slides\", \"deck\", \"keynote\", \"reveal\", \"slideshow\", \"幻灯片\", \"演讲稿\", \"分享稿\", \"小红书图文\", \"talk slides\", \"pitch deck\", \"tech sharing\", \"technical presentation\".",
@@ -13584,6 +13597,12 @@
       "tier": "community",
       "skill_count": 20
     },
+    "doc2x-cli-skills": {
+      "repo": "https://github.com/noedgeai/doc2x-cli-skills.git",
+      "branch": "main",
+      "tier": "community",
+      "skill_count": 1
+    },
     "html-ppt-skill": {
       "repo": "https://github.com/lewislulu/html-ppt-skill.git",
       "branch": "main",
@@ -13640,7 +13659,7 @@
     }
   },
   "categories": {
-    "Content/Publishing": 1027,
+    "Content/Publishing": 1028,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,

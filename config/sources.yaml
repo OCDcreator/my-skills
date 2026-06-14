@@ -108,6 +108,14 @@ skill_sources:
     tier: community
     include_in_main_catalog: true
 
+  - name: doc2x-cli-skills
+    repo: https://github.com/noedgeai/doc2x-cli-skills.git
+    branch: main
+    subdir: skills
+    mode: flatten
+    tier: community
+    include_in_main_catalog: true
+
   - name: last30days-skill
     repo: https://github.com/mvanhorn/last30days-skill.git
     branch: main
