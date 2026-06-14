@@ -1,6 +1,6 @@
 # Lesson Schema
 
-Every `rework | missing | wrong` user message becomes one candidate lesson with these fields. The trace-enrichment fields (assistant action, file states, validator outputs, resolved?, uncertainty) are mandatory — elliptical corrections ("还是不对", "看第17页") are meaningless without the failure context. Each enrichment field carries a **provenance tag** — `(extracted)` if pulled from the in-context transcript, `(reconstructed)` if from memory or a user-paste — and every field must paste **real content** (the actual assistant turn, the real file bytes/excerpt), never a paraphrase. See SKILL.md Hard Contract (CAPTURE runs in the main context; evidence-backed claims).
+Every `rework | missing | wrong` user message becomes one candidate lesson with these fields. The trace-enrichment fields (assistant action, file states, validator outputs, resolved?, uncertainty) are mandatory — elliptical corrections ("还是不对", "看第17页") are meaningless without the failure context. Each enrichment field carries a **provenance tag** — `(extracted)` if it is exact content from the in-context transcript/files, `(user-pasted)` if exact content supplied by the user. **Memory-only reconstruction is NOT evidence**: put it in `uncertainty` and tag the field `unverified`; never present reconstructed-from-memory content as a real trace field. Every evidence field must paste **real content** (the actual assistant turn, the real file bytes/excerpt), never a paraphrase. See SKILL.md Hard Contract (CAPTURE runs in the main context; evidence-backed claims).
 
 ## Fields
 
@@ -15,7 +15,7 @@ LESSON #N
   validator_output : <relevant validator/self-check output at that point, or "none">
   resolved         : yes | no | partial | unknown
   uncertainty      : <anything that cannot be reconstructed — surface to user, do not guess>
-  provenance       : extracted | reconstructed   (tag the enrichment fields above; "extractured" = from in-context transcript, "reconstructed" = from memory/user-paste)
+  provenance       : extracted | user-pasted | unverified   (extracted = exact content from in-context transcript/files; user-pasted = exact content supplied by user; memory-only reconstruction is NOT evidence → put in `uncertainty`, tag `unverified`)
   --- candidate rule ---
   trigger          : <generalized situation: "when X class of input...">
   mistake          : <what the skill/model did wrong>
@@ -28,7 +28,7 @@ LESSON #N
   date_stamp       : YYYY-MM-DD  (applied to the rule when written)
 ```
 
-## Worked example (rewrite-doc2x-markdown)
+## Worked example (rewrite-doc2x-markdown) — illustrative; fields abbreviated for readability. Real runs paste exact excerpts.
 
 ```
 LESSON #1

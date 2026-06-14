@@ -34,7 +34,7 @@ Already-documented rules stay in scope (e.g. a stated 300-char paragraph limit i
 
 **Borderline verdicts are surfaced for explicit user confirmation** — never silently discarded. Silent `preference → discard` is the path that loses recurring real feedback.
 
-**Every `preference-clear → discard` must show its reasoning** (not just borderline): the user quote, why it is preference (not principle), whether existing skill rules already encode it, why it is safe to discard, and the recurrence count. The `preference-clear → discard` path is where the model's self-serving bias is strongest and the user's visibility is weakest — so it gets full sunlight. A discard with no shown reasoning is `unverified`.
+**Every `preference-clear → discard` must show its reasoning** (not just borderline): the user quote, why it is preference (not principle), whether existing skill rules already encode it, why it is safe to discard, and the recurrence count. The `preference-clear → discard` path is where the model's self-serving bias is strongest and the user's visibility is weakest — so it gets full sunlight. A `preference-clear → discard` **without** the required reasoning is **invalid** — it routes to `surface` (or `human_review`), never a final `discard`.
 
 ## Decision matrix — precedence (top wins)
 
