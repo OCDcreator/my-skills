@@ -113,6 +113,7 @@ Load next: `<skill-name>`
 | Chinese social media research | `last30days-skill-cn` |
 | Real-time unified search | `anysearch-skill` |
 | Agent internet access / social channels | `agent-reach` (reference) |
+| After a custom-skill task where the user gave corrections/rework | `skill-evolution` (manually invoked; folds corrections back into the target skill) |
 
 ## Fallback
 

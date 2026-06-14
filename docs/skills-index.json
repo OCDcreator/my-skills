@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-06-14T06:44:22.493021+00:00",
-    "total_skills": 1042,
-    "custom_skills": 35,
+    "generated_at": "2026-06-14T14:58:30.614845+00:00",
+    "total_skills": 1043,
+    "custom_skills": 36,
     "external_skills": 1007,
     "sources_count": 18
   },
@@ -349,6 +349,19 @@
       "path": "custom/skill-catalog-maintainer",
       "name": "skill-catalog-maintainer",
       "description": "Use when working in a skills repository and the user asks to understand, catalog, compare, audit, add, remove, rename, or maintain skills and their metadata, or to update `SKILLS.md`, `README.md`, `AGENTS.md`, `update.sh`, or `update.ps1` after skill changes.",
+      "category": "Content/Publishing",
+      "tier": "custom",
+      "source": "custom",
+      "repo": "git@github.com:OCDcreator/my-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "custom/skill-evolution",
+      "name": "skill-evolution",
+      "description": "Use after finishing a task with ANY custom skill where you gave corrections, rework, or \"do this differently\" feedback, and want to fold those corrections back into the skill so the same mistake is not repeated. Invoke manually at the end of a session — it reads the session's user messages, extracts rework-type feedback with its failure context, runs an anti-overfit gate, and proposes a concrete edit to the target skill's SKILL.md. Use it whenever a custom-skill task ended with you redoing or correcting the model's work, even if you only gave one piece of feedback.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",
@@ -13674,11 +13687,11 @@
       "repo": "git@github.com:OCDcreator/my-skills.git",
       "branch": "main",
       "tier": "custom",
-      "skill_count": 35
+      "skill_count": 36
     }
   },
   "categories": {
-    "Content/Publishing": 1029,
+    "Content/Publishing": 1030,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,
