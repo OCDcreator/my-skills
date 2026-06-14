@@ -18,10 +18,11 @@ if ! python3 scripts/generate_skills_catalog.py; then
 fi
 
 # Check if catalog files were updated and stage them
-git diff --quiet SKILLS.md docs/full-catalog.md README.md
+# (includes docs/skills-index.json — the machine-readable JSON catalog output)
+git diff --quiet SKILLS.md docs/full-catalog.md README.md docs/skills-index.json
 if [ $? -ne 0 ]; then
     echo "[pre-commit] Catalog files updated — staging auto-generated changes..."
-    git add SKILLS.md docs/full-catalog.md README.md
+    git add SKILLS.md docs/full-catalog.md README.md docs/skills-index.json
 fi
 
 echo "[pre-commit] All checks passed. Proceeding with commit."

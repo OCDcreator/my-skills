@@ -10,7 +10,7 @@ The two main skill trees are `custom/` (self-authored skills) and `external/` (c
 ```
 config/sources.yaml          # Single source of truth for all external sources
 scripts/update_external.py   # Core sync logic (replaces duplicated sh/ps1)
-scripts/generate_skills_catalog.py  # Generates SKILLS.md + docs/full-catalog.md + README blocks
+scripts/generate_skills_catalog.py  # Generates SKILLS.md + docs/full-catalog.md + docs/skills-index.json + README blocks
 scripts/verify_structure.py  # Governance gate: checks catalog invariants
 update.sh / update.ps1     # Thin wrappers → scripts/update_external.py
 ```
@@ -34,6 +34,7 @@ update.sh / update.ps1     # Thin wrappers → scripts/update_external.py
 4. **Run `python3 scripts/generate_skills_catalog.py`** — this auto-updates:
    - `SKILLS.md` curated index
    - `docs/full-catalog.md` full index
+   - `docs/skills-index.json` machine-readable JSON catalog
    - `README.md` auto-generated blocks (custom skills table + external sources table)
 5. Run `python3 scripts/verify_structure.py`
 6. Commit and push
@@ -100,7 +101,7 @@ Reference-source rules:
 | `scripts/update_external.py` | Core sync logic | Reads `config/sources.yaml`, clones, copies, commits, pushes |
 | `push.sh` / `.ps1` | Push local changes | `git add -A` + commit + push |
 | `pull.sh` / `.ps1` | Hard reset to remote | `git reset --hard origin/main` (destructive — discards uncommitted work) |
-| `scripts/generate_skills_catalog.py` | Generate indexes | Outputs `SKILLS.md` (curated) + `docs/full-catalog.md` (full) + updates `README.md` blocks |
+| `scripts/generate_skills_catalog.py` | Generate indexes | Outputs `SKILLS.md` (curated) + `docs/full-catalog.md` (full) + `docs/skills-index.json` (machine-readable JSON) + updates `README.md` blocks |
 | `scripts/verify_structure.py` | Governance gate | Validates `sources.yaml` consistency, catalog invariants, bulk isolation |
 
 - Temp clone directory: `.tmp-skills/` (gitignored)
