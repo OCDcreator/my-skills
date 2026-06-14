@@ -73,6 +73,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 | `claude-plugins-official` | `core` | `access`, `agent-development`, `build-mcp-app`, `build-mcp-server`, `build-mcpb`, `cardputer-buddy`, `claude-automation-recommender`, `claude-md-improver`, ... (22 total) | Mirrored from `https://github.com/anthropics/claude-plugins-official.git`. |
 | `deep-research-skills` | `community` | `research`, `research-add-fields`, `research-add-items`, `research-deep`, `research-report`, `research`, `research-add-fields`, `research-add-items`, ... (20 total) | Mirrored from `https://github.com/Weizhena/Deep-Research-skills.git`. |
 | `doc2x-cli-skills` | `community` | `doc2x-cli` | Mirrored from `https://github.com/noedgeai/doc2x-cli-skills.git`. |
+| `doc2x-mcp` | `community` | `doc2x-mcp` | Mirrored from `https://github.com/NoEdgeAI/doc2x-mcp.git`. |
 | `html-ppt-skill` | `community` | `html-ppt` | Mirrored from `https://github.com/lewislulu/html-ppt-skill.git`. |
 | `kepano-obsidian-skills` | `core` | `defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` | Mirrored from `https://github.com/kepano/obsidian-skills.git`. |
 | `last30days-skill` | `core` | `last30days` | Mirrored from `https://github.com/mvanhorn/last30days-skill.git`. |

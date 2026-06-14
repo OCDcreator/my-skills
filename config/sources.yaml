@@ -116,6 +116,14 @@ skill_sources:
     tier: community
     include_in_main_catalog: true
 
+  - name: doc2x-mcp
+    repo: https://github.com/NoEdgeAI/doc2x-mcp.git
+    branch: main
+    subdir: skills
+    mode: flatten
+    tier: community
+    include_in_main_catalog: true
+
   - name: last30days-skill
     repo: https://github.com/mvanhorn/last30days-skill.git
     branch: main

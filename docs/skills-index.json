@@ -1,10 +1,10 @@
 {
   "meta": {
-    "generated_at": "2026-06-14T05:56:30.991136+00:00",
-    "total_skills": 1041,
-    "custom_skills": 35,
-    "external_skills": 1006,
-    "sources_count": 17
+    "generated_at": "2026-06-14T06:42:44.992903+00:00",
+    "total_skills": 1043,
+    "custom_skills": 36,
+    "external_skills": 1007,
+    "sources_count": 18
   },
   "skills": [
     {
@@ -25,6 +25,19 @@
       "name": "design-reference-router",
       "description": "Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation.",
       "category": "Frontend/UI",
+      "tier": "custom",
+      "source": "custom",
+      "repo": "git@github.com:OCDcreator/my-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "custom/doc2x-cli-skills/skills/doc2x-cli",
+      "name": "doc2x-cli",
+      "description": "Installs and operates @noedgeai-org/doc2x-cli for document parsing, translation, and batch processing. Trigger when user mentions doc2x, doc2x-cli, PDF to Markdown, PDF OCR, document translation, batch PDF conversion, or bilingual PDF. Covers install, update, parse, translate, batch, login, logout, models, and term commands. Do NOT trigger for general PDF viewing, browser-based PDF tools, or non-doc2x workflows.",
+      "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",
       "repo": "git@github.com:OCDcreator/my-skills.git",
@@ -12800,6 +12813,19 @@
       "triggers": []
     },
     {
+      "path": "external/doc2x-mcp/doc2x-mcp",
+      "name": "doc2x-mcp",
+      "description": "使用 Doc2x MCP 工具处理 PDF、扫描件和图片：提交解析、查询状态、等待文本、导出 Markdown/LaTeX/DOCX、下载落盘，以及将 PDF v3 layout 结果写为本地 JSON。用户提到 PDF、OCR、scan/scanned PDF、image-to-text、extract text/tables、表格抽取、layout、Markdown、LaTeX/TeX、DOCX、doc2x、doc2x-mcp、MCP、figure/table crop、v3 JSON 时使用。",
+      "category": "Content/Publishing",
+      "tier": "community",
+      "source": "doc2x-mcp",
+      "repo": "https://github.com/NoEdgeAI/doc2x-mcp.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
       "path": "external/html-ppt-skill",
       "name": "html-ppt",
       "description": "HTML PPT Studio — author professional static HTML presentations in many styles, layouts, and animations, all driven by templates. Use when the user asks for a presentation, PPT, slides, keynote, deck, slideshow, \"幻灯片\", \"演讲稿\", \"做一份 PPT\", \"做一份 slides\", a reveal-style HTML deck, a 小红书 图文, or any kind of multi-slide pitch/report/sharing document that should look tasteful and be usable with keyboard navigation. Triggers include keywords like \"presentation\", \"ppt\", \"slides\", \"deck\", \"keynote\", \"reveal\", \"slideshow\", \"幻灯片\", \"演讲稿\", \"分享稿\", \"小红书图文\", \"talk slides\", \"pitch deck\", \"tech sharing\", \"technical presentation\".",
@@ -13603,6 +13629,12 @@
       "tier": "community",
       "skill_count": 1
     },
+    "doc2x-mcp": {
+      "repo": "https://github.com/NoEdgeAI/doc2x-mcp.git",
+      "branch": "main",
+      "tier": "community",
+      "skill_count": 1
+    },
     "html-ppt-skill": {
       "repo": "https://github.com/lewislulu/html-ppt-skill.git",
       "branch": "main",
@@ -13655,11 +13687,11 @@
       "repo": "git@github.com:OCDcreator/my-skills.git",
       "branch": "main",
       "tier": "custom",
-      "skill_count": 35
+      "skill_count": 36
     }
   },
   "categories": {
-    "Content/Publishing": 1028,
+    "Content/Publishing": 1030,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,

@@ -6,10 +6,10 @@ This file contains the **complete** index of all skills in the repository, inclu
 
 ## Stats
 
-- **Total skills**: 1041
+- **Total skills**: 1042
 - **Custom skills**: 35
-- **External sources**: 16
-- **External skills**: 1006
+- **External sources**: 17
+- **External skills**: 1007
 
 ## Custom Skills
 
@@ -1040,6 +1040,12 @@ This file contains the **complete** index of all skills in the repository, inclu
 | Path | Name | Category | Use when |
 |---|---|---|---|
 | `external/doc2x-cli-skills/doc2x-cli` | `doc2x-cli` | Content/Publishing | Installs and operates @noedgeai-org/doc2x-cli for document parsing, translation, and batch processing. Trigger when user mentions doc2x, doc2x-cli, PDF to Markdown, PDF OCR, document translation, batch PDF conversion, or bilingual PDF. Covers install, update, parse, translate, batch, login, logout, models, and term commands. Do NOT trigger for general PDF... |
+
+### `doc2x-mcp` (1 skills)
+
+| Path | Name | Category | Use when |
+|---|---|---|---|
+| `external/doc2x-mcp/doc2x-mcp` | `doc2x-mcp` | Content/Publishing | 使用 Doc2x MCP 工具处理 PDF、扫描件和图片：提交解析、查询状态、等待文本、导出 Markdown/LaTeX/DOCX、下载落盘，以及将 PDF v3 layout 结果写为本地 JSON。用户提到 PDF、OCR、scan/scanned PDF、image-to-text、extract text/tables、表格抽取、layout、Markdown、LaTeX/TeX、DOCX、doc2x、doc2x-mcp、MCP、figure/table crop、v3 JSON 时使用。 |
 
 ### `html-ppt-skill` (1 skills)
 
@@ -2150,6 +2156,7 @@ Duplicate names are expected for external sources; select by path and source, no
 | `external/deep-research-skills/skills/research-zh/research-deep` | `research-deep` | Content/Publishing | community | 读取调研outline，为每个item启动独立agent进行深度调研。禁用task output。 | `https://github.com/Weizhena/Deep-Research-skills.git` | `master` | `skills/research-zh/research-deep` | Clone `https://github.com/Weizhena/Deep-Research-skills.git` at `master` and copy `skills/research-zh/research-deep` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `external/deep-research-skills/skills/research-zh/research-report` | `research-report` | Content/Publishing | community | 将deep调研结果汇总为markdown报告，覆盖所有字段，跳过不确定值。 | `https://github.com/Weizhena/Deep-Research-skills.git` | `master` | `skills/research-zh/research-report` | Clone `https://github.com/Weizhena/Deep-Research-skills.git` at `master` and copy `skills/research-zh/research-report` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `external/doc2x-cli-skills/doc2x-cli` | `doc2x-cli` | Content/Publishing | community | Installs and operates @noedgeai-org/doc2x-cli for document parsing, translation, and batch processing. Trigger when user mentions doc2x, doc2x-cli, PDF to Markdown, PDF OCR, document translation, batch PDF conversion, or bilingual PDF. Covers install, update, parse, translate, batch, login, logout, models, and term commands. Do NOT trigger for general PDF... | `https://github.com/noedgeai/doc2x-cli-skills.git` | `main` | `skills/doc2x-cli` | Clone `https://github.com/noedgeai/doc2x-cli-skills.git` at `main` and copy `skills/doc2x-cli` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
+| `external/doc2x-mcp/doc2x-mcp` | `doc2x-mcp` | Content/Publishing | community | 使用 Doc2x MCP 工具处理 PDF、扫描件和图片：提交解析、查询状态、等待文本、导出 Markdown/LaTeX/DOCX、下载落盘，以及将 PDF v3 layout 结果写为本地 JSON。用户提到 PDF、OCR、scan/scanned PDF、image-to-text、extract text/tables、表格抽取、layout、Markdown、LaTeX/TeX、DOCX、doc2x、doc2x-mcp、MCP、figure/table crop、v3 JSON 时使用。 | `https://github.com/NoEdgeAI/doc2x-mcp.git` | `main` | `skills/doc2x-mcp` | Clone `https://github.com/NoEdgeAI/doc2x-mcp.git` at `main` and copy `skills/doc2x-mcp` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `external/html-ppt-skill` | `html-ppt` | Content/Publishing | community | HTML PPT Studio — author professional static HTML presentations in many styles, layouts, and animations, all driven by templates. Use when the user asks for a presentation, PPT, slides, keynote, deck, slideshow, "幻灯片", "演讲稿", "做一份 PPT", "做一份 slides", a reveal-style HTML deck, a 小红书 图文, or any kind of multi-slide pitch/report/sharing document that should l... | `https://github.com/lewislulu/html-ppt-skill.git` | `main` | `.` | Clone `https://github.com/lewislulu/html-ppt-skill.git` at `main` and copy `.` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `external/kepano-obsidian-skills/defuddle` | `defuddle` | Content/Publishing | core | Extract clean markdown content from web pages using Defuddle CLI, removing clutter and navigation to save tokens. Use instead of WebFetch when the user provides a URL to read or analyze, for online documentation, articles, blog posts, or any standard web page. Do NOT use for URLs ending in .md — those are already markdown, use WebFetch directly. | `https://github.com/kepano/obsidian-skills.git` | `main` | `skills/defuddle` | Clone `https://github.com/kepano/obsidian-skills.git` at `main` and copy `skills/defuddle` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `external/kepano-obsidian-skills/json-canvas` | `json-canvas` | Content/Publishing | core | Create and edit JSON Canvas files (.canvas) with nodes, edges, groups, and connections. Use when working with .canvas files, creating visual canvases, mind maps, flowcharts, or when the user mentions Canvas files in Obsidian. | `https://github.com/kepano/obsidian-skills.git` | `main` | `skills/json-canvas` | Clone `https://github.com/kepano/obsidian-skills.git` at `main` and copy `skills/json-canvas` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
