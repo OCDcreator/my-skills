@@ -65,6 +65,7 @@ def read_asset_text(name: str) -> str:
 
 KAMI_KERNEL_CSS = read_asset_text("kami-default-kernel.css")
 PHYCAT_BLOCKQUOTE_CSS = read_asset_text("phycat-blockquote.css")
+TABLE_CONSISTENT_CSS = read_asset_text("table-consistent.css")
 
 PRINT_BASE_CSS = """
 @page {
@@ -1089,6 +1090,8 @@ def build_html_document_from_fragments(
             KAMI_KERNEL_CSS,
             "/* Vendored blockquote template styles example-callout rendering. */",
             PHYCAT_BLOCKQUOTE_CSS,
+            "/* Consistent table styling: th/td identical, transparent background. */",
+            TABLE_CONSISTENT_CSS,
             "/* OCR-specific CSS keeps scan-specific pagination, table, and media behavior local to this skill. */",
             PRINT_BASE_CSS,
             "  </style>",

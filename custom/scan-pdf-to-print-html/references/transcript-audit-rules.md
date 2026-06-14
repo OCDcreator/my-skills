@@ -28,6 +28,7 @@ Turn `doc2x/page-transcript.raw.md` into an audited `source-transcript.md` witho
   `\( a // \alpha \)，\( a \subset \beta \)，\( \alpha \cap \beta = b \Rightarrow a // b \)`
 - Prefer `\dfrac{...}{...}` for simple fractions such as `\dfrac{1}{2}`.
 - If the numerator or denominator already contains another formula, operator, or nested fraction, use `\tfrac{...}{...}` instead.
+- Inside Markdown table cells, escape a literal `|` that appears within a `$...$` formula as `\|` (e.g. write `$|\mathbf{c}|$` as `$\|\mathbf{c}\|$`). An unescaped `|` is parsed as a table column separator and silently splits the formula across cells, leaving a spurious `| :---: | :---: |` separator row. Common triggers: absolute value `$|x|$`, norm `$|\vec{a}|$`, conditional probability `$P(A|B)$`, set-builder `$\{x \mid p(x)\}$`. <!-- evolved 2026-06-15 -->
 - Keep code as fenced code blocks; do not flatten code into paragraphs.
 - For choice examples, put the stem and options in one blockquote.
 - Put options in list form so the builder can spread them evenly:

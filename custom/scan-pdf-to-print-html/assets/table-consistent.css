@@ -1,0 +1,63 @@
+/* Consistent table styling for math handouts.
+ *
+ * Why this looks the way it does:
+ *   - Source pages rarely distinguish header from body cells.
+ *     Browser defaults make <th> bold + shaded, which invents emphasis
+ *     the source does not have and breaks visual parity.
+ *   - This file forces th and td to share identical font-size, font-weight,
+ *     background, and color so the table reads as a uniform grid.
+ *   - Tables default to a transparent background to match the Kami paper
+ *     surface. Add shading only when the source page actually has it.
+ *   - KaTeX inside cells is pinned to the inherited font-size so formulas
+ *     do not render smaller or larger than surrounding plain text.
+ *   - Selectors are scoped under `.transcript-flow` so the Kami base kernel
+ *     cannot override this without a higher-specificity rule.
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="assets/table-consistent.css">
+ *   or inline the file inside the handout's <style> block.
+ *
+ * Evolved 2026-06-15. */
+
+.transcript-flow table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 3mm 0 4mm;
+  background: transparent;
+  font-size: 12px;
+}
+
+.transcript-flow blockquote table {
+  margin-bottom: 0;
+}
+
+.transcript-flow th,
+.transcript-flow td {
+  padding: 2.4mm 2.6mm;
+  border: 1px solid var(--line, #e8e6dc);
+  text-align: center;
+  vertical-align: middle;
+
+  /* Kill all browser-default th vs td differences */
+  font-weight: normal;
+  font-size: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+/* KaTeX inside cells must match the cell's font-size, not its own default */
+.transcript-flow th .katex,
+.transcript-flow td .katex {
+  font-size: 12px;
+}
+
+/* Images inside cells are centered, not stretched */
+.transcript-flow td img,
+.transcript-flow td mjx-container[display="true"][jax="SVG"],
+.transcript-flow td .mjx-container[display="true"][jax="SVG"] {
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
+}
