@@ -70,7 +70,8 @@ def test_evidence_backed_claims_rule_present():
 def test_capture_provenance_present():
     text = _read()
     # v0.5 M1: CAPTURE provenance tagging + main-context execution
-    assert "reconstructed" in text, "CAPTURE must tag reconstructed-vs-extracted provenance"
+    assert "user-pasted" in text, "CAPTURE must support user-pasted provenance"
+    assert "extracted" in text, "CAPTURE must support extracted provenance"
     assert "main orchestrating context" in text or "main context" in text.lower(), \
         "CAPTURE must run in the main orchestrating context, not a subagent"
 
