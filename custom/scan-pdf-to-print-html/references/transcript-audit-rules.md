@@ -38,6 +38,8 @@ Turn `doc2x/page-transcript.raw.md` into an audited `source-transcript.md` witho
   `- D. ...`
 - Normalize fill-in blanks to exactly `__________`.
 - Put solution text in its own paragraph starting with `解析：`.
+- Strip Obsidian callout markers from blockquotes: `> [!question] text` becomes `> text`. The builder's `clean_markdown()` does this automatically, but manual transcripts should not contain `[!question]`, `[!note]`, etc. <!-- evolved 2026-06-15 -->
+- Choice options: use list form (`- A. ...`) as the default — the builder renders it as an even grid. If you need a specific table layout (e.g., all four options on one row, or a 2×2 grid), write raw HTML `<table>` in the markdown and the builder will pass it through with `table-consistent.css` styling (borderless, transparent, centered). <!-- evolved 2026-06-15 -->
 
 ## Approval Gate
 

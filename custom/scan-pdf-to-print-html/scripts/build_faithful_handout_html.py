@@ -66,6 +66,7 @@ def read_asset_text(name: str) -> str:
 KAMI_KERNEL_CSS = read_asset_text("kami-default-kernel.css")
 PHYCAT_BLOCKQUOTE_CSS = read_asset_text("phycat-blockquote.css")
 TABLE_CONSISTENT_CSS = read_asset_text("table-consistent.css")
+LEAD_TAGS_CSS = read_asset_text("lead-tags.css")
 
 PRINT_BASE_CSS = """
 @page {
@@ -369,13 +370,7 @@ html[data-handout-ready="loading"] #handout-print-root {
   grid-column: 1 / -1;
 }
 
-.transcript-flow .ocr-analysis {
-  margin: 3.2mm 0 4mm;
-  padding: 2.6mm 3mm;
-  border-left: 2px solid var(--accent);
-  background: color-mix(in srgb, var(--surface-soft) 78%, white 22%);
-  font-size: 11.4px;
-}
+/* lead-tag / lead-tag-example / lead-para styles are in assets/lead-tags.css */
 """
 
 MATHJAX_BOOTSTRAP = """
@@ -594,6 +589,11 @@ def clean_markdown(text: str) -> str:
     normalized = FENCED_CODE_BLOCK_PATTERN.sub(protect_literal_segment, normalized)
     normalized = INLINE_CODE_SPAN_PATTERN.sub(protect_literal_segment, normalized)
     normalized = HTML_COMMENT_PATTERN.sub("", normalized)
+    # Strip Obsidian callout markers: "> [!question] text" → "> text"
+    # Evolved 2026-06-15: Obsidian callout syntax leaked into HTML as raw text.
+    normalized = re.sub(
+        r"(?m)^(\s*>\s*)\[!\w+\]\s*", r"\1", normalized
+    )
     # Doc2X emits TeX with \( ... \) / \[ ... \] delimiters, but MarkdownIt
     # strips the backslashes in plain paragraph text. Normalize before render so
     # MathJax still receives intact delimiters across both Markdown and raw HTML.
@@ -731,6 +731,18 @@ def default_title(pages: list[tuple[str, str]], explicit_title: str | None) -> s
     if not pages:
         return "OCR Handout"
     first_page_content = pages[0][1].strip().splitlines()
+
+    # First: look for a leading "# Title" heading (most reliable).
+    # Evolved 2026-06-15: previously the # heading was skipped, causing the
+    # builder to grab a body paragraph as the title.
+    for line in first_page_content:
+        stripped = line.strip()
+        if stripped.startswith("# ") and not stripped.startswith("## "):
+            heading = stripped[2:].strip()
+            protected_title, math_segments = protect_math_segments(heading)
+            return restore_math_segments(protected_title, math_segments)
+
+    # Fallback: first non-heading, non-special line.
     for line in first_page_content:
         stripped = line.strip()
         if stripped and not stripped.startswith(("#", "|", "!", "[", ">", "`")):
@@ -881,6 +893,26 @@ def normalize_fill_blank_markers(fragment_html: str) -> str:
     return normalized
 
 
+# HTML pattern for the leading 解析/解/另解 label inside a <p> body.
+# Matches optional <strong>, the label word, optional </strong>, then separator.
+LEADING_ANALYSIS_LABEL_HTML_PATTERN = re.compile(
+    r"\A\s*(?:<strong>\s*)?"
+    r"(?:【|\[)?"
+    r"(?P<label>解析|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
+    r"(?:】|\])?"
+    r"(?:\s*</strong>)?"
+    r"\s*[：:。\.\s]*"
+)
+
+# HTML pattern for leading 例N labels. Matches 例 + number, optional <strong>.
+LEADING_EXAMPLE_LABEL_HTML_PATTERN = re.compile(
+    r"\A\s*(?:<strong>\s*)?"
+    r"(?P<label>例\s*[\d一二三四五六七八九十百零]+)"
+    r"(?:\s*</strong>)?"
+    r"\s*"
+)
+
+
 def decorate_analysis_paragraphs(fragment_html: str) -> str:
     def replace_paragraph(match: re.Match[str]) -> str:
         attrs = match.group("attrs")
@@ -888,17 +920,57 @@ def decorate_analysis_paragraphs(fragment_html: str) -> str:
         if not paragraph_starts_with_analysis_label(body):
             return match.group(0)
 
+        # Try to extract the label from the HTML body.
+        label_match = LEADING_ANALYSIS_LABEL_HTML_PATTERN.match(body)
+        if label_match:
+            label = label_match.group("label")
+            remaining = body[label_match.end():]
+            badge_html = f'<span class="lead-tag">{html.escape(label)}</span>'
+            new_body = badge_html + remaining
+
+            if 'class="' in attrs or "class='" in attrs:
+                class_pattern = re.compile(r"""\bclass=(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
+                class_match = class_pattern.search(attrs)
+                if class_match:
+                    existing = class_match.group(1) or class_match.group(2) or ""
+                    merged = " ".join(part for part in [existing.strip(), "lead-para"] if part).strip()
+                    quote = '"' if class_match.group(1) is not None else "'"
+                    new_attrs = class_pattern.sub(f'class={quote}{merged}{quote}', attrs, count=1)
+                    return f"<p{new_attrs}>{new_body}</p>"
+
+            return f'<p{attrs} class="lead-para">{new_body}</p>'
+
+        # Fallback: no label match in HTML, keep old behavior
+        return match.group(0)
+
+    return PARAGRAPH_PATTERN.sub(replace_paragraph, fragment_html)
+
+
+def decorate_example_paragraphs(fragment_html: str) -> str:
+    """Wrap leading 例N labels in a lead-tag-example badge."""
+    def replace_paragraph(match: re.Match[str]) -> str:
+        attrs = match.group("attrs")
+        body = match.group("body")
+        label_match = LEADING_EXAMPLE_LABEL_HTML_PATTERN.match(body)
+        if not label_match:
+            return match.group(0)
+
+        label = label_match.group("label")
+        remaining = body[label_match.end():]
+        badge_html = f'<span class="lead-tag-example">{html.escape(label)}</span>'
+        new_body = badge_html + remaining
+
         if 'class="' in attrs or "class='" in attrs:
             class_pattern = re.compile(r"""\bclass=(?:"([^"]*)"|'([^']*)')""", re.IGNORECASE)
             class_match = class_pattern.search(attrs)
             if class_match:
                 existing = class_match.group(1) or class_match.group(2) or ""
-                merged = " ".join(part for part in [existing.strip(), "ocr-analysis"] if part).strip()
+                merged = " ".join(part for part in [existing.strip(), "lead-para"] if part).strip()
                 quote = '"' if class_match.group(1) is not None else "'"
                 new_attrs = class_pattern.sub(f'class={quote}{merged}{quote}', attrs, count=1)
-                return f"<p{new_attrs}>{body}</p>"
+                return f"<p{new_attrs}>{new_body}</p>"
 
-        return f'<p{attrs} class="ocr-analysis">{body}</p>'
+        return f'<p{attrs} class="lead-para">{new_body}</p>'
 
     return PARAGRAPH_PATTERN.sub(replace_paragraph, fragment_html)
 
@@ -1040,6 +1112,7 @@ def normalize_fragment_semantics(fragment_html: str) -> str:
     normalized = normalize_fragment_media(fragment_html)
     normalized = normalize_fill_blank_markers(normalized)
     normalized = decorate_analysis_paragraphs(normalized)
+    normalized = decorate_example_paragraphs(normalized)
     normalized = decorate_blockquotes(normalized)
     return normalized
 
@@ -1090,10 +1163,12 @@ def build_html_document_from_fragments(
             KAMI_KERNEL_CSS,
             "/* Vendored blockquote template styles example-callout rendering. */",
             PHYCAT_BLOCKQUOTE_CSS,
-            "/* Consistent table styling: th/td identical, transparent background. */",
-            TABLE_CONSISTENT_CSS,
             "/* OCR-specific CSS keeps scan-specific pagination, table, and media behavior local to this skill. */",
             PRINT_BASE_CSS,
+            "/* Locator badges for 解析/例N leading labels. Evolved 2026-06-15. */",
+            LEAD_TAGS_CSS,
+            "/* Consistent table styling: must come AFTER print-base so transparent bg + uniform th/td win. Evolved 2026-06-15. */",
+            TABLE_CONSISTENT_CSS,
             "  </style>",
             MATHJAX_BOOTSTRAP,
             PAGINATION_SCRIPT,

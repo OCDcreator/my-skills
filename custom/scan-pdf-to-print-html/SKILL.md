@@ -69,6 +69,7 @@ Workflow:
    `py -3 scripts/build_faithful_handout_html.py --md source-transcript.md --out-html handout.html`
 3. Render: `py -3 scripts/render_html_to_pdf.py --html handout.html --pdf handout.pdf --screenshot handout-screenshot.png`.
    The default PDF from `render_html_to_pdf.py` is a **vector** PDF — this is the correct default. Do not build high-PPI raster PDFs (e.g. 600 PPI screenshot-stitched) unless the user explicitly asks; they are multi-GB, slow, and are not this skill's path. <!-- evolved 2026-06-15 -->
+   **Scan-type raster PDFs are not recommended**: rasterizing a vector PDF re-samples all embedded images, causing visible quality loss (blocky artifacts, color shifts, blurry text). The vector PDF preserves original image resolution and text crispness. If a raster version is truly needed, the user must accept these tradeoffs. <!-- evolved 2026-06-15 -->
 4. Verify in a browser / PDF viewer: math rendered, 0 overflow (no sheet marked `data-fit-state="overflow"`), figures at intended size, title not duplicated.
 5. Open `handout.html` and confirm the body contains real HTML elements (`<h1>/<h2>`, `<p>`, `<ul>/<ol>`, `<table>`) — **not raw Markdown source text**. A build that emits un-converted Markdown is broken; do not proceed to PDF or review. <!-- evolved 2026-06-15 -->
 6. CSS / styling iteration: edit `handout.html` directly (or append a job-local `<style>` override). Do **not** re-run `build_faithful_handout_html.py` to change styling — the builder regenerates its CSS from scratch on every run, so a rebuild silently discards all job-local CSS fixes. Reserve rebuilds for content/source changes. <!-- evolved 2026-06-15 -->
@@ -105,7 +106,10 @@ The local builder now expects and enforces:
 - centered fenced code blocks
 - vendored `phycat`-style example blockquotes
 - two-column even choice-option layout when options are list items inside the blockquote
-- special styling for paragraphs beginning with `解析：`
+- special styling for paragraphs beginning with `解析：` — the builder renders the label as an inline `lead-tag` badge (accent-colored pill), not a border-left box. This avoids the blockquote-like appearance of the old `ocr-analysis` treatment <!-- evolved 2026-06-15 -->
+- Obsidian callout markers (`[!question]`, `[!note]`, etc.) are auto-stripped from blockquotes by `clean_markdown()` <!-- evolved 2026-06-15 -->
+- `table-consistent.css` is emitted **after** the print-base CSS so its transparent-background and uniform th/td rules always win the cascade <!-- evolved 2026-06-15 -->
+- the builder extracts the document title from the first `# ` heading automatically; `--title` is only needed to override <!-- evolved 2026-06-15 -->
 - blank normalization to `__________`
 - `\frac` promotion to `\dfrac` or `\tfrac`
 - Doc2X crop clustering and size clamping
@@ -137,3 +141,4 @@ Hard rules:
 - `assets/kami-default-kernel.css`
 - `assets/phycat-blockquote.css`
 - `assets/table-consistent.css` <!-- evolved 2026-06-15 -->
+- `assets/lead-tags.css` — lead-tag (解析, accent blue) and lead-tag-example (例N, peach #DE7356) badge styles <!-- evolved 2026-06-15 -->
