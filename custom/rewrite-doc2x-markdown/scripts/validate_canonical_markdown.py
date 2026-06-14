@@ -22,7 +22,7 @@ GENERIC_TITLE_PATTERN = re.compile(r"^\s*#\s+Source Transcript\s*$", re.IGNORECA
 PAGE_HEADING_PATTERN = re.compile(r"^\s*#{1,6}\s+Page\s+\d+\s*$", re.IGNORECASE)
 NUMERIC_HEADING_PATTERN = re.compile(r"^\s*#{1,6}\s+\d+(?:\.\d+)*\.?\s+")
 NUMERIC_OUTLINE_LINE_PATTERN = re.compile(r"^\s*\d+(?:\.\d+)+\.?\s+")
-INLINE_NUMERIC_OUTLINE_PATTERN = re.compile(r"(?<!\d)\d+(?:\.\d+)*\.\s+[\u4e00-\u9fffA-Za-z]")
+INLINE_NUMERIC_OUTLINE_PATTERN = re.compile(r"(?<!\d)\d+\.\d+(?:\.\d+)*\.\s+[\u4e00-\u9fffA-Za-z]")
 PRINT_NOISE_PATTERN = re.compile(r"MST\s*高中基础知识与二级结论")
 MARKDOWN_TABLE_PATTERN = re.compile(r"^\s*\|.*\|\s*$")
 MARKDOWN_TABLE_SEPARATOR_PATTERN = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$")
@@ -63,7 +63,7 @@ HTML_FORMULA_HINT_PATTERN = re.compile(
 PLAIN_FRAC_PATTERN = re.compile(r"\\frac\b")
 NON_OBSIDIAN_MATH_DELIMITER_PATTERN = re.compile(r"\\[()\[\]]")
 FRAGILE_KATEX_MACRO_PATTERN = re.compile(
-    r"\\(?:mathbin|mspace|left\.|overset\{\\large\\frown\})"
+    r"\\(?:mspace|left\.|overset\{\\large\\frown\})"
 )
 
 LONG_MARKDOWN_LINE_LIMIT = 300

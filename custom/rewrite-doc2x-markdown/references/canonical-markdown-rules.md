@@ -21,6 +21,14 @@ Regenerate Markdown structure, not source meaning. Fix broken OCR layout, headin
 - For long files, create `markdown-rewrite-plan.md` with checked chunks before final validation:
   `- [x] Page 274 - 线面平行`
 
+### Heading Hierarchy
+
+- `#` = Chapter title (level 1)
+- `##` = Section title (level 2, e.g., "第一节", "第二节")
+- `###` = Knowledge point title (level 3, e.g., "知识点一", "知识点二")
+- `####` = Subsection title (level 4, e.g., "一、", "二、")
+- Never skip levels or use inconsistent hierarchy.
+
 ## Question Callouts
 
 Each complete question stem must be one continuous Obsidian callout.
@@ -47,14 +55,14 @@ Hard rules:
 
 Use **Markdown tables** inside the callout for choices. Do not use HTML `<div>` or `<span>` structures — formulas inside HTML tags do not render in Obsidian.
 
-**Short choices (single line, ≤ 15 Chinese characters per option):**
+**Short choices (≤ 15 Chinese characters per option) — ONE row, 4 columns:**
 
 ```md
 > | A. 0 | B. 1 | C. 2 | D. 3 |
 > | :---: | :---: | :---: | :---: |
 ```
 
-**Long choices (need wrapping):**
+**Long choices (> 15 Chinese characters per option) — TWO rows, 2 columns each:**
 
 ```md
 > | A. 较长的选项内容 | B. 另一个选项 |
@@ -111,7 +119,7 @@ Hard rules:
 - Do not leave one huge dense paragraph, and do not scatter into one-line fragments.
 - Do not add new teaching content not supported by the source.
 - **All formulas in analysis use `$...$` or `$$...$$`** — this is Markdown, not HTML, so MathML is not needed.
-- **Images in analysis**: If the analysis references a figure or diagram, use HTML `<img>` with the correct sizing (max-width:36% for single, max-width:22.5% for double) and place it in the relevant paragraph. Do not use Markdown image syntax `![]()` inside analysis blocks.
+- **Images in analysis**: If the analysis references a figure or diagram, use HTML `<img>` with the correct sizing (`max-width:20%`) and place it in the relevant paragraph. Do not use Markdown image syntax `![]()` inside analysis blocks.
 - Only use HTML `analysis-block` when the analysis contains ZERO formulas (pure text).
 
 ## Formulas
@@ -130,15 +138,17 @@ Hard rules:
 - Split fused Doc2X formulas into readable units.
 - Keep punctuation outside math delimiters when possible.
 - Prefer KaTeX-safe simple notation.
-- Use `\parallel` for parallel lines/planes; do not use Doc2X-style `\mathbin{/ \mspace{-4mu}/}`.
+- Use `\mathbin{/\!/}` for parallel lines/planes. Do NOT use `\parallel`.
 - Avoid fragile macros and environments: `\mspace`, `\left.`, `\overset{\large\frown}{...}`.
 - **Preserve `\begin{array}` from Doc2X output as-is.** Do NOT convert to `\begin{cases}` or any other construct. The Doc2X `\begin{array}{l}...\end{array}` format is correct and should be kept verbatim. Unauthorized conversions are a critical error.
 - For condition groups in normal Markdown, prefer `\begin{cases} ... \end{cases}` inside a `$$...$$` block **only when the source does not already use `\begin{array}`**. If Doc2X output uses `\begin{array}`, keep it. Inside HTML, use MathJax inline SVG for polished braces/cases; use `math-cases` with vertical `case-lines` and MathML fragments only as a fallback when SVG generation is unavailable.
 - For arcs, prefer a simple notation such as `\widehat{AC}`.
-- Prefer `\dfrac{...}{...}` for simple displayed classroom fractions.
-- Use `\tfrac{...}{...}` when a numerator or denominator contains nested formulas or operators.
-- Do not output plain `\frac{...}{...}`.
+- ALL normal fractions use `\dfrac{...}{...}` — both inline `$...$` and display `$$...$$`.
+- Only nested fractions (inside a numerator, denominator, exponent, or log base) use `\tfrac{...}{...}`.
+- Never use plain `\frac{...}{...}`.
 - Mark uncertain symbols locally with `[TO VERIFY: ...]`.
+- Use `\lvert ... \rvert` for absolute values and vector magnitudes. Do NOT use `\left| ... \right|` which stretches incorrectly. Example: `\lvert \overrightarrow{AB}\rvert` not `\left| \overrightarrow{AB}\right|`.
+- `\begin{array}` MUST have `\left\{` before and `\right.` after. Example: `\left\{ \begin{array}{l} ... \end{array}\right.`. Never have bare `\begin{array}` without the braces.
 
 Example:
 
@@ -175,6 +185,13 @@ Fallback HTML condition-group example:
   <math xmlns="http://www.w3.org/1998/Math/MathML"><mo>⇒</mo><mi>a</mi><mo>∥</mo><mi>α</mi></math>
 </span>
 ```
+
+## Vector Notation
+
+- Vectors **a**, **b**, **c**, **e** must use bold notation: `$\mathbf{a}$`, `$\mathbf{b}$`, `$\mathbf{c}$`, `$\mathbf{e}$`.
+- Never use plain `$a$`, `$b$`, `$c$` for vectors.
+- Exception: Point labels like `$A$`, `$B$`, `$C$` stay as-is (these are not vectors).
+- Exception: Triangle side lengths in 解三角形 sections stay as-is (these are scalar lengths, not vectors).
 
 ## Analysis Block Re-typesetting
 
@@ -215,9 +232,8 @@ Use this shape:
 - Prefer local image paths from the Doc2X export, such as `images/name.png`.
 - Use HTML figures with explicit sizing and centering styles.
 - **Image sizing rules** (based on real-world rendering feedback):
-  - Single large figure (e.g., example diagram, graph): `max-width: 36%` (not 72% — too large in Obsidian)
-  - Two related images side-by-side: `max-width: 22.5%` each (not 45% — still too large)
-  - Four choice images in a table row: `max-width: 22%` each (inside table cells, no flex needed)
+  - ALL images use `max-width: 20%` — single figures, side-by-side figures, and triple figures alike.
+  - Four choice images in a table row: `max-width: 20%` each (inside table cells, no flex needed).
 - For standalone images outside callouts, use `<figure>` with `text-align:center`.
 - For images inside callout tables, use `style="max-width:22%;"` directly in the `<img>` tag.
 - Do not use Markdown image syntax `![]()` outside callouts; inside callouts, table cells may contain `<img>` tags.
@@ -225,12 +241,13 @@ Use this shape:
 - Add a short figure note when the image role is not obvious.
 - Do not promote tiny incidental crops into primary figures.
 - If image content is required but unclear, write `[TO VERIFY: image detail unclear]`.
+- Adjacent images (separated by one empty line) should be merged into a single side-by-side figure using `display:flex` layout. Pattern: `</figure>` + empty line + `<figure>` → merge into one `<figure>` with `display:flex`.
 
 Use this shape for standalone images:
 
 ```html
 <figure style="text-align:center;">
-  <img src="../doc2x/export/images/example.jpg" alt="例题图" style="max-width:36%;height:auto;display:block;margin:0 auto;" />
+  <img src="../doc2x/export/images/example.jpg" alt="例题图" style="max-width:20%;height:auto;display:block;margin:0 auto;" />
 </figure>
 ```
 
@@ -238,8 +255,8 @@ For two related images side-by-side (outside callouts):
 
 ```html
 <figure style="display:flex;justify-content:center;align-items:center;gap:0.8rem;flex-wrap:nowrap;text-align:center;">
-  <img src="../doc2x/export/images/example-1.jpg" alt="例题图1" style="max-width:22.5%;height:auto;display:block;margin:0 auto;" />
-  <img src="../doc2x/export/images/example-2.jpg" alt="例题图2" style="max-width:22.5%;height:auto;display:block;margin:0 auto;" />
+  <img src="../doc2x/export/images/example-1.jpg" alt="例题图1" style="max-width:20%;height:auto;display:block;margin:0 auto;" />
+  <img src="../doc2x/export/images/example-2.jpg" alt="例题图2" style="max-width:20%;height:auto;display:block;margin:0 auto;" />
 </figure>
 ```
 
@@ -260,7 +277,7 @@ For two related images side-by-side (outside callouts):
 - Plain `\frac` appears where `\dfrac` or nested `\tfrac` is required.
 - Tables are converted into broken pipe text or prose.
 - Images use Markdown syntax or lack sizing/centering control.
-- Images use oversized max-width (72% or 45%) instead of the correct sizes (36% for single, 22.5% for double).
+- Images use oversized max-width (72%, 45%, 36%, or 22.5%) instead of the correct size (20% for all images).
 - Multiple images in one figure stack vertically because the figure lacks `display:flex`.
 - `\begin{array}` was converted to `\begin{cases}` without authorization — this is a CRITICAL error, always preserve Doc2X's original LaTeX constructs.
 - `\$` corruption: every `$` preceded by `\` due to incorrect regex replacement — verify with `rg '\\\$'` and must be 0.
