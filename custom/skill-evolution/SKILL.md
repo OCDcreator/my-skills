@@ -72,7 +72,7 @@ Not in v0. For structural changes in v0 — a new rule touching Hard Contract / 
 Choose where each surviving rule lands via the 4-tier cascade in `references/landing-zone-rules.md`. Add a date stamp to every new rule.
 
 ### Step 8 — Prepare snapshot path + diff
-Prepare the snapshot path `<target>/SKILL.md.bak-YYYY-MM-DD` (if a same-day snapshot already exists, append `-2`, `-3`, ... rather than overwriting — see Fix 8). Generate the concrete diff (SKILL.md and/or references/), annotated with each change's gate reasoning + the adversarial "strongest reason NOT to add this". Do not write yet.
+Prepare the snapshot path `<target>/SKILL.md.bak-YYYY-MM-DD` (if a same-day snapshot already exists, append `-2`, `-3`, ... rather than overwriting). Generate the concrete diff (SKILL.md and/or references/), annotated with each change's gate reasoning + the adversarial "strongest reason NOT to add this". Do not write yet.
 
 ### Step 9 — Approve → write → log
 Present diff + reasoning. On approve: create the snapshot (`SKILL.md.bak-YYYY-MM-DD`) immediately before writing, then write to the repo path (symlink propagates to load points). Regardless of verdict (approve / revise / reject / discard), append an entry to `<target>/references/evolution-log.md` (creating the file if absent). Do not commit. If frontmatter changed, remind the user to run the catalog generators.
