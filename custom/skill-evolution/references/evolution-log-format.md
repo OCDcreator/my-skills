@@ -17,7 +17,7 @@ One block per run, newest at the bottom:
 
 ## Pre-read step (Step 2 of the pipeline)
 
-Before gating, read the target's `references/evolution-log.md` (create if absent). For each current candidate, scan prior entries for the **same substance** that was previously `discard`ed or `surface`d. Tag the recurrence count:
+Before gating, read the target's `references/evolution-log.md`; if absent, treat as empty (do **not** create it yet — the file is created only when appending in Step 9). For each current candidate, scan prior entries for the **same substance** that was previously `discard`ed or `surface`d. Tag the recurrence count:
 
 - **first** — no prior match.
 - **second** — one prior discard/surface of the same substance. Gate normally, but flag "recurrence #2" in the retro.
