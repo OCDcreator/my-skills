@@ -22,3 +22,6 @@ custom/knowledge-to-print-html/.venv-print/
 .stversions/
 automation/**/__pycache__/
 automation/**/*.pyc
+
+# Superpowers specs/plans are local working docs, not part of the repo
+docs/superpowers/
