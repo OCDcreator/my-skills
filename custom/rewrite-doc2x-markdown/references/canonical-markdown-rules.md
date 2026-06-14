@@ -14,6 +14,8 @@ Regenerate Markdown structure, not source meaning. Fix broken OCR layout, headin
 - Remove `<!-- source-page: N -->` markers; they are internal metadata and must not appear in the final transcript.
 - Use real headings for titles and sections, based on the actual content structure.
 - Remove numeric outline prefixes such as `1.`, `1.1`, and `1.1.1` from headings and body structure labels.
+  - **Example**: `**1. 平移变换**` → `**平移变换**`；`**2. 伸缩变换**` → `**伸缩变换**`
+  - **Exception**: Question subparts inside callouts like `(1) $f(x) = ...$` → keep as-is
 - Question subpart labels such as `(1)` and `(2)` may stay inside a question callout when they are part of the original problem.
 - Remove print header/footer noise such as `MST 高中基础知识与二级结论`.
 - For long files, create `markdown-rewrite-plan.md` with checked chunks before final validation:
@@ -39,36 +41,78 @@ Hard rules:
 - Put the stem, sub-questions, and choices inside the same callout.
 - Prefix every line inside the callout with `>`, including blank spacer lines.
 - Do not leave a naked blank line inside the callout.
-- Put choices in a horizontal HTML choice grid when A4 width can fit them.
-- Use two columns for long choices and four columns for short choices.
-- If a choice option contains a formula, render the formula as MathML or accessible inline SVG inside the HTML option; never put `$...$` inside `<span>`.
-- Do not use Markdown choice lists. If options are too long, keep the HTML choice grid but reduce it to one or two columns.
-- Do not split one question into several separate callouts unless the source really has separate questions.
+- **Callout must end with a blank line (no `>`)** before `**解析**` or the next content. If the callout ending is directly followed by `**解析**` without an empty line, Obsidian will render `**解析**` inside the callout.
 
-## Question Analysis Blocks
+### Choice Format
 
-Question analysis must be one compact continuous HTML block, not a Markdown blockquote.
+Use **Markdown tables** inside the callout for choices. Do not use HTML `<div>` or `<span>` structures — formulas inside HTML tags do not render in Obsidian.
 
-Use this shape:
+**Short choices (single line, ≤ 15 Chinese characters per option):**
 
-```html
-<div class="analysis-block" style="border:1px solid #d0d7de;border-left:4px solid #57606a;border-radius:6px;padding:0.7rem 0.85rem;margin:0.8rem 0;background:#f6f8fa;">
-  <div style="font-weight:600;margin-bottom:0.35rem;">解析</div>
-  <p style="margin:0.35rem 0;">先说明关键依据，再给出必要推导，最后落到答案。</p>
-  <p style="margin:0.35rem 0;">因此，答案为 A。</p>
-</div>
+```md
+> | A. 0 | B. 1 | C. 2 | D. 3 |
+> | :---: | :---: | :---: | :---: |
+```
+
+**Long choices (need wrapping):**
+
+```md
+> | A. 较长的选项内容 | B. 另一个选项 |
+> | :---: | :---: |
+> | C. 第三个选项 | D. 第四个选项 |
+> | :---: | :---: |
+```
+
+**Image options:**
+
+```md
+> | A | B | C | D |
+> | :---: | :---: | :---: | :---: |
+> | <img src="..." alt="A" style="max-width:22%;" /> | <img src="..." alt="B" style="max-width:22%;" /> | <img src="..." alt="C" style="max-width:22%;" /> | <img src="..." alt="D" style="max-width:22%;" /> |
 ```
 
 Hard rules:
 
-- Question analysis must use `<div class="analysis-block" ...>...</div>` with a visible border.
-- Do not use Markdown blockquote syntax for question analysis; `> 解析：` is invalid.
-- Regenerate Doc2X's clumped analysis into readable prose.
-- Split the analysis by the real solution logic, not by OCR line breaks.
-- Keep the analysis compact: usually 2 to 4 short paragraphs; complex multi-part geometry problems may use up to 6 logical paragraphs.
-- Do not leave one huge dense paragraph, and do not scatter the solution into many one-line fragments.
-- Do not add new teaching content that is not supported by the source.
-- Because this is HTML, all formulas inside the analysis block must be MathML or accessible inline SVG. Do not put `$...$`, `$$...$$`, `\(...\)`, or `\[...\]` inside the analysis HTML.
+- Every cell in the table must have `> ` prefix (same as the rest of the callout).
+- Formulas in cells use `$...$` — they are inside the table, which is inside the callout, so they render correctly in Obsidian.
+- Do not use HTML `div` + `span` for choice grids — `$...$` inside `<span>` does not render.
+- Do not use Markdown lists (`- A.`, `- B.`) for choices inside callouts — they break the table layout.
+- Use `:---:` for centered alignment.
+
+## Question Analysis Blocks
+
+Question analysis follows the callout. **There must be an empty line between the callout and the analysis.**
+
+For formula-heavy math content, use **plain Markdown** with `**解析**` or `**解**` heading, NOT HTML blocks. The HTML `analysis-block` format requires MathML for all formulas, which is impractical for complex math.
+
+Use this shape:
+
+```md
+> | A. $x^2$ | B. $2^x$ | C. $x^{-1}$ | D. $x^3$ |
+> | :---: | :---: | :---: | :---: |
+
+**解析**
+
+根据条件 $f(x) = ...$，分析如下...
+
+具体步骤：
+1. 先求导：$f'(x) = ...$
+2. 判断单调性：...
+3. 结论：答案为 A。
+```
+
+Hard rules:
+
+- **There must be an empty line between the callout end and `**解析**`**. No `>` prefix on the empty line.
+- Use `**解析**` or `**解**` in bold (not callout, not HTML block).
+- Regenerate Doc2X's clumped analysis into readable paragraphs.
+- Split by real solution logic, not by OCR line breaks.
+- Keep compact: 2-4 short paragraphs; complex problems may use 6 paragraphs.
+- Do not leave one huge dense paragraph, and do not scatter into one-line fragments.
+- Do not add new teaching content not supported by the source.
+- **All formulas in analysis use `$...$` or `$$...$$`** — this is Markdown, not HTML, so MathML is not needed.
+- **Images in analysis**: If the analysis references a figure or diagram, use HTML `<img>` with the correct sizing (max-width:36% for single, max-width:22.5% for double) and place it in the relevant paragraph. Do not use Markdown image syntax `![]()` inside analysis blocks.
+- Only use HTML `analysis-block` when the analysis contains ZERO formulas (pure text).
 
 ## Formulas
 
@@ -169,28 +213,33 @@ Use this shape:
 
 - Keep images near the text that refers to them.
 - Prefer local image paths from the Doc2X export, such as `images/name.png`.
-- Use HTML figures or images with explicit sizing and centering styles.
-- Do not use Markdown image syntax.
-- If a figure contains multiple images, the figure must use `display:flex` with centered alignment and a gap so the images render on one row when space allows.
+- Use HTML figures with explicit sizing and centering styles.
+- **Image sizing rules** (based on real-world rendering feedback):
+  - Single large figure (e.g., example diagram, graph): `max-width: 36%` (not 72% — too large in Obsidian)
+  - Two related images side-by-side: `max-width: 22.5%` each (not 45% — still too large)
+  - Four choice images in a table row: `max-width: 22%` each (inside table cells, no flex needed)
+- For standalone images outside callouts, use `<figure>` with `text-align:center`.
+- For images inside callout tables, use `style="max-width:22%;"` directly in the `<img>` tag.
+- Do not use Markdown image syntax `![]()` outside callouts; inside callouts, table cells may contain `<img>` tags.
 - Do not put multiple `display:block` images under a plain `text-align:center` figure; they will stack vertically.
 - Add a short figure note when the image role is not obvious.
 - Do not promote tiny incidental crops into primary figures.
 - If image content is required but unclear, write `[TO VERIFY: image detail unclear]`.
 
-Use this shape:
+Use this shape for standalone images:
 
 ```html
 <figure style="text-align:center;">
-  <img src="../doc2x/export/images/example.jpg" alt="例题图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
+  <img src="../doc2x/export/images/example.jpg" alt="例题图" style="max-width:36%;height:auto;display:block;margin:0 auto;" />
 </figure>
 ```
 
-For multiple related images:
+For two related images side-by-side (outside callouts):
 
 ```html
 <figure style="display:flex;justify-content:center;align-items:center;gap:0.8rem;flex-wrap:nowrap;text-align:center;">
-  <img src="../doc2x/export/images/example-1.jpg" alt="例题图1" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
-  <img src="../doc2x/export/images/example-2.jpg" alt="例题图2" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
+  <img src="../doc2x/export/images/example-1.jpg" alt="例题图1" style="max-width:22.5%;height:auto;display:block;margin:0 auto;" />
+  <img src="../doc2x/export/images/example-2.jpg" alt="例题图2" style="max-width:22.5%;height:auto;display:block;margin:0 auto;" />
 </figure>
 ```
 
@@ -211,6 +260,7 @@ For multiple related images:
 - Plain `\frac` appears where `\dfrac` or nested `\tfrac` is required.
 - Tables are converted into broken pipe text or prose.
 - Images use Markdown syntax or lack sizing/centering control.
+- Images use oversized max-width (72% or 45%) instead of the correct sizes (36% for single, 22.5% for double).
 - Multiple images in one figure stack vertically because the figure lacks `display:flex`.
 - `\begin{array}` was converted to `\begin{cases}` without authorization — this is a CRITICAL error, always preserve Doc2X's original LaTeX constructs.
 - `\$` corruption: every `$` preceded by `\` due to incorrect regex replacement — verify with `rg '\\\$'` and must be 0.

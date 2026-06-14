@@ -63,7 +63,7 @@ HTML_FORMULA_HINT_PATTERN = re.compile(
 PLAIN_FRAC_PATTERN = re.compile(r"\\frac\b")
 NON_OBSIDIAN_MATH_DELIMITER_PATTERN = re.compile(r"\\[()\[\]]")
 FRAGILE_KATEX_MACRO_PATTERN = re.compile(
-    r"\\(?:mathbin|mspace|left\.|begin\{array\}|end\{array\}|overset\{\\large\\frown\})"
+    r"\\(?:mathbin|mspace|left\.|overset\{\\large\\frown\})"
 )
 
 LONG_MARKDOWN_LINE_LIMIT = 300
@@ -603,6 +603,14 @@ def auto_fix_markdown(markdown_text: str) -> tuple[str, list[str]]:
         body = LIST_ARTIFACT_PATTERN.sub(r"\1. ", body)
         body = CIRCLED_NUM_ARTIFACT_PATTERN.sub(r"\1 ", body)
 
+        # Rule: remove numeric outline prefixes from bold text (e.g., **1. 平移变换** → **平移变换**)
+        # But preserve question subparts like (1), (2) inside callouts
+        NUMERIC_OUTLINE_BOLD_PATTERN = re.compile(r"\*\*\d+\.\s+(.*?)\*\*")
+        new_body = NUMERIC_OUTLINE_BOLD_PATTERN.sub(r"**\1**", body)
+        if new_body != body:
+            body = new_body
+            changes.append(f"line {index}: removed numeric outline prefix from bold text")
+
         # Rule: stray backslash escapes (not inside code blocks)
         if "`" not in content and "```" not in content:
             body = STRAY_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", body)
@@ -699,6 +707,11 @@ def lint_proofreading(markdown_text: str) -> list[LintMessage]:
 
     for index, line in enumerate(lines, start=1):
         content = strip_quote_marker(line) if is_quote_line(line) else line
+        if "$" in content and "```" not in content.lower():
+            # Skip lines containing LaTeX array constructs — these have legitimate brace imbalances
+            # e.g., \left\{ \begin{array}{l} ... \end{array} \right.
+            if r"\begin{array}" in content or r"\left\{" in content or r"\right." in content:
+                continue
         open_braces = content.count("{")
         close_braces = content.count("}")
         if open_braces != close_braces and "```" not in content.lower():
@@ -723,9 +736,16 @@ def lint_proofreading(markdown_text: str) -> list[LintMessage]:
             messages.append(LintMessage(index, "line looks garbled or corrupted"))
 
     # Check for confusable Chinese characters (flag as suspicious)
+    # But skip lines that contain LaTeX formulas — the backslash+brace patterns
+    # like \left\{ are often falsely flagged as containing "已"
     for index, line in enumerate(lines, start=1):
+        if line.strip().startswith("```"):
+            continue
+        # Remove LaTeX math regions before checking confusable chars
+        line_without_latex = re.sub(r"\\[A-Za-z]+\{[^}]*\}", "", line)
+        line_without_latex = re.sub(r"\$[^\n$]+\$", "", line_without_latex)
         for char, alternates in CONFUSABLE_CHINESE_CHARS.items():
-            if char in line and not line.strip().startswith("```"):
+            if char in line_without_latex:
                 messages.append(LintMessage(index, f"suspicious character [{char}] near [{alternates}] — verify against page image"))
                 break
 

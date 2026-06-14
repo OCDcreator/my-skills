@@ -34,6 +34,21 @@ Also read the local Obsidian Markdown syntax skill for syntax compatibility refe
 - **Doc2X is the primary source**: always use `doc2x/page-transcript.raw.md` as your base text. Do NOT use third-party image OCR tools (MCP screenshots, etc.) as a substitute — they produce worse results and miss content. The Doc2X export is the authoritative transcription.
 - **Preserve ALL detail**: never summarize, condense, or remove derivation steps from analysis sections. Every step of every method (法一, 法二, 法三) must be preserved in full. Missing detail is a critical failure.
 
+## Preconditions & Skill Boundaries
+
+**This skill REQUIRES pre-existing Doc2X OCR output.** It rewrites and cleans existing markdown — it does NOT perform OCR itself. If Doc2X has not been run, use the `scan-pdf-to-print-html` skill (which includes `doc2x_parse_job.py`) to run the full OCR pipeline first.
+
+**Input handling**:
+
+| Input | Status | Action |
+|-------|--------|--------|
+| `doc2x/page-transcript.raw.md` + `doc2x/export/export.md` | **Ideal** | Proceed with rewrite |
+| PDF only, no Doc2X output | **Blocked** | Tell user: "Doc2X OCR not found. Run `scan-pdf-to-print-html` skill first, or manually upload PDF to Doc2X and provide the output files." |
+| PDF + `page-transcript.raw.md` | **OK** | Proceed; use PDF only for proofreading images |
+| Standalone markdown (no doc2x/) | **OK** | Proceed as-is, skip OCR quality gate |
+
+**If you have a PDF but no Doc2X output**: Extract the needed pages as a sub-PDF and call `doc2x_parse_job.py` from the `scan-pdf-to-print-html` skill (or ask the user to run it). The `rewrite-doc2x-markdown` skill itself does NOT contain Doc2X API scripts.
+
 ## Inputs
 
 Accept any of these inputs:
@@ -51,6 +66,12 @@ If only one Doc2X markdown file is provided, still apply this skill and write a 
 ## Forbidden Patterns (LESSONS LEARNED)
 
 These patterns caused critical failures in past sessions. Violating them is a critical error.
+
+### F5 — No silent chunk-boundary duplication
+
+When dispatching subagents for parallel chunking, **each chunk must process its assigned pages and STOP** — never continue into the next chunk's content. If a section heading (e.g., `## 题型-3`) appears at the boundary between chunk N and chunk N+1, it belongs to **chunk N+1 only**, not both.
+
+After assembly, if duplicate section headers or duplicate bullet points appear at chunk boundaries, remove the duplication immediately. The assembler is responsible for clean boundaries — subagents must not "helpfully" include the next section's opening.
 
 ### F1 — No regex for semantic rewrites
 
@@ -234,10 +255,18 @@ or:
 py -3 scripts/validate_canonical_markdown.py --job-dir "C:\path\job" --fix
 ```
 
-This auto-corrects: math spacing, delimiter normalization, fraction standardization, blank line splits, header noise, and leading orphan punctuation.
+After `--fix`, check for callout prefix issues:
+
+```
+py -3 scripts/fix_callout_prefixes.py --md "C:\path\source-transcript.md" --fix
+```
+
+This auto-corrects: math spacing, delimiter normalization, fraction standardization, blank line splits, header noise, leading orphan punctuation, and callout prefix integrity.
 
 **Known validator limitations:**
 The `--fix` mode may incorrectly transform `---` (horizontal rule) into `__________` (fill-in-blank) due to Rule 5 (Fill-in-Blank Normalization). After running `--fix`, visually check that section separators remain as `---` and haven't been corrupted.
+
+The `fix_callout_prefixes.py` script may add `> ` to lines that are intentionally outside callouts. After running it, verify that standalone paragraphs and section headers were not incorrectly prefixed. Lines starting with `##` or `###` should NOT receive a `> ` prefix.
 
 ### Step 5 — Quality Validation
 
@@ -249,8 +278,10 @@ py -3 scripts/validate_canonical_markdown.py --md "C:\path\source-transcript.md"
 
 **Known false positives** (do NOT waste time on these):
 - "possible unclosed inline math `$` delimiter" — triggered by `$$...$$` blocks that contain `$` inside them; these are NOT actual errors in formula-heavy content.
-- "suspicious character [已] near [己/巳]" and "[入] near [人]" — these are legitimate Chinese characters that appear correctly in context. Verify once, then dismiss.
+- "suspicious character [已] near [己/巳]" and "[入] near [人]" — these are legitimate Chinese characters that appear correctly in context. Verify once, then dismiss. Also note: `\left\{` and `\begin{array}` patterns are often falsely flagged as containing "已" due to the `{` character.
 - "possible unclosed display math `$$` delimiter" — same as above, false alarm.
+- "unbalanced braces" — triggered by `\left\{ \begin{array}{l} ... \end{array}\right.` patterns. These are valid LaTeX constructs, not actual brace errors. Verify by counting `\left`/`\right` pairs and `\begin{array}`/`\end{array}` pairs match.
+- "HTML content must use MathML or inline SVG for formulas" — triggered by `$...$` inside `<span>` elements in choice grids. For formula-heavy math content, this is impractical. The canonical rules explicitly allow plain Markdown for math-heavy analysis sections. This is a known validator limitation.
 
 If ALL failures are only these known false positives, report them as "confirmed false positives" and pass the step.
 
@@ -262,20 +293,23 @@ Before reporting, run through this checklist. **For every command-based check, p
 
 #### Evidence-based checks (run command, paste output)
 
-Run each command and include the output in your report:
+Run each command and include the output in your report. **Do not skip any check.** If a check is not applicable, write "N/A — [reason]" instead of omitting it.
 
 1. **No \$ corruption**: `rg -c '\\\$' source-transcript.md` → must be 0
 2. **No \begin{cases} introduced**: `rg -c '\\begin\{cases\}' source-transcript.md` → must match raw transcript count
-3. **\begin{array} preserved**: `rg -c '\\begin\{array\}' source-transcript.md` vs `rg -c '\\begin\{array\}' doc2x/page-transcript.raw.md` → source must be >= raw
-4. **Fused formulas split**: `rg -n '\$[^$]*[，,][^$]*[=<>≥≤][^$]*\$' source-transcript.md` → no independent relations fused
+3. **\begin{array} preserved**: `rg -c '\\begin\{array\}' source-transcript.md` vs `rg -c '\\begin\{array\}' doc2x/page-transcript.raw.md` → source must be >= raw. Note: `\begin{array}` inside `\left\{` constructs is correct — do NOT count these as errors.
+4. **Fused formulas split**: `rg -n '\$[^$]*[，,][^$]*[=<>≥≤][^$]*\$' source-transcript.md` → no independent relations fused. Note: `\begin{array}` rows with `,` separators are NOT fused formulas.
 5. **Paragraph length**: `rg -n '.{300,}' source-transcript.md` → remaining long lines must be pure formula blocks only
 6. **HTML comment integrity**: `rg -n '<!_' source-transcript.md` → must be 0 (Rule 5 corruption check)
-7. **`--fix` pass**: `validate_canonical_markdown.py --fix` → PASS
-8. **Proofreading**: `validate_canonical_markdown.py --check-proofreading` → only known false positives remain
+7. **`--fix` pass**: `validate_canonical_markdown.py --fix` → PASS, except for known false positives (HTML/MathML warnings for formula-heavy content)
+8. **Proofreading**: `validate_canonical_markdown.py --check-proofreading` → only known false positives remain (suspicious character, unbalanced braces from `\begin{array}`)
+9. **Image sizing**: `rg -n 'max-width:72%|max-width:45%' source-transcript.md` → must be 0 (images should use max-width:36% for single, max-width:22.5% for double, per canonical rules)
 
 #### Judgment-based checks (verify, mark pass/fail)
 
-- [ ] **Callout syntax**: every `[!question]`, `[!example]`, `[!note]`, `[!warning]` has `> ` prefix
+You MUST check all items below. Do not skip any. If an item is not applicable, write "N/A — [reason]" instead of omitting it.
+
+- [ ] **Callout syntax**: every `[!question]`, `[!example]`, `[!note]`, `[!warning]` has `> ` prefix (use `rg -n '^\[!'` to verify — any match means a broken callout)
 - [ ] **解析 bold**: every analysis section has `**解析**` or `**解**` in bold
 - [ ] **Content preservation**: ALL derivation steps preserved — no summarizing of 法一/法二/法三
 - [ ] **Doc2X primacy**: content scope matches `doc2x/page-transcript.raw.md` — no detail removed
@@ -284,6 +318,7 @@ Run each command and include the output in your report:
 - [ ] **Long formulas**: display formulas > 60 chars use `\begin{aligned}` with line breaks
 - [ ] **Horizontal rules**: `---` separators not corrupted to `__________`
 - [ ] **OCR typos fixed**: confusable characters (已/己, 人/入, 末/未) verified in analysis blocks
+- [ ] **Chunk boundary clean**: if parallel chunks were used, no duplicate headings or bullet points at boundaries, and no bare callouts without `>` prefix
 
 ### Step 7 — Report
 
@@ -335,6 +370,7 @@ For each chunk, dispatch a subagent with:
 - Instructions: execute Steps 1 through 2.5 (auto-fix → stop-gate → proofread → **analysis block re-typesetting**) on this chunk only, then apply Step 3 (structural format) formatting rules
 - The current `canonical-markdown-rules.md`, `auto-fix-rules.md`, and `analysis-retypesetting.md` as reference
 - **CRITICAL**: subagent must split fused formulas (Rule 4), re-typeset analysis blocks into logical paragraphs, and fix OCR typos — these are the most commonly missed steps
+- **BOUNDARY RULE**: the subagent must NOT include content from the next chunk. If the chunk ends mid-page or at a section boundary, the subagent stops at its last assigned line. It must NOT "continue" into the next chunk to "finish the section"
 - Output: cleaned Markdown for the chunk + `[TO VERIFY]` markers encountered
 
 After each batch completes, check for failed chunks (subagent error or timeout > 5 min). Mark failed chunks in `markdown-rewrite-plan.md` and re-dispatch them in the next batch.
@@ -342,7 +378,9 @@ After each batch completes, check for failed chunks (subagent error or timeout >
 ### Assembly
 
 1. Concatenate chunks in page order.
-2. Check chunk boundaries for:
+2. **Critical — Callout Prefix Check**: After assembly, run `rg -c '^\[!question\]' source-transcript.md` and `rg -c '^\[!example\]' source-transcript.md`. If any result is > 0, STOP. The `>` prefix was lost during assembly. Fix immediately by prefixing all bare `[!question]` and `[!example]` lines with `> `.
+3. Check chunk boundaries for:
+   - **Duplicate content**: if the last section of chunk N is also the first section of chunk N+1, remove the duplicate. This commonly happens when a section heading appears on the boundary page. Keep the version from the chunk where the section's EXAMPLES/CONTENT live, not the chunk that only has the heading.
    - Truncated formulas or tables at page breaks.
    - Heading level consistency across chunks (adjacent chunks must not jump levels).
    - Duplicate or missing `## Page N` markers.
