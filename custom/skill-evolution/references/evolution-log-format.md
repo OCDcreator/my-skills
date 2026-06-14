@@ -27,6 +27,9 @@ Before gating, read the target's `references/evolution-log.md`; if absent, treat
 
 ## Lifecycle
 
+- **Bulletproof append.** Append an entry on EVERY run, regardless of verdict — `add_new`, `strengthen`, `discard`, `human_review`, `surface`, and even error or abort. The log records what happened, including failures. Create `references/evolution-log.md` on the first run (during the Step 9 write phase) if it does not exist. Step 2's pre-read treats an absent log as empty; it never creates the file mid-read.
+- **Never infer unrecorded history.** If the log is absent or incomplete (runs before skill-evolution existed, or runs that failed to log), you cannot reconstruct what was never recorded. Do not fabricate recurrence data — mark provenance honestly.
+- **Cold-start limitation (known).** A young skill gets no recurrence protection for its first runs — every candidate is `first` until the log accrues. The third-strike promotion only fires from run 3 onward (once two prior same-substance entries exist). This is a documented limitation, not a bug to paper over.
 - The log is append-only. Never edit prior entries.
 - Stale `add_new`/`strengthen` rules that were later removed from the skill keep their log entry (it's history).
 - Date stamps on rules (landing-zone-rules.md) cross-reference the log dates.

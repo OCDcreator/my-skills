@@ -2,6 +2,8 @@
 
 The Quick Gate is the product. Its job: keep overfit / duplicate / preference-only feedback out of the skill while letting real engineering principles in. It is model-judged and has a self-serving bias toward `discard`, so it is supplemented by a grep pre-check (Gate 2), borderline surfacing (Gate 3), transparency, and human approval.
 
+**Every verdict requires pasted evidence (Hard Contract).** Gate 2 verdicts paste the matched existing rule text + `file:line` (or state "grep: no hits" for `new`); Gate 3 verdicts quote the user message + the principle-vs-preference reasoning; Gate 1 fails cite the single-document scope. A verdict without pasted evidence is tagged `unverified` in the report — never silently trusted. (This is auditable evidence, not automated verification — see SKILL.md "Known Limitation: Verification Ceiling".)
+
 ## Gate 1 — Generality
 
 Does the rule generalize to a **class of inputs**, not just the triggering document? If you never see this exact document again, is the rule still meaningful?
@@ -32,6 +34,8 @@ Already-documented rules stay in scope (e.g. a stated 300-char paragraph limit i
 
 **Borderline verdicts are surfaced for explicit user confirmation** — never silently discarded. Silent `preference → discard` is the path that loses recurring real feedback.
 
+**Every `preference-clear → discard` must show its reasoning** (not just borderline): the user quote, why it is preference (not principle), whether existing skill rules already encode it, why it is safe to discard, and the recurrence count. The `preference-clear → discard` path is where the model's self-serving bias is strongest and the user's visibility is weakest — so it gets full sunlight. A discard with no shown reasoning is `unverified`.
+
 ## Decision matrix — precedence (top wins)
 
 Evaluate top-down; the first matching row decides. This resolves overlap between wildcards.
@@ -40,7 +44,7 @@ Evaluate top-down; the first matching row decides. This resolves overlap between
 2. Gate 1 == fail → **`discard`** (overfit / single-doc)
 3. Gate 2 == `duplicate` → **`discard`** (already covered)
 4. Gate 3 == `preference-borderline` → **`surface`** (ask user)
-5. Gate 3 == `preference-clear` → **`discard`** (taste)
+5. Gate 3 == `preference-clear` → **`discard`** (taste) — must show full reasoning (user quote + why preference + existing-rule check + recurrence), see Gate 3 above
 6. Gate 2 == `new` & Gate 3 == `principle` → **`add_new`**
 7. Gate 2 == `strengthen` & Gate 3 == `principle` → **`strengthen`**
 

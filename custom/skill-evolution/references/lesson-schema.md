@@ -1,6 +1,6 @@
 # Lesson Schema
 
-Every `rework | missing | wrong` user message becomes one candidate lesson with these fields. The trace-enrichment fields (assistant action, file states, validator outputs, resolved?, uncertainty) are mandatory — elliptical corrections ("还是不对", "看第17页") are meaningless without the failure context.
+Every `rework | missing | wrong` user message becomes one candidate lesson with these fields. The trace-enrichment fields (assistant action, file states, validator outputs, resolved?, uncertainty) are mandatory — elliptical corrections ("还是不对", "看第17页") are meaningless without the failure context. Each enrichment field carries a **provenance tag** — `(extracted)` if pulled from the in-context transcript, `(reconstructed)` if from memory or a user-paste — and every field must paste **real content** (the actual assistant turn, the real file bytes/excerpt), never a paraphrase. See SKILL.md Hard Contract (CAPTURE runs in the main context; evidence-backed claims).
 
 ## Fields
 
@@ -9,12 +9,13 @@ LESSON #N
   user_message     : <verbatim user message>
   classify         : rework | missing | wrong | style-pref | off-topic
   --- trace enrichment (rework/missing/wrong only) ---
-  preceding_action : <what the model did/said right before this correction>
+  preceding_action : <PASTE the real assistant turn right before this correction — do not paraphrase>
   affected_paths   : <file paths touched, with their state at that moment>
   final_state      : <accepted / latest state of those paths>
   validator_output : <relevant validator/self-check output at that point, or "none">
   resolved         : yes | no | partial | unknown
   uncertainty      : <anything that cannot be reconstructed — surface to user, do not guess>
+  provenance       : extracted | reconstructed   (tag the enrichment fields above; "extractured" = from in-context transcript, "reconstructed" = from memory/user-paste)
   --- candidate rule ---
   trigger          : <generalized situation: "when X class of input...">
   mistake          : <what the skill/model did wrong>
