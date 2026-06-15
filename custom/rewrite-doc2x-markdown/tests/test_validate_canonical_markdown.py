@@ -860,6 +860,24 @@ def test_dfrac_in_denominator_flagged(tmp_path: Path) -> None:
     assert "should be \\tfrac" in result.stdout
 
 
+def test_tfrac_nested_behind_intervening_braces_ok(tmp_path: Path) -> None:
+    """\\tfrac inside \\dfrac numerator with intervening {..} groups is correctly nested."""
+    result = run_validator(
+        tmp_path,
+        "# Test\n\n$\\dfrac{-a^2\\left({x + \\tfrac{1}{a}}\\right)}{ax^2}$\n",
+    )
+    assert result.returncode == 0
+
+
+def test_tfrac_in_nested_denominator_behind_braces_ok(tmp_path: Path) -> None:
+    """\\tfrac inside \\dfrac denominator with intervening braces is nested."""
+    result = run_validator(
+        tmp_path,
+        "# Test\n\n$a \\leq \\dfrac{1}{\\ln\\left({1 + \\tfrac{1}{n}}\\right)} - n$\n",
+    )
+    assert result.returncode == 0
+
+
 def test_tfrac_in_ln_argument_flagged(tmp_path: Path) -> None:
     result = run_validator(
         tmp_path,

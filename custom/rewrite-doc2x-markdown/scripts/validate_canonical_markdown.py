@@ -889,10 +889,12 @@ def _scan_fraction_context(math: str) -> list[tuple[int, str]]:
                     j += 1
                 word = math[i + 1:j]
                 if word in ("dfrac", "tfrac"):
-                    top = stack[-1][0] if stack else None
-                    if word == "dfrac" and top in nested_kinds:
-                        issues.append((i, f"\\dfrac inside {top} should be \\tfrac (nested fraction rule)"))
-                    elif word == "tfrac" and top not in nested_kinds:
+                    stack_kinds = {frame[0] for frame in stack}
+                    is_nested = bool(stack_kinds & nested_kinds)
+                    if word == "dfrac" and is_nested:
+                        nearest = next(frame[0] for frame in reversed(stack) if frame[0] in nested_kinds)
+                        issues.append((i, f"\\dfrac inside {nearest} should be \\tfrac (nested fraction rule)"))
+                    elif word == "tfrac" and not is_nested:
                         issues.append((i, "\\tfrac in non-nested context should be \\dfrac"))
                     pending = "frac_num"
                 elif word == "sqrt":
