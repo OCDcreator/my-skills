@@ -16,7 +16,14 @@ Regenerate Markdown structure, not source meaning. Fix broken OCR layout, headin
 - Remove numeric outline prefixes such as `1.`, `1.1`, and `1.1.1` from headings and body structure labels.
   - **Example**: `**1. 平移变换**` → `**平移变换**`；`**2. 伸缩变换**` → `**伸缩变换**`
   - **Exception**: Question subparts inside callouts like `(1) $f(x) = ...$` → keep as-is
-- Question subpart labels such as `(1)` and `(2)` may stay inside a question callout when they are part of the original problem.
+- Question subpart labels such as `(1)`, `(2)`, `(3)` MUST stay inside the question callout when they are part of the original problem. **Each subpart MUST be on its own line** — never cram multiple `(N)` subparts onto a single line, which renders as an unreadable wall of text (变成一坨).
+  - WRONG (crammed on one line): `> (1) 求切线方程；(2) 求极值。`
+  - RIGHT (one subpart per line):
+    ```
+    > (1) 求切线方程。
+    >
+    > (2) 求极值。
+    ```
 - Remove print header/footer noise such as `MST 高中基础知识与二级结论`.
 - For long files, create `markdown-rewrite-plan.md` with checked chunks before final validation:
   `- [x] Page 274 - 线面平行`
@@ -47,6 +54,7 @@ Use this shape:
 Hard rules:
 
 - Put the stem, sub-questions, and choices inside the same callout.
+- **Each numbered subpart `(1)`, `(2)`, `(3)` inside a callout MUST be on its own `>` line**, separated from the next subpart by a blank `>` spacer line. Putting `(1) … (2) … (3) …` on one line is a critical formatting failure (crammed into an unreadable lump).
 - Prefix every line inside the callout with `>`, including blank spacer lines.
 - Do not leave a naked blank line inside the callout.
 - **Callout must end with a blank line (no `>`)** before `**解析**` or the next content. If the callout ending is directly followed by `**解析**` without an empty line, Obsidian will render `**解析**` inside the callout.
@@ -90,6 +98,8 @@ Hard rules:
 ## Question Analysis Blocks
 
 Question analysis follows the callout. **There must be an empty line between the callout and the analysis.**
+
+**Q&A ordering rule (MANDATORY):** Each question's analysis/answer (`**解析**` / `**解答**` / `**证明**`) MUST appear DIRECTLY below its own question callout — never grouped separately. If a document has 练习1, 练习2, 练习3, the correct order is: 练习1 question → 练习1 analysis → 练习2 question → 练习2 analysis → 练习3 question → 练习3 analysis. Grouping all questions together then all analyses together is a structural failure. This applies to 例题 and 练习 alike.
 
 For formula-heavy math content, use **plain Markdown** with `**解析**` or `**解**` heading, NOT HTML blocks. The HTML `analysis-block` format requires MathML for all formulas, which is impractical for complex math.
 
@@ -144,7 +154,12 @@ Hard rules:
 - For condition groups in normal Markdown, prefer `\begin{cases} ... \end{cases}` inside a `$$...$$` block **only when the source does not already use `\begin{array}`**. If Doc2X output uses `\begin{array}`, keep it. Inside HTML, use MathJax inline SVG for polished braces/cases; use `math-cases` with vertical `case-lines` and MathML fragments only as a fallback when SVG generation is unavailable.
 - For arcs, prefer a simple notation such as `\widehat{AC}`.
 - ALL normal fractions use `\dfrac{...}{...}` — both inline `$...$` and display `$$...$$`.
-- Only nested fractions (inside a numerator, denominator, exponent, or log base) use `\tfrac{...}{...}`.
+- Only nested fractions use `\tfrac{...}{...}`. **"Nested" means the fraction is INSIDE one of these contexts**:
+  - The `{numerator}` or `{denominator}` braces of another `\dfrac{...}{...}` or `\tfrac{...}{...}`
+  - An exponent: `^{...\dfrac...}` or `{e}^{\dfrac...}`
+  - A subscript: `_{...\dfrac...}`
+  - Inside `\sqrt{...\dfrac...}`
+- **Function arguments are NOT nested contexts.** `\ln(\dfrac{1}{x})`, `\log(\dfrac{a}{b})`, `\sin(\dfrac{\pi}{2})` — the fraction inside the parentheses is a standalone fraction and must use `\dfrac`, NOT `\tfrac`. Being the argument (真数) of `\ln` or `\log` does not make it nested. Only `\log_{\tfrac{1}{2}}` (the BASE, written as a subscript) would use `\tfrac`.
 - Never use plain `\frac{...}{...}`.
 - Mark uncertain symbols locally with `[TO VERIFY: ...]`.
 - Use `\lvert ... \rvert` for absolute values and vector magnitudes. Do NOT use `\left| ... \right|` which stretches incorrectly. Example: `\lvert \overrightarrow{AB}\rvert` not `\left| \overrightarrow{AB}\right|`.
@@ -193,6 +208,24 @@ Fallback HTML condition-group example:
 - Exception: Point labels like `$A$`, `$B$`, `$C$` stay as-is (these are not vectors).
 - Exception: Triangle side lengths in 解三角形 sections stay as-is (these are scalar lengths, not vectors).
 
+## Punctuation Consistency
+
+Commas in the transcript must be clean and consistent. Hard rules:
+
+- **Every English comma `,` must be followed by exactly one space** — never glued to the next character. `由题意可知,继续推导` is wrong; write `由题意可知, 继续推导`. (Chinese full-width `，` carries its own spacing and needs no extra ASCII space.)
+- **Do not mix `，` and `,` within a single paragraph or callout** — pick one comma style per block and use it consistently throughout that block.
+- **Default style stays as existing rules specify**: Chinese `，` in Chinese prose (per `proofreading-checklist.md` and `analysis-retypesetting.md`); English `, ` between adjacent formulas and in coordinate/list contexts.
+- Collapse any double spaces after a comma (``,  `` → `, `).
+
+Verify (judgment required — math spans and code are false-positive sources):
+```bash
+# English comma directly followed by a non-space character
+rg -n ',[^ \n,)]' source-transcript.md
+# Inspect each hit; skip false positives inside $...$ math (e.g. $f(x,y)$), code spans, HTML attributes.
+```
+
+This rule is **model-enforced**, not a validator regex — comma placement across mixed math/HTML/code contexts is semantic (per Forbidden Pattern F1) and a naive regex would misfire on function arguments like `$f(x, y)$`.
+
 ## Analysis Block Re-typesetting
 
 Detailed re-typesetting rules, OCR typo fixing procedures, subagent dispatch templates, and formula integrity verification commands are in **`references/analysis-retypesetting.md`**.
@@ -229,7 +262,7 @@ Use this shape:
 ## Images
 
 - Keep images near the text that refers to them.
-- Prefer local image paths from the Doc2X export, such as `images/name.png`.
+- Prefer local image paths from the Doc2X export. **Paths are relative to `source-transcript.md`'s location.** Since `source-transcript.md` is in the job root and images are in `doc2x/export/images/`, the correct path is `doc2x/export/images/name.jpg` — NOT `images/name.jpg` (which would be a broken relative path).
 - Use HTML figures with explicit sizing and centering styles.
 - **Image sizing rules** (based on real-world rendering feedback):
   - ALL images use `max-width: 20%` — single figures, side-by-side figures, and triple figures alike.

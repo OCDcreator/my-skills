@@ -61,7 +61,7 @@ def test_accepts_continuous_question_callout_and_compact_html_analysis_block(tmp
 </table>
 
 <figure style="text-align:center;">
-  <img src="images/example.jpg" alt="例题图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
+  <img src="doc2x/export/images/example.jpg" alt="例题图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
 </figure>
 
 公式：$\\dfrac{1}{2} + \\dfrac{\\tfrac{1}{2}}{3}$
@@ -278,8 +278,8 @@ def test_rejects_multi_image_figure_without_horizontal_flex_layout(tmp_path: Pat
         """# 空间几何
 
 <figure style="text-align:center;">
-  <img src="images/a.jpg" alt="图1" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
-  <img src="images/b.jpg" alt="图2" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
+  <img src="doc2x/export/images/a.jpg" alt="图1" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
+  <img src="doc2x/export/images/b.jpg" alt="图2" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
 </figure>
 """,
     )
@@ -292,8 +292,8 @@ def test_rejects_multi_image_figure_without_horizontal_flex_layout(tmp_path: Pat
         """# 空间几何
 
 <figure style="display:flex;justify-content:center;align-items:center;gap:0.8rem;flex-wrap:nowrap;text-align:center;">
-  <img src="images/a.jpg" alt="图1" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
-  <img src="images/b.jpg" alt="图2" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
+  <img src="doc2x/export/images/a.jpg" alt="图1" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
+  <img src="doc2x/export/images/b.jpg" alt="图2" style="max-width:45%;height:auto;display:block;margin:0 auto;" />
 </figure>
 """,
     )
@@ -308,7 +308,7 @@ def test_accepts_choice_grid_with_multiple_single_image_figures_on_one_line(tmp_
 
 > [!question] 题干
 > <div class="choice-grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.5rem 0.8rem;align-items:start;">
-> <span>A. <figure style="text-align:center;margin:0;"><img src="images/a.jpg" alt="A" style="max-width:70%;height:auto;display:block;margin:0 auto;" /></figure></span><span>B. <figure style="text-align:center;margin:0;"><img src="images/b.jpg" alt="B" style="max-width:70%;height:auto;display:block;margin:0 auto;" /></figure></span>
+> <span>A. <figure style="text-align:center;margin:0;"><img src="doc2x/export/images/a.jpg" alt="A" style="max-width:70%;height:auto;display:block;margin:0 auto;" /></figure></span><span>B. <figure style="text-align:center;margin:0;"><img src="doc2x/export/images/b.jpg" alt="B" style="max-width:70%;height:auto;display:block;margin:0 auto;" /></figure></span>
 > </div>
 """,
     )
@@ -808,3 +808,176 @@ def test_proofread_detects_garbled_lines(tmp_path: Path) -> None:
     result = run_proof(tmp_path, "# 空间几何\n\n###ERROR###\n")
     assert result.returncode == 1
     assert "garbled" in result.stdout
+
+
+def test_accepts_consistent_comma_style(tmp_path: Path) -> None:
+    # Regression fixture for Punctuation Consistency (canonical-markdown-rules.md):
+    # clean, consistent, properly-spaced commas must be accepted. The validator
+    # does NOT enforce comma style by regex (it is model-enforced per Forbidden
+    # Pattern F1); this fixture pins the expected clean style so future validator
+    # changes do not break it. Paragraph 1 uses English ", " between formulas;
+    # paragraph 2 uses Chinese "，" in prose — each block is internally consistent.
+    result = run_validator(
+        tmp_path,
+        """# 函数与导数
+
+## 导数的应用
+
+已知函数 $f(x) = x^2$, 求其在 $x = 1$ 处的导数。
+
+由题意可知，$f'(x) = 2x$，因此 $f'(1) = 2$。
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+# --- fraction nesting and QA ordering tests ---
+
+def test_dfrac_in_exponent_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 空间几何\n\n公式：${e}^{\\dfrac{2}{e}}$\n",
+    )
+    assert result.returncode == 1
+    assert "should be \\tfrac" in result.stdout
+
+
+def test_dfrac_in_numerator_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 空间几何\n\n公式：$\\dfrac{\\dfrac{1}{2}x}{e}$\n",
+    )
+    assert result.returncode == 1
+    assert "should be \\tfrac" in result.stdout
+
+
+def test_dfrac_in_denominator_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 空间几何\n\n公式：$\\dfrac{1}{\\ln(1+\\dfrac{1}{n})}$\n",
+    )
+    assert result.returncode == 1
+    assert "should be \\tfrac" in result.stdout
+
+
+def test_tfrac_in_ln_argument_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 空间几何\n\n公式：$\\ln(\\tfrac{1}{x})$\n",
+    )
+    assert result.returncode == 1
+    assert "non-nested context" in result.stdout
+
+
+def test_standalone_dfrac_ok(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 空间几何\n\n公式：$\\dfrac{1}{2}$\n",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_correct_tfrac_in_exponent_ok(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 空间几何\n\n公式：${e}^{\\tfrac{2}{e}}$\n",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_consecutive_questions_no_analysis_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+> [!question] 第一题
+> 题干内容
+
+> [!question] 第二题
+> 题干内容
+""",
+    )
+    assert result.returncode == 1
+    assert "no analysis before next question" in result.stdout
+
+
+def test_question_with_analysis_ok(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+> [!question] 第一题
+> 题干内容
+
+**解析** 答案。
+
+> [!question] 第二题
+> 题干内容
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_image_path_images_prefix_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+<figure style="text-align:center;">
+  <img src="images/foo.jpg" alt="图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
+</figure>
+""",
+    )
+    assert result.returncode == 1
+    assert "image path 'images/...' is likely wrong" in result.stdout
+
+
+def test_image_path_correct_prefix_ok(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+<figure style="text-align:center;">
+  <img src="doc2x/export/images/foo.jpg" alt="图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
+</figure>
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_image_path_https_ok(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+<figure style="text-align:center;">
+  <img src="https://example.com/foo.jpg" alt="图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
+</figure>
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_image_path_markdown_syntax_flagged(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+![alt](images/foo.jpg)
+""",
+    )
+    assert result.returncode == 1
+    assert "image path 'images/...' is likely wrong" in result.stdout
+
+
+def test_image_path_data_uri_ok(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+<figure style="text-align:center;">
+  <img src="data:image/png;base64,iVBORw0KGgo=" alt="图" style="max-width:72%;height:auto;display:block;margin:0 auto;" />
+</figure>
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

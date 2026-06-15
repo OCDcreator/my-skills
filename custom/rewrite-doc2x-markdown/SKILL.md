@@ -33,6 +33,7 @@ Also read the local Obsidian Markdown syntax skill for syntax compatibility refe
 - **PDF extraction allowed only as a proofreading aid**: you may render PDF pages to images for visual comparison, but never treat the rendered images or the PDF itself as a source for text extraction — use the Doc2X OCR markdown for that.
 - **Doc2X is the primary source**: always use `doc2x/page-transcript.raw.md` as your base text. Do NOT use third-party image OCR tools (MCP screenshots, etc.) as a substitute — they produce worse results and miss content. The Doc2X export is the authoritative transcription.
 - **Preserve ALL detail**: never summarize, condense, or remove derivation steps from analysis sections. Every step of every method (法一, 法二, 法三) must be preserved in full. Missing detail is a critical failure.
+- **NEVER upload a full PDF to Doc2X when specific pages are requested**. When the user provides a PDF with a page range (e.g., "pages 6-36"), you MUST use `scripts/extract_and_submit.py --pdf <path> --pages <range> --output-dir <job>` to extract a sub-PDF first, then submit ONLY the sub-PDF to Doc2X. Uploading the full source PDF is a CRITICAL FAILURE that wastes the user's paid OCR quota. The script enforces this with a ratio guard (requests >60% of pages require explicit `--confirm-large`).
 
 ## Preconditions & Skill Boundaries
 
@@ -47,7 +48,13 @@ Also read the local Obsidian Markdown syntax skill for syntax compatibility refe
 | PDF + `page-transcript.raw.md` | **OK** | Proceed; use PDF only for proofreading images |
 | Standalone markdown (no doc2x/) | **OK** | Proceed as-is, skip OCR quality gate |
 
-**If you have a PDF but no Doc2X output**: Extract the needed pages as a sub-PDF and call `doc2x_parse_job.py` from the `scan-pdf-to-print-html` skill (or ask the user to run it). The `rewrite-doc2x-markdown` skill itself does NOT contain Doc2X API scripts.
+**If you have a PDF but no Doc2X output**: You MUST run `scripts/extract_and_submit.py` to extract a sub-PDF (if page range specified) and prepare it for Doc2X submission. Do NOT submit the full source PDF directly — this wastes the user's OCR quota and is a Hard Contract violation.
+
+```
+py -3 scripts/extract_and_submit.py --pdf "C:\path\source.pdf" --pages 6-36 --output-dir "C:\path\job\"
+```
+
+The script writes `doc2x/source-pages.pdf` (the sub-PDF) and `doc2x/extract-manifest.json`. Submit ONLY the sub-PDF to Doc2X. If no page range is needed and the PDF is small (≤10 pages), use `--allow-full-pdf`.
 
 ## Inputs
 
@@ -84,6 +91,8 @@ After assembly, if duplicate section headers or duplicate bullet points appear a
 These transformations need **semantic understanding**. Use subagents to read and edit manually, chunk by chunk.
 
 **Scripts are ONLY allowed for**: pure mechanical substitution (`\(` → `$`), noise tag deletion, `\frac` → `\dfrac`, and other single-pattern replacements that cannot misfire.
+
+> **F6 (no regex for fraction nesting) has been removed** — the `lint_fraction_nesting` validator now automates this check with a brace-depth parser. See Step 4.
 
 ### F2 — No `\$` in regex replacement strings
 
@@ -241,7 +250,13 @@ Only use `<div class="analysis-block">` when the analysis section contains ZERO 
 **Long formula formatting:**
 For display formulas longer than one line, use `\begin{aligned}` with `\\` line breaks. Split at `=` signs, `+`/`-` operators, or logical boundaries. Every long formula must be readable without horizontal scrolling.
 
-### Step 4 — Auto-Validate & Fix
+### Step 4 — Auto-Validate & Fix (HARD GATE)
+
+**This step is a HARD GATE.** The validator must return exit code 0 before you can proceed to Step 5 or report completion. If the validator reports FAIL, you MUST fix the issues and re-run until it passes. Do NOT skip this step, do NOT proceed with known failures, and do NOT claim the document is ready if the validator has not passed.
+
+The validator now checks:
+- **Fraction nesting** (`lint_fraction_nesting`): `\dfrac` inside another fraction's braces/exponent/subscript/sqrt should be `\tfrac`; `\tfrac` in non-nested context (e.g., `\ln` argument) should be `\dfrac`. This is a brace-depth parser — it catches what regex cannot.
+- **Q&A ordering** (`lint_qa_ordering`): consecutive `[!question]` callouts without analysis between them are flagged. Each question's analysis must follow directly.
 
 Run the validator in fix mode to handle any residual mechanical issues:
 
@@ -310,15 +325,20 @@ Run each command and include the output in your report. **Do not skip any check.
 You MUST check all items below. Do not skip any. If an item is not applicable, write "N/A — [reason]" instead of omitting it.
 
 - [ ] **Callout syntax**: every `[!question]`, `[!example]`, `[!note]`, `[!warning]` has `> ` prefix (use `rg -n '^\[!'` to verify — any match means a broken callout)
+- [ ] **Subpart line breaks**: every `(1)`/`(2)`/`(3)` question subpart inside a callout is on its own `>` line — no single `>` line contains two or more `(N)` subparts (grep suspect lines with `rg -n '\([0-9]+\)[^(]*\([0-9]+\)'` inside callout regions, then confirm each remaining hit is a false positive like coordinate pairs)
+- [ ] **Comma consistency & spacing**: every English `,` is followed by exactly one space (never glued like `,x`), no double spaces after a comma, and no paragraph/callout mixes `，` and `,` (grep `rg -n ',[^ \n,)]'`; confirm each remaining hit is a math/code false positive like `$f(x,y)$`)
 - [ ] **解析 bold**: every analysis section has `**解析**` or `**解**` in bold
 - [ ] **Content preservation**: ALL derivation steps preserved — no summarizing of 法一/法二/法三
 - [ ] **Doc2X primacy**: content scope matches `doc2x/page-transcript.raw.md` — no detail removed
 - [ ] **Noise removal**: no `<!-- doc2x score -->`, `<!-- Meanless -->`, `__________` artifacts, stray page numbers
-- [ ] **Fraction rules**: display `\dfrac`, inline `\tfrac` where needed, no bare `\frac`
+- [ ] **Fraction rules**: ✅ Automated by `lint_fraction_nesting` (Step 4 validator). No bare `\frac`; nested fractions use `\tfrac`; function arguments use `\dfrac`. The validator's brace-depth parser catches both directions.
 - [ ] **Long formulas**: display formulas > 60 chars use `\begin{aligned}` with line breaks
 - [ ] **Horizontal rules**: `---` separators not corrupted to `__________`
 - [ ] **OCR typos fixed**: confusable characters (已/己, 人/入, 末/未) verified in analysis blocks
 - [ ] **Chunk boundary clean**: if parallel chunks were used, no duplicate headings or bullet points at boundaries, and no bare callouts without `>` prefix
+- [ ] **Q&A ordering**: ✅ Automated by `lint_qa_ordering` (Step 4 validator). Each question's analysis follows directly.
+- [ ] **Image paths**: ✅ Automated by `lint_image_path` (Step 4 validator). Paths use `doc2x/export/images/...`.
+- [ ] **Sweep-on-report**: if the user reports ANY rule violation on a specific instance, you MUST immediately sweep the ENTIRE document for all other instances of the same violation class — do not fix only the one the user pointed out
 
 ### Step 7 — Report
 

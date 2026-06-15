@@ -27,6 +27,7 @@ PRINT_NOISE_PATTERN = re.compile(r"MST\s*高中基础知识与二级结论")
 MARKDOWN_TABLE_PATTERN = re.compile(r"^\s*\|.*\|\s*$")
 MARKDOWN_TABLE_SEPARATOR_PATTERN = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$")
 MARKDOWN_IMAGE_PATTERN = re.compile(r"!\[[^\]]*]\([^)]+\)")
+MARKDOWN_IMAGE_PATH_PATTERN = re.compile(r"!\[[^\]]*]\(([^)]+)\)")
 HTML_TABLE_PATTERN = re.compile(r"<table\b[^>]*>", re.IGNORECASE)
 HTML_IMAGE_PATTERN = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 HTML_FIGURE_START_PATTERN = re.compile(r"<figure\b[^>]*>", re.IGNORECASE)
@@ -99,6 +100,10 @@ CONFUSABLE_ASCII = {
 GARBLED_LINE_PATTERN = re.compile(r"^[#\$%@!~<>]{3,}$|^[a-zA-Z0-9]{20,}$|###ERROR###")
 OPTION_COUNT_PATTERN = re.compile(r"^\s*[-*]\s+([A-H])[.．、]", re.MULTILINE)
 CHOICE_GRID_OPTION_PATTERN = re.compile(r"<span>\s*([A-H])[.．、]")
+DISPLAY_MATH_PATTERN = re.compile(r"(?<!\$)\$\$(.+?)\$\$(?!\$)", re.DOTALL)
+CALLOUT_TYPE_PATTERN = re.compile(r"^\s*>\s*\[!([^\]]+)\]", re.IGNORECASE)
+QA_ANALYSIS_LINE_PATTERN = re.compile(r"\*\*(?:解析|解答|解|证明|分析)\*\*")
+QA_SUBPART_PATTERN = re.compile(r"^\s*[(（]\s*(?:\d+|[IVXivx]+)\s*[)）]")
 
 
 @dataclass(frozen=True)
@@ -454,6 +459,41 @@ def lint_images(lines: list[str]) -> list[LintMessage]:
     return messages
 
 
+def lint_image_path(lines: list[str]) -> list[LintMessage]:
+    messages: list[LintMessage] = []
+    for index, line in enumerate(lines, start=1):
+        content = strip_quote_marker(line) if is_quote_line(line) else line
+
+        for match in HTML_IMAGE_PATTERN.finditer(content):
+            src = html_attributes(match.group(0)).get("src", "")
+            message = _classify_image_path(src)
+            if message is not None:
+                messages.append(LintMessage(index, message))
+
+        for match in MARKDOWN_IMAGE_PATH_PATTERN.finditer(content):
+            src = match.group(1).strip()
+            message = _classify_image_path(src)
+            if message is not None:
+                messages.append(LintMessage(index, message))
+
+    return messages
+
+
+def _classify_image_path(path: str) -> str | None:
+    if not path:
+        return None
+    if path.startswith(("http://", "https://")) or path.startswith("data:"):
+        return None
+    if path.startswith("doc2x/export/images/"):
+        return None
+    if path.startswith("images/"):
+        return (
+            "image path 'images/...' is likely wrong; use 'doc2x/export/images/...' "
+            "(relative to source-transcript.md)"
+        )
+    return f"image path '{path}' does not match expected pattern 'doc2x/export/images/...'"
+
+
 def lint_multi_image_figures(lines: list[str]) -> list[LintMessage]:
     messages: list[LintMessage] = []
     index = 0
@@ -781,6 +821,172 @@ def lint_proofreading(markdown_text: str) -> list[LintMessage]:
 
     return messages
 
+def lint_qa_ordering(lines: list[str], blocks: list[QuoteBlock]) -> list[LintMessage]:
+    messages: list[LintMessage] = []
+    question_blocks = [block for block in blocks if _is_question_callout(block)]
+    for index in range(len(question_blocks) - 1):
+        q1 = question_blocks[index]
+        q2 = question_blocks[index + 1]
+        if QA_SUBPART_PATTERN.match(_first_content_line_of_block(q2)):
+            continue
+        has_analysis = False
+        for line_idx in range(q1.end_line, q2.start_line - 1):
+            if 0 <= line_idx < len(lines):
+                raw = lines[line_idx]
+                content = strip_quote_marker(raw) if is_quote_line(raw) else raw
+                if QA_ANALYSIS_LINE_PATTERN.search(content) or HTML_ANALYSIS_BLOCK_PATTERN.search(content):
+                    has_analysis = True
+                    break
+        if not has_analysis:
+            messages.append(
+                LintMessage(
+                    q1.start_line,
+                    f"question at line {q1.start_line} has no analysis before next question at line {q2.start_line} — analysis must follow its question directly",
+                )
+            )
+    return messages
+
+
+def _collect_math_spans(lines: list[str]) -> list[tuple[int, str]]:
+    cleaned: list[str] = []
+    for raw in lines:
+        content = strip_quote_marker(raw) if is_quote_line(raw) else raw
+        cleaned.append(strip_mathml(content))
+    full_text = "\n".join(cleaned)
+
+    spans: list[tuple[int, str]] = []
+    masked = list(full_text)
+    for match in DISPLAY_MATH_PATTERN.finditer(full_text):
+        inner = match.group(1)
+        start_line = full_text.count("\n", 0, match.start(1)) + 1
+        spans.append((start_line, inner))
+        for k in range(match.start(), match.end()):
+            if masked[k] != "\n":
+                masked[k] = " "
+    masked_text = "".join(masked)
+    for match in INLINE_MATH_PATTERN.finditer(masked_text):
+        inner = match.group(1)
+        start_line = full_text.count("\n", 0, match.start(1)) + 1
+        spans.append((start_line, inner))
+    return spans
+
+
+def _scan_fraction_context(math: str) -> list[tuple[int, str]]:
+    nested_kinds = {"frac_num", "frac_den", "exp", "sub", "sqrt"}
+    stack: list[tuple[str, str | None]] = []
+    issues: list[tuple[int, str]] = []
+    pending: str | None = None
+    valid = True
+
+    i = 0
+    n = len(math)
+    while i < n:
+        ch = math[i]
+        if ch == "\\":
+            if i + 1 < n and ("a" <= math[i + 1] <= "z" or "A" <= math[i + 1] <= "Z"):
+                j = i + 1
+                while j < n and ("a" <= math[j] <= "z" or "A" <= math[j] <= "Z"):
+                    j += 1
+                word = math[i + 1:j]
+                if word in ("dfrac", "tfrac"):
+                    top = stack[-1][0] if stack else None
+                    if word == "dfrac" and top in nested_kinds:
+                        issues.append((i, f"\\dfrac inside {top} should be \\tfrac (nested fraction rule)"))
+                    elif word == "tfrac" and top not in nested_kinds:
+                        issues.append((i, "\\tfrac in non-nested context should be \\dfrac"))
+                    pending = "frac_num"
+                elif word == "sqrt":
+                    pending = "sqrt"
+                i = j
+                continue
+            i += 2
+            continue
+        if ch == "^":
+            if i + 1 < n and math[i + 1] == "{":
+                pending = "exp"
+            i += 1
+            continue
+        if ch == "_":
+            if i + 1 < n and math[i + 1] == "{":
+                pending = "sub"
+            i += 1
+            continue
+        if ch == "[" and pending == "sqrt":
+            depth = 1
+            j = i + 1
+            while j < n and depth > 0:
+                if math[j] == "[":
+                    depth += 1
+                elif math[j] == "]":
+                    depth -= 1
+                j += 1
+            if depth != 0:
+                valid = False
+                break
+            i = j
+            continue
+        if ch == "{":
+            kind = pending if pending is not None else "other"
+            if kind == "frac_num":
+                stack.append(("frac_num", "frac_den"))
+            else:
+                stack.append((kind, None))
+            pending = None
+            i += 1
+            continue
+        if ch == "}":
+            if not stack:
+                valid = False
+                break
+            _frame_kind, next_after = stack.pop()
+            if next_after == "frac_den":
+                pending = "frac_den"
+            i += 1
+            continue
+        i += 1
+
+    if not valid or stack:
+        return []
+    return issues
+
+
+def lint_fraction_nesting(lines: list[str]) -> list[LintMessage]:
+    messages: list[LintMessage] = []
+    for start_line, math in _collect_math_spans(lines):
+        if "{" not in math:
+            continue
+        for rel_pos, text in _scan_fraction_context(math):
+            line_no = start_line + math.count("\n", 0, rel_pos)
+            messages.append(LintMessage(line_no, text))
+    return messages
+
+
+def _callout_type(block: QuoteBlock) -> str:
+    for line in block.lines:
+        match = CALLOUT_TYPE_PATTERN.match(line)
+        if match:
+            return match.group(1).lower()
+    return ""
+
+
+def _is_question_callout(block: QuoteBlock) -> bool:
+    return block.kind == "callout" and _callout_type(block) == "question"
+
+
+def _first_content_line_of_block(block: QuoteBlock) -> str:
+    for line in block.lines:
+        content = strip_quote_marker(line).strip()
+        if not content:
+            continue
+        if content.startswith("[!"):
+            rest = re.sub(r"^\[![^\]]*\]\s*", "", content).strip()
+            if rest:
+                return rest
+            continue
+        return content
+    return ""
+
+
 def lint_markdown(
     markdown_text: str,
     max_analysis_lines: int,
@@ -793,6 +999,7 @@ def lint_markdown(
     messages.extend(lint_headings_and_print_noise(lines))
     messages.extend(lint_tables(lines))
     messages.extend(lint_images(lines))
+    messages.extend(lint_image_path(lines))
     messages.extend(lint_multi_image_figures(lines))
     messages.extend(lint_formulas(lines))
     messages.extend(lint_inline_math_spacing(lines))
@@ -809,6 +1016,8 @@ def lint_markdown(
         )
     )
     messages.extend(lint_choice_options(lines, blocks))
+    messages.extend(lint_fraction_nesting(lines))
+    messages.extend(lint_qa_ordering(lines, blocks))
     return sorted(messages, key=lambda message: message.line)
 
 
