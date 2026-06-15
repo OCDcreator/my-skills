@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-06-14T18:09:15.088368+00:00",
-    "total_skills": 1043,
-    "custom_skills": 36,
+    "generated_at": "2026-06-15T14:10:14.011038+00:00",
+    "total_skills": 1044,
+    "custom_skills": 37,
     "external_skills": 1007,
     "sources_count": 18
   },
@@ -284,6 +284,19 @@
       "path": "custom/pdf-toc-bookmarker",
       "name": "pdf-toc-bookmarker",
       "description": "Create a new PDF with clickable bookmarks/outline from scanned or image-only table-of-contents pages. Use when Codex needs to add PDF bookmarks from TOC screenshots/pages, especially for scanned Chinese books where local OCR is unreliable. Requires the user to provide a PDF file path, the TOC page range, and the actual PDF page where printed page 1 begins before rendering or writing bookmarks.",
+      "category": "Content/Publishing",
+      "tier": "custom",
+      "source": "custom",
+      "repo": "git@github.com:OCDcreator/my-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "custom/piclist-upload",
+      "name": "piclist-upload",
+      "description": "Use when uploading images to the user's personal image host (pic.ltreen.tech, a Lsky Pro+ bed on fnOS reached via frp), migrating images embedded in Markdown/HTML files (remote CDN links like noedgeai/unsplash/imgur, or local paths) to that bed through the local PicList client, getting image URLs/外链, or anything involving PicList upload, 图床, 图片上传, 图片外链, 批量传图, markdown 图片替换, markdown 里图片迁移. Always use this skill when the user mentions uploading pictures, image hosting, PicList, pic.ltreen.tech, Lsky/ 兰空图床, or wants to replace/migrate image links in documents — even if they don't name PicList explicitly.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",
@@ -13687,11 +13700,11 @@
       "repo": "git@github.com:OCDcreator/my-skills.git",
       "branch": "main",
       "tier": "custom",
-      "skill_count": 36
+      "skill_count": 37
     }
   },
   "categories": {
-    "Content/Publishing": 1030,
+    "Content/Publishing": 1031,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,
