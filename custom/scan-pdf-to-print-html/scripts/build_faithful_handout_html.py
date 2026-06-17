@@ -382,6 +382,9 @@ window.MathJax = {
   },
   svg: {
     fontCache: 'none'
+  },
+  startup: {
+    typeset: false
   }
 };
 </script>
@@ -442,6 +445,14 @@ async function waitForHandoutAssets(root) {
       img.addEventListener('error', done, { once: true });
     });
   }));
+
+  if (window.MathJax && window.MathJax.startup && window.MathJax.startup.promise) {
+    try {
+      await window.MathJax.startup.promise;
+    } catch (_err) {
+      // Keep print flow alive even if MathJax startup reports an issue.
+    }
+  }
 
   if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {
     try {
@@ -619,7 +630,11 @@ def protect_math_segments(text: str) -> tuple[str, list[str]]:
 def restore_math_segments(text: str, segments: list[str]) -> str:
     restored = text
     for index, segment in enumerate(segments):
-        restored = restored.replace(f"@@MATHSEGMENT{index}@@", segment)
+        # Math is restored after MarkdownIt renders HTML. Keep it as text for
+        # MathJax by escaping HTML-sensitive characters. Without this,
+        # expressions like `$0<a<2$` are parsed by the browser as malformed
+        # `<a...` tags before MathJax can typeset them.
+        restored = restored.replace(f"@@MATHSEGMENT{index}@@", html.escape(segment, quote=False))
     return restored
 
 
@@ -857,7 +872,7 @@ def strip_html_tags(value: str) -> str:
 # ordinary word (解析几何, 解决, 注意到). 方案N / 法N carry a numeral
 # (Chinese, Arabic, or Roman) so bare words like 方案案 / 法案 do not match.
 ANALYSIS_LABEL_PATTERN = re.compile(
-    r"\A(?:解析|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
+    r"\A(?:分析|解析|解答|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
     r"(?=$|[\s\u3000：:。，,\.（(、])"
 )
 
@@ -893,12 +908,12 @@ def normalize_fill_blank_markers(fragment_html: str) -> str:
     return normalized
 
 
-# HTML pattern for the leading 解析/解/另解 label inside a <p> body.
+# HTML pattern for the leading 分析/解析/解答/解/另解 label inside a <p> body.
 # Matches optional <strong>, the label word, optional </strong>, then separator.
 LEADING_ANALYSIS_LABEL_HTML_PATTERN = re.compile(
     r"\A\s*(?:<strong>\s*)?"
     r"(?:【|\[)?"
-    r"(?P<label>解析|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
+    r"(?P<label>分析|解析|解答|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
     r"(?:】|\])?"
     r"(?:\s*</strong>)?"
     r"\s*[：:。\.\s]*"

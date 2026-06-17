@@ -166,6 +166,40 @@ def test_includes_mathjax_for_doc2x_latex(tmp_path: Path) -> None:
     assert "tex-mml-chtml.js" not in html
 
 
+def test_mathjax_is_manually_typeset_after_startup(tmp_path: Path) -> None:
+    """Pagination must not race MathJax's startup auto-typeset.
+
+    The handout first measures source blocks, paginates them into A4 sheets,
+    then exports. If MathJax auto-typesets the source tree while pagination is
+    moving nodes, formulas can remain as raw ``$...$`` in the final print root.
+    Disable startup auto-typesetting and wait for startup before the explicit
+    ``typesetPromise`` call.
+    """
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("# T\n\n公式 $x^2+1$。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--md",
+            str(source_md),
+            "--out-html",
+            str(out_html),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert "typeset: false" in html
+    assert "MathJax.startup.promise" in html
+    assert "await window.MathJax.startup.promise" in html
+
+
 def test_preserves_inline_latex_from_plain_markdown_paragraphs(tmp_path: Path) -> None:
     source_md = tmp_path / "source-transcript.md"
     out_html = tmp_path / "handout.html"
@@ -202,6 +236,39 @@ def test_preserves_inline_latex_from_plain_markdown_paragraphs(tmp_path: Path) -
     assert r"$ \alpha \bot \beta $" in html
     assert r"$ m // \alpha $" in html
     assert r"( \alpha \bot \beta )" not in html
+
+
+def test_escapes_angle_brackets_inside_restored_math_segments(tmp_path: Path) -> None:
+    """Raw ``<`` inside TeX must not become browser HTML tags.
+
+    Expressions like ``$0<a<2$`` are common in math handouts. The builder
+    protects math before MarkdownIt and restores it afterward; restored math
+    must be HTML-escaped so the browser gives MathJax a text node instead of
+    parsing ``<a``/``<b`` as malformed tags.
+    """
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("# T\n\n范围 $0<a<2$，且 $b<\\dfrac{4}{e^2}$。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--md",
+            str(source_md),
+            "--out-html",
+            str(out_html),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert "$0&lt;a&lt;2$" in html
+    assert "$b&lt;\\dfrac{4}{e^2}$" in html
+    assert "$0<a<2$" not in html
 
 
 def test_does_not_apply_markdown_emphasis_inside_math_segments(tmp_path: Path) -> None:
@@ -805,7 +872,8 @@ def test_marks_analysis_paragraphs_and_normalizes_fill_in_blanks(tmp_path: Path)
     html = out_html.read_text(encoding="utf-8")
 
     assert "判定是__________。" in html
-    assert 'class="ocr-analysis"' in html
+    assert 'class="lead-para"' in html
+    assert 'class="lead-tag">解析</span>' in html
 
 
 def test_code_blocks_use_centered_preformatted_layout(tmp_path: Path) -> None:
@@ -911,7 +979,26 @@ def test_marks_bold_label_analysis_paragraphs(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     html = out_html.read_text(encoding="utf-8")
 
-    assert 'class="ocr-analysis"' in html
+    assert 'class="lead-para"' in html
+    assert 'class="lead-tag">解析</span>' in html
+
+
+def test_marks_analysis_and_answer_labels_as_lead_tags(tmp_path: Path) -> None:
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text("## Page 1\n\n**分析** 先设切点。\n\n**解答** 由题意可得。\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert 'class="lead-tag">分析</span>' in html
+    assert 'class="lead-tag">解答</span>' in html
 
 
 def test_does_not_style_words_that_only_start_with_a_label_prefix(tmp_path: Path) -> None:
@@ -930,7 +1017,8 @@ def test_does_not_style_words_that_only_start_with_a_label_prefix(tmp_path: Path
     assert result.returncode == 0, result.stderr
     html = out_html.read_text(encoding="utf-8")
 
-    assert 'class="ocr-analysis"' not in html
+    assert 'class="lead-para"' not in html
+    assert 'class="lead-tag"' not in html
 
 
 def test_dedupes_content_h1_when_it_equals_the_explicit_title(tmp_path: Path) -> None:
@@ -1011,7 +1099,8 @@ def test_styles_numbered_method_labels(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     html = out_html.read_text(encoding="utf-8")
 
-    assert 'class="ocr-analysis"' in html
+    assert 'class="lead-para"' in html
+    assert 'class="lead-tag">方案一</span>' in html
 
 
 def test_does_not_style_words_after_method_prefix_without_a_numeral(tmp_path: Path) -> None:
@@ -1030,7 +1119,8 @@ def test_does_not_style_words_after_method_prefix_without_a_numeral(tmp_path: Pa
     assert result.returncode == 0, result.stderr
     html = out_html.read_text(encoding="utf-8")
 
-    assert 'class="ocr-analysis"' not in html
+    assert 'class="lead-para"' not in html
+    assert 'class="lead-tag"' not in html
 
 
 def test_phycat_blockquote_rule_is_scoped_higher_than_base_blockquote_css(tmp_path: Path) -> None:

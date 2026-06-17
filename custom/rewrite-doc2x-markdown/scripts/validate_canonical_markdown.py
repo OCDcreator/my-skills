@@ -412,11 +412,13 @@ def lint_numeric_outline_labels(lines: list[str], blocks: list[QuoteBlock]) -> l
     return messages
 
 
-def lint_tables(lines: list[str]) -> list[LintMessage]:
+def lint_tables(lines: list[str], blocks: list[QuoteBlock]) -> list[LintMessage]:
     messages: list[LintMessage] = []
+    callout_line_numbers = quote_line_numbers_for_kind(blocks, "callout")
     for index, line in enumerate(lines, start=1):
         if MARKDOWN_TABLE_SEPARATOR_PATTERN.match(line) or MARKDOWN_TABLE_PATTERN.match(line):
-            messages.append(LintMessage(index, "Markdown tables are not allowed; use centered HTML tables"))
+            if index not in callout_line_numbers:
+                messages.append(LintMessage(index, "Markdown tables are not allowed outside question callouts; use centered HTML tables"))
 
         for match in HTML_TABLE_PATTERN.finditer(line):
             attrs = html_attributes(match.group(0))
@@ -655,8 +657,10 @@ def auto_fix_markdown(markdown_text: str) -> tuple[str, list[str]]:
         if "`" not in content and "```" not in content:
             body = STRAY_BACKSLASH_ESCAPE_PATTERN.sub(r"\1", body)
 
-        # Rule: fill-in blank normalization
-        body = FILLIN_BLANK_PATTERN.sub("__________", body)
+        # Rule: fill-in blank normalization. Do not rewrite Markdown table
+        # separators such as `| :---: |`, which are used for choice grids.
+        if not MARKDOWN_TABLE_SEPARATOR_PATTERN.match(body):
+            body = FILLIN_BLANK_PATTERN.sub("__________", body)
 
         # Rule: print noise removal
         if PRINT_NOISE_PATTERN.search(body) and len(body.strip()) < 30:
@@ -691,13 +695,11 @@ def auto_fix_markdown(markdown_text: str) -> tuple[str, list[str]]:
 
         # Reconstruct line
         if is_quote and body:
-            body_prefix = strip_quote_marker(line).rstrip()
             indent = line[: len(line) - len(line.lstrip())]
-            if indent and not body.strip().startswith(">"):
-                body = indent + body
-            fixed_lines.append(body)
+            fixed_lines.append(f"{indent}> {body}")
         elif is_quote and not body.strip():
-            fixed_lines.append(">")
+            indent = line[: len(line) - len(line.lstrip())]
+            fixed_lines.append(f"{indent}>")
         elif not body.strip() and original.strip():
             fixed_lines.append(body)
         else:
@@ -999,7 +1001,7 @@ def lint_markdown(
     blocks = collect_quote_blocks(lines)
     messages: list[LintMessage] = []
     messages.extend(lint_headings_and_print_noise(lines))
-    messages.extend(lint_tables(lines))
+    messages.extend(lint_tables(lines, blocks))
     messages.extend(lint_images(lines))
     messages.extend(lint_image_path(lines))
     messages.extend(lint_multi_image_figures(lines))
