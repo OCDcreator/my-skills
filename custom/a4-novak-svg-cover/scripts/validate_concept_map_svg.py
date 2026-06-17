@@ -56,6 +56,19 @@ def rect_label(el: ET.Element) -> str:
     return f"{cls} ({x1:.1f},{y1:.1f})-({x2:.1f},{y2:.1f})"
 
 
+def class_tokens(el: ET.Element) -> set[str]:
+    return set((el.attrib.get("class", "") or "").split())
+
+
+def has_ancestor_class(parent_map: dict[ET.Element, ET.Element], el: ET.Element, cls: str) -> bool:
+    current = parent_map.get(el)
+    while current is not None:
+        if cls in class_tokens(current):
+            return True
+        current = parent_map.get(current)
+    return False
+
+
 def has_min_gap(
     a: tuple[float, float, float, float],
     b: tuple[float, float, float, float],
@@ -75,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = ET.parse(args.svg).getroot()
+    parent_map = {child: parent for parent in root.iter() for child in parent}
     errors: list[str] = []
 
     if root.attrib.get("width") != "210mm":
@@ -100,8 +114,9 @@ def main(argv: list[str] | None = None) -> int:
         el
         for el in root.iter()
         if local_name(el.tag) == "rect"
-        and "bg" not in (el.attrib.get("class", "").split())
-        and "label-shield" not in (el.attrib.get("class", "").split())
+        and "bg" not in class_tokens(el)
+        and "label-shield" not in class_tokens(el)
+        and not has_ancestor_class(parent_map, el, "formula-fit")
     ]
     for el in rects:
         if "fill" not in el.attrib:

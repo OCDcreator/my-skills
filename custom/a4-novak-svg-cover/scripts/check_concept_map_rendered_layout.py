@@ -38,6 +38,26 @@ def main(argv: list[str] | None = None) -> int:
         const b = el.getBBox();
         return {x:b.x, y:b.y, width:b.width, height:b.height, right:b.x+b.width, bottom:b.y+b.height};
       };
+      const transformedBbox = (el) => {
+        const b = el.getBBox();
+        const elementMatrix = el.getCTM();
+        const rootMatrix = svg.getCTM();
+        if (!elementMatrix || !rootMatrix) return {x:b.x, y:b.y, width:b.width, height:b.height, right:b.x+b.width, bottom:b.y+b.height};
+        const matrix = rootMatrix.inverse().multiply(elementMatrix);
+        const points = [
+          new DOMPoint(b.x, b.y).matrixTransform(matrix),
+          new DOMPoint(b.x + b.width, b.y).matrixTransform(matrix),
+          new DOMPoint(b.x, b.y + b.height).matrixTransform(matrix),
+          new DOMPoint(b.x + b.width, b.y + b.height).matrixTransform(matrix),
+        ];
+        const xs = points.map(p => p.x);
+        const ys = points.map(p => p.y);
+        const x = Math.min(...xs);
+        const y = Math.min(...ys);
+        const right = Math.max(...xs);
+        const bottom = Math.max(...ys);
+        return {x, y, width:right-x, height:bottom-y, right, bottom};
+      };
       const intersects = (a, b) => !(a.right <= b.x || b.right <= a.x || a.bottom <= b.y || b.bottom <= a.y);
       const containsWithPad = (outer, inner, pad) => (
         inner.x >= outer.x + pad && inner.right <= outer.right - pad &&
@@ -49,10 +69,12 @@ def main(argv: list[str] | None = None) -> int:
       const shields = [...document.querySelectorAll('rect.label-shield')]
         .map((el, i) => ({el, i, cls: el.getAttribute('class') || '', b: bbox(el)}));
       const cards = [...document.querySelectorAll('rect')]
-        .filter(el => !el.classList.contains('bg') && !el.classList.contains('label-shield'))
+        .filter(el => !el.classList.contains('bg') && !el.classList.contains('label-shield') && !el.closest('g.formula-fit'))
         .map((el, i) => ({el, i, cls: el.getAttribute('class') || '', b: bbox(el)}));
       const texts = [...document.querySelectorAll('text')]
         .map((el, i) => ({el, i, text: el.textContent || '', b: bbox(el)}));
+      const formulas = [...document.querySelectorAll('g.formula-fit')]
+        .map((el, i) => ({el, i, text: el.getAttribute('data-formula-id') || 'formula', b: transformedBbox(el)}));
       const paths = [...document.querySelectorAll('path.edge,path.edge-strong')]
         .map((el, i) => ({el, i, cls: el.getAttribute('class') || '', b: bbox(el)}));
 
@@ -73,14 +95,25 @@ def main(argv: list[str] | None = None) -> int:
         }
       }
 
+      for (const f of formulas) {
+        const cx = f.b.x + f.b.width / 2;
+        const cy = f.b.y + f.b.height / 2;
+        const owner = cards.find(card => pointIn({x: cx, y: cy}, card.b));
+        if (!owner) continue;
+        f.owner = owner;
+        if (!containsWithPad(owner.b, f.b, minTextPad)) {
+          errors.push(`formula overflows card padding: "${f.text}" formula=${JSON.stringify(f.b)} card=${owner.cls} ${JSON.stringify(owner.b)}`);
+        }
+      }
+
       for (const card of cards) {
-        const ownedTexts = texts.filter(t => t.owner === card);
-        if (!ownedTexts.length) continue;
-        const group = ownedTexts.reduce((acc, t) => ({
-          x: Math.min(acc.x, t.b.x),
-          y: Math.min(acc.y, t.b.y),
-          right: Math.max(acc.right, t.b.right),
-          bottom: Math.max(acc.bottom, t.b.bottom),
+        const ownedContent = [...texts.filter(t => t.owner === card), ...formulas.filter(f => f.owner === card)];
+        if (!ownedContent.length) continue;
+        const group = ownedContent.reduce((acc, item) => ({
+          x: Math.min(acc.x, item.b.x),
+          y: Math.min(acc.y, item.b.y),
+          right: Math.max(acc.right, item.b.right),
+          bottom: Math.max(acc.bottom, item.b.bottom),
         }), {x: Infinity, y: Infinity, right: -Infinity, bottom: -Infinity});
         group.width = group.right - group.x;
         group.height = group.bottom - group.y;

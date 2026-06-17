@@ -51,6 +51,26 @@ Design constraints:
 - Use inline presentation attributes (`fill`, `stroke`, `font-family`, etc.). Do not rely on `<style>`, CSS variables, or class-only styling.
 - Add explicit `fill="none"` on paths and hairlines that should not fill.
 
+## Math Formula Rendering
+
+For math-heavy concept maps, do not mix raw SVG text math with rendered formula fragments. Choose one formula policy for all visible mathematical expressions.
+
+<!-- evolved 2026-06-17 -->
+- Preferred standalone-SVG path: keep formula sources in data files, render them at build time with MathJax SVG output, and embed them as `<g class="formula-fit" data-formula-id="...">` path/rect/vector fragments.
+<!-- evolved 2026-06-17 -->
+- Chinese explanatory text may remain SVG `<text>`, but expressions such as `e^x`, `ln x`, `f'(x)`, subscripts, exponents, derivatives, equations, and function notation should go through the formula pipeline.
+<!-- evolved 2026-06-17 -->
+- If KaTeX is requested, use it only when the output is converted to SVG/vector fragments; raw KaTeX HTML is not enough for a standalone SVG deliverable.
+<!-- evolved 2026-06-17 -->
+- Formula-aware validators must skip MathJax internal geometry inside `g.formula-fit` and treat formula groups as card content for padding and centering checks.
+
+## Background Policy
+
+<!-- evolved 2026-06-17 -->
+- Default to one solid page background rect. Do not add decorative grids, hairlines, dot matrices, or paper texture unless the user explicitly asks for them.
+<!-- evolved 2026-06-17 -->
+- If the user asks for a plain background, add a guard test or grep check that rejects background grid paths/hairlines.
+
 ## Layout Pattern
 
 For lecture handouts, prefer a measured Novak/tree layout:
@@ -125,6 +145,9 @@ Expected checks:
 
 - A4 root size and viewBox are exact.
 - No `<style>` block dependency.
+- Math expressions are not left as raw SVG text when a formula pipeline is being used.
+- Formula fragments inside `g.formula-fit` do not get counted as card rectangles.
+- The background is a single solid page fill unless decorative texture was explicitly requested.
 - No forbidden glyphs.
 - Removed subtitle/footer phrases are absent.
 - Cards do not overlap and keep the configured gap.
