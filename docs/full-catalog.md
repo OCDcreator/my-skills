@@ -6,8 +6,8 @@ This file contains the **complete** index of all skills in the repository, inclu
 
 ## Stats
 
-- **Total skills**: 1044
-- **Custom skills**: 37
+- **Total skills**: 1045
+- **Custom skills**: 38
 - **External sources**: 17
 - **External skills**: 1007
 
@@ -15,6 +15,7 @@ This file contains the **complete** index of all skills in the repository, inclu
 
 | Path | Name | Category | Use when |
 |---|---|---|---|
+| `custom/a4-novak-svg-cover` | `a4-novak-svg-cover` | Content/Publishing | Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text collisions, or off-center card text. |
 | `custom/codex-autopilot-scaffold` | `codex-autopilot-scaffold` | Content/Publishing | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrades. Do not use for one-shot fixes or existing OpenCode Loop... |
 | `custom/design-reference-router` | `design-reference-router` | Frontend/UI | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. |
 | `custom/fnos-fpk-dev` | `fnos-fpk-dev` | Content/Publishing | 飞牛 fnOS FPK 应用包开发指南。涵盖目录结构、manifest 配置、生命周期脚本、用户向导、权限管理、resource 资源声明和桌面图标配置。Use when developing fnOS FPK packages, creating fnOS apps, writing cmd scripts, configuring wizard/manifest/privilege/resource, desktop icons, ui/config, or when the user mentions 飞牛、fnOS、fpk。 |
@@ -1175,6 +1176,7 @@ Duplicate names are expected for external sources; select by path and source, no
 
 | Path | Name | Category | Tier | Use when | Source repo | Source branch | Source subdir | Install hint |
 |---|---|---|---|---|---|---|---|---|
+| `custom/a4-novak-svg-cover` | `a4-novak-svg-cover` | Content/Publishing | custom | Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text collisions, or off-center card text. | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/a4-novak-svg-cover` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/a4-novak-svg-cover` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `custom/codex-autopilot-scaffold` | `codex-autopilot-scaffold` | Content/Publishing | custom | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrades. Do not use for one-shot fixes or existing OpenCode Loop... | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/codex-autopilot-scaffold` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/codex-autopilot-scaffold` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `custom/design-reference-router` | `design-reference-router` | Frontend/UI | custom | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/design-reference-router` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/design-reference-router` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `custom/fnos-fpk-dev` | `fnos-fpk-dev` | Content/Publishing | custom | 飞牛 fnOS FPK 应用包开发指南。涵盖目录结构、manifest 配置、生命周期脚本、用户向导、权限管理、resource 资源声明和桌面图标配置。Use when developing fnOS FPK packages, creating fnOS apps, writing cmd scripts, configuring wizard/manifest/privilege/resource, desktop icons, ui/config, or when the user mentions 飞牛、fnOS、fpk。 | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/fnos-fpk-dev` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/fnos-fpk-dev` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |

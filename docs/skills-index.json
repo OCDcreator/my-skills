@@ -1,12 +1,25 @@
 {
   "meta": {
-    "generated_at": "2026-06-17T05:33:13.450522+00:00",
-    "total_skills": 1044,
-    "custom_skills": 37,
+    "generated_at": "2026-06-17T11:33:19.638857+00:00",
+    "total_skills": 1045,
+    "custom_skills": 38,
     "external_skills": 1007,
     "sources_count": 18
   },
   "skills": [
+    {
+      "path": "custom/a4-novak-svg-cover",
+      "name": "a4-novak-svg-cover",
+      "description": "Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text collisions, or off-center card text.",
+      "category": "Content/Publishing",
+      "tier": "custom",
+      "source": "custom",
+      "repo": "git@github.com:OCDcreator/my-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
     {
       "path": "custom/codex-autopilot-scaffold",
       "name": "codex-autopilot-scaffold",
@@ -13700,11 +13713,11 @@
       "repo": "git@github.com:OCDcreator/my-skills.git",
       "branch": "main",
       "tier": "custom",
-      "skill_count": 37
+      "skill_count": 38
     }
   },
   "categories": {
-    "Content/Publishing": 1031,
+    "Content/Publishing": 1032,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,

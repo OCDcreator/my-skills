@@ -1,0 +1,11 @@
+{
+  "eval_id": 0,
+  "eval_name": "a4-math-cover",
+  "prompt": "我有一份数学讲义 handout.html，想在第一页加一个 A4 竖版 Novak 风格的 SVG 概念图封面。内容是“函数零点与导数”，需要树形知识图谱，不要圆形脑图，最后要能导出 PDF。请给出 SVG 生成方案、插入 HTML 的 CSS 和验证步骤。",
+  "assertions": [
+    "Specifies exact A4 SVG root dimensions and viewBox.",
+    "Chooses a tree/Novak layout rather than a circular mind map.",
+    "Includes inline styling and validation steps for overlap, glyphs, centering, and PDF/HTML rendering.",
+    "Includes full-page cover CSS that overrides generic image clamping."
+  ]
+}

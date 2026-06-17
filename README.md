@@ -70,6 +70,7 @@ my-skills/
 <!-- BEGIN GENERATED CUSTOM_SKILLS -->
 | 技能 | 说明 |
 |------|------|
+| [a4-novak-svg-cover](custom/a4-novak-svg-cover/) | Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text... |
 | [codex-autopilot-scaffold](custom/codex-autopilot-scaffold/) | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrad... |
 | [design-reference-router](custom/design-reference-router/) | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. |
 | [fnos-fpk-dev](custom/fnos-fpk-dev/) | 飞牛 fnOS FPK 应用包开发指南。涵盖目录结构、manifest 配置、生命周期脚本、用户向导、权限管理、resource 资源声明和桌面图标配置。Use when developing fnOS FPK packages, creating fnOS apps, writing cmd scripts, configuring wizard/manifest/privilege/resource, desktop icons, ui/config, or when the user mentions 飞牛、fnOS、fpk。 |

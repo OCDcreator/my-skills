@@ -1,0 +1,11 @@
+{
+  "eval_id": 1,
+  "eval_name": "black-tofu-fix",
+  "prompt": "这个 concept-map.svg 在浏览器里正常，但导出 PDF 后很多卡片变成黑块，箭头和 x₀/x₁ 也显示成方框。帮我修复 SVG，并说明之后怎么防止这类问题。",
+  "assertions": [
+    "Identifies class-only/CSS-dependent styling as a black-fill risk.",
+    "Requires inline presentation attributes and explicit fill=none for paths.",
+    "Identifies risky glyphs and replaces them with stable Chinese/ASCII alternatives.",
+    "Recommends static validation to prevent recurrence."
+  ]
+}

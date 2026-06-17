@@ -1,0 +1,11 @@
+{
+  "eval_id": 2,
+  "eval_name": "overlap-centering",
+  "prompt": "我做了一个 A4 SVG 知识图谱封面，但卡片互相压住，线穿过文字，卡片里的文字也没有上下居中。请把它改成适合打印的四列树形布局，并给我一个自动检查脚本的检查项清单。",
+  "assertions": [
+    "Uses measured columns and safe margins rather than manual dragging.",
+    "Requires minimum card gaps and text padding.",
+    "Draws connectors beneath cards/text and uses label shields.",
+    "Checks rendered text-group centering with a browser geometry validator."
+  ]
+}

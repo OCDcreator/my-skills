@@ -1,0 +1,11 @@
+{
+  "eval_id": 3,
+  "eval_name": "html-cover-scaling",
+  "prompt": "我把 SVG 概念图插进 source-transcript.md 后，handout.html 第一页只显示一个很小的图，后面的第1讲还挤在同一页。请给出修复方案。",
+  "assertions": [
+    "Identifies generic transcript image CSS as the likely scaling cause.",
+    "Adds a dedicated concept-map sheet and image overrides.",
+    "Forces the first lecture/chapter heading after the cover onto a fresh sheet.",
+    "Requires rendering PDF/screenshot to verify full-page coverage."
+  ]
+}

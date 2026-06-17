@@ -1001,6 +1001,62 @@ def test_marks_analysis_and_answer_labels_as_lead_tags(tmp_path: Path) -> None:
     assert 'class="lead-tag">解答</span>' in html
 
 
+def test_marks_quoted_example_and_exercise_labels_as_peach_badges(tmp_path: Path) -> None:
+    """Question labels inside blockquotes must use the peach example badge.
+
+    The markdown source commonly writes examples/exercises as Obsidian-style
+    question callouts. After callout marker stripping, both 【例题1】 and
+    【练习 1】 should become lead-tag-example badges, including when nested in a
+    blockquote.
+    """
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text(
+        "## Page 1\n\n"
+        "> [!question] 【例题1】已知函数。\n\n"
+        "> [!question] 【练习 1】（2024浙江名校模拟）已知不等式。\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert 'class="lead-tag-example">例题1</span>' in html
+    assert 'class="lead-tag-example">练习 1</span>' in html
+    assert '【例题1】' not in html
+    assert '【练习 1】' not in html
+
+
+def test_table_consistent_css_overrides_default_table_borders(tmp_path: Path) -> None:
+    """The skill table template is borderless and must override base borders."""
+    source_md = tmp_path / "source-transcript.md"
+    out_html = tmp_path / "handout.html"
+    source_md.write_text(
+        "## Page 1\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT_PATH), "--md", str(source_md), "--out-html", str(out_html)],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    html = out_html.read_text(encoding="utf-8")
+
+    assert ".transcript-flow th," in html
+    assert ".transcript-flow td" in html
+    assert "border: none;" in html
+    assert "border: 1px solid var(--line, #e8e6dc);" not in html
+
+
 def test_does_not_style_words_that_only_start_with_a_label_prefix(tmp_path: Path) -> None:
     """'解析几何' starts with '解析' but is a noun, not a solution label.
     The boundary check must reject word-continuation false positives."""

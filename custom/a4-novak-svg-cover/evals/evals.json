@@ -1,0 +1,29 @@
+{
+  "skill_name": "a4-novak-svg-cover",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "我有一份数学讲义 handout.html，想在第一页加一个 A4 竖版 Novak 风格的 SVG 概念图封面。内容是“函数零点与导数”，需要树形知识图谱，不要圆形脑图，最后要能导出 PDF。请给出 SVG 生成方案、插入 HTML 的 CSS 和验证步骤。",
+      "expected_output": "A deterministic A4 SVG cover workflow with 210mm x 297mm root, tree layout, inline styles, full-page cover CSS, and validation commands for overlap, glyphs, centering, and PDF/HTML rendering.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "这个 concept-map.svg 在浏览器里正常，但导出 PDF 后很多卡片变成黑块，箭头和 x₀/x₁ 也显示成方框。帮我修复 SVG，并说明之后怎么防止这类问题。",
+      "expected_output": "Diagnoses CSS/class-only styling and font fallback risks, recommends inline presentation attributes, fill=none on paths, replacing risky glyphs with stable Chinese/ASCII, and running static validation.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我做了一个 A4 SVG 知识图谱封面，但卡片互相压住，线穿过文字，卡片里的文字也没有上下居中。请把它改成适合打印的四列树形布局，并给我一个自动检查脚本的检查项清单。",
+      "expected_output": "Proposes measured four-column A4 layout with 10mm edge padding, 3mm card gaps, line layering below cards/text, label shields, text padding, centered text-group checks, and Playwright rendered geometry validation.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "我把 SVG 概念图插进 source-transcript.md 后，handout.html 第一页只显示一个很小的图，后面的第1讲还挤在同一页。请给出修复方案。",
+      "expected_output": "Identifies generic transcript image clamping and missing sheet pagination, then provides a dedicated concept-map sheet, full-page image CSS overrides, and forced page breaks before lecture headings.",
+      "files": []
+    }
+  ]
+}

@@ -919,12 +919,15 @@ LEADING_ANALYSIS_LABEL_HTML_PATTERN = re.compile(
     r"\s*[：:。\.\s]*"
 )
 
-# HTML pattern for leading 例N labels. Matches 例 + number, optional <strong>.
+# HTML pattern for leading example/exercise labels. Matches labels such as
+# 例1 / 例题1 / 【例题1】 / 【练习 1】, optional <strong>.
 LEADING_EXAMPLE_LABEL_HTML_PATTERN = re.compile(
     r"\A\s*(?:<strong>\s*)?"
-    r"(?P<label>例\s*[\d一二三四五六七八九十百零]+)"
+    r"(?:【|\[)?"
+    r"(?P<label>(?:例题|例|练习)\s*[\d一二三四五六七八九十百零]+)"
+    r"(?:】|\])?"
     r"(?:\s*</strong>)?"
-    r"\s*"
+    r"\s*[：:。\.\s]*"
 )
 
 

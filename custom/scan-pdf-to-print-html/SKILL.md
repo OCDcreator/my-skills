@@ -63,6 +63,8 @@ Use markdown-source mode when the input `.md`:
 
 Note: the builder treats bare adjacent `![](...)` images as OCR crops and clusters them into a ~92mm row. Wrap any intentional multi-image layout in a `<figure>` so it is preserved at its authored size.
 
+Note: authored full-page cover assets, such as an SVG concept map on the handout homepage, are not OCR crops. Put them in a dedicated cover/sheet wrapper with job-local CSS that overrides generic transcript image clamps (`max-width`, `max-height`, etc.), then verify the rendered HTML/PDF shows the asset filling the first A4 sheet and the first real lecture/chapter heading starts on a fresh sheet. <!-- evolved 2026-06-17 -->
+
 Workflow:
 1. Copy the input into the job dir as `source-transcript.md` (it IS the canonical transcript — no `doc2x/` artifacts exist).
 2. Build HTML directly. For the title, prefer **omitting** `--title` so the builder extracts it from the first `# ` heading in the markdown; pass `--title` only to override. Never derive the title from the filename. If the markdown has no `# ` heading, add one before building. <!-- evolved 2026-06-15 -->
@@ -70,7 +72,7 @@ Workflow:
 3. Render: `py -3 scripts/render_html_to_pdf.py --html handout.html --pdf handout.pdf --screenshot handout-screenshot.png`.
    The default PDF from `render_html_to_pdf.py` is a **vector** PDF — this is the correct default. Do not build high-PPI raster PDFs (e.g. 600 PPI screenshot-stitched) unless the user explicitly asks; they are multi-GB, slow, and are not this skill's path. <!-- evolved 2026-06-15 -->
    **Scan-type raster PDFs are not recommended**: rasterizing a vector PDF re-samples all embedded images, causing visible quality loss (blocky artifacts, color shifts, blurry text). The vector PDF preserves original image resolution and text crispness. If a raster version is truly needed, the user must accept these tradeoffs. <!-- evolved 2026-06-15 -->
-4. Verify in a browser / PDF viewer: math rendered, 0 overflow (no sheet marked `data-fit-state="overflow"`), figures at intended size, title not duplicated.
+4. Verify in a browser / PDF viewer: math rendered, 0 overflow (no sheet marked `data-fit-state="overflow"`), figures at intended size, title not duplicated. If a job-local post-process changed math rendering, pagination, cover layout, or injected CSS/JS, also verify there are no browser page errors and inspect concrete DOM/rendering counters for the intended contract (for example, KaTeX present, MathJax absent, no raw math delimiters left, no broken images, and no first-page cover shrinkage). <!-- evolved 2026-06-17 -->
 5. Open `handout.html` and confirm the body contains real HTML elements (`<h1>/<h2>`, `<p>`, `<ul>/<ol>`, `<table>`) — **not raw Markdown source text**. A build that emits un-converted Markdown is broken; do not proceed to PDF or review. <!-- evolved 2026-06-15 -->
 6. CSS / styling iteration: edit `handout.html` directly (or append a job-local `<style>` override). Do **not** re-run `build_faithful_handout_html.py` to change styling — the builder regenerates its CSS from scratch on every run, so a rebuild silently discards all job-local CSS fixes. Reserve rebuilds for content/source changes. <!-- evolved 2026-06-15 -->
 
@@ -107,6 +109,7 @@ The local builder now expects and enforces:
 - vendored `phycat`-style example blockquotes
 - two-column even choice-option layout when options are list items inside the blockquote
 - special styling for paragraphs beginning with `解析：` — the builder renders the label as an inline `lead-tag` badge (accent-colored pill), not a border-left box. This avoids the blockquote-like appearance of the old `ocr-analysis` treatment <!-- evolved 2026-06-15 -->
+- example/exercise labels inside normal paragraphs or blockquotes should use `lead-tag-example` peach badges when they begin with source-style labels such as `例`, `例题`, `例N`, `【例题1】`, or `【练习 1】`; do not leave them as plain bold text inside the quote. <!-- evolved 2026-06-17 -->
 - Obsidian callout markers (`[!question]`, `[!note]`, etc.) are auto-stripped from blockquotes by `clean_markdown()` <!-- evolved 2026-06-15 -->
 - `table-consistent.css` is emitted **after** the print-base CSS so its transparent-background and uniform th/td rules always win the cascade <!-- evolved 2026-06-15 -->
 - the builder extracts the document title from the first `# ` heading automatically; `--title` is only needed to override <!-- evolved 2026-06-15 -->
@@ -115,7 +118,7 @@ The local builder now expects and enforces:
 - Doc2X crop clustering and size clamping
 - centered table cells, but only display math may be block-centered in cells
 - ordered-list numbering must be preserved **verbatim from the source**: keep the original number prefix as visible text inside the `<li>` rather than relying on `<ol>` auto-numbering, because `<ol>` resets per block when other content sits between items <!-- evolved 2026-06-15 -->
-- table header (`<th>`) and body (`<td>`) cells must share the same font-size, font-weight, and background; tables default to a **transparent** background. Add header emphasis only when the source page actually has it (fidelity), never as decoration <!-- evolved 2026-06-15 -->
+- table header (`<th>`) and body (`<td>`) cells must share the same font-size, font-weight, background, and border state; the skill table template defaults to **transparent and borderless** (`border: none`). Add ruled borders or header emphasis only when the source page actually has them (fidelity), never as decoration. <!-- evolved 2026-06-15; strengthened 2026-06-17 -->
 - block elements (tables, figures) nested inside blockquotes must not carry extra bottom margin — the quote's own padding is sufficient; extra margins create visible blank space at the quote's bottom edge <!-- evolved 2026-06-15 -->
 - when a `$...$` math formula inside a Markdown table cell contains a literal `|`, escape it as `\|` in the transcript so the cell is not split into columns — see `references/transcript-audit-rules.md` <!-- evolved 2026-06-15 -->
 

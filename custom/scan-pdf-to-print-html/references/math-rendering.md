@@ -63,6 +63,19 @@ KaTeX does not automatically participate in the builder's pagination — the pag
 
 `ignoredTags` must include `math` so KaTeX does not try to re-parse the native MathML inside `<math>` table cells.
 
+## Verify a KaTeX post-process
+
+After a job-local KaTeX switch, render fresh HTML/PDF/screenshot before review and check the actual browser output, not just the source strings. At minimum verify:
+
+- no `pageerror` or console syntax error from injected CSS/JS;
+- `.katex` nodes exist when the document contains LaTeX math;
+- MathJax containers/scripts are absent when the job intentionally replaced MathJax;
+- pagination measured after `renderMathInElement(...)` and `document.fonts.ready`;
+- no raw `$...$`, `\(...\)`, or `\[...\]` math remains visible in the rendered body;
+- no sheet is marked overflow after the renderer switch.
+
+Typical failure signatures: `Unexpected token` from malformed injected JavaScript, a post-process that misses the real `</style>` insertion point, or pagination measuring raw math because the old `MathJax.typesetPromise(...)` wait block was left in place. <!-- evolved 2026-06-17 -->
+
 ## Native MathML
 
 Tables authored with inline `<math>...</math>` (MathML) are rendered by the browser's native MathML Core, not by MathJax or KaTeX. Both renderers leave them alone. Chromium renders MathML Core faithfully in `render_html_to_pdf.py` output. If a job reports broken table glyphs, suspect the MathML, not the LaTeX engine.

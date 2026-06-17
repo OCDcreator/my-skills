@@ -5,9 +5,10 @@
  *     Browser defaults make <th> bold + shaded, which invents emphasis
  *     the source does not have and breaks visual parity.
  *   - This file forces th and td to share identical font-size, font-weight,
- *     background, and color so the table reads as a uniform grid.
- *   - Tables default to a transparent background to match the Kami paper
- *     surface. Add shading only when the source page actually has it.
+ *     background, color, and border state.
+ *   - Tables default to a transparent, borderless surface to match the
+ *     skill template. Add ruled borders only when the source page actually
+ *     has them.
  *   - KaTeX inside cells is pinned to the inherited font-size so formulas
  *     do not render smaller or larger than surrounding plain text.
  *   - Selectors are scoped under `.transcript-flow` so the Kami base kernel
@@ -22,6 +23,7 @@
 .transcript-flow table {
   width: 100%;
   border-collapse: collapse;
+  border: none;
   margin: 3mm 0 4mm;
   background: transparent;
   font-size: 12px;
@@ -34,7 +36,7 @@
 .transcript-flow th,
 .transcript-flow td {
   padding: 2.4mm 2.6mm;
-  border: 1px solid var(--line, #e8e6dc);
+  border: none;
   text-align: center;
   vertical-align: middle;
 
