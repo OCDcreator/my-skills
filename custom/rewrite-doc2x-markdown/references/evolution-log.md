@@ -159,3 +159,98 @@ candidates extracted, all approved by user in a single batch.
   currently-loaded skill text; recommend a fresh session to exercise the
   improved rules.
 
+---
+
+## 2026-06-17 — batch: 4 lessons from pages 179-209 rework
+
+Session rewriting pages 179-209 produced follow-up corrections on rendered
+Markdown structure. Four candidates were surfaced and approved by the user.
+
+### Candidate A — human_review approved: two-row choice table separator
+
+- **Trigger (verbatim):** "两行表格时 下面会多出> | :---: | :---: |"
+- **Classification:** `rework` — the long-choice table example instructed a
+  second alignment row after the C/D row, which rendered as an extra visible row.
+- **Provenance:** `(extracted)` — in-session user correction and current file
+  verification.
+- **Gate verdict:** `human_review` (Gate 1 PASS / Gate 2 conflict / Gate 3
+  principle).
+  - Gate 2 evidence: `canonical-markdown-rules.md` long-choice example had a
+    second `> | :---: | :---: |` after C/D.
+  - Adversarial: the old example is normal Markdown-table syntax. Counter: the
+    user's actual Obsidian/Typora rendering showed an unwanted extra row, and the
+    project contract prioritizes canonical Markdown that renders well.
+- **Landing zone:** `references/canonical-markdown-rules.md` Choice Format.
+
+### Candidate B — strengthen: simple formula-list comma placement
+
+- **Trigger (verbatim):** "$m, n$ $\\alpha, \\beta$ 有一些公式中的逗号，就是我的意思是这种应该是  $m$, $n$ $\\alpha$, $\\beta$ 就是逗号该在公式外，这种明显排列的公式，当然复杂公式的话，逗号确实需要再公式中。"
+- **Classification:** `rework` — simple lists stayed inside one inline math span.
+- **Provenance:** `(extracted)` — in-session user correction and corrected
+  output scan (`simple_list_inside_math_count= 0`).
+- **Gate verdict:** `strengthen` (Gate 1 PASS / Gate 2 strengthen / Gate 3
+  principle).
+  - Gate 2 evidence: existing rule said "Keep punctuation outside math delimiters
+    when possible" but did not distinguish simple lists from intervals/functions.
+  - Adversarial: a broad regex would break intervals and function arguments.
+    Counter: the rule explicitly requires semantic classification and preserves
+    complex formula commas.
+- **Landing zone:** `references/canonical-markdown-rules.md` Formulas + `SKILL.md`
+  Step 6 self-check.
+
+### Candidate C — strengthen: display math delimiter blocks
+
+- **Trigger:** subagent review found inline-style display math such as
+  `$${g}^{\\prime}\\left(x\\right)=...>0$$`.
+- **Classification:** `rework` — formulas used display delimiters on the same line.
+- **Provenance:** `(extracted)` — in-session subagent finding and corrected scan.
+- **Gate verdict:** `strengthen` (Gate 1 PASS / Gate 2 strengthen / Gate 3
+  principle).
+  - Gate 2 evidence: existing rule said display math is a standalone `$$...$$`
+    block, but did not forbid `$$formula$$` explicitly.
+  - Adversarial: validators already false-positive around display math. Counter:
+    this is a concrete Markdown formatting rule with a cheap grep self-check.
+- **Landing zone:** `references/canonical-markdown-rules.md` Formulas + `SKILL.md`
+  evidence checks.
+
+### Candidate D — strengthen: semantic heading hierarchy
+
+- **Trigger (verbatim):** "第三讲的结构压根就不对"
+- **Classification:** `rework` — prior fix removed level jumps but left generic
+  headings (`知识点总结`, `经典例题`, `归纳总结`) as siblings of their owning topics.
+- **Provenance:** `(extracted)` — in-session screenshot/user correction, plus
+  memory corroboration of a prior heading-hierarchy correction on 122-178.
+- **Gate verdict:** `strengthen` (Gate 1 PASS / Gate 2 strengthen / Gate 3
+  principle).
+  - Gate 2 evidence: existing Heading Hierarchy said "Never skip levels or use
+    inconsistent hierarchy" but did not require checking rendered outline
+    semantics.
+  - Recurrence evidence: `MEMORY.md` records prior "标题层级不对，重新整理" and
+    "normalize heading hierarchy across the document, not just at the local
+    offending heading."
+  - Adversarial: document-specific topic names should not be hard-coded. Counter:
+    the rule generalizes to generic child headings under any topic.
+- **Landing zone:** `references/canonical-markdown-rules.md` Heading Hierarchy +
+  `SKILL.md` judgment self-check.
+
+### Batch metadata
+
+- **Pairwise conflict check:** 4 candidates, checked as a batch; only Candidate A
+  conflicted with the old table example and was explicitly approved by the user.
+- **Dev Eval:** corrected output passed:
+  `py -3 ...\\validate_canonical_markdown.py --md product\\2026-06-17-jimi-daoshu-179-209\\source-transcript.md --fix --dry-run`
+  → `DRY RUN: would auto-fix 0 issue(s)`.
+- **Outcome:** APPROVED (user replied "批准").
+- **Files written:**
+  - `references/canonical-markdown-rules.md` (Candidates A-D)
+  - `SKILL.md` (Candidates B-D self-checks)
+  - `references/evolution-log.md` (this entry)
+- **Snapshots:**
+  - `SKILL.md.bak-2026-06-17`
+  - `references/canonical-markdown-rules.md.bak-2026-06-17`
+- **Recurrence count:** Candidate D has prior same-substance memory evidence;
+  log recurrence treated as first in append-only evolution log for this exact
+  rule. Candidates A-C are first.
+- **Active-context staleness:** editing the repo file does not change the
+  currently-loaded skill text; recommend a fresh session to exercise the
+  improved rules.

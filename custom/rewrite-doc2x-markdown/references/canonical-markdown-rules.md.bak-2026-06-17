@@ -35,7 +35,6 @@ Regenerate Markdown structure, not source meaning. Fix broken OCR layout, headin
 - `###` = Knowledge point title (level 3, e.g., "知识点一", "知识点二")
 - `####` = Subsection title (level 4, e.g., "一、", "二、")
 - Never skip levels or use inconsistent hierarchy.
-- <!-- evolved 2026-06-17 --> Heading hierarchy is semantic, not just numeric. Topic headings and their generic child headings must form a meaningful outline: e.g. `### 指对同构：技巧与模型` may contain `#### 知识点总结`, `#### 经典例题`, and `#### 归纳总结`; those child labels should not appear as siblings of the owning topic. When the user reports heading hierarchy problems, sweep the whole affected chapter/section and inspect the rendered outline semantics, not only heading-level jumps.
 
 ## Question Callouts
 
@@ -77,9 +76,8 @@ Use **Markdown tables** inside the callout for choices. Do not use HTML `<div>` 
 > | A. 较长的选项内容 | B. 另一个选项 |
 > | :---: | :---: |
 > | C. 第三个选项 | D. 第四个选项 |
+> | :---: | :---: |
 ```
-
-Do not add a second alignment row after the C/D row in a two-row choice table. In Obsidian/Typora this renders as an extra visible row beneath the choices; one alignment row after A/B is enough for the two-column table.
 
 **Image options:**
 
@@ -149,8 +147,6 @@ Hard rules:
 - Preserve mathematical meaning and symbol order.
 - Split fused Doc2X formulas into readable units.
 - Keep punctuation outside math delimiters when possible.
-- <!-- evolved 2026-06-17 --> For simple formula lists, keep separators outside math delimiters: write `$m$, $n$`, `$\alpha$, $\beta$`, `${x}_{1}$, `${x}_{2} \in D$`. Keep commas inside math delimiters for intervals, coordinates, function arguments, arrays, and complex formulas such as `$f(x, y)$`, `$(0, 1)$`, or `$\left[ a, b\right]$`.
-- <!-- evolved 2026-06-17 --> Display math delimiters must be standalone block lines. Never emit `$$formula$$` on one line; write `$$`, then the formula content, then `$$` on its own line. Multi-line display formulas must also place the opening and closing `$$` on separate lines.
 - Prefer KaTeX-safe simple notation.
 - Use `\mathbin{/\!/}` for parallel lines/planes. Do NOT use `\parallel`.
 - Avoid fragile macros and environments: `\mspace`, `\left.`, `\overset{\large\frown}{...}`.

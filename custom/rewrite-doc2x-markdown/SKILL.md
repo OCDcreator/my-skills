@@ -316,9 +316,10 @@ Run each command and include the output in your report. **Do not skip any check.
 4. **Fused formulas split**: `rg -n '\$[^$]*[，,][^$]*[=<>≥≤][^$]*\$' source-transcript.md` → no independent relations fused. Note: `\begin{array}` rows with `,` separators are NOT fused formulas.
 5. **Paragraph length**: `rg -n '.{300,}' source-transcript.md` → remaining long lines must be pure formula blocks only
 6. **HTML comment integrity**: `rg -n '<!_' source-transcript.md` → must be 0 (Rule 5 corruption check)
-7. **`--fix` pass**: `validate_canonical_markdown.py --fix` → PASS, except for known false positives (HTML/MathML warnings for formula-heavy content)
-8. **Proofreading**: `validate_canonical_markdown.py --check-proofreading` → only known false positives remain (suspicious character, unbalanced braces from `\begin{array}`)
-9. **Image sizing**: `rg -n 'max-width:72%|max-width:45%' source-transcript.md` → must be 0 (images should use max-width:36% for single, max-width:22.5% for double, per canonical rules)
+7. **No inline-style display math**: `rg -n '^\$\$.+\$\$$|^> \$\$.+\$\$$' source-transcript.md` → must be 0; display math uses standalone `$$` delimiter lines.
+8. **`--fix` pass**: `validate_canonical_markdown.py --fix` → PASS, except for known false positives (HTML/MathML warnings for formula-heavy content)
+9. **Proofreading**: `validate_canonical_markdown.py --check-proofreading` → only known false positives remain (suspicious character, unbalanced braces from `\begin{array}`)
+10. **Image sizing**: `rg -n 'max-width:72%|max-width:45%' source-transcript.md` → must be 0 (images should use max-width:36% for single, max-width:22.5% for double, per canonical rules)
 
 #### Judgment-based checks (verify, mark pass/fail)
 
@@ -327,6 +328,8 @@ You MUST check all items below. Do not skip any. If an item is not applicable, w
 - [ ] **Callout syntax**: every `[!question]`, `[!example]`, `[!note]`, `[!warning]` has `> ` prefix (use `rg -n '^\[!'` to verify — any match means a broken callout)
 - [ ] **Subpart line breaks**: every `(1)`/`(2)`/`(3)` question subpart inside a callout is on its own `>` line — no single `>` line contains two or more `(N)` subparts (grep suspect lines with `rg -n '\([0-9]+\)[^(]*\([0-9]+\)'` inside callout regions, then confirm each remaining hit is a false positive like coordinate pairs)
 - [ ] **Comma consistency & spacing**: every English `,` is followed by exactly one space (never glued like `,x`), no double spaces after a comma, and no paragraph/callout mixes `，` and `,` (grep `rg -n ',[^ \n,)]'`; confirm each remaining hit is a math/code false positive like `$f(x,y)$`)
+- [ ] **Simple formula-list comma placement**: simple variable/symbol lists are split into separate inline math spans (`$m$, $n$`, `$\alpha$, $\beta$`, `${x}_{1}$, `${x}_{2} \in D$`); commas inside intervals, coordinates, function arguments, arrays, and complex formulas are preserved.
+- [ ] **Semantic heading hierarchy**: inspect the rendered outline, not only heading-level jumps. Topic headings should own generic children such as `知识点总结`, `经典例题`, `归纳总结`, `特别地`, and `基本规律`; those child labels should not become siblings of their owning topic.
 - [ ] **解析 bold**: every analysis section has `**解析**` or `**解**` in bold
 - [ ] **Content preservation**: ALL derivation steps preserved — no summarizing of 法一/法二/法三
 - [ ] **Doc2X primacy**: content scope matches `doc2x/page-transcript.raw.md` — no detail removed
