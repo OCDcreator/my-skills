@@ -1,16 +1,10 @@
-# Math Rendering: KaTeX Required for Printable HTML
+# Math Rendering: MathJax vs KaTeX
 
-Printable HTML/PDF handouts must use **KaTeX HTML/font rendering** for LaTeX math by default. The local builder may still emit **MathJax 3 (`tex-svg`)** as its bootstrap, but that is an intermediate builder implementation detail, not an acceptable final renderer for math-bearing printable outputs.
+The builder ships with **MathJax 3 (`tex-svg`)** as the default math renderer. This file explains when to keep it and when to switch to **KaTeX**, and how to switch safely. Read this when the rendered math looks too heavy/thick, or when a job needs the most elegant possible typography.
 
-MathJax SVG is allowed only when the user explicitly requests MathJax SVG or a fully self-contained offline math file and accepts the heavier formula appearance. Otherwise, apply the safe KaTeX post-process below before final screenshot/PDF export. <!-- evolved 2026-06-17 -->
+## Default: MathJax tex-svg
 
-## Required Default: KaTeX
-
-KaTeX renders to HTML + web fonts (Computer Modern-style), which is visibly lighter and is the required default for polished math handouts. It also keeps math text closer to selectable/searchable text than SVG path glyphs.
-
-The handout must not be delivered with MathJax `tex-svg` output unless the exception above applies.
-
-## Why MathJax tex-svg Is Not the Default
+`build_faithful_handout_html.py` injects MathJax with `svg: { fontCache: 'none' }` and the pagination script calls `MathJax.typesetPromise(...)` before measuring page height.
 
 Strengths:
 - Self-contained: every glyph is an SVG path, so the HTML renders identically anywhere with no font-loading dependency.
@@ -20,7 +14,11 @@ Weakness observed in practice:
 - SVG path fills read as a **heavy/bold** type weight next to body text, especially for `\dfrac` fractions and large symbols. For dense math handouts this looks thick rather than elegant.
 - Math glyphs are vector paths, so the math text is **not selectable/searchable** in the PDF.
 
-## How to enforce KaTeX (the safe way)
+## When to switch to KaTeX
+
+Switch when the user asks for crisper / more elegant / "高雅" math typography, or selectable math text. KaTeX renders to HTML + web fonts (Computer Modern-style), which is visibly lighter and is the de-facto standard for elegant web math. Trade-off: it loads woff2 fonts from a CDN at render time (one extra wait, but the pagination script already awaits `document.fonts.ready` via the patch below).
+
+## How to switch (the safe way)
 
 KaTeX does not automatically participate in the builder's pagination — the pagination script measures page height, and it must measure **after** math is rendered. If you swap the MathJax `<script>` bootstrap for KaTeX but leave the pagination script calling `MathJax.typesetPromise`, pagination will measure raw `$...$` text and overflow. So two coupled edits are required, applied as a **job-local post-process** (do not edit the shared builder for one job):
 
@@ -65,13 +63,13 @@ KaTeX does not automatically participate in the builder's pagination — the pag
 
 `ignoredTags` must include `math` so KaTeX does not try to re-parse the native MathML inside `<math>` table cells.
 
-## Verify KaTeX before delivery
+## Verify a KaTeX post-process
 
-After enforcing KaTeX, render fresh HTML/PDF/screenshot before review and check the actual browser output, not just the source strings. For every math-bearing job, verify:
+After a job-local KaTeX switch, render fresh HTML/PDF/screenshot before review and check the actual browser output, not just the source strings. At minimum verify:
 
 - no `pageerror` or console syntax error from injected CSS/JS;
 - `.katex` nodes exist when the document contains LaTeX math;
-- MathJax containers/scripts are absent;
+- MathJax containers/scripts are absent when the job intentionally replaced MathJax;
 - pagination measured after `renderMathInElement(...)` and `document.fonts.ready`;
 - no raw `$...$`, `\(...\)`, or `\[...\]` math remains visible in the rendered body;
 - no sheet is marked overflow after the renderer switch.

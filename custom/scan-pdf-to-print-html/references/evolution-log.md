@@ -49,3 +49,10 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
 
 **Written:** DIFF G (SKILL.md), DIFF H (references/math-rendering.md).
 **Snapshot:** SKILL.md.bak-2026-06-17.
+
+## 2026-06-17 — run against scan-pdf-to-print-html
+- candidate: Printable HTML/PDF formulas must use KaTeX HTML/font rendering by default; MathJax tex-svg is only an explicit user-requested exception.
+  verdict: strengthen
+  reason: Existing rules only documented a KaTeX switch/verification path while `math-rendering.md` still said MathJax tex-svg was the default, which caused visibly heavy PDF formulas.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: second (strengthens C21)
