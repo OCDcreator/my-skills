@@ -872,7 +872,7 @@ def strip_html_tags(value: str) -> str:
 # ordinary word (解析几何, 解决, 注意到). 方案N / 法N carry a numeral
 # (Chinese, Arabic, or Roman) so bare words like 方案案 / 法案 do not match.
 ANALYSIS_LABEL_PATTERN = re.compile(
-    r"\A(?:分析|解析|解答|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
+    r"\A(?:分析|解析|解答|证明|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
     r"(?=$|[\s\u3000：:。，,\.（(、])"
 )
 
@@ -908,12 +908,12 @@ def normalize_fill_blank_markers(fragment_html: str) -> str:
     return normalized
 
 
-# HTML pattern for the leading 分析/解析/解答/解/另解 label inside a <p> body.
+# HTML pattern for the leading 分析/解析/解答/证明/解/另解 label inside a <p> body.
 # Matches optional <strong>, the label word, optional </strong>, then separator.
 LEADING_ANALYSIS_LABEL_HTML_PATTERN = re.compile(
     r"\A\s*(?:<strong>\s*)?"
     r"(?:【|\[)?"
-    r"(?P<label>分析|解析|解答|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
+    r"(?P<label>分析|解析|解答|证明|另解|注意|方案[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|法[一二三四五六七八九十零两0-9ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ]+|解)"
     r"(?:】|\])?"
     r"(?:\s*</strong>)?"
     r"\s*[：:。\.\s]*"
