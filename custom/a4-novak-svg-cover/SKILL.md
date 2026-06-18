@@ -51,9 +51,18 @@ Design constraints:
 - Use inline presentation attributes (`fill`, `stroke`, `font-family`, etc.). Do not rely on `<style>`, CSS variables, or class-only styling.
 - Add explicit `fill="none"` on paths and hairlines that should not fill.
 
+## Typography And Formula Readability
+
+<!-- evolved 2026-06-17 -->
+- Card body text is content, not a caption: it must not be visibly smaller than the handout's normal body text or shrink into footnote-like copy. If body text looks small in the rendered preview, enlarge it first, then adjust card height, row spacing, or wording to keep the layout valid.
+<!-- evolved 2026-06-17 -->
+- Card titles may remain larger/bolder than body lines, but non-title explanatory lines should still be comfortably readable on an A4 print preview.
+<!-- evolved 2026-06-17 -->
+- When MathJax formula fragments are used, formula `max_w` / `max_h` must be tuned with the surrounding text size. Do not let formulas become the smallest visual element in the card; scale formulas and text together, then rerun formula-aware layout checks.
+
 ## Math Formula Rendering
 
-For math-heavy concept maps, do not mix raw SVG text math with rendered formula fragments. Choose one formula policy for all visible mathematical expressions.
+For math-heavy concept maps, the MathJax SVG pipeline is the **default, proactively-run renderer** whenever card content contains any math (function notation like `tan/sin/cos`, Greek letters, subscripts/superscripts, fractions, roots, equations, or symbol names like `alpha`/`omega`). Do not write that math as raw SVG `<text>` and then stop — run the pipeline up front: list expressions in `formulas.json`, render with `render_mathjax_svg.mjs`, and embed each as `<g class="formula-fit" data-formula-id="...">`. Within a single map, choose one formula policy for all visible expressions; "do not mix raw SVG text math with rendered formula fragments" is not satisfied by an all-raw-text map. <!-- evolved 2026-06-18 -->
 
 <!-- evolved 2026-06-17 -->
 - Preferred standalone-SVG path: keep formula sources in data files, render them at build time with MathJax SVG output, and embed them as `<g class="formula-fit" data-formula-id="...">` path/rect/vector fragments.
@@ -63,6 +72,8 @@ For math-heavy concept maps, do not mix raw SVG text math with rendered formula 
 - If KaTeX is requested, use it only when the output is converted to SVG/vector fragments; raw KaTeX HTML is not enough for a standalone SVG deliverable.
 <!-- evolved 2026-06-17 -->
 - Formula-aware validators must skip MathJax internal geometry inside `g.formula-fit` and treat formula groups as card content for padding and centering checks.
+<!-- evolved 2026-06-17 -->
+- After increasing text size, increase formula fragment bounds and card/row geometry together rather than shrinking MathJax output to preserve the old layout.
 
 ## Background Policy
 
@@ -155,6 +166,7 @@ Expected checks:
 - Cards keep the edge safe area.
 - Text stays within card padding.
 - Text groups are centered inside cards.
+- Rendered body text and MathJax formula lines are readable at A4 preview size and do not look like footnotes compared with the handout body.
 - Edges are below text in DOM order.
 - Edges do not visibly cross text unless hidden by a card or label shield.
 - Edge strokes are not too heavy.
