@@ -56,3 +56,15 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
   reason: Existing rules only documented a KaTeX switch/verification path while `math-rendering.md` still said MathJax tex-svg was the default, which caused visibly heavy PDF formulas.
   gate: { g1: pass, g2: strengthen, g3: principle }
   recurrence: second (strengthens C21)
+
+## 2026-06-19 — run against scan-pdf-to-print-html
+- candidate: Final rendered HTML/PDF must reject contentless non-cover sheets, including separator-only `<hr>` / empty `.flow-block` pages.
+  verdict: add_new
+  reason: A real job produced a blank tenth page from `<div class="flow-block"><hr></div>`; existing rules checked overflow but not zero-content sheets.
+  gate: { g1: pass, g2: new, g3: principle }
+  recurrence: first
+- candidate: Blockquoted Markdown formula rendering must prevent literal quote-marker `>` leakage into formula text while preserving legitimate inequalities.
+  verdict: strengthen
+  reason: Existing math and blockquote rules covered raw delimiters/callout cleanup but did not explicitly guard against Markdown quote prefixes entering rendered formulas.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: first

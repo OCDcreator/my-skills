@@ -74,7 +74,9 @@ After enforcing KaTeX, render fresh HTML/PDF/screenshot before review and check 
 - MathJax containers/scripts are absent;
 - pagination measured after `renderMathInElement(...)` and `document.fonts.ready`;
 - no raw `$...$`, `\(...\)`, or `\[...\]` math remains visible in the rendered body;
+- no Markdown blockquote marker `>` has leaked into formula text. If a rendered formula contains `>`, compare against the source: keep legitimate inequalities, but fix quote-prefix leakage before export; <!-- evolved 2026-06-19 -->
 - no sheet is marked overflow after the renderer switch.
+- no non-cover `.sheet` is contentless; separator-only fragments such as `<hr>` must not be allowed to occupy an A4 page by themselves. <!-- evolved 2026-06-19 -->
 
 Typical failure signatures: `Unexpected token` from malformed injected JavaScript, a post-process that misses the real `</style>` insertion point, or pagination measuring raw math because the old `MathJax.typesetPromise(...)` wait block was left in place. <!-- evolved 2026-06-17 -->
 
