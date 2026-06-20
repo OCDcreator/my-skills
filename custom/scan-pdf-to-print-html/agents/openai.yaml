@@ -1,4 +1,4 @@
 interface:
   display_name: "Scan PDF To Print HTML"
-  short_description: "Doc2X OCR to auditable A4 HTML and PDF"
-  default_prompt: "Use $scan-pdf-to-print-html to parse this scanned PDF with Doc2X, audit source-transcript.md first, and then turn it into faithful A4 HTML/PDF without rewriting content."
+  short_description: "Canonical markdown to A4 HTML/PDF"
+  default_prompt: "Use $scan-pdf-to-print-html to turn this completed source-transcript.md into faithful A4 HTML/PDF with Kami rendering and print checks."

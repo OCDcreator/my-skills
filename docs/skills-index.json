@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated_at": "2026-06-20T08:48:57.241486+00:00",
+    "generated_at": "2026-06-20T09:47:11.214624+00:00",
     "total_skills": 1045,
     "custom_skills": 38,
     "external_skills": 1007,
@@ -348,7 +348,7 @@
     {
       "path": "custom/scan-pdf-to-print-html",
       "name": "scan-pdf-to-print-html",
-      "description": "Use when scanned or image-only PDFs need Doc2X OCR into a faithful, auditable page transcript and then A4 HTML/PDF, OR when an already-clean markdown file must become a printable A4 HTML/PDF handout. Best for textbooks, notes, worksheets, formulas, tables, diagrams, and question pages where content must stay source-faithful. For OCR inputs, `source-transcript.md` must be audited before HTML assembly; for clean markdown inputs, skip OCR and assemble directly.",
+      "description": "Use when a completed canonical `source-transcript.md` or other clean markdown must become faithful A4 HTML/PDF. Also use after `rewrite-doc2x-markdown` has finished OCR cleanup for scanned PDFs, textbooks, formulas, tables, diagrams, or question pages. Do not use as the default PDF-to-Markdown or Doc2X OCR entry point.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",

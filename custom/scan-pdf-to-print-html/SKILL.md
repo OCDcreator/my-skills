@@ -1,17 +1,17 @@
 ---
 name: scan-pdf-to-print-html
-description: Use when scanned or image-only PDFs need Doc2X OCR into a faithful, auditable page transcript and then A4 HTML/PDF, OR when an already-clean markdown file must become a printable A4 HTML/PDF handout. Best for textbooks, notes, worksheets, formulas, tables, diagrams, and question pages where content must stay source-faithful. For OCR inputs, `source-transcript.md` must be audited before HTML assembly; for clean markdown inputs, skip OCR and assemble directly.
+description: Use when a completed canonical `source-transcript.md` or other clean markdown must become faithful A4 HTML/PDF. Also use after `rewrite-doc2x-markdown` has finished OCR cleanup for scanned PDFs, textbooks, formulas, tables, diagrams, or question pages. Do not use as the default PDF-to-Markdown or Doc2X OCR entry point.
 ---
 
 # Scan Pdf To Print Html
 
-Produce a Doc2X-backed OCR job with:
+Produce faithful print outputs from an approved canonical Markdown transcript:
 
-- `doc2x/page-transcript.raw.md`: untouched raw page transcript
-- `source-transcript.md`: canonical transcript to audit and edit
 - `handout.html` and PDF: final print outputs
 
-Never rewrite, summarize, teach, merge away page provenance, or silently replace the canonical transcript with export markdown.
+This is the downstream print skill. For a PDF-only or messy Doc2X/OCR Markdown task, run the project-local `rewrite-doc2x-markdown` skill first to create the canonical `source-transcript.md`; then use this skill for Kami-based HTML/PDF assembly.
+
+Never run OCR cleanup, rewrite, summarize, teach, merge away page provenance, or silently replace the canonical transcript with export markdown inside this skill.
 
 ## Hard Contract
 
@@ -25,7 +25,7 @@ These apply in **every** mode:
 
 ### OCR Hard Contract (scanned / Doc2X jobs only)
 
-The gates below apply **only** to scanned-PDF jobs that go through Doc2X OCR. Markdown-source jobs (already-clean markdown) skip them — see Markdown-Source Mode below.
+The gates below apply **only** to legacy scanned-PDF jobs that already have Doc2X artifacts in the job directory. New PDF-to-Markdown/OCR work should start in `rewrite-doc2x-markdown`, not here. Markdown-source jobs (already-clean markdown) skip these gates — see Markdown-Source Mode below.
 
 - `doc2x/export/export.md` is reference-only, and should be localized to sibling `images/` assets whenever the Doc2X zip already contains matching local crops.
 - `job.json.transcript_audit_status` starts at `pending`; HTML is blocked until it is `approved`.
@@ -43,9 +43,11 @@ Read these before work:
 
 ## Required Workflow
 
-1. Run `py -3 scripts/doc2x_parse_job.py --pdf "C:\path\scan.pdf" --out-dir "C:\path\job"`.
-2. Inspect `doc2x/page-transcript.raw.md`, `source-transcript.md`, and `pages/` when review is needed.
-3. Audit `source-transcript.md` against the raw transcript and source pages.
+Use this legacy workflow only when continuing an existing job directory that already contains Doc2X OCR artifacts. Do not use it as the default entry point for new PDF-to-Markdown work.
+
+1. Confirm `rewrite-doc2x-markdown` has already produced or approved `source-transcript.md`, or that this is a legacy job with existing `doc2x/` artifacts.
+2. Inspect `doc2x/page-transcript.raw.md`, `source-transcript.md`, and `pages/` when legacy review is needed.
+3. Audit `source-transcript.md` against the raw transcript and source pages only for legacy OCR jobs that were not already approved by `rewrite-doc2x-markdown`.
 4. Run `py -3 scripts/lint_transcript_structure.py --job-dir "C:\path\job"`.
 5. After the user approves the transcript and the lint result, set `job.json.transcript_audit_status` to `approved`.
 6. Write `layout-brief.md`.
@@ -59,11 +61,11 @@ If step 4 or step 5 never happened, step 8 must fail. Treat that failure as corr
 
 ## Markdown-Source Mode (clean canonical markdown input)
 
-When the input is already a clean, well-structured markdown file — not a scanned PDF and not messy OCR output — skip Doc2X OCR and the audit/lint gates. This happens when a transcript was authored by hand or pre-cleaned upstream.
+This is the default mode for new work. Use it when the input is already a clean, well-structured markdown file, including `source-transcript.md` produced by the project-local `rewrite-doc2x-markdown` skill.
 
 Use markdown-source mode when the input `.md`:
 - has correct, intentional structure (headings, lists, tables, `$...$` math, `<figure>` blocks), and
-- is **not** the raw Doc2X `page-transcript.raw.md` / `export.md` — those are OCR output and still belong to the audit path above.
+- is **not** the raw Doc2X `page-transcript.raw.md` / `export.md` — those are OCR output and must be cleaned by `rewrite-doc2x-markdown` before this skill builds HTML/PDF.
 
 Note: the builder treats bare adjacent `![](...)` images as OCR crops and clusters them into a ~92mm row. Wrap any intentional multi-image layout in a `<figure>` so it is preserved at its authored size.
 
@@ -88,7 +90,7 @@ Everything else still holds: keep `source-transcript.md` canonical, never let an
 
 ## Transcript Audit Rules
 
-Read `references/transcript-audit-rules.md` before editing `source-transcript.md`.
+For new OCR/PDF jobs, transcript audit and canonical Markdown rewriting belong to `rewrite-doc2x-markdown`. Read `references/transcript-audit-rules.md` here only when continuing a legacy scan job whose transcript has not already been approved upstream.
 
 During audit:
 
@@ -142,7 +144,7 @@ Hard rules:
 
 ## Files
 
-- `scripts/doc2x_parse_job.py`
+- `scripts/doc2x_parse_job.py` — legacy/compatibility OCR job materializer; do not use as the default new PDF-to-Markdown entry point
 - `scripts/build_handout_via_subagents.py`
 - `scripts/build_faithful_handout_html.py` — Kami-kernel A4 HTML builder (used in both OCR and markdown-source modes)
 - `scripts/render_html_to_pdf.py` — Playwright HTML→A4 PDF + screenshot (engine-agnostic math wait)
