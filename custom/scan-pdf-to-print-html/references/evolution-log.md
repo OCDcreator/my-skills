@@ -68,3 +68,29 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
   reason: Existing math and blockquote rules covered raw delimiters/callout cleanup but did not explicitly guard against Markdown quote prefixes entering rendered formulas.
   gate: { g1: pass, g2: strengthen, g3: principle }
   recurrence: first
+
+## 2026-06-20 — run against scan-pdf-to-print-html
+- candidate: Non-cover A4 sheets must not end with excessive trailing blank space; enforce with `scripts/validate_sheet_bottom_margin.py`.
+  verdict: add_new
+  reason: A real job showed a non-cover sheet whose bottom third was blank because a display-math block could not split across pages; existing rules only rejected fully blank sheets, not sheets with large trailing blanks.
+  gate: { g1: pass, g2: new, g3: principle }
+  recurrence: first
+
+## 2026-06-20 — refinement of C25
+- candidate: Tighten trailing-blank threshold to 10%, exempt cover and final sheets, and exempt a sheet when the following sheet starts with a `.phycat-blockquote`.
+
+## 2026-06-20 (session 2: blockquote math-marker leakage)
+- candidate: Blockquote structural `>` markers must be stripped from interior lines of callout-embedded `$$...$$` blocks before math protection, and a standalone validator must catch any residual leakage.
+  verdict: add_new + strengthen
+  reason: A real job showed multi-line display math inside an Obsidian callout where every interior line still carried the blockquote prefix; `clean_markdown()` only stripped the `[!type]` marker, so the `>` prefixes were captured as part of the formula and rendered literally inside KaTeX. This requires both a builder-side strip in `build_faithful_handout_html.py` and a source-level detector.
+  gate: { g1: pass, g2: new, g3: principle }
+  recurrence: second (strengthens C25)
+  written:
+    - `scripts/build_faithful_handout_html.py`: added `CALLOUT_DISPLAY_MATH_PATTERN` and `_strip_callout_display_math_prefixes()`; called inside `clean_markdown()` after Obsidian callout marker removal. Also tightened the existing callout-marker strip regex from `\s*` to `[ \t]*` so a marker at the end of a line no longer swallows the newline and merges with the next `> $$` delimiter line.
+    - `scripts/validate_math_quote_leakage.py`: new CLI detector that reports any line inside a `$$...$$` block beginning with `>`.
+    - `SKILL.md`: updated Builder Markdown Contract C25 rule, added validator command, inserted workflow step 7a (OCR path) and step 2a (markdown-source path), and listed the new validator in Files.
+  snapshot: SKILL.md.bak-2026-06-20-2
+  verdict: strengthen
+  reason: User clarified that 35% was too loose to catch the third-sheet blank and that blockquotes must stay whole; only the following-sheet-start-blockquote case should be exempt.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: first

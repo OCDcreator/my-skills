@@ -298,6 +298,8 @@ def test_fix_preserves_callout_prefixes_and_choice_table_separators(tmp_path: Pa
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "> [!question] 例题" in fixed
+    assert "> | A. $(-1,2]$ | B. $(1,2)$ | C. $(-1,4)$ | D. $(-1,\\sqrt{11})$ |" in fixed
+    assert "$| B.$" not in fixed
     assert "> | :---: | :---: | :---: | :---: |" in fixed
     assert ":__________:" not in fixed
 

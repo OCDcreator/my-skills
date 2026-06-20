@@ -16,6 +16,15 @@ HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 MATH_SEGMENT_PATTERN = re.compile(r"\$\$.*?\$\$|\$.*?\$", re.DOTALL)
 FENCED_CODE_BLOCK_PATTERN = re.compile(r"(^```[^\n]*\n.*?^```[ \t]*$)", re.MULTILINE | re.DOTALL)
 INLINE_CODE_SPAN_PATTERN = re.compile(r"(`+)([^`\n]*?)\1")
+# Matches a $$...$$ block whose opening and closing delimiters are both on
+# blockquote lines (typical of Obsidian callouts). The interior lines will
+# have their structural '>' prefix stripped so they do not leak into the formula.
+CALLOUT_DISPLAY_MATH_PATTERN = re.compile(
+    r"(?m)^([ \t]*>[ \t]*)\$\$[ \t]*$\n"
+    r"(.*?)\n"
+    r"^[ \t]*>[ \t]*\$\$[ \t]*$",
+    re.DOTALL,
+)
 FORBIDDEN_FRAGMENT_PATTERN = re.compile(
     r"<!DOCTYPE|<html\b|</html>|<head\b|</head>|<body\b|</body>|<style\b|</style>|<script\b|</script>",
     re.IGNORECASE,
@@ -588,6 +597,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _strip_callout_display_math_prefixes(text: str) -> str:
+    """Remove '>' prefixes from every line of a callout-embedded $$...$$ block.
+
+    Example:
+        > $$          $$
+        > a      ->   a
+        > b           b
+        > $$          $$
+    """
+    def replacer(match: re.Match[str]) -> str:
+        prefix = match.group(1)
+        body = match.group(2)
+        escaped_prefix = re.escape(prefix.rstrip())
+        stripped_body = re.sub(rf"(?m)^{escaped_prefix}[ \t]?", "", body)
+        return f"$$\n{stripped_body}\n$$"
+
+    return CALLOUT_DISPLAY_MATH_PATTERN.sub(replacer, text)
+
+
 def clean_markdown(text: str) -> str:
     normalized = text.replace("\r\n", "\n").strip()
     literal_segments: list[str] = []
@@ -602,9 +630,18 @@ def clean_markdown(text: str) -> str:
     normalized = HTML_COMMENT_PATTERN.sub("", normalized)
     # Strip Obsidian callout markers: "> [!question] text" → "> text"
     # Evolved 2026-06-15: Obsidian callout syntax leaked into HTML as raw text.
+    # Use horizontal whitespace only after the marker so a marker at the end
+    # of a line does not swallow the newline and merge with the next quote line.
     normalized = re.sub(
-        r"(?m)^(\s*>\s*)\[!\w+\]\s*", r"\1", normalized
+        r"(?m)^(\s*>\s*)\[!\w+\][ \t]*", r"\1", normalized
     )
+    # Strip leading blockquote markers from interior lines of display-math
+    # blocks embedded in Obsidian callouts. Otherwise protect_math_segments()
+    # captures the '>' prefixes as part of the formula, and they render as
+    # literal '>' inside the math. Legitimate '>' inequalities inside the
+    # formula are preserved because only the structural blockquote prefix is
+    # removed. Evolved 2026-06-20.
+    normalized = _strip_callout_display_math_prefixes(normalized)
     # Doc2X emits TeX with \( ... \) / \[ ... \] delimiters, but MarkdownIt
     # strips the backslashes in plain paragraph text. Normalize before render so
     # MathJax still receives intact delimiters across both Markdown and raw HTML.

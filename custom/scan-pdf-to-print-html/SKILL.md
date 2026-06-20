@@ -21,6 +21,7 @@ These apply in **every** mode:
 - The main thread must never one-shot the full transcript into final HTML.
 - Reviewer subagents start only after real HTML, screenshot, and PDF exist.
 - Final rendered output must have no contentless non-cover A4 sheet. After pagination, inspect the actual `.sheet` inventory for zero-text/zero-media pages; if a separator-only block such as `<hr>` or an empty `.flow-block` creates a blank page, filter that ignorable block before exporting the fresh PDF. <!-- evolved 2026-06-19 -->
+- No non-cover, non-final A4 sheet may end with excessive trailing blank space. After rendering, run `py -3 scripts/validate_sheet_bottom_margin.py --html handout.html`; if any sheet's bottom blank exceeds 10% of the `.sheet-body` height, adjust pagination (e.g., allow long blockquotes or display blocks to split across pages) or tighten sheet-level margins before re-exporting. Cover sheets and the final sheet are exempt, and a sheet is also exempt when the very first content element on the following sheet is a `.phycat-blockquote` (because example/question blockquotes must be kept whole). <!-- evolved 2026-06-20 -->
 
 ### OCR Hard Contract (scanned / Doc2X jobs only)
 
@@ -49,8 +50,10 @@ Read these before work:
 5. After the user approves the transcript and the lint result, set `job.json.transcript_audit_status` to `approved`.
 6. Write `layout-brief.md`.
 7. Build HTML only through the orchestrator path.
+7a. Run `py -3 scripts/validate_math_quote_leakage.py --md source-transcript.md` on the canonical transcript. If it reports leaked `>` markers inside math segments, fix the source (or confirm `clean_markdown()` handled them) before continuing. <!-- evolved 2026-06-20 -->
 8. Run `py -3 scripts/validate_job_state.py "C:\path\job" --require-html`.
-9. Export fresh screenshot and PDF (`py -3 scripts/render_html_to_pdf.py --html handout.html --pdf handout.pdf --screenshot handout-screenshot.png`), then start reviewer subagents.
+9. Run `py -3 scripts/validate_sheet_bottom_margin.py --html handout.html` to enforce the trailing-blank-space hard contract on every non-cover sheet.
+10. Export fresh screenshot and PDF (`py -3 scripts/render_html_to_pdf.py --html handout.html --pdf handout.pdf --screenshot handout-screenshot.png`), then start reviewer subagents.
 
 If step 4 or step 5 never happened, step 8 must fail. Treat that failure as correct behavior.
 
@@ -70,11 +73,12 @@ Workflow:
 1. Copy the input into the job dir as `source-transcript.md` (it IS the canonical transcript — no `doc2x/` artifacts exist).
 2. Build HTML directly. For the title, prefer **omitting** `--title` so the builder extracts it from the first `# ` heading in the markdown; pass `--title` only to override. Never derive the title from the filename. If the markdown has no `# ` heading, add one before building. <!-- evolved 2026-06-15 -->
    `py -3 scripts/build_faithful_handout_html.py --md source-transcript.md --out-html handout.html`
+2a. Run `py -3 scripts/validate_math_quote_leakage.py --md source-transcript.md`. A non-zero exit means blockquote markers leaked into math segments; fix the source or the builder before rendering. <!-- evolved 2026-06-20 -->
 3. Render: `py -3 scripts/render_html_to_pdf.py --html handout.html --pdf handout.pdf --screenshot handout-screenshot.png`.
    The default PDF from `render_html_to_pdf.py` is a **vector** PDF — this is the correct default. Do not build high-PPI raster PDFs (e.g. 600 PPI screenshot-stitched) unless the user explicitly asks; they are multi-GB, slow, and are not this skill's path. <!-- evolved 2026-06-15 -->
    **Scan-type raster PDFs are not recommended**: rasterizing a vector PDF re-samples all embedded images, causing visible quality loss (blocky artifacts, color shifts, blurry text). The vector PDF preserves original image resolution and text crispness. If a raster version is truly needed, the user must accept these tradeoffs. <!-- evolved 2026-06-15 -->
 4. Math rendering is a hard output contract: final printable HTML/PDF must use **KaTeX HTML/font rendering** for LaTeX math by default. If the builder emits MathJax SVG, apply the safe KaTeX post-process from `references/math-rendering.md` before the final render/export. Do not leave MathJax `tex-svg` as the final renderer unless the user explicitly requests MathJax SVG or a fully self-contained offline math file and accepts the heavier formula appearance. <!-- evolved 2026-06-17 -->
-5. Verify in a browser / PDF viewer: math rendered, 0 overflow (no sheet marked `data-fit-state="overflow"`), 0 contentless non-cover sheets, figures at intended size, title not duplicated. For math-bearing jobs, inspect concrete DOM/rendering counters for the hard contract: `.katex` nodes exist, MathJax scripts/containers are absent, no raw `$...$` / `\(...\)` / `\[...\]` math delimiters remain visible, no Markdown blockquote marker `>` has leaked into formula text, there are no browser page errors, no broken images, and pagination waits for `renderMathInElement(...)` plus `document.fonts.ready` before measuring. If a job-local post-process changed pagination, cover layout, or injected CSS/JS, verify the same no-error/no-overflow/no-blank-sheet contract and no first-page cover shrinkage. <!-- evolved 2026-06-17; strengthened 2026-06-19 -->
+5. Verify in a browser / PDF viewer: math rendered, 0 overflow (no sheet marked `data-fit-state="overflow"`), 0 contentless non-cover sheets, figures at intended size, title not duplicated. For math-bearing jobs, inspect concrete DOM/rendering counters for the hard contract: `.katex` nodes exist, MathJax scripts/containers are absent, no raw `$...$` / `\(...\)` / `\[...\]` math delimiters remain visible, no Markdown blockquote marker `>` has leaked into formula text, there are no browser page errors, no broken images, and pagination waits for `renderMathInElement(...)` plus `document.fonts.ready` before measuring. Then run `py -3 scripts/validate_sheet_bottom_margin.py --html handout.html` to confirm no non-cover sheet ends with more than 35% trailing blank space. If a job-local post-process changed pagination, cover layout, or injected CSS/JS, verify the same no-error/no-overflow/no-blank-sheet/no-excessive-trailing-blank contract and no first-page cover shrinkage. <!-- evolved 2026-06-17; strengthened 2026-06-19; strengthened 2026-06-20 -->
 6. Open `handout.html` and confirm the body contains real HTML elements (`<h1>/<h2>`, `<p>`, `<ul>/<ol>`, `<table>`) — **not raw Markdown source text**. A build that emits un-converted Markdown is broken; do not proceed to PDF or review. <!-- evolved 2026-06-15 -->
 7. CSS / styling iteration: edit `handout.html` directly (or append a job-local `<style>` override). Do **not** re-run `build_faithful_handout_html.py` to change styling — the builder regenerates its CSS from scratch on every run, so a rebuild silently discards all job-local CSS fixes. Reserve rebuilds for content/source changes. <!-- evolved 2026-06-15 -->
 
@@ -122,7 +126,7 @@ The local builder now expects and enforces:
 - ordered-list numbering must be preserved **verbatim from the source**: keep the original number prefix as visible text inside the `<li>` rather than relying on `<ol>` auto-numbering, because `<ol>` resets per block when other content sits between items <!-- evolved 2026-06-15 -->
 - table header (`<th>`) and body (`<td>`) cells must share the same font-size, font-weight, background, and border state; the skill table template defaults to **transparent and borderless** (`border: none`). Add ruled borders or header emphasis only when the source page actually has them (fidelity), never as decoration. <!-- evolved 2026-06-15; strengthened 2026-06-17 -->
 - block elements (tables, figures) nested inside blockquotes must not carry extra bottom margin — the quote's own padding is sufficient; extra margins create visible blank space at the quote's bottom edge <!-- evolved 2026-06-15 -->
-- When rendering blockquoted Markdown that contains formulas, keep `>` as a structural blockquote marker only; never let literal Markdown quote prefixes become part of `$...$`, `\(...\)`, `\[...\]`, or rendered KaTeX formula text. Legitimate mathematical `>` comparisons stay; the defect is quote-marker leakage. <!-- evolved 2026-06-19 -->
+- When rendering blockquoted Markdown that contains formulas, keep `>` as a structural blockquote marker only; never let literal Markdown quote prefixes become part of `$...$`, `\(...\)`, `\[...\]`, or rendered KaTeX formula text. Legitimate mathematical `>` comparisons stay; the defect is quote-marker leakage. `clean_markdown()` strips `>` prefixes from interior lines of `$$...$$` blocks embedded in Obsidian callouts before math segments are protected. Validate with `py -3 scripts/validate_math_quote_leakage.py --md source-transcript.md`; a non-zero exit is a build blocker. <!-- evolved 2026-06-19; strengthened 2026-06-20 -->
 - when a `$...$` math formula inside a Markdown table cell contains a literal `|`, escape it as `\|` in the transcript so the cell is not split into columns — see `references/transcript-audit-rules.md` <!-- evolved 2026-06-15 -->
 
 ## HTML Path
@@ -142,6 +146,7 @@ Hard rules:
 - `scripts/build_handout_via_subagents.py`
 - `scripts/build_faithful_handout_html.py` — Kami-kernel A4 HTML builder (used in both OCR and markdown-source modes)
 - `scripts/render_html_to_pdf.py` — Playwright HTML→A4 PDF + screenshot (engine-agnostic math wait)
+- `scripts/validate_math_quote_leakage.py` — detects structural blockquote `>` markers leaked into `$...$` / `$$...$$` math segments <!-- evolved 2026-06-20 -->
 - `scripts/lint_transcript_structure.py`
 - `scripts/validate_job_state.py`
 - `assets/kami-default-kernel.css`

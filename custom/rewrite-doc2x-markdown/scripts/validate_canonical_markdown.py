@@ -77,7 +77,6 @@ LEADING_ORPHAN_DOTS_PATTERN = re.compile(r"^\.{2,}\s+")
 STRAY_BACKSLASH_ESCAPE_PATTERN = re.compile(r"\\([*#_[\]])")
 FILLIN_BLANK_PATTERN = re.compile(r"_{2,}|-{2,}")
 FRAC_PATTERN = re.compile(r"\\frac\{([^}]*)}\{([^}]*)}")
-DOLLAR_SPACE_PATTERN = re.compile(r"\$ (?P<body>[^\n$]+?) \$")
 PAREN_MATH_PATTERN = re.compile(r"\\\(([^)]+)\\\)")
 BRACKET_MATH_PATTERN = re.compile(r"\\\[([^\]]+)\\\]")
 LIST_ARTIFACT_PATTERN = re.compile(r"^(\d+)\.{2,}\s+")
@@ -555,6 +554,54 @@ def lint_inline_math_spacing(lines: list[str]) -> list[LintMessage]:
     return messages
 
 
+def is_escaped(text: str, index: int) -> bool:
+    backslashes = 0
+    cursor = index - 1
+    while cursor >= 0 and text[cursor] == "\\":
+        backslashes += 1
+        cursor -= 1
+    return backslashes % 2 == 1
+
+
+def is_single_math_dollar(text: str, index: int) -> bool:
+    if text[index] != "$" or is_escaped(text, index):
+        return False
+    if index > 0 and text[index - 1] == "$":
+        return False
+    if index + 1 < len(text) and text[index + 1] == "$":
+        return False
+    return True
+
+
+def normalize_inline_math_boundary_spacing(text: str) -> tuple[str, bool]:
+    """Trim spaces inside paired inline math without crossing between formulas."""
+    result: list[str] = []
+    changed = False
+    index = 0
+    while index < len(text):
+        if not is_single_math_dollar(text, index):
+            result.append(text[index])
+            index += 1
+            continue
+
+        close = index + 1
+        while close < len(text) and not is_single_math_dollar(text, close):
+            close += 1
+
+        if close >= len(text):
+            result.append(text[index:])
+            break
+
+        body = text[index + 1 : close]
+        fixed_body = body.strip()
+        if fixed_body != body:
+            changed = True
+        result.append(f"${fixed_body}$")
+        index = close + 1
+
+    return "".join(result), changed
+
+
 def lint_html_math(lines: list[str]) -> list[LintMessage]:
     messages: list[LintMessage] = []
     mathml_blocks, mathml_line_numbers = collect_mathml_blocks(lines)
@@ -673,8 +720,12 @@ def auto_fix_markdown(markdown_text: str) -> tuple[str, list[str]]:
             body = ""
             changes.append(f"line {index}: removed orphan page number line")
 
-        # Rule: inline math spacing
-        body = DOLLAR_SPACE_PATTERN.sub(r"$\g<body>$", body)
+        # Rule: inline math spacing. Use paired-dollar scanning so adjacent
+        # table cells such as `$x$ | B. $y$` are not collapsed into `$x$| B.$y$`.
+        new_body, spacing_changed = normalize_inline_math_boundary_spacing(body)
+        if spacing_changed:
+            body = new_body
+            changes.append(f"line {index}: normalized inline math boundary spacing")
 
         # Rule: math delimiter normalization
         body = PAREN_MATH_PATTERN.sub(r"$\1$", body)
