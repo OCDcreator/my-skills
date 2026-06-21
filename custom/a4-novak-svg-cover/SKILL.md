@@ -28,6 +28,7 @@ Produce or preserve these artifacts in the job directory:
 - `generate_concept_map_svg.py`: deterministic generator for repeatable edits.
 - `validate_concept_map_svg.py`: static SVG checks.
 - `check_concept_map_rendered_layout.py`: browser geometry checks when Playwright is available.
+- When any visible math is present: `formulas.json` and the MathJax-rendered SVG fragments embedded in `concept-map.svg` as `g.formula-fit[data-formula-id]`.
 - Optional `concept-map-layout-design.md`: human-readable layout notes.
 
 ## A4 SVG Requirements
@@ -64,6 +65,8 @@ Design constraints:
 
 For math-heavy concept maps, the MathJax SVG pipeline is the **default, proactively-run renderer** whenever card content contains any math (function notation like `tan/sin/cos`, Greek letters, subscripts/superscripts, fractions, roots, equations, or symbol names like `alpha`/`omega`). Do not write that math as raw SVG `<text>` and then stop — run the pipeline up front: list expressions in `formulas.json`, render with `render_mathjax_svg.mjs`, and embed each as `<g class="formula-fit" data-formula-id="...">`. Within a single map, choose one formula policy for all visible expressions; "do not mix raw SVG text math with rendered formula fragments" is not satisfied by an all-raw-text map. <!-- evolved 2026-06-18 -->
 
+<!-- evolved 2026-06-20 -->
+- This is a validator-enforced hard contract: the static validator must fail by default when visible SVG `<text>` contains formula-like content outside `g.formula-fit`, or when a `formula-fit` group lacks `data-formula-id`. Do not claim the cover is complete after using `--allow-raw-math-text`; that flag is only for an explicitly human-approved exception and must be disclosed.
 <!-- evolved 2026-06-17 -->
 - Preferred standalone-SVG path: keep formula sources in data files, render them at build time with MathJax SVG output, and embed them as `<g class="formula-fit" data-formula-id="...">` path/rect/vector fragments.
 <!-- evolved 2026-06-17 -->
@@ -156,7 +159,8 @@ Expected checks:
 
 - A4 root size and viewBox are exact.
 - No `<style>` block dependency.
-- Math expressions are not left as raw SVG text when a formula pipeline is being used.
+- Math expressions are not left as raw SVG text; `validate_concept_map_svg.py` rejects formula-like visible `<text>` by default unless it is inside `g.formula-fit`.
+- Every `g.formula-fit` group has `data-formula-id`, proving that the MathJax formula pipeline was intentionally used rather than pasted as anonymous SVG.
 - Formula fragments inside `g.formula-fit` do not get counted as card rectangles.
 - The background is a single solid page fill unless decorative texture was explicitly requested.
 - No forbidden glyphs.
@@ -174,7 +178,7 @@ Expected checks:
 ## Bundled Resources
 
 - `scripts/generate_concept_map_svg.py`: concrete deterministic generator from the derivative/tangent job. Adapt the content and box coordinates, but preserve the measured layout approach.
-- `scripts/validate_concept_map_svg.py`: static artifact validator.
+- `scripts/validate_concept_map_svg.py`: static artifact validator, including the hard MathJax-pipeline gate for formula-like raw SVG text.
 - `scripts/check_concept_map_rendered_layout.py`: Playwright geometry validator.
 - `references/layout-design-notes.md`: compact notes from the successful A4 four-column layout.
 
@@ -189,6 +193,7 @@ Expected checks:
 | Lines obscure labels | Draw paths first; add label shields behind text. |
 | Chinese/math symbols show tofu | Replace risky glyphs with stable Chinese/ASCII equivalents. |
 | First lecture starts on cover page | Add a dedicated cover sheet and force lecture headings to fresh sheets. |
+| Formulas appear as raw `<text>` | Put sources in `formulas.json`, render with MathJax SVG, embed `g.formula-fit[data-formula-id]`, then rerun the static validator. |
 
 ## Minimal Workflow
 

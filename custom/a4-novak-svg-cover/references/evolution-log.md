@@ -32,3 +32,12 @@
   recurrence: first
   dev_eval: pass (validate_concept_map_svg.py + check_concept_map_rendered_layout.py on corrected output)
   provenance: extracted
+
+## 2026-06-20 — run against a4-novak-svg-cover
+- candidate: enforce the MathJax SVG pipeline in code by failing static validation when formula-like visible <text> remains outside g.formula-fit[data-formula-id].
+  verdict: strengthen
+  reason: Existing rules already declared MathJax the default for formulas, but validation did not reject all-raw-text formula SVGs; the static validator now hard-fails raw formula-like text and anonymous formula-fit groups.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: first
+  dev_eval: pass (py -3 -m pytest custom/a4-novak-svg-cover/tests -q => 5 passed)
+  provenance: extracted

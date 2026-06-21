@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -29,6 +30,20 @@ REMOVED_PHRASES = (
     "概念  题型  方法的树形关联图谱",
     "导数与切线 | 树形知识图谱 | A4 portrait concept map",
     "A4 portrait concept map",
+)
+
+MATH_TEXT_PATTERNS = (
+    (re.compile(r"\\(?:frac|sqrt|sum|int|lim|sin|cos|tan|ln|log|exp|alpha|beta|gamma|theta|lambda|omega|pi|Delta|begin|end)\b"), "LaTeX/math command"),
+    (re.compile(r"\$|\\\(|\\\)|\\\[|\\\]"), "LaTeX math delimiter"),
+    (re.compile(r"[A-Za-z0-9)}\]]\s*\^\s*[-+A-Za-z0-9({\\]"), "superscript marker"),
+    (re.compile(r"[A-Za-z0-9)}\]]\s*_\s*[-+A-Za-z0-9({\\]"), "subscript marker"),
+    (re.compile(r"\b(?:sin|cos|tan|ln|log|exp)\s*[A-Za-z(]"), "function name"),
+    (re.compile(r"\b[a-zA-Z]\s*'\s*\("), "derivative function notation"),
+    (re.compile(r"\b[a-zA-Z]\s*\([^)]*[a-zA-Z0-9][^)]*\)"), "function notation"),
+    (re.compile(r"[A-Za-z0-9)}\]]\s*[=<>]\s*[-+A-Za-z0-9({\[]"), "equation/comparison"),
+    (re.compile(r"[≤≥≈≠∈∉⊂⊆∪∩]"), "math symbol"),
+    (re.compile(r"\b(?:x|y|t|u|v|n|m|k)\d+\b"), "indexed variable"),
+    (re.compile(r"\b(?:alpha|beta|gamma|theta|lambda|omega|Delta|pi)\b"), "spelled math symbol"),
 )
 
 
@@ -60,6 +75,10 @@ def class_tokens(el: ET.Element) -> set[str]:
     return set((el.attrib.get("class", "") or "").split())
 
 
+def element_text(el: ET.Element) -> str:
+    return "".join(el.itertext()).strip()
+
+
 def has_ancestor_class(parent_map: dict[ET.Element, ET.Element], el: ET.Element, cls: str) -> bool:
     current = parent_map.get(el)
     while current is not None:
@@ -67,6 +86,14 @@ def has_ancestor_class(parent_map: dict[ET.Element, ET.Element], el: ET.Element,
             return True
         current = parent_map.get(current)
     return False
+
+
+def math_text_reason(text: str) -> str | None:
+    normalized = " ".join(text.split())
+    for pattern, reason in MATH_TEXT_PATTERNS:
+        if pattern.search(normalized):
+            return reason
+    return None
 
 
 def has_min_gap(
@@ -85,6 +112,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("svg", type=Path)
     parser.add_argument("--min-gap-mm", type=float, default=3.0)
+    parser.add_argument(
+        "--allow-raw-math-text",
+        action="store_true",
+        help="Human-approved escape hatch: permit formula-like visible <text> outside MathJax formula-fit groups.",
+    )
     args = parser.parse_args(argv)
 
     root = ET.parse(args.svg).getroot()
@@ -102,13 +134,22 @@ def main(argv: list[str] | None = None) -> int:
     if style_count:
         errors.append(f"SVG must not depend on embedded CSS style blocks, found {style_count}")
 
-    all_text = "".join(el.text or "" for el in root.iter() if local_name(el.tag) == "text")
+    all_text = "".join(element_text(el) for el in root.iter() if local_name(el.tag) == "text")
     for phrase in REMOVED_PHRASES:
         if phrase in all_text:
             errors.append(f"removed phrase still present: {phrase}")
     for glyph, reason in FORBIDDEN_GLYPHS.items():
         if glyph in all_text:
             errors.append(f"forbidden glyph {glyph!r}: {reason}")
+
+    formula_groups = [
+        el
+        for el in root.iter()
+        if local_name(el.tag) == "g" and "formula-fit" in class_tokens(el)
+    ]
+    for index, el in enumerate(formula_groups, start=1):
+        if not (el.attrib.get("data-formula-id") or "").strip():
+            errors.append(f"formula-fit group #{index} missing data-formula-id")
 
     rects = [
         el
@@ -125,9 +166,29 @@ def main(argv: list[str] | None = None) -> int:
             errors.append(f"rect missing stroke: {rect_label(el)}")
 
     texts = [el for el in root.iter() if local_name(el.tag) == "text"]
+    raw_math_texts: list[tuple[str, str]] = []
     for el in texts:
         if "fill" not in el.attrib:
-            errors.append(f"text missing fill: {el.text!r}")
+            errors.append(f"text missing fill: {element_text(el)!r}")
+        if not has_ancestor_class(parent_map, el, "formula-fit"):
+            text = element_text(el)
+            if text:
+                reason = math_text_reason(text)
+                if reason:
+                    raw_math_texts.append((text, reason))
+
+    if raw_math_texts and not args.allow_raw_math_text:
+        if not formula_groups:
+            errors.append(
+                "formula-like visible SVG text found but no MathJax "
+                "g.formula-fit[data-formula-id] groups exist; run formulas.json "
+                "through render_mathjax_svg.mjs and embed formula-fit groups"
+            )
+        for text, reason in raw_math_texts:
+            errors.append(
+                "raw formula-like SVG <text> must be rendered through the MathJax "
+                f"formula pipeline: {text!r} ({reason})"
+            )
 
     for left, right in itertools.combinations(rects, 2):
         if not has_min_gap(rect_bbox(left), rect_bbox(right), args.min_gap_mm):
@@ -144,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"PASS concept map validation: rects={len(rects)} texts={len(texts)} "
+        f"formula_groups={len(formula_groups)} raw_math_texts=0 "
         f"min_gap_mm={args.min_gap_mm:g} forbidden_glyphs=0 style_blocks=0"
     )
     return 0

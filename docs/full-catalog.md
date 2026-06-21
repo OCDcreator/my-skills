@@ -1,6 +1,6 @@
 # Full Skills Catalog
 
-Generated from repository state on 2026-06-20.
+Generated from repository state on 2026-06-21.
 
 This file contains the **complete** index of all skills in the repository, including bulk sources. For the curated quick-reference, see [`SKILLS.md`](../SKILLS.md).
 

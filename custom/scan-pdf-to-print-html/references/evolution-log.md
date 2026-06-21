@@ -94,3 +94,16 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
   reason: User clarified that 35% was too loose to catch the third-sheet blank and that blockquotes must stay whole; only the following-sheet-start-blockquote case should be exempt.
   gate: { g1: pass, g2: strengthen, g3: principle }
   recurrence: first
+
+## 2026-06-20 — run against scan-pdf-to-print-html
+- candidate: Rendered question/example blockquotes must hard-verify `lead-tag-example` badges, the left accent rule, neutral option-table styling distinct from non-blockquote data tables, and readable option images.
+  verdict: strengthen + add_new
+  reason: A real markdown-source handout regressed twice: first the question blockquote style lost the expected left accent treatment, then a global table fix incorrectly added borders/background to question option tables and shrank option images. Existing rules documented lead badges and transparent tables, but the review gate did not enforce them as browser-DOM checks and did not distinguish blockquote option tables from non-blockquote data tables.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: second-ish (strengthens C18/C23 and review-gate table/image checks)
+  written:
+    - `SKILL.md`: added a rendered-output hard contract for question/example blockquotes, lead badges, neutral option tables, and readable option images; updated Markdown-Source Mode validation to run the new rendered contract validator; strengthened the Builder Markdown Contract and file list.
+    - `references/review-gate.md`: added `validate_rendered_handout_contract.py --html handout.html` and explicit reviewer checks for lead badges, blockquote left rule, option table neutrality, `th`/`td` parity, readable option images, and non-blockquote data-table distinction.
+    - `scripts/validate_rendered_handout_contract.py`: new Playwright DOM validator scoped to `#handout-print-root`.
+    - `tests/test_validate_rendered_handout_contract.py`: regression tests for accepting neutral option tables and rejecting ruled option tables/tiny images.
+  snapshot: SKILL.md.bak-2026-06-20-3

@@ -9,7 +9,9 @@ between the bottom of the last content element and the bottom of the sheet body.
 A sheet is exempt from the check when the very first content element on the
 following sheet is a `.phycat-blockquote`, because example/question blockquotes
 must be kept whole; in that case the trailing blank on the preceding sheet is
-the unavoidable cost of keeping the blockquote unsplit.
+the unavoidable cost of keeping the blockquote unsplit. A sheet is also exempt
+when it is explicitly marked `data-ends-before-lecture="true"`, because some
+jobs require each lecture-level heading to start on a fresh A4 sheet.
 """
 
 from __future__ import annotations
@@ -139,7 +141,8 @@ def validate(
                     const nextBody = nextSheet ? nextSheet.querySelector('.sheet-body') : null;
                     const nextFirstChild = nextBody ? firstContentChild(nextBody) : null;
                     const nextStartsWithBlockquote = isBlockquote(nextFirstChild);
-                    const exempt = nextStartsWithBlockquote;
+                    const endsBeforeLecture = sheet.dataset.endsBeforeLecture === 'true';
+                    const exempt = nextStartsWithBlockquote || endsBeforeLecture;
 
                     const trailing = bodyRect.bottom - lastContentBottom(body);
                     const fraction = trailing / bodyHeight;
@@ -151,6 +154,7 @@ def validate(
                         bodyHeightPx: Math.round(bodyHeight),
                         fraction: Number(fraction.toFixed(3)),
                         nextStartsWithBlockquote,
+                        endsBeforeLecture,
                     });
 
                     if (!exempt && fraction > maxFraction) {
@@ -177,7 +181,12 @@ def validate(
 
     print(f"Sheets inspected: {results['sheetCount']}")
     for m in results["measurements"]:
-        exempt_note = " [exempt: next sheet starts with blockquote]" if m["nextStartsWithBlockquote"] else ""
+        exempt_reasons = []
+        if m["nextStartsWithBlockquote"]:
+            exempt_reasons.append("next sheet starts with blockquote")
+        if m["endsBeforeLecture"]:
+            exempt_reasons.append("forced lecture break")
+        exempt_note = f" [exempt: {', '.join(exempt_reasons)}]" if exempt_reasons else ""
         print(
             f"  Sheet {m['pageNumber']}: trailing {m['trailingPx']}px / "
             f"body {m['bodyHeightPx']}px ({m['fraction'] * 100:.1f}%){exempt_note}"
