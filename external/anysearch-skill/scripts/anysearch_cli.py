@@ -360,7 +360,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog=(
             "examples:\n"
             "  anysearch search \"quantum computing\"\n"
-            "  anysearch search \"AAPL\" --domain finance --sub_domain finance.us_stock\n"
+            "  anysearch search \"AAPL\" --domain finance --sub_domain finance.quote\n"
             "  anysearch get_sub_domains --domain finance\n"
             "  anysearch extract --url https://example.com\n"
             "  anysearch batch_search --queries '[{\"query\":\"AAPL\"},{\"query\":\"GOOG\"}]'\n"
@@ -400,11 +400,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     search_p.add_argument(
         "--sub_domain", "-s",
-        help="Sub-domain routing key (e.g. finance.us_stock). Required for vertical search; obtain via get_sub_domains.",
+        help="Sub-domain routing key (e.g. finance.quote). Required for vertical search; obtain via get_sub_domains.",
     )
     search_p.add_argument(
         "--sub_domain_params", "--sdp", "-p",
-        help="Sub_domain parameters as JSON or key=value pairs (e.g. ticker=AAPL,period=2025). Schema depends on the sub_domain (see get_sub_domains output).",
+        help="Sub_domain parameters as JSON or key=value pairs (e.g. type=stock,symbol=AAPL,cn_code=). Schema depends on the sub_domain (see get_sub_domains output).",
     )
     search_p.add_argument(
         "--max_results", "-m",

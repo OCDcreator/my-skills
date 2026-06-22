@@ -73,7 +73,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 | `anysearch-skill` | `community` | `anysearch` | Mirrored from `https://github.com/anysearch-ai/anysearch-skill.git`. |
 | `axton-obsidian-visual-skills` | `community` | `excalidraw-diagram`, `mermaid-visualizer`, `obsidian-canvas-creator` | Mirrored from `https://github.com/axtonliu/axton-obsidian-visual-skills.git`. |
 | `baoyu-skills` | `community` | `baoyu-article-illustrator`, `baoyu-comic`, `baoyu-compress-image`, `baoyu-cover-image`, `baoyu-danger-gemini-web`, `baoyu-danger-x-to-markdown`, `baoyu-diagram`, `baoyu-electron-extract`, ... (21 total) | Mirrored from `https://github.com/JimLiu/baoyu-skills.git`. |
-| `claude-plugins-official` | `core` | `access`, `agent-development`, `build-mcp-app`, `build-mcp-server`, `build-mcpb`, `cardputer-buddy`, `claude-automation-recommender`, `claude-md-improver`, ... (22 total) | Mirrored from `https://github.com/anthropics/claude-plugins-official.git`. |
+| `claude-plugins-official` | `core` | `access`, `agent-development`, `build-mcp-app`, `build-mcp-server`, `build-mcpb`, `cardputer-buddy`, `claude-automation-recommender`, `claude-md-improver`, ... (23 total) | Mirrored from `https://github.com/anthropics/claude-plugins-official.git`. |
 | `deep-research-skills` | `community` | `research`, `research-add-fields`, `research-add-items`, `research-deep`, `research-report`, `research`, `research-add-fields`, `research-add-items`, ... (20 total) | Mirrored from `https://github.com/Weizhena/Deep-Research-skills.git`. |
 | `doc2x-cli-skills` | `community` | `doc2x-cli` | Mirrored from `https://github.com/noedgeai/doc2x-cli-skills.git`. |
 | `doc2x-mcp` | `community` | `doc2x-mcp` | Mirrored from `https://github.com/NoEdgeAI/doc2x-mcp.git`. |
@@ -81,7 +81,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 | `kepano-obsidian-skills` | `core` | `defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown` | Mirrored from `https://github.com/kepano/obsidian-skills.git`. |
 | `last30days-skill` | `core` | `last30days` | Mirrored from `https://github.com/mvanhorn/last30days-skill.git`. |
 | `last30days-skill-cn` | `community` | `last30days-cn` | Mirrored from `https://github.com/Jesseovo/last30days-skill-cn.git`. |
-| `mattpocock-skills` | `core` | `caveman`, `design-an-interface`, `diagnose`, `edit-article`, `git-guardrails-claude-code`, `grill-me`, `grill-with-docs`, `handoff`, ... (29 total) | Mirrored from `https://github.com/mattpocock/skills.git`. |
+| `mattpocock-skills` | `core` | `ask-matt`, `codebase-design`, `decision-mapping`, `design-an-interface`, `diagnosing-bugs`, `domain-modeling`, `edit-article`, `git-guardrails-claude-code`, ... (34 total) | Mirrored from `https://github.com/mattpocock/skills.git`. |
 | `startup-pressure-test` | `community` | `startup-pressure-test` | Mirrored from `https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git`. |
 | `taste-skill` | `community` | `brandkit`, `industrial-brutalist-ui`, `gpt-taste`, `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `minimalist-ui`, `full-output-enforcement`, ... (13 total) | Mirrored from `https://github.com/Leonxlnx/taste-skill.git`. |
 | `ui-ux-pro-max-skill` | `community` | `ckm:banner-design`, `ckm:brand`, `ckm:design`, `ckm:design-system`, `ckm:slides`, `ckm:ui-styling`, `ui-ux-pro-max` | Mirrored from `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git`. |

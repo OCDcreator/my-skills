@@ -14,6 +14,18 @@ from . import schema
 OUTPUT_DIR = Path.home() / ".local" / "share" / "last30days" / "out"
 
 
+def _safe_href(url: str) -> str:
+    """仅放行 http/https 链接作为 HTML href，拦截 javascript:/data: 等可执行协议。
+
+    抓取/搜索结果中的 URL 不可信，直接写入 href 会造成存储型 XSS（点击执行）。
+    非 http(s) 链接一律降级为 ``#``。
+    """
+    cleaned = (url or "").strip()
+    if cleaned.lower().startswith(("http://", "https://")):
+        return cleaned
+    return "#"
+
+
 def _items(report: schema.Report, name: str):
     return getattr(report, name, None) or []
 
@@ -178,6 +190,23 @@ def _fmt_eng_wechat(eng) -> str:
     return f" [{', '.join(parts)}]" if parts else ""
 
 
+def _clusters_md_lines(report: schema.Report, limit: int = 8) -> list:
+    """跨平台聚合热点（Markdown），无簇时返回空列表。"""
+    clusters = getattr(report, "clusters", None) or []
+    if not clusters:
+        return []
+    lines = ["### 🔗 跨平台聚合热点", ""]
+    for c in clusters[:limit]:
+        sources = "、".join(c.get("sources", []))
+        title = c.get("representative_title", "") or "(无标题)"
+        lines.append(f"- **{title}** — 覆盖 {sources}（{c.get('size', 0)} 条）")
+        url = c.get("representative_url", "")
+        if url:
+            lines.append(f"  {url}")
+    lines.append("")
+    return lines
+
+
 def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "none") -> str:
     """Render compact output for the assistant to synthesize."""
     lines = []
@@ -202,6 +231,8 @@ def render_compact(report: schema.Report, limit: int = 15, missing_keys: str = "
     if missing_keys != "none":
         lines.append("*💡 提示: 补齐各平台 API Key 可多源交叉验证。*")
         lines.append("")
+
+    lines.extend(_clusters_md_lines(report))
 
     weibo_e = _err(report, "weibo_error")
     weibo = _items(report, "weibo")
@@ -539,6 +570,8 @@ def render_full_report(report: schema.Report) -> str:
         "",
     ]
 
+    lines.extend(_clusters_md_lines(report))
+
     wb = _items(report, "weibo")
     if wb:
         lines.extend(["## 微博动态", ""])
@@ -800,7 +833,7 @@ def render_html_report(report: schema.Report) -> str:
             f'<div class="item-meta"><span>{escape(code)}</span><span>{escape(date)}</span><span>{escape(author)}</span></div>'
             f'<h3>{escape(snippet or url)}</h3>'
             f'<p>{escape(reason)}</p>'
-            f'<a href="{escape(url, quote=True)}" target="_blank" rel="noopener noreferrer">{escape(url)}</a>'
+            f'<a href="{escape(_safe_href(url), quote=True)}" target="_blank" rel="noopener noreferrer">{escape(url)}</a>'
             '</div>'
             f'<div class="item-score"><span>{score_value}</span><small>SCORE</small></div>'
             '</article>'
@@ -810,6 +843,32 @@ def render_html_report(report: schema.Report) -> str:
     sparse_note = ""
     if freshness["is_sparse"]:
         sparse_note = '<div class="notice">近期可确认数据较少，请在最终分析中明确说明时效性和覆盖限制。</div>'
+
+    cluster_section = ""
+    clusters = getattr(report, "clusters", None) or []
+    if clusters:
+        cluster_rows = []
+        for c in clusters[:8]:
+            c_sources = "、".join(c.get("sources", []))
+            c_title = c.get("representative_title", "") or "(无标题)"
+            c_url = c.get("representative_url", "") or ""
+            cluster_rows.append(
+                '<article class="item-card">'
+                f'<div class="item-index">×{c.get("size", 0)}</div>'
+                '<div class="item-main">'
+                f'<div class="item-meta"><span>{escape(c_sources)}</span></div>'
+                f'<h3>{escape(c_title)}</h3>'
+                f'<a href="{escape(_safe_href(c_url), quote=True)}" target="_blank" rel="noopener noreferrer">{escape(c_url)}</a>'
+                '</div>'
+                f'<div class="item-score"><span>{c.get("size", 0)}</span><small>SOURCES</small></div>'
+                '</article>'
+            )
+        cluster_section = (
+            '<section class="section">'
+            '<div class="section-title"><h2>跨平台聚合热点</h2><div class="meta">cross-source clusters</div></div>'
+            f'<div class="items">{"".join(cluster_rows)}</div>'
+            '</section>'
+        )
 
     return f"""<!doctype html>
 <html lang="zh-CN">
@@ -887,6 +946,7 @@ h1 {{ font-size:clamp(48px,9vw,136px); line-height:.92; letter-spacing:-.02em; m
   </section>
   <section class="band"><strong>{escape(source_summary)}</strong><div class="meta">generated {generated}</div></section>
   {sparse_note}
+  {cluster_section}
   <section class="section">
     <div class="section-title"><h2>平台覆盖</h2><div class="meta">source matrix</div></div>
     <div class="sources">{''.join(source_cards)}</div>

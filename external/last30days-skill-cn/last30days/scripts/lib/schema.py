@@ -437,6 +437,7 @@ class Report:
     best_practices: List[str] = field(default_factory=list)
     prompt_pack: List[str] = field(default_factory=list)
     context_snippet_md: str = ""
+    clusters: List[Dict[str, Any]] = field(default_factory=list)
     weibo_error: Optional[str] = None
     xiaohongshu_error: Optional[str] = None
     bilibili_error: Optional[str] = None
@@ -489,6 +490,8 @@ class Report:
             d['from_cache'] = self.from_cache
         if self.cache_age_hours is not None:
             d['cache_age_hours'] = self.cache_age_hours
+        if self.clusters:
+            d['clusters'] = self.clusters
         return d
 
     @classmethod

@@ -9,15 +9,28 @@ from typing import Optional, Tuple
 CST = timezone(timedelta(hours=8))
 
 
-def get_date_range(days: int = 30) -> Tuple[str, str]:
-    """Get the date range for the last N days.
+def get_date_range(days: int = 30, as_of: Optional[str] = None) -> Tuple[str, str]:
+    """Get the date range for the N days ending at ``as_of`` (or today).
+
+    Args:
+        days: 回溯天数。
+        as_of: 终点日期 YYYY-MM-DD（历史回溯）；为空时以今天为终点。
 
     Returns:
         Tuple of (from_date, to_date) as YYYY-MM-DD strings
+
+    Raises:
+        ValueError: as_of 无法解析为有效日期时。
     """
-    today = datetime.now(CST).date()
-    from_date = today - timedelta(days=days)
-    return from_date.isoformat(), today.isoformat()
+    if as_of:
+        parsed = parse_date(as_of)
+        if parsed is None:
+            raise ValueError(f"无效的 --as-of 日期: {as_of!r}（应为 YYYY-MM-DD）")
+        end_date = parsed.date()
+    else:
+        end_date = datetime.now(CST).date()
+    from_date = end_date - timedelta(days=days)
+    return from_date.isoformat(), end_date.isoformat()
 
 
 def parse_date(date_str: Optional[str]) -> Optional[datetime]:

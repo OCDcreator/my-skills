@@ -120,7 +120,7 @@ my-skills/
 | `external/awesome-claude-skills/` | [ComposioHQ/awesome-claude-skills](https://github.com/ComposioHQ/awesome-claude-skills.git) | 863 个技能（bulk：完整索引见 docs/full-catalog.md） |
 | `external/axton-obsidian-visual-skills/` | [axtonliu/axton-obsidian-visual-skills](https://github.com/axtonliu/axton-obsidian-visual-skills.git) | 3 个技能 |
 | `external/baoyu-skills/` | [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills.git) | 21 个技能 |
-| `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official.git) | 22 个技能（core：高质量官方/精选源） |
+| `external/claude-plugins-official/` | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official.git) | 23 个技能（core：高质量官方/精选源） |
 | `external/deep-research-skills/` | [Weizhena/Deep-Research-skills](https://github.com/Weizhena/Deep-Research-skills.git) | 20 个技能 |
 | `external/doc2x-cli-skills/` | [noedgeai/doc2x-cli-skills](https://github.com/noedgeai/doc2x-cli-skills.git) | 1 个技能 |
 | `external/doc2x-mcp/` | [NoEdgeAI/doc2x-mcp](https://github.com/NoEdgeAI/doc2x-mcp.git) | 1 个技能 |
@@ -128,7 +128,7 @@ my-skills/
 | `external/kepano-obsidian-skills/` | [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills.git) | 5 个技能（core：高质量官方/精选源） |
 | `external/last30days-skill/` | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill.git) | 1 个技能（core：高质量官方/精选源） |
 | `external/last30days-skill-cn/` | [Jesseovo/last30days-skill-cn](https://github.com/Jesseovo/last30days-skill-cn.git) | 1 个技能 |
-| `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills.git) | 29 个技能（core：高质量官方/精选源） |
+| `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills.git) | 34 个技能（core：高质量官方/精选源） |
 | `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git) | 1 个技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill.git) | 13 个技能 |
 | `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git) | 7 个技能 |

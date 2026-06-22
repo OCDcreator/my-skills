@@ -13,7 +13,9 @@ Options:
     --deep              深度搜索，更多数据源
     --debug             启用调试日志
     --days N            回溯天数 (1-30, default: 30)
+    --as-of DATE        历史回溯：以 YYYY-MM-DD 为终点回溯 N 天 (default: 今天)
     --search SOURCES    指定搜索源 (逗号分隔): weibo,xiaohongshu,bilibili,zhihu,douyin,wechat,baidu,toutiao
+                        未指定时回退到环境变量 LAST30DAYS_DEFAULT_SEARCH；EXCLUDE_SOURCES 可排除源
     --diagnose          显示数据源可用性诊断
 """
 
@@ -64,6 +66,45 @@ def parse_search_flag(search_str: str) -> set:
     return sources
 
 
+# 8 个规范源（不含 xhs 别名），用于默认/排除集合运算
+ALL_SOURCE_IDS = {
+    "weibo", "xiaohongshu", "bilibili", "zhihu",
+    "douyin", "wechat", "baidu", "toutiao",
+}
+
+
+def resolve_search_sources(cli_search):
+    """解析最终启用的搜索源。
+
+    优先级: --search > 环境变量 LAST30DAYS_DEFAULT_SEARCH > 全部源；
+    随后减去环境变量 EXCLUDE_SOURCES（逗号分隔）。
+
+    返回 None 表示"按查询类型自动启用全部源"（沿用 run_research 既有行为）。
+    """
+    sources = None
+    if cli_search:
+        sources = parse_search_flag(cli_search)
+    else:
+        default_env = os.environ.get("LAST30DAYS_DEFAULT_SEARCH", "").strip()
+        if default_env:
+            sources = parse_search_flag(default_env)
+
+    exclude_env = os.environ.get("EXCLUDE_SOURCES", "").strip()
+    if exclude_env:
+        excluded = {
+            ("xiaohongshu" if s.strip().lower() == "xhs" else s.strip().lower())
+            for s in exclude_env.split(",")
+            if s.strip()
+        }
+        base = sources if sources is not None else set(ALL_SOURCE_IDS)
+        sources = base - excluded
+        if not sources:
+            print("错误: EXCLUDE_SOURCES 排除后没有可用搜索源。", file=sys.stderr)
+            sys.exit(1)
+
+    return sources
+
+
 def _cleanup_children():
     with _child_pids_lock:
         pids = list(_child_pids)
@@ -107,6 +148,7 @@ from lib import (
     toutiao,
     dates,
     dedupe,
+    cluster,
     env,
     normalize,
     query,
@@ -268,6 +310,7 @@ def main():
     parser.add_argument("--deep", action="store_true", help="深度搜索")
     parser.add_argument("--debug", action="store_true", help="启用调试日志")
     parser.add_argument("--days", type=int, default=30, choices=range(1, 31), metavar="N", help="回溯天数 (1-30)")
+    parser.add_argument("--as-of", dest="as_of", type=str, default=None, metavar="YYYY-MM-DD", help="历史回溯：以指定日期为终点回溯 N 天")
     parser.add_argument("--diagnose", action="store_true", help="显示数据源诊断")
     parser.add_argument("--timeout", type=int, default=None, metavar="SECS", help="全局超时秒数")
     parser.add_argument("--search", type=str, default=None, metavar="SOURCES", help="逗号分隔的搜索源列表")
@@ -300,18 +343,19 @@ def main():
         diag = {
             "weibo": env.is_weibo_available(config),
             "xiaohongshu": env.is_xiaohongshu_available(config),
-            "bilibili": True,
-            "zhihu": True,
+            "bilibili": env.probe_bilibili(),
+            "zhihu": env.probe_zhihu(),
             "douyin": env.is_douyin_available(config),
             "wechat": env.is_wechat_available(config),
             "baidu_api": env.is_baidu_api_available(config),
-            "toutiao": True,
+            "toutiao": env.probe_toutiao(),
             "xiaohongshu_api_base": env.get_xiaohongshu_api_base(config),
             "crawler_engine": {
                 "playwright_available": crawler_status["playwright_available"],
                 "cached_logins": crawler_status["cached_logins"],
                 "note": "安装 Playwright 后，微博/小红书/抖音/B站/知乎可无需 API Key 使用爬虫模式",
             },
+            "note_douyin_toutiao": "抖音/头条原生接口需签名参数，常被风控；接口失败时改用公开搜索引擎兜底，仅能拿到公开链接，无真实互动数据与精确日期。",
         }
         print(json.dumps(diag, indent=2, ensure_ascii=False))
         sys.exit(0)
@@ -332,11 +376,13 @@ def main():
         print("用法: python3 last30days.py <topic> [options]", file=sys.stderr)
         sys.exit(1)
 
-    from_date, to_date = dates.get_date_range(args.days)
+    try:
+        from_date, to_date = dates.get_date_range(args.days, as_of=args.as_of)
+    except ValueError as e:
+        print(f"错误: {e}", file=sys.stderr)
+        sys.exit(1)
 
-    search_sources = None
-    if args.search:
-        search_sources = parse_search_flag(args.search)
+    search_sources = resolve_search_sources(args.search)
 
     query_type = qt.detect_query_type(args.topic)
     search_topic = query.extract_core_subject(args.topic)
@@ -428,7 +474,13 @@ def main():
         deduped_douyin, deduped_wechat, deduped_baidu, deduped_toutiao,
     )
 
+    clusters = cluster.build_clusters(
+        deduped_weibo, deduped_xhs, deduped_bili, deduped_zhihu,
+        deduped_douyin, deduped_wechat, deduped_baidu, deduped_toutiao,
+    )
+
     report = schema.create_report(args.topic, from_date, to_date, "all")
+    report.clusters = clusters
     report.weibo = deduped_weibo
     report.xiaohongshu = deduped_xhs
     report.bilibili = deduped_bili

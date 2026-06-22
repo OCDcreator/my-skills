@@ -28,9 +28,9 @@
 | # | 需求 | 预期结果第一行 |
 |---|---|---|
 | 1 | 搜索 "capital of France"，返回 2 条结果 | `## Search Results` |
-| 2 | 搜索 "AAPL"，domain=finance, sub_domain=finance.us_stock，`--sdp ticker=AAPL`，返回 2 条 | `## Search Results` |
-| 3 | 搜索 "latest trends"，domain=finance, sub_domain=finance.us_stock，`--sdp ticker=TSLA,period=2025`，返回 2 条 | `## Search Results` |
-| 4 | 搜索 "MSFT"，domain=finance, sub_domain=finance.us_stock，`-p ticker=MSFT`，返回 2 条 | `## Search Results` |
+| 2 | 搜索 "AAPL"，domain=finance, sub_domain=finance.quote，`--sdp type=stock,symbol=AAPL,cn_code=`，返回 2 条 | `## Search Results` |
+| 3 | 搜索 "latest trends"，domain=finance, sub_domain=finance.quote，`--sdp type=stock,symbol=TSLA,cn_code=,period=30d`，返回 2 条 | `## Search Results` |
+| 4 | 搜索 "MSFT"，domain=finance, sub_domain=finance.quote，`-p type=stock,symbol=MSFT,cn_code=`，返回 2 条 | `## Search Results` |
 | 5 | 搜索 "market trends"，domain=finance, sub_domain=finance.market，`--sdp region=,timeframe=`（required param 填空值），返回 2 条 | `## Search Results` |
 
 ---
@@ -39,8 +39,8 @@
 
 | # | 需求 | 预期结果第一行 |
 |---|---|---|
-| 6 | 搜索 "AAPL"，domain=finance, sub_domain=finance.us_stock，`--sub_domain_params '{"ticker":"AAPL"}'`（JSON 向后兼容） | `## Search Results` |
-| 7 | 搜索 "AAPL"，domain=finance, sub_domain=finance.us_stock，`--sub_domain_params '{ticker:AAPL}'`（模拟 PowerShell 剥引号退化格式） | `## Search Results` |
+| 6 | 搜索 "AAPL"，domain=finance, sub_domain=finance.quote，`--sub_domain_params '{"type":"stock","symbol":"AAPL","cn_code":""}'`（JSON 向后兼容） | `## Search Results` |
+| 7 | 搜索 "AAPL"，domain=finance, sub_domain=finance.quote，`--sub_domain_params '{type:stock,symbol:AAPL,cn_code:}'`（模拟 PowerShell 剥引号退化格式） | `## Search Results` |
 
 > ⚠️ 场景 7 是本次新增的 `{key:value}` 兼容修复。如果返回 Error 而非 Search Results，是 bug。
 
@@ -59,8 +59,8 @@
 
 | # | 需求 | 预期结果第一行 |
 |---|---|---|
-| 10 | batch_search：`--query "AAPL stock" --query "MSFT revenue"`，共享 `--domain finance --sub_domain finance.us_stock`，不加 per-item 参数 | `## Query 1:` |
-| 11 | batch_search 用 `@文件` 引用 JSON 文件。文件内容：`[{"query":"AAPL earnings","sub_domain_params":"ticker=AAPL"},{"query":"MSFT revenue","sub_domain_params":"ticker=MSFT"}]`。共享 `--domain finance --sub_domain finance.us_stock` | `## Query 1:` |
+| 10 | batch_search：`--query "AAPL stock" --query "MSFT revenue"`，共享 `--domain finance --sub_domain finance.quote --sdp type=stock,symbol=,cn_code=`，不加 per-item 参数 | `## Query 1:` |
+| 11 | batch_search 用 `@文件` 引用 JSON 文件。文件内容：`[{"query":"AAPL earnings","sub_domain_params":"type=stock,symbol=AAPL,cn_code="},{"query":"MSFT revenue","sub_domain_params":"type=stock,symbol=MSFT,cn_code="}]`。共享 `--domain finance --sub_domain finance.quote` | `## Query 1:` |
 
 ---
 
@@ -68,9 +68,9 @@
 
 | # | 需求 | 预期结果第一行 |
 |---|---|---|
-| 12 | batch_search 用 `@文件` 引用 JSON 文件。文件内容：`[{"query":"quantum computing"},{"query":"AAPL stock","domain":"finance","sub_domain":"finance.us_stock","sub_domain_params":"ticker=AAPL"}]`。**不加共享参数** | `## Query 1:` |
-| 13 | batch_search 直接传内联 JSON 数组：`[{"query":"test general"},{"query":"AAPL","domain":"finance","sub_domain":"finance.us_stock"}]` | `## Query 1:` |
-| 14 | batch_search 传 mangled JSON（无引号 key，模拟 PowerShell 剥引号）：`[{query:test general},{query:AAPL,domain:finance,sub_domain:finance.us_stock}]` | `## Query 1:` |
+| 12 | batch_search 用 `@文件` 引用 JSON 文件。文件内容：`[{"query":"quantum computing"},{"query":"AAPL stock","domain":"finance","sub_domain":"finance.quote","sub_domain_params":"type=stock,symbol=AAPL,cn_code="}]`。**不加共享参数** | `## Query 1:` |
+| 13 | batch_search 直接传内联 JSON 数组：`[{"query":"test general"},{"query":"AAPL","domain":"finance","sub_domain":"finance.quote","sub_domain_params":"type=stock,symbol=AAPL,cn_code="}]` | `## Query 1:` |
+| 14 | batch_search 传 mangled JSON（无引号 key，模拟 PowerShell 剥引号）：`[{query:test general},{query:AAPL,domain:finance,sub_domain:finance.quote,sub_domain_params:type=stock,symbol=AAPL,cn_code=}]` | `## Query 1:` |
 
 > ⚠️ 场景 14 验证 batch_search 的 repairJson 逻辑能处理退化 JSON。如果报错（非网络超时），是 bug。
 

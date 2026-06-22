@@ -9,6 +9,7 @@ Author: Jesse (https://github.com/Jesseovo)
 """
 
 import json
+import re
 import sys
 import urllib.parse
 import urllib.request
@@ -60,6 +61,9 @@ def search_douyin(
     if not items:
         items = _search_via_public(topic, limit)
 
+    if not items:
+        items = _search_via_site_search(topic, limit)
+
     scored = []
     for i, item in enumerate(items):
         text = item.get("text", "")
@@ -109,6 +113,70 @@ def _search_via_public(topic: str, limit: int) -> List[Dict[str, Any]]:
             items.append(_parse_aweme(aweme))
     except Exception as e:
         sys.stderr.write(f"[抖音] 公开接口搜索失败: {e}\n")
+    return items
+
+
+def _fetch_html(url: str, timeout: int = 8) -> str:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept-Encoding": "identity",
+        "Referer": "https://cn.bing.com/",
+    }
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def _clean_text(text: str) -> str:
+    text = re.sub(r"<[^>]+>", "", text or "")
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _search_via_site_search(topic: str, limit: int) -> List[Dict[str, Any]]:
+    """官方接口/爬虫无结果时，用公开搜索引擎兜底获取抖音公开链接。"""
+    items: List[Dict[str, Any]] = []
+    try:
+        query = f"site:douyin.com/video {topic}"
+        encoded = urllib.parse.quote(query)
+        url = f"https://cn.bing.com/search?q={encoded}&setmkt=zh-CN&ensearch=0"
+        html = _fetch_html(url)
+        blocks = re.findall(r'<li class="b_algo"[^>]*>([\s\S]*?)</li>', html)
+        seen = set()
+        for block in blocks:
+            title_match = re.search(
+                r'<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>\s*</h2>',
+                block,
+                re.S,
+            )
+            if not title_match:
+                continue
+            href = title_match.group(1)
+            if "douyin.com" not in href or href in seen:
+                continue
+            seen.add(href)
+            title = _clean_text(title_match.group(2))
+            snip_match = re.search(r"<p[^>]*>([\s\S]*?)</p>", block, re.S)
+            snippet = _clean_text(snip_match.group(1)) if snip_match else ""
+            text = f"{title} {snippet}".strip() if snippet else title
+            items.append({
+                "text": text,
+                "url": href,
+                "author_name": "",
+                "author_id": "",
+                "date": None,
+                "engagement": {"views": 0, "likes": 0, "comments": 0, "shares": 0},
+                "hashtags": re.findall(r"#([^#\s]+)#?", text),
+                "duration": 0,
+                "source": "site-search-fallback",
+            })
+            if len(items) >= limit:
+                break
+    except Exception as e:
+        sys.stderr.write(f"[抖音] 站内搜索兜底失败: {e}\n")
+    if items:
+        sys.stderr.write(f"[抖音] 官方接口/爬虫无结果，已用公开搜索兜底获取 {len(items)} 条公开链接。\n")
     return items
 
 

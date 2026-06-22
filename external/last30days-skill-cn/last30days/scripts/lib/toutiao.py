@@ -49,6 +49,9 @@ def search_toutiao(
             if hi.get("title", "").lower() not in existing_titles:
                 items.append(hi)
 
+    if not items:
+        items = _search_via_site_search(topic, limit)
+
     scored = []
     for i, item in enumerate(items):
         title = item.get("title", "")
@@ -116,6 +119,62 @@ def _get_hot_related(topic: str) -> List[Dict[str, Any]]:
                 })
     except Exception as e:
         sys.stderr.write(f"[今日头条] 热榜搜索失败: {e}\n")
+    return items
+
+
+def _fetch_html(url: str, timeout: int = 8) -> str:
+    headers = {
+        "User-Agent": _UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept-Encoding": "identity",
+        "Referer": "https://cn.bing.com/",
+    }
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return response.read().decode("utf-8", errors="replace")
+
+
+def _search_via_site_search(topic: str, limit: int) -> List[Dict[str, Any]]:
+    """官方搜索/热榜无结果时，用公开搜索引擎兜底获取头条公开链接。"""
+    items: List[Dict[str, Any]] = []
+    try:
+        query = f"site:toutiao.com {topic}"
+        encoded = urllib.parse.quote(query)
+        url = f"https://cn.bing.com/search?q={encoded}&setmkt=zh-CN&ensearch=0"
+        html = _fetch_html(url)
+        blocks = re.findall(r'<li class="b_algo"[^>]*>([\s\S]*?)</li>', html)
+        seen = set()
+        for block in blocks:
+            title_match = re.search(
+                r'<h2[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>\s*</h2>',
+                block,
+                re.S,
+            )
+            if not title_match:
+                continue
+            href = title_match.group(1)
+            if "toutiao.com" not in href or href in seen:
+                continue
+            seen.add(href)
+            title = _clean_html(title_match.group(2))
+            snip_match = re.search(r"<p[^>]*>([\s\S]*?)</p>", block, re.S)
+            snippet = _clean_html(snip_match.group(1)) if snip_match else ""
+            items.append({
+                "title": title,
+                "abstract": snippet,
+                "url": href,
+                "source_name": "今日头条",
+                "date": None,
+                "engagement": {},
+                "source": "site-search-fallback",
+            })
+            if len(items) >= limit:
+                break
+    except Exception as e:
+        sys.stderr.write(f"[今日头条] 站内搜索兜底失败: {e}\n")
+    if items:
+        sys.stderr.write(f"[今日头条] 官方搜索/热榜无结果，已用公开搜索兜底获取 {len(items)} 条公开链接。\n")
     return items
 
 

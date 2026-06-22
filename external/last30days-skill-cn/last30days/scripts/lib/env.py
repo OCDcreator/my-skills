@@ -3,8 +3,12 @@
 Author: Jesse (https://github.com/Jesseovo)
 """
 
+import json
 import logging
 import os
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
@@ -192,6 +196,92 @@ def is_baidu_api_available(config: Dict[str, Any]) -> bool:
 
 def is_toutiao_available() -> bool:
     return True
+
+
+# ---------------------------------------------------------------------------
+# 实时探测（仅供 --diagnose 使用）
+#
+# is_*_available() 反映的是"配置/能力是否具备"；下面的 probe_* 则真实发一个
+# 短超时请求，反映各源公开端点此刻是否还能拿到数据。约定：
+#   - 端点返回明确错误（HTTP 4xx/5xx）或空数据 → False（诚实标记为不可用）
+#   - 仅连接超时/网络异常 → fail-open 返回 True（瞬时故障不武断判死）
+# ---------------------------------------------------------------------------
+
+_PROBE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+
+
+def _probe_json(url: str, headers: Dict[str, str], timeout: int = 5) -> Optional[dict]:
+    """发一个短超时 GET 并解析 JSON。
+
+    返回 dict 表示拿到可解析响应；返回 None 表示明确失败（HTTP 错误/非 JSON）；
+    抛出异常表示瞬时网络问题，由调用方 fail-open 处理。
+    """
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read(50000)
+    try:
+        return json.loads(raw.decode("utf-8", "replace"))
+    except (ValueError, TypeError):
+        return None
+
+
+def probe_bilibili(timeout: int = 5) -> bool:
+    """探测 B站公开搜索 API 是否仍返回结果（对齐 bilibili._search_page 端点）。"""
+    kw = urllib.parse.quote("AI")
+    url = (
+        f"https://api.bilibili.com/x/web-interface/search/type"
+        f"?search_type=video&keyword={kw}&page=1&page_size=5&order=totalrank"
+    )
+    headers = {"User-Agent": _PROBE_UA, "Referer": "https://search.bilibili.com/"}
+    try:
+        data = _probe_json(url, headers, timeout)
+        if not data or data.get("code") != 0:
+            return False
+        return bool(data.get("data", {}).get("result"))
+    except urllib.error.HTTPError:
+        return False
+    except Exception:
+        return True
+
+
+def probe_zhihu(timeout: int = 5) -> bool:
+    """探测知乎公开搜索 API 是否仍返回结果（对齐 zhihu._search_general 端点）。"""
+    kw = urllib.parse.quote("AI")
+    url = f"https://www.zhihu.com/api/v4/search_v3?t=general&q={kw}&offset=0&limit=1"
+    headers = {"User-Agent": _PROBE_UA, "Referer": "https://www.zhihu.com/"}
+    try:
+        data = _probe_json(url, headers, timeout)
+        if not data:
+            return False
+        return bool(data.get("data"))
+    except urllib.error.HTTPError:
+        return False
+    except Exception:
+        return True
+
+
+def probe_toutiao(timeout: int = 5) -> bool:
+    """探测今日头条原生搜索接口是否仍返回结果（对齐 toutiao._search_content 端点）。
+
+    该接口现已普遍需要 _signature，通常返回空 data；此时如实返回 False，
+    提示用户头条实际依赖公开搜索引擎兜底（见 note_douyin_toutiao）。
+    """
+    kw = urllib.parse.quote("AI")
+    url = f"https://www.toutiao.com/api/search/content/?keyword={kw}&count=1&offset=0"
+    headers = {
+        "User-Agent": _PROBE_UA,
+        "Referer": "https://www.toutiao.com/",
+        "Cookie": "tt_webid=1",
+    }
+    try:
+        data = _probe_json(url, headers, timeout)
+        if not data:
+            return False
+        return bool(data.get("data"))
+    except urllib.error.HTTPError:
+        return False
+    except Exception:
+        return True
 
 
 def _all_source_ids() -> List[str]:

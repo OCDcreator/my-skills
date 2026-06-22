@@ -63,8 +63,11 @@ python {{SKILL_DIR}}/scripts/last30days.py "{{USER_TOPIC}}" --quick --emit compa
 python {{SKILL_DIR}}/scripts/last30days.py "{{USER_TOPIC}}" --deep --emit md
 python {{SKILL_DIR}}/scripts/last30days.py "{{USER_TOPIC}}" --emit html-path
 python {{SKILL_DIR}}/scripts/last30days.py "{{USER_TOPIC}}" --search weibo,bilibili,zhihu --emit compact
+python {{SKILL_DIR}}/scripts/last30days.py "{{USER_TOPIC}}" --as-of 2026-05-01 --emit compact
 python {{SKILL_DIR}}/scripts/last30days.py --diagnose
 ```
+
+`--as-of YYYY-MM-DD` 以指定日期为终点回溯 N 天（历史回溯）；未指定 `--search` 时回退到环境变量 `LAST30DAYS_DEFAULT_SEARCH`，`EXCLUDE_SOURCES` 可排除指定源。输出中若多个平台讨论同一事件，会先给出「跨平台聚合热点」。
 
 ## Output Modes
 
