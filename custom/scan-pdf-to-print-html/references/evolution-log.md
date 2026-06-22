@@ -120,3 +120,16 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
     - `scripts/validate_rendered_handout_contract.py`: already tightened before this evolution write to measure border width/color/background/plain-box state.
     - `tests/test_validate_rendered_handout_contract.py`: already added a regression fixture for flattened 1px/plain box borders while retaining passing neutral table/blockquote coverage.
   snapshot: SKILL.md.bak-2026-06-22
+
+## 2026-06-22 — run against scan-pdf-to-print-html
+- candidate: Rendered full-page cover/special sheets must align with regular A4 sheets in screen preview, enforced by the rendered contract validator with narrow marked-cover scope.
+  verdict: strengthen
+  reason: A real handout used `.concept-map-sheet { margin: 0 }` while regular `.sheet` pages were centered, so the browser preview showed the cover left-aligned and page 2 centered; existing cover rules checked first-page fill and no shrinkage but did not compare the cover sheet frame against regular sheets. The validator now compares marked cover/special sheets to the first regular sheet by rendered `left` and `width` with a 2px tolerance, and regression tests ensure it catches the margin mismatch without failing ordinary no-cover handouts.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: second-ish (strengthens C20 full-page cover verification)
+  written:
+    - `SKILL.md`: added a hard contract and markdown-source validation language for marked cover-vs-regular sheet screen alignment.
+    - `references/review-gate.md`: added the same marked-cover alignment check to the known failure classes, explicitly excluding unmarked ordinary pages and print-mode zero margins.
+    - `scripts/validate_rendered_handout_contract.py`: added Playwright `getBoundingClientRect()` comparison for `.concept-map-sheet`, `[data-sheet-role="cover"]`, and `[data-cover-sheet="true"]` against the first regular `.sheet`.
+    - `tests/test_validate_rendered_handout_contract.py`: added fail/pass fixtures for left-aligned cover margin and no-cover handouts.
+  snapshot: SKILL.md.bak-2026-06-22-2

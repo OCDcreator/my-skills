@@ -77,7 +77,7 @@ def validate(
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 794, "height": 1123})
+        page = browser.new_page(viewport={"width": 1440, "height": 1123})
         page.on("pageerror", lambda exc: errors.append(str(exc)))
         page.on(
             "console",
@@ -141,6 +141,36 @@ def validate(
               const nonCoverSheets = sheets.filter((s, index) =>
                 index > 0 && !s.classList.contains('concept-map-sheet')
               );
+              const specialCoverSheets = sheets.filter((sheet) =>
+                sheet.classList.contains('concept-map-sheet') ||
+                sheet.matches('[data-sheet-role="cover"], [data-cover-sheet="true"]')
+              );
+              const regularSheets = sheets.filter((sheet) => !specialCoverSheets.includes(sheet));
+              const sheetAlignmentTolerancePx = 2;
+              const sheetAlignmentFailures = [];
+              if (specialCoverSheets.length > 0 && regularSheets.length > 0) {
+                const regularRect = regularSheets[0].getBoundingClientRect();
+                specialCoverSheets.forEach((sheet, index) => {
+                  const rect = sheet.getBoundingClientRect();
+                  const leftDelta = Math.abs(rect.left - regularRect.left);
+                  const widthDelta = Math.abs(rect.width - regularRect.width);
+                  if (
+                    leftDelta > sheetAlignmentTolerancePx ||
+                    widthDelta > sheetAlignmentTolerancePx
+                  ) {
+                    sheetAlignmentFailures.push({
+                      index,
+                      classes: sheet.className,
+                      left: Math.round(rect.left * 10) / 10,
+                      width: Math.round(rect.width * 10) / 10,
+                      regularLeft: Math.round(regularRect.left * 10) / 10,
+                      regularWidth: Math.round(regularRect.width * 10) / 10,
+                      leftDelta: Math.round(leftDelta * 10) / 10,
+                      widthDelta: Math.round(widthDelta * 10) / 10,
+                    });
+                  }
+                });
+              }
               const contentlessSheets = nonCoverSheets.filter((sheet) => {
                 const text = (sheet.innerText || '').replace(/第\\s*\\d+\\s*页/g, '').trim();
                 const media = sheet.querySelectorAll('img,svg,canvas,table,math,.katex').length;
@@ -231,6 +261,10 @@ def validate(
                 htmlElements: scope.querySelectorAll('h1,h2,h3,h4,p,blockquote,table,ul,ol').length,
                 handoutReady: document.documentElement.dataset.handoutReady || '',
                 sheets: sheets.length,
+                specialCoverSheets: specialCoverSheets.length,
+                regularSheets: regularSheets.length,
+                sheetAlignmentFailures,
+                sheetAlignmentTolerancePx,
                 overflowSheets: sheets.filter((s) => s.dataset.fitState === 'overflow').length,
                 contentlessSheets: contentlessSheets.length,
                 katexNodes: scope.querySelectorAll('.katex').length,
@@ -280,6 +314,16 @@ def validate(
     add("real HTML elements present", result["htmlElements"] > 0, f"elements={result['htmlElements']}")
     if result["sheets"] > 0:
         add("0 overflow sheets", result["overflowSheets"] == 0, f"overflow={result['overflowSheets']}")
+        if result["specialCoverSheets"] > 0 and result["regularSheets"] > 0:
+            add(
+                "special cover sheets align with regular sheets in screen preview",
+                len(result["sheetAlignmentFailures"]) == 0,
+                (
+                    f"special={result['specialCoverSheets']} regular={result['regularSheets']} "
+                    f"tolerance={result['sheetAlignmentTolerancePx']}px "
+                    f"failures={result['sheetAlignmentFailures'][:3]}"
+                ),
+            )
         add(
             "0 contentless non-cover sheets",
             result["contentlessSheets"] == 0,

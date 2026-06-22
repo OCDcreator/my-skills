@@ -85,6 +85,53 @@ def _write_handout(path: Path, css: str) -> None:
     )
 
 
+def _write_cover_handout(path: Path, cover_margin: str) -> None:
+    path.write_text(
+        f"""<!doctype html>
+<html data-handout-ready="true">
+<head>
+<meta charset="utf-8">
+<style>
+body {{
+  margin: 0;
+  padding: 24px 0;
+}}
+.sheet {{
+  width: 794px;
+  height: 1123px;
+  margin: 0 auto 12mm;
+  background: white;
+}}
+.concept-map-sheet {{
+  margin: {cover_margin};
+}}
+@media print {{
+  .concept-map-sheet {{ margin: 0; }}
+}}
+</style>
+</head>
+<body>
+<main id="handout-print-root">
+  <article class="sheet concept-map-sheet" data-fit-state="ready">
+    <svg width="794" height="1123" viewBox="0 0 794 1123">
+      <rect width="794" height="1123" fill="white"/>
+      <text x="397" y="560" text-anchor="middle">cover</text>
+    </svg>
+  </article>
+  <article class="sheet" data-fit-state="ready">
+    <section class="sheet-body">
+      <h1>正文</h1>
+      <p>普通内容页。</p>
+    </section>
+  </article>
+</main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+
 @pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
 def test_rendered_contract_accepts_neutral_choice_table(tmp_path: Path) -> None:
     html = tmp_path / "handout.html"
@@ -122,6 +169,66 @@ def test_rendered_contract_accepts_neutral_choice_table(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     assert "question option tables are neutral" in result.stdout
     assert "question option images are readable" in result.stdout
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_rendered_contract_rejects_left_aligned_cover_sheet(tmp_path: Path) -> None:
+    html = tmp_path / "handout.html"
+    _write_cover_handout(html, "0")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--html",
+            str(html),
+            "--wait-ms",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "[FAIL] special cover sheets align with regular sheets in screen preview" in result.stdout
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_rendered_contract_skips_cover_alignment_when_no_cover_sheet(tmp_path: Path) -> None:
+    html = tmp_path / "handout.html"
+    _write_handout(
+        html,
+        """
+.transcript-flow .phycat-blockquote table,
+.transcript-flow .phycat-blockquote th,
+.transcript-flow .phycat-blockquote td {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+}
+.transcript-flow .phycat-blockquote img {
+  width: 100px;
+  height: 80px;
+}
+""",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--html",
+            str(html),
+            "--wait-ms",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "special cover sheets align with regular sheets in screen preview" not in result.stdout
 
 
 @pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
