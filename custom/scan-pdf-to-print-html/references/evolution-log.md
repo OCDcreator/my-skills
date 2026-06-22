@@ -107,3 +107,16 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
     - `scripts/validate_rendered_handout_contract.py`: new Playwright DOM validator scoped to `#handout-print-root`.
     - `tests/test_validate_rendered_handout_contract.py`: regression tests for accepting neutral option tables and rejecting ruled option tables/tiny images.
   snapshot: SKILL.md.bak-2026-06-20-3
+
+## 2026-06-22 — run against scan-pdf-to-print-html
+- candidate: Rendered `.phycat-blockquote` left-rule validation must reject flattened 1px/plain/same-color box borders while preserving legitimate visible accent-rule variants.
+  verdict: strengthen
+  reason: A real handout had `.phycat-blockquote` flattened by a later generic blockquote rule into `border: 1px solid var(--line)`, but the rendered validator only checked for a nonzero/non-none left border and falsely passed it. The rule now requires computed-style validation and paired pass/fail regression coverage so the validator catches the miss without false positives on valid accent rules.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: second-ish (strengthens the 2026-06-20 rendered blockquote contract)
+  written:
+    - `SKILL.md`: strengthened the hard contract, Builder Markdown Contract, and file list to require computed left-accent validation that rejects flattened/plain boxes without rejecting valid `.phycat-blockquote` variants.
+    - `references/review-gate.md`: clarified that the left accent rule must be visible as a computed accent rule, not a generic 1px/plain/same-color box border.
+    - `scripts/validate_rendered_handout_contract.py`: already tightened before this evolution write to measure border width/color/background/plain-box state.
+    - `tests/test_validate_rendered_handout_contract.py`: already added a regression fixture for flattened 1px/plain box borders while retaining passing neutral table/blockquote coverage.
+  snapshot: SKILL.md.bak-2026-06-22

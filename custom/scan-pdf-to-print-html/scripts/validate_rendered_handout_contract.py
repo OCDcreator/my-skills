@@ -114,6 +114,16 @@ def validate(
                 return normalized === 'rgba(0,0,0,0)' || normalized === 'transparent';
               }
 
+              function px(value) {
+                const n = Number.parseFloat(String(value));
+                return Number.isFinite(n) ? n : 0;
+              }
+
+              function sameColor(a, b) {
+                return String(a).replace(/\\s+/g, '').toLowerCase() ===
+                  String(b).replace(/\\s+/g, '').toLowerCase();
+              }
+
               function styleOf(el) {
                 const s = getComputedStyle(el);
                 return {
@@ -140,7 +150,33 @@ def validate(
               const blockquotes = Array.from(scope.querySelectorAll('.transcript-flow .phycat-blockquote'));
               const badBlockquoteRules = blockquotes.filter((quote) => {
                 const s = getComputedStyle(quote);
-                return s.borderLeftWidth === '0px' || s.borderLeftStyle === 'none';
+                const leftWidth = px(s.borderLeftWidth);
+                const topWidth = px(s.borderTopWidth);
+                const rightWidth = px(s.borderRightWidth);
+                const bottomWidth = px(s.borderBottomWidth);
+                const maxOtherWidth = Math.max(topWidth, rightWidth, bottomWidth);
+                const hasVisibleLeftRule =
+                  leftWidth >= 2.5 &&
+                  s.borderLeftStyle !== 'none' &&
+                  !isTransparent(s.borderLeftColor) &&
+                  !sameColor(s.borderLeftColor, s.backgroundColor);
+                const isPlainBoxBorder =
+                  maxOtherWidth > 0 &&
+                  leftWidth <= maxOtherWidth + 0.5 &&
+                  sameColor(s.borderLeftColor, s.borderTopColor) &&
+                  sameColor(s.borderLeftColor, s.borderRightColor) &&
+                  sameColor(s.borderLeftColor, s.borderBottomColor);
+                return !hasVisibleLeftRule || isPlainBoxBorder;
+              });
+              const badBlockquoteRuleDetails = badBlockquoteRules.slice(0, 3).map((quote) => {
+                const s = getComputedStyle(quote);
+                return {
+                  left: `${s.borderLeftWidth} ${s.borderLeftStyle} ${s.borderLeftColor}`,
+                  top: `${s.borderTopWidth} ${s.borderTopStyle} ${s.borderTopColor}`,
+                  right: `${s.borderRightWidth} ${s.borderRightStyle} ${s.borderRightColor}`,
+                  bottom: `${s.borderBottomWidth} ${s.borderBottomStyle} ${s.borderBottomColor}`,
+                  background: s.backgroundColor,
+                };
               });
 
               const labelPattern = /(^|[\\s【])(?:例题?|练习)\\s*\\d/;
@@ -207,6 +243,7 @@ def validate(
                 calloutMarkers: (bodyText.match(/\\[!(?:question|note|tip|warning|info)\\]/gi) || []).length,
                 blockquotes: blockquotes.length,
                 badBlockquoteRules: badBlockquoteRules.length,
+                badBlockquoteRuleDetails,
                 labelBlockquotes: labelBlockquotes.length,
                 exampleBadges: scope.querySelectorAll('.lead-tag-example').length,
                 missingExampleBadges: missingExampleBadges.length,
@@ -265,7 +302,10 @@ def validate(
         add(
             "blockquote left rule visible",
             result["badBlockquoteRules"] == 0,
-            f"blockquotes={result['blockquotes']} bad={result['badBlockquoteRules']}",
+            (
+                f"blockquotes={result['blockquotes']} bad={result['badBlockquoteRules']} "
+                f"sample={result['badBlockquoteRuleDetails']}"
+            ),
         )
     if result["labelBlockquotes"] > 0:
         add(

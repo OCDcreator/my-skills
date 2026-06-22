@@ -125,6 +125,48 @@ def test_rendered_contract_accepts_neutral_choice_table(tmp_path: Path) -> None:
 
 
 @pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_rendered_contract_rejects_flattened_blockquote_left_rule(tmp_path: Path) -> None:
+    html = tmp_path / "handout.html"
+    _write_handout(
+        html,
+        """
+.transcript-flow .phycat-blockquote {
+  border: 1px solid #e8e6dc;
+  background: #e8e6dc;
+}
+.transcript-flow .phycat-blockquote table,
+.transcript-flow .phycat-blockquote th,
+.transcript-flow .phycat-blockquote td {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 400;
+}
+.transcript-flow .phycat-blockquote img {
+  width: 100px;
+  height: 80px;
+}
+""",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_PATH),
+            "--html",
+            str(html),
+            "--wait-ms",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "[FAIL] blockquote left rule visible" in result.stdout
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
 def test_rendered_contract_rejects_ruled_choice_table_and_tiny_images(tmp_path: Path) -> None:
     html = tmp_path / "handout.html"
     _write_handout(
