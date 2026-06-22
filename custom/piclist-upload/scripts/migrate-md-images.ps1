@@ -7,6 +7,12 @@
   用返回的新 URL 替换原文，生成 .uploaded.md（不动原文件）。
   PicList 默认图床已切到兰空，开箱即用。
 
+  跨平台说明：
+  - Windows: pwsh -File migrate-md-images.ps1 -InputPath ...  (或 powershell -File ...)
+  - Mac:     先 brew install --cask powershell，再 pwsh -File migrate-md-images.ps1 -InputPath ...
+  - 本脚本走本机 PicList server (http://127.0.0.1:36677)，所以本机必须有 PicList 在跑。
+    服务器/无 PicList 环境：改用兰空直连 API 手动迁移（见 references/upload-paths.md）。
+
 .PARAMETER InputPath
   源 md/html 文件路径。
 

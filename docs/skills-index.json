@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generated_at": "2026-06-21T15:03:18.739751+00:00",
+    "generated_at": "2026-06-22T04:29:17.623278+00:00",
     "total_skills": 1045,
     "custom_skills": 38,
     "external_skills": 1007,
@@ -309,7 +309,7 @@
     {
       "path": "custom/piclist-upload",
       "name": "piclist-upload",
-      "description": "Use when uploading images to the user's personal image host (pic.ltreen.tech, a Lsky Pro+ bed on fnOS reached via frp), migrating images embedded in Markdown/HTML files (remote CDN links like noedgeai/unsplash/imgur, or local paths) to that bed through the local PicList client, getting image URLs/外链, or anything involving PicList upload, 图床, 图片上传, 图片外链, 批量传图, markdown 图片替换, markdown 里图片迁移. Always use this skill when the user mentions uploading pictures, image hosting, PicList, pic.ltreen.tech, Lsky/ 兰空图床, or wants to replace/migrate image links in documents — even if they don't name PicList explicitly.",
+      "description": "Use when uploading images to the user's personal image host (pic.ltreen.tech, a Lsky Pro+ bed on fnOS reached via frp), migrating images embedded in Markdown/HTML files (remote CDN links like noedgeai/unsplash/imgur, or local paths) to that bed, getting image URLs/外链, or anything involving PicList upload, 图床, 图片上传, 图片外链, 批量传图, markdown 图片替换, markdown 里图片迁移, 兰空/Lsky 直连 API, or uploading from a non-Windows machine (Mac/Linux). Always use this skill when the user mentions uploading pictures, image hosting, PicList, pic.ltreen.tech, Lsky/兰空图床, or wants to replace/migrate image links in documents — even if they don't name PicList explicitly.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",
