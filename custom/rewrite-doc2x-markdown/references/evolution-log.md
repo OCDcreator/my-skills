@@ -254,3 +254,31 @@ Markdown structure. Four candidates were surfaced and approved by the user.
 - **Active-context staleness:** editing the repo file does not change the
   currently-loaded skill text; recommend a fresh session to exercise the
   improved rules.
+
+## 2026-06-23 — add_new + strengthen: adjacent-figure-merge gate (md split-figure root cause)
+
+- **Trigger (verbatim user message):** "47页相邻三张图怎么没有并排放？难道是技能校验门这里还有漏洞？49页末和50页初这两张也是相邻的应该并排放，不知道是不是 md 格式错误？还有 52页末两张图" + "62页末两张图没有并排放"
+- **Classification:** `missing` (rework surfaced downstream in scan skill, but root cause was rewrite producing split figures)
+- **Provenance:** `(extracted)` — full session transcript in-context.
+- **Root-cause analysis:** `source-transcript.md` (canonical output of this skill) emitted 5 groups of logically-grouped images as adjacent independent `<figure>` blocks (e.g. 对偶性质图1/2/3, 内切圆图1/2, 例题4示意图1/2, 仅一个交点情形5图1/2, 第三定义图1/2), each a single-image figure separated only by blank lines. The existing rule `references/canonical-markdown-rules.md:281` ("Adjacent images should be merged") existed but had **no executable gate** — `lint_multi_image_figures` only checks multi-image *inside one* figure, so single-image figures side-by-side passed silently. This is the same "rule exists, no executable gate" gap pattern as scan skill's C24→C27 (2026-06-17 discard was a mis-diagnosis). The downstream scan skill's C27 side-by-side gate could not catch it either, because the images were never grouped in the first place.
+- **Gate verdict:** `add_new` (Gate 1 PASS general — any multi-view/sub-figure group / Gate 2 `new` for the executable gate, `strengthen` for the rule text / Gate 3 principle — structural layout correctness, verifiable)
+  - Gate 2 evidence (rule text): `canonical-markdown-rules.md:281` existed ("should be merged") but was guidance only.
+  - Gate 2 evidence (gate): grep `lint_adjacent|adjacent_figures` in `validate_canonical_markdown.py` → no hits before this change.
+  - Dev Eval (non-regression): `python3 -m pytest tests/ -q` → 76 passed (was 75; +1 new regression test). New lint verified to (a) catch a minimal split-figure md and (b) NOT flag prose-separated independent figures.
+- **Pairwise conflict:** fast path (1 candidate).
+- **Landing zone:** `scripts/validate_canonical_markdown.py` (new `lint_adjacent_figures_must_merge`, wired into dispatch); `references/canonical-markdown-rules.md:281` (rule hardened, "should"→"MUST", notes enforcement); `SKILL.md` Step 6 (new judgment self-check item); `tests/test_validate_canonical_markdown.py` (regression test).
+- **Strongest reason NOT to add:** the rule text already existed; arguably model should just follow it. **Counter:** the user empirically hit the failure twice (this session + the rule's pre-existence proves it was never reliably followed), and the scan-skill C24→C27 history shows "guidance without a gate" repeatedly fails. An executable gate is the durable fix.
+- **Outcome:** APPROVED (user selected "rewrite: 加相邻图合并校验门（核心）").
+- **Files written:**
+  - `scripts/validate_canonical_markdown.py` (new `lint_adjacent_figures_must_merge` + dispatch wiring)
+  - `references/canonical-markdown-rules.md` (rule line 281 hardened)
+  - `SKILL.md` (Step 6 self-check "Adjacent figures merged")
+  - `tests/test_validate_canonical_markdown.py` (regression test)
+- **Snapshots:**
+  - `SKILL.md.bak-2026-06-23`
+  - `scripts/validate_canonical_markdown.py.bak-2026-06-23`
+  - `references/canonical-markdown-rules.md.bak-2026-06-23`
+  - `tests/test_validate_canonical_markdown.py.bak-2026-06-23`
+- **Recurrence count:** first for the executable gate; the rule text existed since 2026-06-16 but was never enforced.
+- **Active-context staleness:** editing the repo file does not change this session's loaded skill text; recommend a fresh session to exercise the improved gate.
+- **Discarded candidate (this session):** "禁止 [!note] '已在上面保留，不重复抄录' 占位符 callout" — classified `missing` but Gate 1 borderline (single-document content judgment, not a generalizable class) → user did not select it. Substance: redundant-summary placeholder callouts should be silently omitted rather than emitted as `[!note]`. Not written.

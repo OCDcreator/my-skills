@@ -312,16 +312,48 @@ def validate(
               });
 
               // --- Aspect-ratio image width band check (C26) ---
-              // Exempt: choice-table images, images inside marked cover sheets,
-              // and images inside .ocr-image-cluster or <figure> (those are
-              // governed by the cluster/figure layout, not single-image width).
+              // Per figure-policy.md, the only exempt images are choice-table
+              // images and images on marked cover sheets. <figure>/cluster images
+              // are NOT blanket-exempt: a single-image figure must satisfy the
+              // band for its own aspect ratio. A multi-image group renders as one
+              // side-by-side row, so each sibling occupies only a fraction of the
+              // row; for those we check the group's AGGREGATE rendered width
+              // against the band of the row's dominant aspect class (and the
+              // side-by-side gate C27 separately verifies they stayed in one row).
+              // Smooth target as a function of aspect ratio (redesigned
+              // 2026-06-23). No hard jump at class boundaries; near-square
+              // figures read fine at ~30%, only genuinely wide figures need
+              // a wide column. Target is then capped by the image's OWN
+              // natural width so it is never upscaled past native resolution.
+              function smoothTargetPct(ar) {
+                const pts = [
+                  [0.0, 18], [0.7, 22], [0.9, 27], [1.0, 30], [1.2, 35],
+                  [1.5, 45], [2.0, 58], [2.5, 68], [3.5, 78], [6.0, 82],
+                ];
+                if (ar <= pts[0][0]) return pts[0][1];
+                if (ar >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+                for (let i = 0; i < pts.length - 1; i++) {
+                  const a0 = pts[i][0], t0 = pts[i][1];
+                  const a1 = pts[i + 1][0], t1 = pts[i + 1][1];
+                  if (a0 <= ar && ar <= a1) {
+                    const r = (ar - a0) / (a1 - a0);
+                    return t0 + (t1 - t0) * r;
+                  }
+                }
+                return 30;
+              }
               function classifyAspect(naturalW, naturalH) {
                 const ar = naturalW / Math.max(naturalH, 1);
-                if (ar < 0.9) return { cls: 'portrait', lo: 0.15, hi: 0.28 };
-                if (ar <= 1.1) return { cls: 'near-square', lo: 0.28, hi: 0.45 };
-                if (ar <= 1.5) return { cls: 'landscape-mild', lo: 0.45, hi: 0.58 };
-                if (ar <= 2.5) return { cls: 'landscape-typical', lo: 0.58, hi: 0.75 };
-                return { cls: 'landscape-wide', lo: 0.75, hi: 0.90 };
+                const target = smoothTargetPct(ar) / 100;
+                const lo = Math.max(0.12, target - 0.07);
+                const hi = Math.min(0.92, target + 0.07);
+                let cls;
+                if (ar < 0.9) cls = 'portrait';
+                else if (ar <= 1.1) cls = 'near-square';
+                else if (ar <= 1.5) cls = 'landscape-mild';
+                else if (ar <= 2.5) cls = 'landscape-typical';
+                else cls = 'landscape-wide';
+                return { cls, lo, hi, target };
               }
               function isMarkedCover(node) {
                 let cur = node;
@@ -336,33 +368,130 @@ def validate(
                 }
                 return false;
               }
-              const widthBandImages = checkImageWidthBands
-                ? Array.from(scope.querySelectorAll('.transcript-flow img')).filter((img) => {
-                    if (img.closest('.phycat-blockquote table')) return false;
-                    if (img.closest('.ocr-image-cluster, figure')) return false;
-                    if (isMarkedCover(img)) return false;
-                    if (!img.naturalWidth || !img.naturalHeight) return false;
-                    return true;
-                  })
-                : [];
-              const widthBandViolations = widthBandImages.map((img) => {
-                const band = classifyAspect(img.naturalWidth, img.naturalHeight);
-                const sheet = img.closest('.sheet') || img.closest('.sheet-body') || scope;
+              function sheetBodyWidth(node) {
+                const sheet = node.closest('.sheet') || node.closest('.sheet-body') || scope;
                 const body = sheet.querySelector('.sheet-body') || sheet;
                 const bodyRect = body.getBoundingClientRect();
-                const refWidth = bodyRect.width || sheet.getBoundingClientRect().width || 1;
-                const rect = img.getBoundingClientRect();
-                const frac = rect.width / Math.max(refWidth, 1);
-                const ok = frac >= band.lo - 1e-3 && frac <= band.hi + 1e-3;
-                return {
-                  ok,
-                  cls: band.cls,
-                  aspect: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
-                  renderedPct: Math.round(frac * 1000) / 10,
-                  band: `${Math.round(band.lo * 100)}-${Math.round(band.hi * 100)}%`,
-                  src: (img.getAttribute('src') || '').slice(0, 80),
-                };
-              }).filter((v) => !v.ok);
+                return bodyRect.width || sheet.getBoundingClientRect().width || 1;
+              }
+              // Dominant class = widest band (largest hi) among the group, so the
+              // aggregate check accepts a row that is collectively large enough.
+              function dominantBand(imgs) {
+                let best = null;
+                for (const im of imgs) {
+                  const b = classifyAspect(im.naturalWidth, im.naturalHeight);
+                  if (!best || b.hi > best.hi) best = b;
+                }
+                return best || classifyAspect(1, 1);
+              }
+              const widthBandViolations = [];
+              const widthBandImages = [];
+              if (checkImageWidthBands) {
+                const allImgs = Array.from(scope.querySelectorAll('.transcript-flow img'));
+                // Group images by their figure/cluster container so multi-image
+                // rows are evaluated once at the group level.
+                const groupMap = new Map();
+                const standalone = [];
+                for (const img of allImgs) {
+                  if (img.closest('.phycat-blockquote table')) continue;
+                  if (isMarkedCover(img)) continue;
+                  if (!img.naturalWidth || !img.naturalHeight) continue;
+                  const grp = img.closest('.ocr-image-cluster, figure');
+                  if (grp && grp.querySelectorAll('img').length > 1) {
+                    const arr = groupMap.get(grp) || [];
+                    arr.push(img);
+                    groupMap.set(grp, arr);
+                  } else {
+                    standalone.push(img);
+                  }
+                }
+                const refWidthOf = (node) => sheetBodyWidth(node) || 1;
+                // Natural-width cap: an image's effective target band is capped
+                // by its own natural width as a fraction of body width, so it is
+                // never expected to render wider than its native pixel resolution
+                // (which would upscale and blur it).
+                function naturalFrac(img, refWidth) {
+                  return img.naturalWidth / Math.max(refWidth, 1);
+                }
+                function capBand(band, capFrac) {
+                  if (capFrac <= band.lo) {
+                    // natural width is below the band; accept the natural size.
+                    return { lo: Math.max(0.12, capFrac - 0.07), hi: capFrac + 0.07, target: capFrac };
+                  }
+                  const hi = Math.min(band.hi, Math.max(band.lo, capFrac));
+                  return { lo: band.lo, hi: hi, target: Math.min(band.target || ((band.lo + band.hi) / 2), capFrac) };
+                }
+                // Single-image containers: each image checked against its own band.
+                for (const img of standalone) {
+                  widthBandImages.push(img);
+                  const band = classifyAspect(img.naturalWidth, img.naturalHeight);
+                  const refWidth = refWidthOf(img);
+                  const capped = capBand(band, naturalFrac(img, refWidth));
+                  const rect = img.getBoundingClientRect();
+                  const frac = rect.width / Math.max(refWidth, 1);
+                  // "Near is exempt": allow a small tolerance so images that
+                  // are off by a few percentage points (e.g. multi-image rows
+                  // where each sibling shares the band) still pass.
+                  const ok = frac >= capped.lo - 0.04 && frac <= capped.hi + 0.04;
+                  if (!ok) {
+                    widthBandViolations.push({
+                      ok,
+                      mode: 'single',
+                      cls: band.cls,
+                      aspect: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
+                      renderedPct: Math.round(frac * 1000) / 10,
+                      band: `${Math.round(capped.lo * 100)}-${Math.round(capped.hi * 100)}%`,
+                      src: (img.getAttribute('src') || '').slice(0, 80),
+                    });
+                  }
+                }
+                // Multi-image rows: EACH sibling is judged independently against
+                // its own aspect-ratio band (with its own natural-width cap). A
+                // side-by-side row does NOT justify enlarging each image to fill
+                // the row — each image keeps the size it would have alone.
+                //
+                // EXCEPTION (evolved 2026-06-23): when the siblings'
+                // independent widths sum to more than 100% of body width, the
+                // row is "over-subscribed" — keeping all siblings on one row
+                // requires shrinking each below its own band. In that case the
+                // group prefers staying on one row (no wrapping) and the
+                // independent-width rule is EXEMPTED for every sibling in that
+                // group, rather than forcing a wrap or flagging each as a
+                // violation. The C27 side-by-side gate still verifies they
+                // stayed in one row.
+                for (const [grp, imgs] of groupMap.entries()) {
+                  const refWidth = refWidthOf(grp);
+                  // sum of each sibling's independent target (capped by its own
+                  // natural width) as a fraction of body width
+                  let indepTotal = 0;
+                  for (const img of imgs) {
+                    const band = classifyAspect(img.naturalWidth, img.naturalHeight);
+                    const capped = capBand(band, naturalFrac(img, refWidth));
+                    indepTotal += capped.target || ((capped.lo + capped.hi) / 2);
+                  }
+                  const overSubscribed = indepTotal > 1.0;
+                  for (const img of imgs) {
+                    widthBandImages.push(img);
+                    if (overSubscribed) continue; // exempt: forced to one row
+                    const band = classifyAspect(img.naturalWidth, img.naturalHeight);
+                    const capped = capBand(band, naturalFrac(img, refWidth));
+                    const rect = img.getBoundingClientRect();
+                    const frac = rect.width / Math.max(refWidth, 1);
+                    const ok = frac >= capped.lo - 0.04 && frac <= capped.hi + 0.04;
+                    if (!ok) {
+                      widthBandViolations.push({
+                        ok,
+                        mode: 'row-sibling',
+                        cls: band.cls,
+                        aspect: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
+                        renderedPct: Math.round(frac * 1000) / 10,
+                        band: `${Math.round(capped.lo * 100)}-${Math.round(capped.hi * 100)}%`,
+                        src: (img.getAttribute('src') || '').slice(0, 60),
+                      });
+                    }
+                  }
+                }
+              }
 
               // --- Adjacent-image side-by-side check (C27) ---
               // Only inside .ocr-image-cluster and authored <figure>.
@@ -383,9 +512,22 @@ def validate(
               const stackedPairs = [];
               sideBySideGroups.forEach((group) => {
                 const imgs = Array.from(group.querySelectorAll('img'));
+                // A flex-wrap:wrap container may legitimately wrap extra images
+                // onto a second row when each image is sized independently (its
+                // own aspect-ratio target) and the row total exceeds 100%. That
+                // is expected multi-row layout, NOT a "stacked" failure. Only
+                // flag when the container does NOT wrap (so wrapping would be a
+                // real layout break) or when ALL siblings collapsed into one
+                // vertical column (a true stack, e.g. display:block regression).
+                const style = getComputedStyle(group);
+                const allowsWrap = style.flexWrap === 'wrap' || style.flexWrap === 'wrap-reverse';
+                const isVerticalStack = style.display !== 'flex' && style.display !== 'grid';
                 for (let i = 0; i < imgs.length; i += 1) {
                   for (let j = i + 1; j < imgs.length; j += 1) {
                     if (rectsStacked(imgs[i], imgs[j])) {
+                      // Exempt wrapping in a flex-wrap container that is not a
+                      // degenerate single-column stack.
+                      if (allowsWrap && !isVerticalStack) continue;
                       stackedPairs.push({
                         container: group.tagName.toLowerCase() + (group.className ? '.' + group.className.split(' ')[0] : ''),
                         srcA: (imgs[i].getAttribute('src') || '').slice(0, 60),

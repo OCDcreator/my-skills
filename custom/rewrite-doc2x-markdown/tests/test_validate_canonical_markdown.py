@@ -355,6 +355,42 @@ def test_rejects_multi_image_figure_without_horizontal_flex_layout(tmp_path: Pat
     assert flex_result.returncode == 0, flex_result.stdout + flex_result.stderr
 
 
+def test_rejects_adjacent_single_image_figures_that_should_merge(tmp_path: Path) -> None:
+    """Two or more single-image figures separated only by blank lines must be
+    merged into one side-by-side figure; emitting each crop as its own figure
+    stacks them vertically. (Regression: 2026-06-23 session.)"""
+    result = run_validator(
+        tmp_path,
+        """# 对偶性质
+
+<figure style="text-align:center;"><img src="doc2x/export/images/a.jpg" alt="对偶性质图1" style="max-width:20%;height:auto;display:block;margin:0 auto;"/></figure>
+
+<figure style="text-align:center;"><img src="doc2x/export/images/b.jpg" alt="对偶性质图2" style="max-width:20%;height:auto;display:block;margin:0 auto;"/></figure>
+
+<figure style="text-align:center;"><img src="doc2x/export/images/c.jpg" alt="对偶性质图3" style="max-width:20%;height:auto;display:block;margin:0 auto;"/></figure>
+
+**证明**
+""",
+    )
+
+    assert result.returncode == 1
+    assert "adjacent single-image figures must be merged" in result.stdout
+
+    # Prose-separated single-image figures are independent and NOT flagged.
+    ok_result = run_validator(
+        tmp_path,
+        """# 独立情形
+
+<figure style="text-align:center;"><img src="doc2x/export/images/a.jpg" alt="情形1" style="max-width:32%;height:auto;display:block;margin:0 auto;"/></figure>
+
+情形 1 的说明文字。
+
+<figure style="text-align:center;"><img src="doc2x/export/images/b.jpg" alt="情形2" style="max-width:32%;height:auto;display:block;margin:0 auto;"/></figure>
+""",
+    )
+    assert ok_result.returncode == 0, ok_result.stdout + ok_result.stderr
+
+
 def test_accepts_choice_grid_with_multiple_single_image_figures_on_one_line(tmp_path: Path) -> None:
     result = run_validator(
         tmp_path,

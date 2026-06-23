@@ -41,22 +41,37 @@ These are builder-enforced output constraints, not soft review suggestions:
 
 ## Rendered Image Width Contract
 
-Post-render check only — it does NOT change the builder's existing mm clamp (34/48/64/72mm). The validator computes each non-exempt image's aspect ratio from `naturalWidth/naturalHeight` and checks its rendered width against a band expressed as a fraction of the `.sheet-body` content width: <!-- evolved 2026-06-23 -->
+Post-render check only — it does NOT change the builder's existing mm clamp (34/48/64/72mm). The validator computes each non-exempt image's aspect ratio from `naturalWidth/naturalHeight` and checks its rendered width against a band expressed as a fraction of the `.sheet-body` content width. <!-- redesigned 2026-06-23 -->
 
-| Class | aspect (w/h) | target | accept band |
-|---|---|---|---|
-| portrait | < 0.9 | 20% | 15–28% |
-| near-square | 0.9–1.1 | 35% | 28–45% |
-| landscape-mild | 1.1–1.5 | 50% | 45–58% |
-| landscape-typical | 1.5–2.5 | 65% | 58–75% |
-| landscape-wide | > 2.5 | 80% | 75–90% |
+The target width is a **smooth function of aspect ratio** (no hard jump at class boundaries), and is **capped by the image's own natural width** so a figure is never enlarged beyond its native pixel resolution (which would blur it). This applies **per image, independently** — including each sibling in a multi-image `<figure>`/cluster. A side-by-side row does NOT justify enlarging each image to fill the row; each image keeps the width it would have alone, and the row wraps (`flex-wrap:wrap`) if the per-image widths total more than 100%. Control points (interpolated linearly between): <!-- evolved 2026-06-23 -->
+
+| aspect (w/h) | target |
+|---|---|
+| ≤ 0.7 | ~20% |
+| 0.9 | ~27% |
+| 1.0 (square) | 30% |
+| 1.2 | 35% |
+| 1.5 | 45% |
+| 2.0 | 58% |
+| 2.5 | 68% |
+| ≥ 3.5 | ~78% |
+
+Each image's effective target = `min(smooth_target(aspect), natural_width_%_of_body)`. The accept band is target ±7 percentage points (with a ±4pp "near-is-exempt" grace on each edge enforced by the validator). Multi-image rows are judged per-sibling (each image against its own band), NOT by aggregate row width. **Oversubscribed rows**: when the siblings' independent widths sum to more than 100% of body width, the group prefers staying on ONE row over wrapping — each sibling is proportionally shrunk to fit (~95% total) and the independent-width rule is EXEMPTED for every sibling in that group (use `flex-wrap:nowrap` on the figure so it cannot wrap). Rationale: near-square figures (ar≈1) read fine at ~30% — pushing them to 50% (or enlarging each row sibling to fill the row) wastes space and enlarges them past native resolution; only genuinely wide figures (ar>1.5) need a wide column. The cap prevents upscaling blurry crops. <!-- evolved 2026-06-23 -->
+
+Examples: ar=1.0 → ~30% (band 23–37%); ar=1.13 → ~33%; ar=1.5 → 45%; ar=2.5 → 68%.
 
 Exempt from this band:
 
 - images inside `.phycat-blockquote` option tables (they keep the readable-minimum gate)
 - marked cover sheets (`.concept-map-sheet`, `[data-sheet-role="cover"]`, `[data-cover-sheet="true"]`)
 
+"Near is exempt" tolerance: the validator applies a small ±4 percentage-point grace on each band edge, so an image off by a few percent (e.g. a multi-image row where each sibling legitimately shares the band) still passes. When two hard contracts conflict, do not fight both to the letter — if one target is essentially met, let it win. <!-- evolved 2026-06-23 -->
+
 A failed image is fixed by editing job-local CSS in `handout.html` (e.g. an inline `style="width:..."` or a job-local `<style>` override), not by rebuilding. Rationale: a tall narrow figure wastes space at wide widths, and a wide figure is illegible when clamped to a narrow column — width should follow form.
+
+### Figure-Boundary Trade-Off vs Trailing-Blank Rule
+
+This width band can conflict with the sheet trailing-blank rule (`validate_sheet_bottom_margin.py`, ≤10% of body). When the first content block on the *next* sheet is a figure whose image satisfies its width band AND that block is too tall to move up into the current sheet's trailing blank (or almost fits — within ~8% of the gap), the trailing blank on the current sheet is the **unavoidable cost of the image-width rule**. The bottom-margin validator exempts such a sheet rather than letting the two hard contracts fight: the rule whose target is met (image width) wins over the rule whose target cannot be met without breaking it (trailing blank). This mirrors the existing blockquote/lecture-break exemptions. <!-- evolved 2026-06-23 -->
 
 ## Rendered Adjacent-Image Side-by-Side Contract
 

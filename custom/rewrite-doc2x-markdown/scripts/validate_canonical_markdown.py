@@ -529,6 +529,83 @@ def lint_multi_image_figures(lines: list[str]) -> list[LintMessage]:
     return messages
 
 
+def lint_adjacent_figures_must_merge(lines: list[str]) -> list[LintMessage]:
+    """Adjacent standalone <figure> blocks (separated only by blank lines) that
+    each contain a single image must be merged into one side-by-side figure.
+
+    Catches the regression where OCR cleanup emits each crop as its own
+    `<figure>...</figure>` (each a single-image figure, so the existing
+    multi-image-in-one-figure lint does not fire), leaving logically-grouped
+    images as a vertical stack. Canonical rule: adjacent images belong in one
+    `display:flex` figure.
+
+    Only flags runs of >=2 single-image figures separated solely by blank
+    lines (no prose between them). A run interrupted by a non-blank,
+    non-figure line is treated as independent figures and not flagged.
+    """
+    messages: list[LintMessage] = []
+    n = len(lines)
+    i = 0
+    # A "single-image figure block" = one `<figure ...>` line (possibly spanning
+    # multiple lines until `</figure>`) that contains exactly one <img ...>.
+    def parse_single_image_figure(start: int):
+        """If lines[start] begins a single-image figure, return (end_index_exclusive, line1_number).
+        Otherwise return None."""
+        line = strip_quote_marker(lines[start]) if is_quote_line(lines[start]) else lines[start]
+        if not HTML_FIGURE_START_PATTERN.search(line):
+            return None
+        # gather the full figure text (may span lines)
+        idx = start
+        buf = [line]
+        # if the figure does not close on this line, walk forward
+        if not HTML_FIGURE_END_PATTERN.search(line):
+            while idx + 1 < n:
+                idx += 1
+                nxt = strip_quote_marker(lines[idx]) if is_quote_line(lines[idx]) else lines[idx]
+                buf.append(nxt)
+                if HTML_FIGURE_END_PATTERN.search(nxt):
+                    break
+        text = "\n".join(buf)
+        img_count = len(HTML_IMAGE_PATTERN.findall(text))
+        if img_count != 1:
+            return None
+        return idx + 1  # exclusive end
+
+    while i < n:
+        result = parse_single_image_figure(i)
+        if result is None:
+            i += 1
+            continue
+        # found a single-image figure at line i (1-based i+1); look ahead for a run
+        run_start_line = i + 1
+        run_count = 1
+        cursor = result
+        while cursor < n:
+            # skip only blank lines between figures
+            j = cursor
+            while j < n and lines[j].strip() == "":
+                j += 1
+            if j >= n or j == cursor:
+                break  # no blank gap or end of file
+            nxt_result = parse_single_image_figure(j)
+            if nxt_result is None:
+                break
+            run_count += 1
+            cursor = nxt_result
+        if run_count >= 2:
+            messages.append(
+                LintMessage(
+                    run_start_line,
+                    f"{run_count} adjacent single-image figures must be merged into one side-by-side figure (display:flex); "
+                    "each crop as its own figure stacks them vertically. Merge `<figure>..</figure>\\n\\n<figure>..</figure>` "
+                    "into one `<figure style=\"display:flex;...\">` with both <img> inside.",
+                )
+            )
+        i = cursor if cursor > i else result
+    return messages
+
+
+
 def lint_formulas(lines: list[str]) -> list[LintMessage]:
     messages: list[LintMessage] = []
     for index, line in enumerate(lines, start=1):
@@ -1056,6 +1133,7 @@ def lint_markdown(
     messages.extend(lint_images(lines))
     messages.extend(lint_image_path(lines))
     messages.extend(lint_multi_image_figures(lines))
+    messages.extend(lint_adjacent_figures_must_merge(lines))
     messages.extend(lint_formulas(lines))
     messages.extend(lint_inline_math_spacing(lines))
     messages.extend(lint_html_math(lines))

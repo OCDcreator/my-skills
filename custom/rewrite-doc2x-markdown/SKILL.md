@@ -334,6 +334,7 @@ You MUST check all items below. Do not skip any. If an item is not applicable, w
 - [ ] **Content preservation**: ALL derivation steps preserved — no summarizing of 法一/法二/法三
 - [ ] **Doc2X primacy**: content scope matches `doc2x/page-transcript.raw.md` — no detail removed
 - [ ] **Noise removal**: no `<!-- doc2x score -->`, `<!-- Meanless -->`, `__________` artifacts, stray page numbers
+- [ ] **Adjacent figures merged**: logically-grouped images (numbered 图1/图2/图3, multi-view of one figure, sub-cases with no prose between them) are merged into ONE `<figure style="display:flex;...">` with all `<img>` inside — never emitted as adjacent single-image `<figure>` blocks separated only by blank lines, which stack vertically. ✅ Automated by `lint_adjacent_figures_must_merge` (Step 4 validator). Prose-separated independent figures are NOT flagged.
 - [ ] **Fraction rules**: ✅ Automated by `lint_fraction_nesting` (Step 4 validator). No bare `\frac`; nested fractions use `\tfrac`; function arguments use `\dfrac`. The validator's brace-depth parser catches both directions.
 - [ ] **Long formulas**: display formulas > 60 chars use `\begin{aligned}` with line breaks
 - [ ] **Horizontal rules**: `---` separators not corrupted to `__________`

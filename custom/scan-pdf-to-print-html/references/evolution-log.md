@@ -181,3 +181,39 @@ written:
   - `scripts/validate_rendered_handout_contract.py`: added 4 CLI flags (--check-image-width-bands/--no-, --check-adjacent-side-by-side/--no-, --disallow-remote-images, --remote-image-allowlist), extended validate() signature, added 3 JS collectors (widthBandViolations, stackedPairs, remoteImageSrcs), added 3 Python checks.
 
 snapshot: SKILL.md.bak-2026-06-23, references/figure-policy.md.bak-2026-06-23, references/review-gate.md.bak-2026-06-23, scripts/validate_rendered_handout_contract.py.bak-2026-06-23
+
+## 2026-06-23 (session 2) — figure width/grouping rule evolution (rescan of ch03-conic-properties)
+
+Provenance note: CAPTURE ran in the main orchestrating context from visible current-session user messages; trace enrichment tagged `(extracted)`. Most scan-side changes were already written inline during the session; this entry records them and the residual analysis.
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C29 | Image width target must be a SMOOTH function of aspect ratio (no hard jump at 1.1), capped by each image's own natural width (no upscaling past native res). Near-square (ar≈1) → ~30%, not 50%. | rework | pass | strengthen (redesigns C26) | principle | **strengthen** (written inline) | second (redesigns same-day C26) |
+| C30 | Multi-image `<figure>`/cluster rows: EACH sibling judged independently against its OWN band (per-image), NOT by aggregate row width. A row does NOT justify enlarging each sibling to fill it. | rework | pass | strengthen | principle | **strengthen** (written inline) | second (refines C26/C27) |
+| C31 | Oversubscribed rows (siblings' independent widths sum >100% of body): prefer staying ONE row over wrapping — proportional shrink to ~95% + `flex-wrap:nowrap` + EXEMPT the independent-width rule for that group. | rework | pass | new | principle | **add_new** (written inline) | first |
+| C32 | C27 side-by-side gate must allow `flex-wrap:wrap` wrapping (multi-row layout) inside flex containers — wrapping to a 2nd row is normal, NOT a "stacked" failure. Only flag `display:block` single-column collapse. | rework | pass | strengthen | principle | **strengthen** (written inline) | second (refines C27) |
+| C33 | Job-local balance hook should split OL/UL candidate blocks by `<li>` when the block is too tall to move whole (extends the existing split logic beyond multi-child divs). | missing | pass | strengthen | principle | **strengthen** (written inline) | first |
+
+Session rework trace (user messages, chronologic):
+1. "为什么感觉这个大小还是过大了...感觉 50 就有点太多了，这个大小在30-35之间比较合适" → C29 redesign (smooth target).
+2. "如果最大宽度比图片宽，那么就按照图片宽度就行了。你来重新设计这个区间宽度" → C29 natural-width cap.
+3. "合并的图的宽度，也是每个图按照各自的分配逻辑来限制宽度，而不是强行弄到和总宽差不多" → C30 per-image independent.
+4. "如果超过100% 还是并成一排，但是可以豁免独立宽度规定" → C31 oversubscription exemption.
+5. "47/49/52/62 页相邻图没并排" + "md 格式错误?" → root cause traced UPSTREAM to rewrite skill (rule existed, no gate) — that fix is recorded in rewrite-doc2x-markdown's evolution-log. On the scan side, C32 was the residual (allow flex-wrap multi-row).
+6. "在这种技能冲突的情况下，可以权衡一下，如果图片宽度差不多，或者底部留白差不多，那就豁免" → reinforced the figure-boundary trade-off exemption (already added earlier this date) + the "near-is-exempt" tolerance on width bands.
+
+Cross-skill note: the split-figure root cause (user messages #5) lived in rewrite-doc2x-markdown, not scan. The scan skill's C27 could not catch it because the images were never grouped. This is the recurring "rule exists, no executable gate" failure mode (cf. C24→C27 on 2026-06-17/23). The rewrite-side gate added this session closes it at the source.
+
+Dev Eval: scan skill validator changes were exercised inline during the session — `validate_rendered_handout_contract.py` 14/14 PASS (`checked=99 violations=0`, `stackedPairs=0`), `validate_sheet_bottom_margin.py` PASS, on the final corrected handout.
+
+Written (inline during session, recorded here):
+- `scripts/validate_rendered_handout_contract.py`: C26 redesigned to smooth-target + natural-width cap; C30 per-sibling check; C31 oversubscription exemption; C32 flex-wrap allowance in C27; `capBand` returns target.
+- `scripts/validate_sheet_bottom_margin.py`: figure-boundary `imgBandOk` simplified to per-image (dropped aggregate), uses same smooth-target + cap.
+- `references/figure-policy.md`: redesigned width contract (smooth control points, per-image, oversubscription exemption, flex-wrap allowance).
+- `SKILL.md`: width-band hard contract rewritten (smooth target, per-image, oversubscription exemption, flex-wrap).
+- job-local `handout.html` (ch03-conic-properties): balance hook enhanced to split OL/UL by `<li>` (C33) — this is a job-local edit, pattern to consider folding into the builder if it recurs.
+
+snapshot: SKILL.md.bak-2026-06-23, references/figure-policy.md.bak-2026-06-23, references/review-gate.md.bak-2026-06-23, scripts/validate_rendered_handout_contract.py.bak-2026-06-23 (created during the earlier same-day run; this session-2 run made further edits on top).
+
+Discarded candidates (this session):
+- "禁止 [!note] '已在上面保留，不重复抄录' 占位符" — Gate 1 borderline (single-document content judgment). User removed the element from this job but did not generalize it into a scan-skill rule. Not written.

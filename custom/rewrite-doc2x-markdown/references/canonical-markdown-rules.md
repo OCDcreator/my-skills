@@ -278,7 +278,7 @@ Use this shape:
 - Add a short figure note when the image role is not obvious.
 - Do not promote tiny incidental crops into primary figures.
 - If image content is required but unclear, write `[TO VERIFY: image detail unclear]`.
-- Adjacent images (separated by one empty line) should be merged into a single side-by-side figure using `display:flex` layout. Pattern: `</figure>` + empty line + `<figure>` → merge into one `<figure>` with `display:flex`.
+- Adjacent images (separated by one empty line, no prose between them) MUST be merged into a single side-by-side figure using `display:flex` layout. Pattern: `</figure>` + empty line + `<figure>` → merge into one `<figure>` with `display:flex`. This is enforced by `lint_adjacent_figures_must_merge` — emitting logically-grouped images (numbered 图1/图2/图3, multi-view sub-figures, sub-cases with no prose between them) as adjacent single-image figures stacks them vertically and is rejected. Independent figures separated by prose are not flagged. <!-- enforced 2026-06-23 -->
 
 Use this shape for standalone images:
 
