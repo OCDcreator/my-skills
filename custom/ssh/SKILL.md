@@ -17,8 +17,9 @@ Connect to and manage all known devices via SSH/SCP from the current workstation
 | **router** | 192.168.31.204 | root | 22 | `ssh root@192.168.31.204` | QWRT, busybox shell |
 | **fnos** | 192.168.31.147 | letian | 22 | `ssh letian@192.168.31.147` | 飞牛 fnOS, Linux |
 | **fa880** | 192.168.31.49 | letain | 22 | `ssh letain@192.168.31.49` | Windows OpenSSH, key-based auth, hostname FA880 |
+| **aliyun-ltreen** | (local ssh config) | root | 22 | `ssh aliyun-ltreen` | 阿里云 ECS, CentOS 7, key-based auth, IP in local ~/.ssh/config |
 
-When the user says "连 Mac", "SSH 到路由器", "Unraid 上执行" etc., resolve to the matching device above. If the target is ambiguous, ask which device.
+When the user says "连 Mac", "SSH 到路由器", "Unraid 上执行", "连阿里云", "连服务器" etc., resolve to the matching device above. If the target is ambiguous, ask which device.
 
 ## Quick decision
 
@@ -97,6 +98,10 @@ $Fa880 = 'letain@192.168.31.49'
 ```
 
 Windows OpenSSH, hostname FA880. Same quirks as the other Windows device: default shell may be cmd.exe or PowerShell depending on configuration.
+
+### 阿里云 ECS (aliyun-ltreen)
+
+CentOS 7, key-based auth. User `root`. Connect via alias: `ssh aliyun-ltreen`. External server on public internet. Actual IP is stored in local `~/.ssh/config` only, not in this repo.
 
 ## Bundled scripts (Mac-specific)
 
@@ -192,6 +197,15 @@ Host windows
   HostName 192.168.31.148
   User lt
   Port 22
+  ServerAliveInterval 30
+  ServerAliveCountMax 4
+
+Host aliyun-ltreen
+  HostName <your-aliyun-ip>
+  User root
+  Port 22
+  IdentityFile ~/.ssh/id_ed25519
+  StrictHostKeyChecking no
   ServerAliveInterval 30
   ServerAliveCountMax 4
 ```
