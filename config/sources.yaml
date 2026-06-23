@@ -140,6 +140,14 @@ skill_sources:
     tier: community
     include_in_main_catalog: true
 
+  - name: reverse-skill
+    repo: https://github.com/zhaoxuya520/reverse-skill.git
+    branch: main
+    subdir: .
+    mode: flatten
+    tier: community
+    include_in_main_catalog: true
+
 reference_sources:
   - name: awesome-design-md
     repo: https://github.com/VoltAgent/awesome-design-md.git
