@@ -957,11 +957,13 @@ LEADING_ANALYSIS_LABEL_HTML_PATTERN = re.compile(
 )
 
 # HTML pattern for leading example/exercise labels. Matches labels such as
-# 例1 / 例题1 / 【例题1】 / 【练习 1】, optional <strong>.
+# 例1 / 例题1 / 【例题】 / 【例题1】 / 【练习】 / 【练习 1】, optional <strong>.
+# Bare `例` is intentionally excluded unless it carries a number, so ordinary
+# prose like "例如" is not mis-decorated as an example badge.
 LEADING_EXAMPLE_LABEL_HTML_PATTERN = re.compile(
     r"\A\s*(?:<strong>\s*)?"
     r"(?:【|\[)?"
-    r"(?P<label>(?:例题|例|练习)\s*[\d一二三四五六七八九十百零]+)"
+    r"(?P<label>(?:(?:例题|练习)(?:\s*[\d一二三四五六七八九十百零]+)?|例\s*[\d一二三四五六七八九十百零]+))"
     r"(?:】|\])?"
     r"(?:\s*</strong>)?"
     r"\s*[：:。\.\s]*"

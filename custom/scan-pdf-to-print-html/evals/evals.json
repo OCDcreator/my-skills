@@ -1,0 +1,36 @@
+{
+  "skill_name": "scan-pdf-to-print-html",
+  "_note": "Lightweight programmatic regression evals. Run via evals/run_programmatic_eval.py (no subagents, no LLM grading). Schema is compatible with skill-creator so fixtures + expectations can be reused by the full eval flow for big-version checkups.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "example-blockquote-coverage",
+      "fixture": "fixtures/examples.md",
+      "expectations": [
+        "pre-build gate (validate_example_blockquote_coverage) reports bare-paragraph example labels",
+        "no example label renders as a bare <p> outside a .phycat-blockquote after build+postprocess",
+        "解析 paragraphs render OUTSIDE blockquotes (analysis is never blockquoted)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "svg-cover-injection",
+      "fixture": "fixtures/chapter-breaks.md",
+      "cover_fixture": "fixtures/with-cover.svg",
+      "expectations": [
+        "first .sheet is a marked cover (.concept-map-sheet + data-sheet-role=cover)",
+        "cover sheet contains an <img> pointing at the injected SVG"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "chapter-h2-pagination",
+      "fixture": "fixtures/chapter-breaks.md",
+      "expectations": [
+        "each chapter h2 (第N章/节) except the first begins a new .sheet",
+        "the sheet before each non-first chapter h2 is marked data-ends-before-lecture=true",
+        "a NON-chapter h2 (e.g. 大招总结) does NOT cause its predecessor to be marked (exemption must not be too broad)"
+      ]
+    }
+  ]
+}

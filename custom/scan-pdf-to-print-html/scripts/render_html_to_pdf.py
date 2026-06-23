@@ -9,6 +9,7 @@ chromium headless to produce deterministic results.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from pathlib import Path
@@ -45,6 +46,120 @@ def _resolve_output_parent(pdf_path: Path) -> None:
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
 
 
+def _load_pdf_bookmarks(page) -> list[dict[str, object]]:
+    payload = page.evaluate(
+        """
+        () => {
+          const root = document.getElementById('handout-print-root');
+          if (!root) return [];
+          try {
+            const raw = root.dataset.pdfBookmarks || '[]';
+            const entries = JSON.parse(raw);
+            return Array.isArray(entries) ? entries : [];
+          } catch (_err) {
+            return [];
+          }
+        }
+        """
+    )
+    entries: list[dict[str, object]] = []
+    for entry in payload or []:
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title", "")).strip()
+        if not title:
+            continue
+        try:
+            page_number = int(entry.get("page", 0))
+        except Exception:
+            continue
+        try:
+            level = int(entry.get("level", 2))
+        except Exception:
+            level = 2
+        entries.append({"title": title, "page": page_number, "level": level})
+    return entries
+
+
+def _dedupe_bookmarks(entries: list[dict[str, object]]) -> list[dict[str, object]]:
+    deduped: list[dict[str, object]] = []
+    seen: set[tuple[str, int, int]] = set()
+    for entry in entries:
+        key = (
+            str(entry["title"]),
+            int(entry["page"]),
+            int(entry["level"]),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(entry)
+    return deduped
+
+
+def _normalize_bookmark_levels(entries: list[dict[str, object]]) -> list[dict[str, object]]:
+    normalized: list[dict[str, object]] = []
+    previous_level = 1
+    for entry in entries:
+        raw_level = max(1, int(entry.get("level", 2)))
+        level = raw_level
+        if level > previous_level + 1:
+            level = previous_level + 1
+        normalized.append(
+            {
+                "title": str(entry["title"]),
+                "page": int(entry["page"]),
+                "level": level,
+            }
+        )
+        previous_level = level
+    return normalized
+
+
+def _apply_pdf_bookmarks(pdf_path: Path, bookmarks: list[dict[str, object]]) -> None:
+    if not bookmarks:
+        return
+    try:
+        import fitz  # noqa: WPS433
+    except ImportError:
+        print("NOTE: PyMuPDF not installed; skipping PDF bookmarks.")
+        return
+
+    doc = fitz.open(pdf_path)
+    toc: list[list[object]] = [[1, "封面", 1]]
+    page_count = doc.page_count
+
+    for entry in _normalize_bookmark_levels(bookmarks):
+        page_number = int(entry["page"])
+        if page_number < 1:
+            continue
+        page_number = min(page_number, page_count)
+        level = max(1, int(entry["level"]))
+        title = str(entry["title"]).strip()
+        if not title:
+            continue
+        toc.append([level, title, page_number])
+
+    doc.set_toc(toc)
+    doc.save(pdf_path, incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+    doc.close()
+
+    check = fitz.open(pdf_path)
+    actual_len = len(check.get_toc())
+    check.close()
+    if actual_len == len(toc):
+        return
+
+    # Fallback: some PDFs do not reliably persist a full TOC via incremental
+    # save. Reopen, reapply, and write a fresh replacement file.
+    retry = fitz.open(pdf_path)
+    retry.set_toc(toc)
+    temp_path = pdf_path.with_name(f"{pdf_path.stem}.bookmarks{pdf_path.suffix}")
+    retry.save(temp_path)
+    retry.close()
+    temp_path.replace(pdf_path)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -60,33 +175,21 @@ def main(argv: list[str] | None = None) -> int:
 
     _resolve_output_parent(pdf_path)
 
-    try:
-        from playwright.sync_api import sync_playwright  # noqa: E402
-    except ImportError as exc:
-        raise SystemExit(
-            f"Playwright is required but not installed. Install with: pip install playwright && playwright install chromium\n"
-            f"Details: {exc}"
-        ) from exc
+    # Ensure sibling modules (handout_browser.py in the same scripts/ dir) are
+    # importable regardless of how this script is launched (direct run,
+    # subprocess, or importlib from tests/).
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from handout_browser import open_handout
 
-    url = html_path.as_uri()
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(
-            viewport={"width": args.viewport_width, "height": args.viewport_height}
-        )
-        page = context.new_page()
-        page.goto(url, wait_until="networkidle")
-
-        # Engine-agnostic math wait — works for MathJax tex-svg and KaTeX.
-        page.wait_for_function(
-            "document.documentElement.dataset.handoutReady === 'true'",
-            timeout=60_000,
-        )
-        page.wait_for_function(
-            "document.fonts && document.fonts.status === 'loaded'",
-            timeout=60_000,
-        )
-        page.wait_for_timeout(args.wait_ms)
+    with open_handout(
+        html_path,
+        viewport=(args.viewport_width, args.viewport_height),
+        strict_ready=True,
+        ready_timeout_ms=60_000,
+        fonts_timeout_ms=60_000,
+        settle_ms=args.wait_ms,
+    ) as (page, _errors):
+        bookmarks = _dedupe_bookmarks(_load_pdf_bookmarks(page))
 
         # Full-page screenshot (optional).
         if screenshot_path:
@@ -134,6 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         if out_path is None:
             raise SystemExit(f"All PDF target names were locked: {last_err}")
 
+        _apply_pdf_bookmarks(out_path, bookmarks)
         print(f"pdf -> {out_path} ({out_path.stat().st_size} bytes)")
         if out_path != pdf_path:
             print(
@@ -141,7 +245,6 @@ def main(argv: list[str] | None = None) -> int:
                 f"the canonical path ({pdf_path.name})."
             )
 
-        browser.close()
     return 0
 
 

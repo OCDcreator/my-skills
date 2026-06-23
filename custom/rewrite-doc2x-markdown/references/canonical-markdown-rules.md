@@ -59,6 +59,7 @@ Hard rules:
 - Prefix every line inside the callout with `>`, including blank spacer lines.
 - Do not leave a naked blank line inside the callout.
 - **Callout must end with a blank line (no `>`)** before `**解析**` or the next content. If the callout ending is directly followed by `**解析**` without an empty line, Obsidian will render `**解析**` inside the callout.
+- **Every example/exercise labeled paragraph must live inside a callout (blockquote).** A line beginning with `例题N` / `练习N` (with optional `**bold**`, `【】`/`[]` brackets, or Chinese numerals) is an example label. If such a label is NOT on a `>` line, the downstream print builder renders it as a plain paragraph with no `.phycat-blockquote` styling — this is the root cause of "examples have no quote block" defects. The label, the stem, and any sub-questions/choices all belong in the same callout. The analysis (`**解析**`) that follows must stay OUT of the callout per the analysis rule below — only the question side is blockquoted. This extends the existing choice-callout rule from choice questions to ALL examples and exercises. <!-- evolved 2026-06-23 -->
 
 ### Choice Format
 

@@ -74,27 +74,19 @@ def validate(
     skip_cover: bool,
     skip_last: bool,
 ) -> int:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise SystemExit(f"Playwright required: {exc}")
+    # Ensure sibling modules (handout_browser.py in the same scripts/ dir) are
+    # importable regardless of how this script is launched.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from handout_browser import open_handout
 
-    url = html_path.as_uri()
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        context = browser.new_context(viewport={"width": 794, "height": 1123})
-        page = context.new_page()
-        page.goto(url, wait_until="networkidle")
-        page.wait_for_function(
-            "document.documentElement.dataset.handoutReady === 'true'",
-            timeout=60_000,
-        )
-        page.wait_for_function(
-            "document.fonts && document.fonts.status === 'loaded'",
-            timeout=60_000,
-        )
-        page.wait_for_timeout(400)
-
+    with open_handout(
+        html_path,
+        viewport=(794, 1123),
+        strict_ready=True,
+        ready_timeout_ms=60_000,
+        fonts_timeout_ms=60_000,
+        settle_ms=400,
+    ) as (page, _errors):
         results = page.evaluate(
             """
             ({ maxFraction, skipCover, skipLast }) => {
@@ -183,6 +175,33 @@ def validate(
                     return null;
                 }
 
+                // The builder wraps each block in a <div class="flow-block">, so a
+                // chapter <h2> sits INSIDE the flow-block, not as a direct sheet-body
+                // child. firstContentChild returns the wrapper; this helper looks one
+                // level inside it for an h2 and returns the h2 element (or null).
+                function firstContentH2(el) {
+                    if (!el) return null;
+                    if (el.tagName === 'H2') return el;
+                    if (el.tagName === 'DIV') {
+                        return el.querySelector(':scope > h2');
+                    }
+                    return null;
+                }
+
+                // A chapter-shaped heading text. MUST stay in sync with
+                // postprocess_handout_for_contract.py's isLectureHeading +
+                // isChapterBreakHeading. Only chapter-shaped h2 (第N章/节/讲/篇/单元/
+                // 部分, 单元N, N.中文, Module/Lesson/Chapter N) forces a fresh sheet;
+                // a generic exposition h2 like "大招 2" or "补充说明" does NOT — that
+                // would let any tall block escape the trailing-blank check.
+                // NOTE: no \b — \b is an ASCII word boundary that fails after a CJK
+                // character (e.g. "第三章" ends with a CJK char, \b never fires there).
+                function isChapterShapedText(text) {
+                    var t = (text || '').trim();
+                    if (/^第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)(?:\\s|$|[：:．、。])/.test(t)) return true;
+                    return /^(?:第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)|单元\\s*[0-9一二三四五六七八九十百零]+|[0-9]+\\s*[\\.、]\\s*[\\u4e00-\\u9fff]|(?:Module|Lesson|Chapter)\\s+\\d)/.test(t);
+                }
+
                 function lastContentBottom(body) {
                     const children = Array.from(body.children).filter(
                         el => !el.classList.contains('doc-title')
@@ -217,13 +236,15 @@ def validate(
                     const nextFirstChild = nextBody ? firstContentChild(nextBody) : null;
                     const nextStartsWithBlockquote = isBlockquote(nextFirstChild);
                     const endsBeforeLecture = sheet.dataset.endsBeforeLecture === 'true';
+                    const nextChapterH2 = firstContentH2(nextFirstChild);
+                    const nextStartsWithChapterH2 = !!(nextChapterH2 && isChapterShapedText(nextChapterH2.textContent));
 
                     const trailing = bodyRect.bottom - lastContentBottom(body);
                     const fraction = trailing / bodyHeight;
                     const pageNumber = sheet.dataset.pageNumber || String(index + 1);
 
                     const figureBoundary = nextStartsFigureBoundary(nextBody, bodyRect.width, trailing);
-                    const exempt = nextStartsWithBlockquote || endsBeforeLecture || figureBoundary;
+                    const exempt = nextStartsWithBlockquote || endsBeforeLecture || figureBoundary || nextStartsWithChapterH2;
 
                     measurements.push({
                         pageNumber,
@@ -233,6 +254,7 @@ def validate(
                         nextStartsWithBlockquote,
                         endsBeforeLecture,
                         figureBoundary,
+                        nextStartsWithChapterH2,
                     });
 
                     if (!exempt && fraction > maxFraction) {
@@ -255,8 +277,6 @@ def validate(
             },
         )
 
-        browser.close()
-
     print(f"Sheets inspected: {results['sheetCount']}")
     for m in results["measurements"]:
         exempt_reasons = []
@@ -266,6 +286,8 @@ def validate(
             exempt_reasons.append("forced lecture break")
         if m.get("figureBoundary"):
             exempt_reasons.append("next sheet starts with band-compliant figure")
+        if m.get("nextStartsWithChapterH2"):
+            exempt_reasons.append("next sheet starts with chapter h2")
         exempt_note = f" [exempt: {', '.join(exempt_reasons)}]" if exempt_reasons else ""
         print(
             f"  Sheet {m['pageNumber']}: trailing {m['trailingPx']}px / "

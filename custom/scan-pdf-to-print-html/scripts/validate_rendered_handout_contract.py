@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -111,10 +112,10 @@ def validate(
     disallow_remote_images: bool,
     remote_image_allowlist: list[str],
 ) -> int:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:
-        raise SystemExit(f"Playwright required: {exc}")
+    # Ensure sibling modules (handout_browser.py in the same scripts/ dir) are
+    # importable regardless of how this script is launched.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from handout_browser import open_handout
 
     html_path = html_path.expanduser().resolve()
     if not html_path.exists():
@@ -122,29 +123,15 @@ def validate(
 
     errors: list[str] = []
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1440, "height": 1123})
-        page.on("pageerror", lambda exc: errors.append(str(exc)))
-        page.on(
-            "console",
-            lambda msg: errors.append(f"[{msg.type}] {msg.text}") if msg.type == "error" else None,
-        )
-        page.goto(html_path.as_uri(), wait_until="networkidle")
-        page.wait_for_function(
-            """
-            () => !document.documentElement.dataset.handoutReady ||
-                  document.documentElement.dataset.handoutReady === 'true'
-            """,
-            timeout=120_000,
-        )
-        page.wait_for_function(
-            "() => !document.fonts || document.fonts.status === 'loaded'",
-            timeout=120_000,
-        )
-        if wait_ms > 0:
-            page.wait_for_timeout(wait_ms)
-
+    with open_handout(
+        html_path,
+        viewport=(1440, 1123),
+        collect_errors=True,
+        strict_ready=False,
+        ready_timeout_ms=120_000,
+        fonts_timeout_ms=120_000,
+        settle_ms=wait_ms,
+    ) as (page, errors):
         result = page.evaluate(
             """
             ({
@@ -608,7 +595,6 @@ def validate(
                 "remoteAllowlist": remote_image_allowlist,
             },
         )
-        browser.close()
 
     checks: list[tuple[str, bool, str]] = []
 

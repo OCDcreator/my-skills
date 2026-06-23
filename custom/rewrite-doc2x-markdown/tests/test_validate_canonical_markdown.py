@@ -1003,6 +1003,10 @@ def test_consecutive_questions_no_analysis_flagged(tmp_path: Path) -> None:
 
 > [!question] 第二题
 > 题干内容
+
+**解析**
+
+统一放到后面讲，这是错误结构。
 """,
     )
     assert result.returncode == 1
@@ -1021,6 +1025,39 @@ def test_question_with_analysis_ok(tmp_path: Path) -> None:
 
 > [!question] 第二题
 > 题干内容
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_rejects_bare_example_stem_outside_question_callout(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 圆锥曲线
+
+【例题 1】已知椭圆 $C : \\dfrac{x^2}{4} + \\dfrac{y^2}{3} = 1$。
+
+(1) 求方程；
+
+(2) 证明直线过定点。
+""",
+    )
+    assert result.returncode == 1
+    assert "example/exercise stem must be wrapped in a `> [!question]` callout" in result.stdout
+
+
+def test_allows_consecutive_question_callouts_when_interstitial_content_exists(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 圆锥曲线
+
+> [!question] 例题 1
+> 已知点 $A$ 在曲线上。
+
+提示：本题解析见后文一题多解部分。
+
+> [!question] 例题 2
+> 已知点 $B$ 在曲线上。
 """,
     )
     assert result.returncode == 0, result.stdout + result.stderr

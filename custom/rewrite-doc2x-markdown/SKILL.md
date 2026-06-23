@@ -198,6 +198,15 @@ rg -c '\\begin\{cases\}' source-transcript.md
 # Check 6: Every 例/例题 has a callout (structural rule)
 rg -c '> \[!question\]' source-transcript.md
 # Should match the number of examples in the document.
+
+# Check 7: No example/exercise label sits OUTSIDE a callout (the downstream
+# "examples have no quote block" defect). Run the validator's dedicated lint
+# rather than a manual rg, because it correctly scopes to question callouts.
+py -3 scripts/validate_canonical_markdown.py --md source-transcript.md
+# A non-zero exit with "example/exercise stem must be wrapped in a `> [!question]`
+# callout" means a 例题N/练习N paragraph is a bare paragraph. Fix by wrapping
+# it (and its stem/options) in a `> [!question]` callout. Note: analysis
+# (解析) paragraphs must stay OUT of callouts — only the question side is wrapped.
 ```
 
 If any check fails, fix the issue and re-run the check before proceeding.

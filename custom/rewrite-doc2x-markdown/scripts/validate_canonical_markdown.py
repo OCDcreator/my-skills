@@ -103,6 +103,9 @@ DISPLAY_MATH_PATTERN = re.compile(r"(?<!\$)\$\$(.+?)\$\$(?!\$)", re.DOTALL)
 CALLOUT_TYPE_PATTERN = re.compile(r"^\s*>\s*\[!([^\]]+)\]", re.IGNORECASE)
 QA_ANALYSIS_LINE_PATTERN = re.compile(r"\*\*(?:解析|解答|解|证明|分析)\*\*")
 QA_SUBPART_PATTERN = re.compile(r"^\s*[(（]\s*(?:\d+|[IVXivx]+)\s*[)）]")
+BARE_QUESTION_START_PATTERN = re.compile(
+    r"^\s*(?:【\s*)?(?:例题|练习)(?:\s*[0-9一二三四五六七八九十百零]+)?(?:\s*[】)])?(?:\s+\S|[（(])"
+)
 
 
 @dataclass(frozen=True)
@@ -378,6 +381,30 @@ def lint_choice_options(lines: list[str], blocks: list[QuoteBlock]) -> list[Lint
             messages.append(LintMessage(index, "choice option must stay inside a question callout"))
         elif VERTICAL_CHOICE_OPTION_PATTERN.match(content):
             messages.append(LintMessage(index, "choice options must use a horizontal HTML choice grid"))
+    return messages
+
+
+def lint_bare_question_starts(lines: list[str], blocks: list[QuoteBlock]) -> list[LintMessage]:
+    messages: list[LintMessage] = []
+    question_callout_line_numbers = {
+        line_no
+        for block in blocks
+        if _is_question_callout(block)
+        for line_no in range(block.start_line, block.end_line + 1)
+    }
+    for index, line in enumerate(lines, start=1):
+        if index in question_callout_line_numbers:
+            continue
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", ">")):
+            continue
+        if BARE_QUESTION_START_PATTERN.match(stripped):
+            messages.append(
+                LintMessage(
+                    index,
+                    "example/exercise stem must be wrapped in a `> [!question]` callout",
+                )
+            )
     return messages
 
 
@@ -960,6 +987,7 @@ def lint_qa_ordering(lines: list[str], blocks: list[QuoteBlock]) -> list[LintMes
         if QA_SUBPART_PATTERN.match(_first_content_line_of_block(q2)):
             continue
         has_analysis = False
+        has_interstitial_content = False
         for line_idx in range(q1.end_line, q2.start_line - 1):
             if 0 <= line_idx < len(lines):
                 raw = lines[line_idx]
@@ -967,7 +995,25 @@ def lint_qa_ordering(lines: list[str], blocks: list[QuoteBlock]) -> list[LintMes
                 if QA_ANALYSIS_LINE_PATTERN.search(content) or HTML_ANALYSIS_BLOCK_PATTERN.search(content):
                     has_analysis = True
                     break
-        if not has_analysis:
+                if content.strip():
+                    has_interstitial_content = True
+        if has_analysis or has_interstitial_content:
+            continue
+
+        later_analysis_before_heading = False
+        for line_idx in range(q2.end_line, len(lines)):
+            raw = lines[line_idx]
+            content = strip_quote_marker(raw) if is_quote_line(raw) else raw
+            stripped = content.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("#"):
+                break
+            if QA_ANALYSIS_LINE_PATTERN.search(content) or HTML_ANALYSIS_BLOCK_PATTERN.search(content):
+                later_analysis_before_heading = True
+                break
+
+        if later_analysis_before_heading:
             messages.append(
                 LintMessage(
                     q1.start_line,
@@ -1149,6 +1195,7 @@ def lint_markdown(
         )
     )
     messages.extend(lint_choice_options(lines, blocks))
+    messages.extend(lint_bare_question_starts(lines, blocks))
     messages.extend(lint_fraction_nesting(lines))
     messages.extend(lint_qa_ordering(lines, blocks))
     return sorted(messages, key=lambda message: message.line)

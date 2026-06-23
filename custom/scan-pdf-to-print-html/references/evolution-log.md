@@ -217,3 +217,152 @@ snapshot: SKILL.md.bak-2026-06-23, references/figure-policy.md.bak-2026-06-23, r
 
 Discarded candidates (this session):
 - "禁止 [!note] '已在上面保留，不重复抄录' 占位符" — Gate 1 borderline (single-document content judgment). User removed the element from this job but did not generalize it into a scan-skill rule. Not written.
+
+## 2026-06-23 (session 3: dormant-postprocess activation)
+
+**Session trigger:** User reported three defects when using the scan skill: (1) example blocks had no quote styling (`.phycat-blockquote`), (2) a root-level SVG was not used as the homepage cover, (3) chapter `##` headings (except the first) did not start on a fresh sheet and the previous page's blank space was not exempted. User asked why "using the skill" did not enforce these, and requested strengthening the skill.
+
+**Root cause (the unifying finding):** All three capabilities already EXISTED in code — `postprocess_handout_for_contract.py` implemented `ensureExampleQuote()`/`mergeExampleRuns()` (example wrap), `inject_cover_metadata()`/`injectConceptCover()` (SVG cover), and `paginateHandout()` (forced pagination). But SKILL.md's Markdown-Source Mode workflow (8 steps) NEVER listed postprocess as a step, and the Files section did not register the script. So a model following the workflow ran `build_faithful_handout_html.py` and stopped — silently skipping every dormant capability. This is the same "rule exists, no executable gate / dormant code" failure mode as C24/C27 (figure grouping) traced earlier this date.
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C34 | Add postprocess as mandatory Markdown-Source step 3 | missing | pass | new (grep: postprocess not in workflow steps) | principle | **add_new** | first (same dormant-code class as C24/C27) |
+| C35 | Register postprocess + new gate in Files section | missing | pass | strengthen | principle | **strengthen** | first |
+| C36 | Widen `isLectureHeading` + add `isChapterBreakHeading` for chapter h2 pagination | rework | pass | strengthen (lecture-break framework existed, too narrow) | principle | **strengthen** | first |
+| C37 | Exempt trailing-blank when next sheet starts with chapter h2 | rework | pass | strengthen (extends existing 3 exemptions) | principle | **strengthen** | first |
+| C38 | New `validate_example_blockquote_coverage.py` pre-build gate | missing | pass | new | principle | **add_new** | first |
+
+Session rework trace (user messages, chronologic):
+1. "生成的HTML的例题却没有引用块，还有就是...没有使用 svg...二级标题（除了第一个外）应该从新的一页开始，而且他的上一页能够豁免空白" → three defects, traced to dormant postprocess (C34/C35) + narrow pagination (C36/C37) + missing pre-build gate (C38).
+2. User decisions (via AskUserQuestion): pagination-priority + blank-exempt (C36/C37 direction); scan adds front gate AND upstream rewrite strengthened (C38 + rewrite side); SVG defaults to auto-use as cover (no code needed — inject_cover_metadata already keys on `concept-map.svg` fixed name, which user confirmed is always the cover's name).
+
+**Written this session:**
+- `scan-pdf-to-print-html/SKILL.md`: added step 2b (`validate_example_blockquote_coverage.py`), step 3 (mandatory postprocess — the core root-cause fix), renumbered 3→4...8→9; Files section now registers `postprocess_handout_for_contract.py` and `validate_example_blockquote_coverage.py`; step 6 exemption list adds chapter-h2.
+- `scan-pdf-to-print-html/scripts/postprocess_handout_for_contract.py`: `isLectureHeading` regex widened (章/节/篇/单元/部分); new `isChapterBreakHeading()` (单元N, numeric outline, Module/Lesson/Chapter); pagination branch now triggers on `isLectureHeading || (h2 && isChapterBreakHeading)`.
+- `scan-pdf-to-print-html/scripts/validate_sheet_bottom_margin.py`: new `nextStartsWithChapterH2` exemption (4th exemption, OR-joined with blockquote/lecture/figure).
+- `scan-pdf-to-print-html/scripts/validate_example_blockquote_coverage.py`: NEW pre-build gate (line-by-line in_quote state machine, 例题/练习 + mandatory number regex, excludes 例如/举例).
+- `rewrite-doc2x-markdown/references/canonical-markdown-rules.md`: new Hard rule (example/exercise labels must live in a callout; analysis stays out).
+- `rewrite-doc2x-markdown/SKILL.md`: new Check 7 (run validator's `lint_bare_question_starts`).
+
+**Concurrency event (IMPORTANT):** During this session, another process/session modified `rewrite-doc2x-markdown/scripts/validate_canonical_markdown.py` concurrently, adding `BARE_QUESTION_START_PATTERN` + `lint_bare_question_starts` + `lint_qa_ordering` interstitial-content guard. This is functionally the same lint I planned to add (4c). The concurrent implementation is sound (syntactically valid, functional, correctly scoped to `[!question]` callouts, has heading/quote guards) and was verified by running it against a fixture. I accepted it rather than adding a duplicate. Minor known edge: a bare `例题N 的解析` paragraph (analysis that happens to start with the example label) gets flagged as a missing callout wrap — acceptable in practice (analyses normally start with 解析：). User was informed.
+
+**Snapshots (behavior-changing writes):**
+- `scan-pdf-to-print-html/SKILL.md.bak-2026-06-23-2`
+- `scan-pdf-to-print-html/scripts/postprocess_handout_for_contract.py.bak-2026-06-23`
+- `scan-pdf-to-print-html/scripts/validate_sheet_bottom_margin.py.bak-2026-06-23`
+- `rewrite-doc2x-markdown/SKILL.md.bak-2026-06-23-2`
+- `rewrite-doc2x-markdown/references/canonical-markdown-rules.md.bak-2026-06-23-2`
+- `rewrite-doc2x-markdown/scripts/validate_canonical_markdown.py.bak-2026-06-23-2` (pre-concurrent-change snapshot; the concurrent process's edits landed on top of the live file, not on this snapshot)
+
+**Verification Ceiling note:** This session reduced the trust surface by converting three dormant capabilities into explicit workflow commands (step 2b, step 3) plus a pre-build gate (C38) plus a widened validator (C37). It does NOT eliminate model self-discipline dependence — if a model skips step 3 entirely, the defects recur. Dev Eval below checks non-regression only, not behavior.
+
+**Dev Eval (non-regression, run after writes):**
+- `validate_sheet_bottom_margin.py` on existing `product/2026-06-19-mst-ch04-multi-select-methods/handout.html`: caught a **bug in this session's own edit** during Dev Eval — the initial `nextFirstChild.tagName === 'H2'` check never fired because the builder wraps every block in a `<div class="flow-block">`, so the chapter `<h2>` sits inside the wrapper, not as a direct sheet-body child. Fixed by adding `firstContentChildIsH2()` helper that looks one level inside the flow-block. After the fix: Sheet 19 (94.8% blank, next=第二节 h2) and Sheet 31 (39.6%, next=第三节 h2) correctly exempted; Sheet 39 (19.5%, next=解法 continuation, not a chapter) correctly stays a violation. This is exactly the user-requested "chapter h2 → exempt previous page's blank" behavior. Pre-existing violations (Sheet 39 image-width) unchanged.
+- `validate_rendered_handout_contract.py`: no new violation categories introduced (stackedPairs=0, remoteImageSrcs=[]); one pre-existing image-width-band finding on this job, unrelated to this session's changes.
+- Node `--check` + functional test of the widened `isLectureHeading`/`isChapterBreakHeading` regexes: 14/14 cases pass, including the regression guard `第3讲 → true` (original behavior preserved) and all new shapes (第N章/节/篇/单元, 单元N, N.中文, Module/Lesson/Chapter N). Caught and fixed a CJK `\b` boundary bug: the original `/^第…讲\b/` silently failed on `第3讲` because `\b` does not fire after a CJK character — replaced with a delimiter/`$` group.
+
+**This session's Dev Eval caught two real bugs in this session's own edits** (the `\b` CJK regression in postprocess, and the flow-block-wrapper gap in the validator) — strong evidence that the write-then-verify discipline works, even though the verification is lint-level not behavior-level.
+
+## 2026-06-23 (session 4: lightweight regression evals)
+
+**Session trigger:** User noted the skill has a high bug rate and asked for evals. Also noted a recurring pain: "重复造轮子" — many tools the model can't just reuse, it has to build its own, wasting tokens and time. Decision: build evals first (the high-bug-rate defense), defer the wheel-reinvention problem to be data-driven by eval results later.
+
+**Reference consulted:** skill-creator (`external/anthropics-skills/skill-creator/SKILL.md`) — its core thesis is "draft → run test cases → review → improve", and "if all 3 test cases independently wrote the same helper, bundle it as a script". This session applied the *run-test-cases* half (programmatic, no subagents) and deferred the *subagent-benchmark* half to big-version checkups. Chose lightweight programmatic eval over skill-creator's full flow to avoid the token/time cost the user flagged — the full flow spawns multiple claude processes per iteration.
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C39 | Add lightweight regression evals for the 3 high-bug areas | missing | pass | new | principle | **add_new** | first |
+
+**Why this isn't overfit (Gate 1 pass):** the 3 evals cover the 3 capability areas that produced this session's defects (example blockquote, SVG cover, chapter pagination) — but they generalize: any future edit to postprocess/build/validate logic in those areas trips them. The fixtures are static and minimal; the contracts asserted (no bare example `<p>`, cover sheet marking, chapter pagination) are the skill's permanent output contracts, not single-document quirks.
+
+**Written this session (all NEW files, no existing script modified — avoids conflict with concurrent codex edits):**
+- `evals/evals.json` — 3 eval cases, schema-compatible with skill-creator (`skill_name`, `evals[].id/name/fixture/expectations`).
+- `evals/fixtures/examples.md` — choice example + proof example + deliberately-bare example (tests both postprocess auto-wrap AND the pre-build gate).
+- `evals/fixtures/chapter-breaks.md` — three 第N章 chapters with enough body to each fill content.
+- `evals/fixtures/with-cover.svg` — minimal 210×297 viewBox SVG (named concept-map.svg at runtime to trigger inject_cover_metadata).
+- `evals/run_programmatic_eval.py` — runner: per eval, copy fixture to temp job dir → build → postprocess → Playwright DOM assertions. No subagents, no LLM grading. Exit code = failed assertion count.
+- `SKILL.md` — new `## Regression Evals` section (when to run, how to run, coverage, relationship to skill-creator full flow, verification ceiling).
+
+**Dev Eval (the eval validating itself — ran the suite 3 times during dev):**
+- First run: eval 1 passed but with a flawed assertion ("wraps all N labels" used `>= label_count` where label_count was undercounted because the source regex missed callout-title labels). The `>=` mask hid it. Caught only when I broadened the count regex and got 4 labels vs 3 blockquotes → false FAIL.
+- Root cause: "label count" ≠ "example count" (one example references its own label mid-prose), and `mergeExampleRuns` can combine adjacent examples. The count-match contract was wrong.
+- Fix: rewrote the assertion to the *real* contract — "zero bare example `<p>` OUTSIDE any `.phycat-blockquote` ancestor". This is postprocess's actual job. After fix: 7/7 PASS, exit 0.
+- eval 2 initial bug: dispatch passed 3 args to a 2-arg function (signature parity miss). Fixed by making `assert_cover_injection` accept `fixture_md` (unused, for parity).
+- Final full run: 7/7 PASS, exit 0. Evidence per assertion prints concrete DOM state (blockquote counts, cover class/role, chapter-h2 sheet mapping).
+
+**Concurrency note:** codex is editing this skill in parallel (SKILL.md, postprocess_handout_for_contract.py changed mid-session). The eval runner only INVOKES existing scripts via subprocess (never imports/edits them), so it is robust to codex's refactors — and if codex breaks cover injection or pagination, this eval goes red immediately. That is precisely the eval's value.
+
+**Verification ceiling:** the eval catches code-logic regressions (regex too narrow, exemption missing, cover injection broken, pagination off). It does NOT catch model-behavior regressions (model skips step 3). The user's "high bug rate" pain is mostly code-logic regressions (silent, hidden behind apparently-correct markdown rules), so this directly targets it.
+
+**Deferred (the "重复造轮子" pain):** not addressed this session per user decision ("暂不处理，先看 evals 数据"). Once evals accumulate failure patterns, the data will show which validate scripts overlap and could merge — that's the evidence-driven path to reducing script proliferation, rather than guessing now.
+
+**No snapshot needed this session:** all writes were NEW files (evals/*) plus a NEW section appended to SKILL.md. No existing behavioral reference file was modified, so no `.bak` required. (SKILL.md was already snapshotted earlier today as bak-2026-06-23-2; codex's concurrent edits landed on the live file.)
+
+## 2026-06-23 (session 5: post-codex regression caught + eval negative case)
+
+**Session trigger:** Codex finished its parallel work on this skill. Ran the new programmatic evals (session 4) to verify codex's changes didn't break the three contracts — evals passed 7/7. Then ran the project's existing pytest suite (`tests/`) for a full regression check across both agents' merged changes. pytest caught 1 failure that evals missed.
+
+**The regression (real, introduced by session 3's C37):**
+- `tests/test_validate_sheet_bottom_margin.py::test_bottom_margin_rejects_same_blank_without_lecture_marker` FAILED.
+- The test fixture has sheet 3's first content as `<h2>大招 2</h2>` (a NON-chapter-shaped h2) and sheet 2 with NO `data-ends-before-lecture` marker. The test expects the validator to REJECT sheet 2's blank (returncode 1).
+- Session 3's C37 added `nextStartsWithChapterH2` exemption via `firstContentChildIsH2(nextFirstChild)`, which returned true for ANY h2 — including "大招 2". So the exemption fired incorrectly and the validator returned 0 (PASS) instead of 1 (FAIL).
+- Root cause: the exemption was too broad. User's actual requirement (session 3 AskUserQuestion) was "二级标题（除第一个外）应该从新的一页开始" for CHAPTER headings, not arbitrary h2. A generic exposition h2 like "大招总结" or "补充说明" must NOT escape the trailing-blank check.
+
+**Why evals missed it but pytest caught it (the two-layer defense working as designed):**
+- Session 4's eval 3 only had POSITIVE assertions (chapter h2 → marked). It never tested the NEGATIVE case (non-chapter h2 → NOT marked). So the over-broad exemption looked correct to evals.
+- pytest's unit test specifically constructed the "大招 2" edge case — exactly the kind of targeted unit-level boundary that end-to-end evals under-test.
+- This is the complementary value of BOTH layers: evals catch end-to-end contract breaks (did the whole pipeline produce a cover? did examples get wrapped?), pytest catches narrow logic-precision regressions (does this specific input produce this specific boolean?).
+
+**Fix (this session):**
+- `validate_sheet_bottom_margin.py`: replaced `firstContentChildIsH2` (returns bool for any h2) with `firstContentH2` (returns the h2 element) + `isChapterShapedText` (text check, regex synced with postprocess's `isLectureHeading`+`isChapterBreakHeading`, no `\b` — CJK boundary bug from session 3). Exemption now requires the next sheet's first h2 to be chapter-SHAPED, not just any h2. Snapshot: `validate_sheet_bottom_margin.py.bak-2026-06-23-3`.
+- `evals/fixtures/chapter-breaks.md`: added a non-chapter `## 大招总结` section.
+- `evals/run_programmatic_eval.py` + `evals/evals.json`: added Assertion C (NEGATIVE) to eval 3 — verifies a non-chapter h2 does NOT cause a false `ends-before-lecture` mark on its predecessor. This closes the eval gap so a future re-widening of the exemption is caught by evals too, not only pytest.
+
+**Verification (both layers green after fix):**
+- pytest: 102 passed (was 101 passed / 1 failed before fix).
+- evals: 8/8 PASS (was 7/7; added the negative assertion).
+
+**Lesson (folds back into the skill-evolution Quick Gate as a recurring class):** positive-only test coverage is a known blind spot — "does the thing work when it should" is tested, "does the thing NOT fire when it shouldn't" is not. Session 4's eval design repeated this mistake. The fix (add the negative case) is general: every exemption/trigger rule needs both a positive fixture (triggers correctly) and a negative fixture (does not trigger on near-miss input). This applies to the other two evals too, but they were less exposed because their contracts are "no bare X" (already negative-shaped). Eval 3's "chapter h2 → exempt" was positive-shaped, hence the gap.
+
+**Concurrency:** codex's changes to SKILL.md, postprocess, render_html_to_pdf, working-contract, and rewrite references all merged cleanly with session 3-4 edits. No conflict. The evals (which only subprocess-invoke scripts) verified codex's refactors preserved the three contracts. This is exactly the "guard other agents' changes while you're away" value proposition of the eval suite.
+
+## 2026-06-23 (session 6: fixing the first reusable wheel — playwright context)
+
+**Session trigger:** User asked "what wheels are worth fixing" — repeating tools that future work could reuse instead of rebuilding. Decision: act now, fix one wheel. This session fixed wheel #2 (Playwright handout-rendering context), the most clearly duplicated of the three candidates.
+
+**Why this wheel first (data-driven, from session 5 inventory):**
+- 3 scripts each copy-pasted the launch+wait sequence: `render_html_to_pdf.py`, `validate_rendered_handout_contract.py`, `validate_sheet_bottom_margin.py`.
+- The copies had drifted: viewport 794×1123 vs 1440×1123 vs configurable; handoutReady wait strict (`=== 'true'`) vs lenient (`!dataset || === 'true'`); timeout 60s vs 120s; one listens to console errors, others don't.
+- Session 5's bugs (CJK `\b`, flow-block wrapper gap) were spread across these copies — a fix in one didn't propagate. This is the textbook "duplicate code drifts" cost.
+
+**The wheel (NEW file):** `scripts/handout_browser.py` — a single `open_handout()` context manager that parameterizes every drift axis (viewport, collect_errors, strict_ready, timeouts, settle_ms) and yields `(page, errors)` inside a `with` block that auto-closes the browser. Importable AND directly runnable as a smoke test (`python3 handout_browser.py handout.html`).
+
+**Refactor (3 scripts now call the wheel instead of inlining):**
+- `validate_sheet_bottom_margin.py`: 26 lines of launch+wait → 1 `open_handout(...)` call. Bonus: fixed a `SyntaxWarning` (invalid `\s` escape in the JS string I added in session 5's C37 — `\s` → `\\s` so Python emits `\s` for JS; behavior unchanged, warning gone, future-proof).
+- `validate_rendered_handout_contract.py`: 33 lines → 1 call. Output diff against the pre-refactor snapshot = **identical** (byte-for-byte), exit code identical (1 on the test handout's pre-existing image-width violation).
+- `render_html_to_pdf.py`: 18 lines + redundant import-check block → 1 call. Verified by generating a real 6.5MB PDF + 7.7MB screenshot.
+
+**The import-path gotcha (caught by pytest, fixed inline):**
+- After the refactor, `tests/test_render_html_to_pdf.py::test_playwright_render_skips_when_browser_not_available` FAILED with `ModuleNotFoundError: No module named 'handout_browser'`.
+- Root cause: the test loads the script via `importlib.util.spec_from_file_location`, which does NOT add the script's directory to `sys.path`. So `from handout_browser import open_handout` inside the script couldn't find its sibling.
+- Fix: each refactored script now does `sys.path.insert(0, str(Path(__file__).resolve().parent))` before the import. Standard Python pattern for "script imports a sibling module" — works regardless of launch method (direct run, subprocess, importlib). After fix: 102 passed.
+
+**Verification (both layers green):**
+- evals: 8/8 ALL EVALS PASS (the 3 contracts still hold after refactor).
+- pytest: 102 passed (was 101+1 fail before the import-path fix; the fail was the refactor's own integration bug, caught and fixed in-session).
+
+**Two layers catching different things, again:**
+- evals verified the end-to-end contracts survived (cover still injected, examples still wrapped, chapters still paginate).
+- pytest caught the integration-level regression (import path) that evals couldn't — evals runs scripts via subprocess (which DOES set cwd/sys.path implicitly), so it never hit the importlib path issue. This is exactly the complementary coverage pattern from session 5.
+
+**Why this matters for the user's "重复造轮子" pain:**
+- Before: any new "check the rendered HTML" script would copy-paste ~25 lines of launch+wait, inevitably drift, and spread bugs.
+- After: a new script writes `with open_handout(html) as (page, errors): ...` — one line, consistent behavior, single fix point. This is the "可插拔、结构性特别强、抗多元化" the user described: a verified-stable component that future work assembles rather than rebuilds.
+
+**Snapshots:** `render_html_to_pdf.py.bak-2026-06-23-4`, `validate_rendered_handout_contract.py.bak-2026-06-23-4`, `validate_sheet_bottom_margin.py.bak-2026-06-23-4`.
+
+**Wheels NOT fixed this session (deferred, with rationale):**
+- Wheel #1 (markdown code-segment protection, `protect_code_segments`): duplicated across 3 files, but spans TWO skills (scan + rewrite). Fixing it needs a cross-skill shared location, which is a bigger architectural decision the user wanted to defer. Data: the duplication is real but lower-frequency than the playwright wheel (new markdown-lint scripts are rarer than new DOM-check scripts).
+- Wheel #3 (chapter-heading regex, `isChapterShapedText`/`isChapterBreakHeading`): duplicated in postprocess + validate_sheet_bottom_margin. Lower priority because it's only 2 copies and both were just synced in session 5. Worth folding into a shared module if a 3rd copy appears.
+
+**SKILL.md note:** did NOT add a "reuse handout_browser" rule this session — the wheel's existence + the 3 refactored call sites already model the pattern. If future scripts start inlining launch+wait again, THAT is the signal to add a rule (data-driven, per the user's "先看数据" principle).
