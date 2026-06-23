@@ -350,10 +350,123 @@ def assert_chapter_pagination(job_dir: Path, html_path: Path, fixture_md: Path) 
     return assertions
 
 
+def assert_footer_page_breadcrumb(job_dir: Path, html_path: Path, fixture_md: Path) -> list[Assertion]:
+    """Eval 4: footer shows "第 X / N 页" on the right, heading breadcrumb on
+    the left (deepest/last heading on the page), and covers have no footer.
+
+    fixture_md accepted for signature parity; footer assertions depend only on
+    the post-build HTML.
+    """
+    _ = fixture_md  # signature parity; intentionally unused
+    assertions: list[Assertion] = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(html_path.as_uri(), wait_until="networkidle")
+        wait_for_handout_ready(page)
+
+        # Per-sheet snapshot of footer state.
+        sheets = page.evaluate(
+            """() => {
+                const sheets = Array.from(document.querySelectorAll('.sheet'));
+                return sheets.map((s, i) => {
+                    const isCover = s.classList.contains('concept-map-sheet') ||
+                        s.dataset.sheetRole === 'cover' ||
+                        s.dataset.coverSheet === 'true';
+                    const footer = s.querySelector('.sheet-footer');
+                    const pageLabel = s.querySelector('.sheet-page-label');
+                    const trailLabel = s.querySelector('.sheet-trail-label');
+                    return {
+                        idx: i,
+                        isCover,
+                        hasFooter: !!footer,
+                        page: pageLabel ? (pageLabel.textContent || '').trim() : null,
+                        trail: trailLabel ? (trailLabel.textContent || '').trim() : null,
+                    };
+                });
+            }"""
+        )
+
+        total = len(sheets)
+
+        # Assertion A: every NON-cover sheet's page label is "第 X / N 页" with
+        # the correct total. This locks both the new "X / N" format and that
+        # the denominator equals the real sheet count.
+        fmt = Assertion(f"each non-cover sheet shows '第 X / {total} 页' (total = sheet count)")
+        bad_pages = []
+        for s in sheets:
+            if s["isCover"]:
+                continue
+            expected = f"第 {s['idx'] + 1} / {total} 页"
+            if s["page"] != expected:
+                bad_pages.append((s["idx"], s["page"], expected))
+        if not bad_pages:
+            fmt.ok(f"all {sum(1 for s in sheets if not s['isCover'])} non-cover sheet(s) match")
+        else:
+            fmt.fail(f"page label mismatches: {bad_pages}")
+        assertions.append(fmt)
+
+        # Assertion B: non-first, non-cover sheets carry a breadcrumb that
+        # reflects the heading they belong to. The chapter-breaks fixture puts
+        # each 第N章 on its own sheet, so sheet i (1-indexed after any cover)
+        # whose first block is 第N章 must carry that chapter name in its trail.
+        # We check the general contract: any sheet whose body starts with a
+        # chapter h2 has that chapter name in its breadcrumb.
+        chapter_trails = page.evaluate(
+            """() => {
+                const sheets = Array.from(document.querySelectorAll('.sheet'));
+                const out = [];
+                for (const s of sheets) {
+                    if (s.classList.contains('concept-map-sheet') ||
+                        s.dataset.sheetRole === 'cover' ||
+                        s.dataset.coverSheet === 'true') continue;
+                    const body = s.querySelector('.sheet-body');
+                    if (!body) continue;
+                    const firstBlock = body.querySelector(':scope > .flow-block');
+                    if (!firstBlock) continue;
+                    const h2 = firstBlock.querySelector(':scope > h2');
+                    if (!h2) continue;
+                    const h2text = (h2.textContent || '').trim();
+                    if (!/^第[0-9一二三四五六七八九十百零]+[章节]/.test(h2text)) continue;
+                    const trail = s.querySelector('.sheet-trail-label');
+                    out.push({ h2: h2text, trail: trail ? (trail.textContent || '').trim() : '' });
+                }
+                return out;
+            }"""
+        )
+        trail_ok = Assertion("each sheet starting with 第N章 carries that chapter name in its breadcrumb")
+        chapter_name_re = re.compile(r"第[0-9一二三四五六七八九十百零]+[章节]")
+        bad_trails = []
+        for t in chapter_trails:
+            name_match = chapter_name_re.match(t["h2"])
+            if not name_match or name_match.group(0) not in t["trail"]:
+                bad_trails.append(t)
+        if chapter_trails and not bad_trails:
+            trail_ok.ok(f"{len(chapter_trails)} chapter sheet(s) carry correct breadcrumb: {[t['trail'] for t in chapter_trails]}")
+        else:
+            trail_ok.fail(f"chapter sheets with missing/wrong breadcrumb: {bad_trails or 'no chapter sheets found'}")
+        assertions.append(trail_ok)
+
+        # Assertion C: covers (if any) have NO footer.
+        cover_footer = Assertion("cover sheet(s) have no .sheet-footer")
+        cover_sheets = [s for s in sheets if s["isCover"]]
+        bad_covers = [s["idx"] for s in cover_sheets if s["hasFooter"]]
+        if not bad_covers:
+            cover_footer.ok(f"{len(cover_sheets)} cover sheet(s), none with a footer")
+        else:
+            cover_footer.fail(f"cover sheet(s) unexpectedly have a footer: {bad_covers}")
+        assertions.append(cover_footer)
+
+        browser.close()
+    return assertions
+
+
 EVAL_DISPATCH = {
     "example-blockquote-coverage": assert_example_blockquote,
     "svg-cover-injection": assert_cover_injection,
     "chapter-h2-pagination": assert_chapter_pagination,
+    "footer-page-and-breadcrumb": assert_footer_page_breadcrumb,
 }
 
 

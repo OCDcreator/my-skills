@@ -31,6 +31,16 @@
         "the sheet before each non-first chapter h2 is marked data-ends-before-lecture=true",
         "a NON-chapter h2 (e.g. 大招总结) does NOT cause its predecessor to be marked (exemption must not be too broad)"
       ]
+    },
+    {
+      "id": 4,
+      "name": "footer-page-and-breadcrumb",
+      "fixture": "fixtures/chapter-breaks.md",
+      "expectations": [
+        "each non-cover sheet's page label is '第 X / N 页' where N equals the total sheet count",
+        "each sheet whose body starts with 第N章 carries that chapter name in its .sheet-trail-label breadcrumb",
+        "cover sheet(s) (when present via a cover fixture) have no .sheet-footer"
+      ]
     }
   ]
 }

@@ -213,7 +213,15 @@ def validate(
                 });
               }
               const contentlessSheets = nonCoverSheets.filter((sheet) => {
-                const text = (sheet.innerText || '').replace(/第\\s*\\d+\\s*页/g, '').trim();
+                // Strip the WHOLE footer (page number AND heading breadcrumb)
+                // before judging. The footer now carries a breadcrumb like
+                // "第二章 › 第一节" which would otherwise mask a truly blank
+                // sheet as having content. Removing the footer element's own
+                // text is robust to both page-number format changes and the
+                // breadcrumb text.
+                const footer = sheet.querySelector('.sheet-footer');
+                const footerText = footer ? (footer.innerText || '') : '';
+                const text = (sheet.innerText || '').replace(footerText, '').trim();
                 const media = sheet.querySelectorAll('img,svg,canvas,table,math,.katex').length;
                 return text.length === 0 && media === 0;
               });

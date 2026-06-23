@@ -754,6 +754,39 @@ def test_build_html_document_does_not_render_header_label_or_footer_title_text()
     assert "Fragment Assembly</span>" not in html
 
 
+def test_build_html_document_emits_two_column_footer_scaffold() -> None:
+    """Footer carries a left trail-label span + right page-label span, and the
+    footer CSS uses space-between so the breadcrumb sits left and the page
+    number right. The renumberSheets JS fills both at runtime, so the static
+    scaffold only needs the DOM hooks and the layout contract."""
+    module = load_module()
+
+    html = module.build_html_document_from_fragments(
+        [("7", "<p>第一页片段</p>")],
+        title="Footer Scaffold",
+        source_label="OCR Transcript",
+    )
+
+    assert "sheet-trail-label" in html
+    assert "sheet-page-label" in html
+    # space-between layout so breadcrumb (left) and page number (right) sit
+    # on opposite edges; align-items baseline keeps them on one line.
+    assert "justify-content: space-between" in html
+    # The breadcrumb span must truncate rather than wrap or push the page
+    # number off the row.
+    assert "white-space: nowrap" in html
+    assert "text-overflow: ellipsis" in html
+    # The current page number and the last heading tier are emphasized
+    # (bold + accent orange) via the .sheet-emph span.
+    assert ".sheet-emph" in html
+    assert "#FB8B05" in html
+    assert "font-weight: 700" in html
+    # The renumberSheets helper computes the per-sheet heading stack at
+    # runtime; verify the helper + the chapter-level detector are present.
+    assert "function renumberSheets" in html
+    assert "function trailHeadingLevel" in html
+
+
 def test_promotes_fraction_display_style_for_simple_and_nested_math(tmp_path: Path) -> None:
     source_md = tmp_path / "source-transcript.md"
     out_html = tmp_path / "handout.html"

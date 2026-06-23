@@ -162,7 +162,8 @@ html[data-handout-ready="loading"] #handout-print-root {
 
 .sheet-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: baseline;
   gap: 6mm;
   color: var(--muted);
   font-size: 9px;
@@ -172,6 +173,26 @@ html[data-handout-ready="loading"] #handout-print-root {
   margin-top: 6mm;
   padding-top: 3mm;
   border-top: 1px solid var(--line);
+}
+
+.sheet-trail-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: 6mm;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sheet-page-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.sheet-emph {
+  font-weight: 700;
+  color: #FB8B05;
 }
 
 .doc-title {
@@ -490,10 +511,12 @@ function createSheet(pageNumber, title, sourceLabel, showTitle) {
 
   const footer = document.createElement('footer');
   footer.className = 'sheet-footer';
+  const footerTrail = document.createElement('span');
+  footerTrail.className = 'sheet-trail-label';
   const footerPage = document.createElement('span');
   footerPage.className = 'sheet-page-label';
   footerPage.textContent = `第 ${pageNumber} 页`;
-  footer.append(footerPage);
+  footer.append(footerTrail, footerPage);
 
   sheet.append(body, footer);
   return sheet;
@@ -532,13 +555,84 @@ function appendBlockToSheet(sheet, block) {
   return true;
 }
 
+function trailHeadingLevel(heading) {
+  const text = (heading.textContent || '').replace(/\\s+/g, ' ').trim();
+  // Lecture/chapter-shaped headings (第N讲/章/节/部分/篇/单元, 单元N, numeric
+  // outline "1. 力学", Module/Lesson/Chapter N) sit one level above a plain
+  // h2 — they are the document's top bookmark tier. Matches the postprocess
+  // isChapterBreakHeading/isLectureHeading shape.
+  const isChapterShaped = /^(?:第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)|单元\\s*[0-9一二三四五六七八九十百零]+|[0-9]+\\s*[\\.、]\\s*[\\u4e00-\\u9fff]|(?:Module|Lesson|Chapter)\\s+\\d)/.test(text);
+  const rank = /H([1-6])/.exec(heading.tagName || '');
+  const numeric = rank ? Number(rank[1]) : 6;
+  if (isChapterShaped) return 1;
+  if (numeric <= 2) return 2;
+  if (numeric === 3) return 3;
+  return 4;
+}
+
 function renumberSheets(root) {
   const sheets = Array.from(root.querySelectorAll('.sheet'));
+  const total = sheets.length;
+  // Document-level heading stack: every h2/h3/h4 advances it, and a sheet's
+  // breadcrumb is the full ancestor chain at the DEEPEST (last) heading it
+  // contains — so a page spanning a level change shows the level it ends on
+  // (the user's "临界页取最后一级" rule).
+  const stack = [];
   sheets.forEach((sheet, index) => {
     const pageNumber = index + 1;
     sheet.dataset.pageNumber = String(pageNumber);
+    const isCover = sheet.classList.contains('concept-map-sheet') ||
+      sheet.dataset.sheetRole === 'cover' ||
+      sheet.dataset.coverSheet === 'true';
+    if (!isCover) {
+      const body = sheet.querySelector('.sheet-body');
+      let pageStackSnapshot = null;
+      if (body) {
+        const headings = Array.from(body.querySelectorAll('.flow-block h2, .flow-block h3, .flow-block h4, h2, h3, h4'));
+        headings.forEach((heading) => {
+          const title = (heading.textContent || '').replace(/\\s+/g, ' ').trim();
+          if (!title) return;
+          const level = trailHeadingLevel(heading);
+          while (stack.length && stack[stack.length - 1].level >= level) {
+            stack.pop();
+          }
+          stack.push({ level, title });
+          pageStackSnapshot = stack.map((entry) => entry.title);
+        });
+      }
+      const trailLabel = sheet.querySelector('.sheet-trail-label');
+      if (trailLabel) {
+        if (pageStackSnapshot && pageStackSnapshot.length) {
+          // Render the path as "前 › 前 › 前 › <emph>最后一级</emph>" — every
+          // segment except the last is muted, the last (current) level is
+          // bold + accent (the page's actual heading tier).
+          const parts = pageStackSnapshot.slice();
+          const last = parts.pop();
+          trailLabel.replaceChildren();
+          if (parts.length) {
+            trailLabel.append(document.createTextNode(parts.join(' › ') + ' › '));
+          }
+          const emph = document.createElement('span');
+          emph.className = 'sheet-emph';
+          emph.textContent = last;
+          trailLabel.append(emph);
+        } else {
+          trailLabel.textContent = '';
+        }
+      }
+    }
     sheet.querySelectorAll('.sheet-page-label').forEach((node) => {
-      node.textContent = `第 ${pageNumber} 页`;
+      // "第 <emph>X</emph> / N 页" — bold + accent on the current page number.
+      node.replaceChildren(
+        document.createTextNode('第 '),
+        (() => {
+          const e = document.createElement('span');
+          e.className = 'sheet-emph';
+          e.textContent = String(pageNumber);
+          return e;
+        })(),
+        document.createTextNode(` / ${total} 页`),
+      );
     });
   });
 }

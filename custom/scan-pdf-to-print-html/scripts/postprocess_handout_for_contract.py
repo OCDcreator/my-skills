@@ -460,14 +460,9 @@ function injectConceptCover(root) {
   image.alt = root.dataset.coverAlt || (root.dataset.title ? `${root.dataset.title} 概念图` : '概念图');
   body.appendChild(image);
 
-  const footer = document.createElement('footer');
-  footer.className = 'sheet-footer';
-  const label = document.createElement('span');
-  label.className = 'sheet-page-label';
-  label.textContent = '第 1 页';
-  footer.appendChild(label);
-
-  cover.append(body, footer);
+  // Covers show no footer — no page number, no heading breadcrumb. The cover
+  // still counts toward the total page count N used by regular sheets.
+  cover.append(body);
   root.insertBefore(cover, root.firstChild);
   root.dataset.coverInjected = 'true';
   return true;
