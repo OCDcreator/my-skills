@@ -48,6 +48,49 @@ def build_parser() -> argparse.ArgumentParser:
         default=1000,
         help="Extra wait after fonts/math/pagination settle",
     )
+    parser.add_argument(
+        "--check-image-width-bands",
+        action="store_true",
+        default=True,
+        help="Verify non-exempt images render within their aspect-ratio width band "
+        "(portrait ~20%% / square ~35%% / landscape 50-80%% of sheet-body width). "
+        "Use --no-check-image-width-bands to disable. <!-- evolved 2026-06-23 -->",
+    )
+    parser.add_argument(
+        "--no-check-image-width-bands",
+        dest="check_image_width_bands",
+        action="store_false",
+        help="Disable the aspect-ratio image width band check.",
+    )
+    parser.add_argument(
+        "--check-adjacent-side-by-side",
+        action="store_true",
+        default=True,
+        help="Verify images inside the same .ocr-image-cluster or <figure> are "
+        "side-by-side, not vertically stacked. <!-- evolved 2026-06-23 -->",
+    )
+    parser.add_argument(
+        "--no-check-adjacent-side-by-side",
+        dest="check_adjacent_side_by_side",
+        action="store_false",
+        help="Disable the adjacent-image side-by-side check.",
+    )
+    parser.add_argument(
+        "--disallow-remote-images",
+        action="store_true",
+        default=False,
+        help="Fail if any <img src> in handout.html is a non-local URL. OFF by default; "
+        "turned on automatically as part of the image-hosting workflow step. "
+        "Non-image remote refs (KaTeX CDN stylesheet/script) are unaffected. "
+        "<!-- evolved 2026-06-23 -->",
+    )
+    parser.add_argument(
+        "--remote-image-allowlist",
+        action="append",
+        default=[],
+        help="Hostname substrings exempt from --disallow-remote-images "
+        "(repeatable). Reserved for legitimate remote <img> essentials.",
+    )
     return parser
 
 
@@ -63,6 +106,10 @@ def validate(
     require_katex: bool,
     disallow_mathjax: bool,
     wait_ms: int,
+    check_image_width_bands: bool,
+    check_adjacent_side_by_side: bool,
+    disallow_remote_images: bool,
+    remote_image_allowlist: list[str],
 ) -> int:
     try:
         from playwright.sync_api import sync_playwright
@@ -100,7 +147,14 @@ def validate(
 
         result = page.evaluate(
             """
-            ({ minChoiceImageWidth, minChoiceImageHeight }) => {
+            ({
+              minChoiceImageWidth,
+              minChoiceImageHeight,
+              checkImageWidthBands,
+              checkAdjacentSideBySide,
+              disallowRemoteImages,
+              remoteAllowlist,
+            }) => {
               const printRoot = document.querySelector('#handout-print-root');
               const scope = printRoot || document.body;
               const bodyText = scope.innerText || '';
@@ -257,6 +311,106 @@ def validate(
                 return rect.width < minChoiceImageWidth || rect.height < minChoiceImageHeight;
               });
 
+              // --- Aspect-ratio image width band check (C26) ---
+              // Exempt: choice-table images, images inside marked cover sheets,
+              // and images inside .ocr-image-cluster or <figure> (those are
+              // governed by the cluster/figure layout, not single-image width).
+              function classifyAspect(naturalW, naturalH) {
+                const ar = naturalW / Math.max(naturalH, 1);
+                if (ar < 0.9) return { cls: 'portrait', lo: 0.15, hi: 0.28 };
+                if (ar <= 1.1) return { cls: 'near-square', lo: 0.28, hi: 0.45 };
+                if (ar <= 1.5) return { cls: 'landscape-mild', lo: 0.45, hi: 0.58 };
+                if (ar <= 2.5) return { cls: 'landscape-typical', lo: 0.58, hi: 0.75 };
+                return { cls: 'landscape-wide', lo: 0.75, hi: 0.90 };
+              }
+              function isMarkedCover(node) {
+                let cur = node;
+                while (cur && cur !== scope) {
+                  if (
+                    cur.classList && (
+                      cur.classList.contains('concept-map-sheet') ||
+                      cur.matches('[data-sheet-role="cover"], [data-cover-sheet="true"]')
+                    )
+                  ) return true;
+                  cur = cur.parentElement;
+                }
+                return false;
+              }
+              const widthBandImages = checkImageWidthBands
+                ? Array.from(scope.querySelectorAll('.transcript-flow img')).filter((img) => {
+                    if (img.closest('.phycat-blockquote table')) return false;
+                    if (img.closest('.ocr-image-cluster, figure')) return false;
+                    if (isMarkedCover(img)) return false;
+                    if (!img.naturalWidth || !img.naturalHeight) return false;
+                    return true;
+                  })
+                : [];
+              const widthBandViolations = widthBandImages.map((img) => {
+                const band = classifyAspect(img.naturalWidth, img.naturalHeight);
+                const sheet = img.closest('.sheet') || img.closest('.sheet-body') || scope;
+                const body = sheet.querySelector('.sheet-body') || sheet;
+                const bodyRect = body.getBoundingClientRect();
+                const refWidth = bodyRect.width || sheet.getBoundingClientRect().width || 1;
+                const rect = img.getBoundingClientRect();
+                const frac = rect.width / Math.max(refWidth, 1);
+                const ok = frac >= band.lo - 1e-3 && frac <= band.hi + 1e-3;
+                return {
+                  ok,
+                  cls: band.cls,
+                  aspect: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
+                  renderedPct: Math.round(frac * 1000) / 10,
+                  band: `${Math.round(band.lo * 100)}-${Math.round(band.hi * 100)}%`,
+                  src: (img.getAttribute('src') || '').slice(0, 80),
+                };
+              }).filter((v) => !v.ok);
+
+              // --- Adjacent-image side-by-side check (C27) ---
+              // Only inside .ocr-image-cluster and authored <figure>.
+              function rectsStacked(a, b) {
+                // Two images are "stacked" (not side-by-side) when their vertical
+                // bands do not overlap: the lower image's top is at or below the
+                // upper image's bottom. Horizontal alignment is irrelevant —
+                // stacked images are usually horizontally aligned (both centered).
+                const ra = a.getBoundingClientRect();
+                const rb = b.getBoundingClientRect();
+                const upper = ra.top <= rb.top ? ra : rb;
+                const lower = upper === ra ? rb : ra;
+                return lower.top >= upper.bottom - 1;
+              }
+              const sideBySideGroups = checkAdjacentSideBySide
+                ? Array.from(scope.querySelectorAll('.ocr-image-cluster, figure'))
+                : [];
+              const stackedPairs = [];
+              sideBySideGroups.forEach((group) => {
+                const imgs = Array.from(group.querySelectorAll('img'));
+                for (let i = 0; i < imgs.length; i += 1) {
+                  for (let j = i + 1; j < imgs.length; j += 1) {
+                    if (rectsStacked(imgs[i], imgs[j])) {
+                      stackedPairs.push({
+                        container: group.tagName.toLowerCase() + (group.className ? '.' + group.className.split(' ')[0] : ''),
+                        srcA: (imgs[i].getAttribute('src') || '').slice(0, 60),
+                        srcB: (imgs[j].getAttribute('src') || '').slice(0, 60),
+                      });
+                    }
+                  }
+                }
+              });
+
+              // --- HTML-local-image-only check (C28) ---
+              const remoteImageSrcs = disallowRemoteImages
+                ? Array.from(scope.querySelectorAll('img')).map((img) => img.getAttribute('src') || '')
+                    .filter((src) => {
+                      if (!src) return false;
+                      if (src.startsWith('data:') || src.startsWith('file:')) return false;
+                      let url;
+                      try { url = new URL(src, document.baseURI); } catch (e) { return false; }
+                      if (url.protocol === 'file:') return false;
+                      const host = url.hostname;
+                      if (remoteAllowlist.some((h) => host.includes(h))) return false;
+                      return true;
+                    })
+                : [];
+
               return {
                 htmlElements: scope.querySelectorAll('h1,h2,h3,h4,p,blockquote,table,ul,ol').length,
                 handoutReady: document.documentElement.dataset.handoutReady || '',
@@ -295,12 +449,21 @@ def validate(
                       return { width: Math.round(r.width), height: Math.round(r.height) };
                     })()
                   : null,
-              };
+                widthBandImagesChecked: widthBandImages.length,
+                widthBandViolations,
+                sideBySideGroupsChecked: sideBySideGroups.length,
+                stackedPairs,
+                remoteImageSrcs,
+            };
             }
             """,
             {
                 "minChoiceImageWidth": min_choice_image_width,
                 "minChoiceImageHeight": min_choice_image_height,
+                "checkImageWidthBands": check_image_width_bands,
+                "checkAdjacentSideBySide": check_adjacent_side_by_side,
+                "disallowRemoteImages": disallow_remote_images,
+                "remoteAllowlist": remote_image_allowlist,
             },
         )
         browser.close()
@@ -381,6 +544,32 @@ def validate(
                 f"first={result['firstChoiceImageSize']}"
             ),
         )
+    if check_image_width_bands:
+        add(
+            "non-exempt images render within aspect-ratio width band",
+            len(result["widthBandViolations"]) == 0,
+            (
+                f"checked={result['widthBandImagesChecked']} "
+                f"violations={len(result['widthBandViolations'])} "
+                f"sample={result['widthBandViolations'][:3]}"
+            ),
+        )
+    if check_adjacent_side_by_side:
+        add(
+            "clustered/figure images are side-by-side, not stacked",
+            len(result["stackedPairs"]) == 0,
+            (
+                f"groups={result['sideBySideGroupsChecked']} "
+                f"stackedPairs={len(result['stackedPairs'])} "
+                f"sample={result['stackedPairs'][:3]}"
+            ),
+        )
+    if disallow_remote_images:
+        add(
+            "handout.html uses local image paths only (no remote src)",
+            len(result["remoteImageSrcs"]) == 0,
+            f"remote={len(result['remoteImageSrcs'])} sample={result['remoteImageSrcs'][:3]}",
+        )
 
     print("=" * 72)
     print("RENDERED HANDOUT CONTRACT")
@@ -406,6 +595,10 @@ def main() -> int:
         args.require_katex,
         args.disallow_mathjax,
         args.wait_ms,
+        args.check_image_width_bands,
+        args.check_adjacent_side_by_side,
+        args.disallow_remote_images,
+        args.remote_image_allowlist,
     )
 
 

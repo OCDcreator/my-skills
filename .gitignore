@@ -28,3 +28,5 @@ docs/superpowers/
 
 # skill-evolution pre-edit snapshots
 custom/**/SKILL.md.bak-*
+custom/**/*.bak-*
+custom/**/*.bak-*.*

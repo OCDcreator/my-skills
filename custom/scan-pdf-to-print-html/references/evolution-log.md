@@ -133,3 +133,51 @@ Provenance note: CAPTURE used user-pasted restored session memory plus visible c
     - `scripts/validate_rendered_handout_contract.py`: added Playwright `getBoundingClientRect()` comparison for `.concept-map-sheet`, `[data-sheet-role="cover"]`, and `[data-cover-sheet="true"]` against the first regular `.sheet`.
     - `tests/test_validate_rendered_handout_contract.py`: added fail/pass fixtures for left-aligned cover margin and no-cover handouts.
   snapshot: SKILL.md.bak-2026-06-22-2
+
+## 2026-06-23 — run against scan-pdf-to-print-html
+
+Provenance note: CAPTURE ran in the main orchestrating context from visible current-session user messages; trace enrichment tagged `(extracted)`. No long-session reconstruction.
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C26 | Add rendered image width upper-bound gate driven by aspect-ratio bands (portrait ~20% / square ~35% / landscape 50-80% in three sub-bands); gate checks post-render only, builder mm clamp unchanged | missing | pass | new | principle | **add_new** | first |
+| C27 | Add rendered adjacent-image side-by-side detection gate scoped to builder-clustered `.ocr-image-cluster` and authored `<figure>`; verify grouped images are not vertically stacked via getBoundingClientRect | missing | pass | strengthen | principle | **strengthen** | second (same substance as 2026-06-17 C24; that discard was an `ignored`-diagnosis process gap — rules existed with no executable gate; now closed) |
+| C28 | Add optional Markdown image-hosting workflow step (invoke `piclist-upload` skill's `migrate-md-images.ps1` against a `source-transcript.md` copy) + HTML-local-image-only gate (`--disallow-remote-images`, OFF by default, auto-on during image-hosting step); HTML keeps local paths to avoid unstable remote reads during render/PDF | missing | pass | new | principle | **add_new** | first |
+
+Pairwise conflict check: C26 vs C27 (width vs layout) complementary; C26 vs C28 (width vs URL) unrelated; C27 vs C28 unrelated. No conflicts. C26 internally merges the user's two width requests (#1 absolute upper-bound + #3 aspect-ratio bands) into one gate to avoid two competing width checks.
+
+User decisions (AskUserQuestion, 2026-06-23):
+- Width strategy: gate checks only, builder mm clamp unchanged → fix via job-local CSS.
+- Side-by-side scope: only `.ocr-image-cluster` and `<figure>` (low false-positive).
+- Image-hosting scope: scan skill adds workflow step calling `piclist-upload`; does not reimplement upload.
+- Landscape bands: aspect 1-1.5→50%, 1.5-2.5→65%, >2.5→80%.
+- `--disallow-remote-images` default OFF; auto-on during image-hosting workflow step.
+
+- candidate: C26
+  verdict: add_new
+  reason: Existing rules only covered choice-table-image readable-minimum (SKILL.md:132) and a "no tiny crop as full-width" semantic ban (working-contract.md:72); no general rendered width gate, no aspect-ratio policy. Builder uses fixed mm clamp (34/48/64/72mm) classified by max(width,height), not aspect ratio.
+  gate: { g1: pass, g2: new, g3: principle }
+  recurrence: first
+- candidate: C27
+  verdict: strengthen
+  reason: 2026-06-17 C24 discarded the same substance as "existing rules already cover it / was ignored", but those (figure-policy.md:39, review-gate.md:18, working-contract.md:42/70, page-fragment-worker.md:87) were builder instructions with NO post-render DOM check. This upgrades the rule to an executable getBoundingClientRect gate.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: second (matches C24 substance; that discard mis-diagnosed an `ignored` gap as `duplicate`)
+- candidate: C28
+  verdict: add_new
+  reason: No image-hosting logic existed in scan skill. User confirmed `custom/piclist-upload` skill already implements upload+migration (path 4 `migrate-md-images.ps1`, handles Doc2X `?x=&y=&w=&h=` query params). Structural change routed through human_review per Step 6; user confirmed scope = workflow step + gate, scan skill does not reimplement upload. `--disallow-remote-images` default OFF to avoid blocking existing jobs that still reference Doc2X CDN crops.
+  gate: { g1: pass, g2: new, g3: principle }
+  recurrence: first
+
+Dev Eval: validator-equipped skill. Candidates are `missing`-class new features with no corrected output to lint → Dev Eval N/A for semantic novelty. BUT full existing test suite run as non-regression check:
+- `python3 -m pytest tests/test_validate_rendered_handout_contract.py -q` → 5 passed
+- `python3 -m pytest -q --ignore=tests/test_crop_page_bodies.py` → 96 passed (test_crop_page_bodies.py collection error is a pre-existing missing-PIL dependency, unrelated to this change)
+New-flag defaults verified compatible with existing fixtures (width/side-by-side gates default ON but fixtures have no violating images; remote gate default OFF).
+
+written:
+  - `SKILL.md`: added 3 Hard Contract items (image width band, side-by-side, image-hosting workflow + local-only HTML), added Markdown-Source Mode step 8 (optional image-hosting via piclist-upload), updated Files entry for validate_rendered_handout_contract.py.
+  - `references/figure-policy.md`: appended "Rendered Image Width Contract" (band table) and "Rendered Adjacent-Image Side-by-Side Contract" sections.
+  - `references/review-gate.md`: strengthened item 12 with rendered image contract failure classes (width band, side-by-side, local-only-when-image-hosted).
+  - `scripts/validate_rendered_handout_contract.py`: added 4 CLI flags (--check-image-width-bands/--no-, --check-adjacent-side-by-side/--no-, --disallow-remote-images, --remote-image-allowlist), extended validate() signature, added 3 JS collectors (widthBandViolations, stackedPairs, remoteImageSrcs), added 3 Python checks.
+
+snapshot: SKILL.md.bak-2026-06-23, references/figure-policy.md.bak-2026-06-23, references/review-gate.md.bak-2026-06-23, scripts/validate_rendered_handout_contract.py.bak-2026-06-23

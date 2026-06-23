@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generated_at": "2026-06-22T04:29:17.623278+00:00",
-    "total_skills": 1045,
+    "generated_at": "2026-06-22T10:48:48.176180+00:00",
+    "total_skills": 1051,
     "custom_skills": 38,
-    "external_skills": 1007,
+    "external_skills": 1013,
     "sources_count": 18
   },
   "skills": [
@@ -12243,7 +12243,7 @@
     {
       "path": "external/baoyu-skills/baoyu-wechat-summary",
       "name": "baoyu-wechat-summary",
-      "description": "Summarizes WeChat group chat highlights into a structured digest using the local wx-cli binary (https://github.com/jackwener/wx-cli). Generates a normal digest by default; a roast (毒舌) version is opt-in. Maintains per-group history (history.json + history-digests.jsonl) and per-user profiles across runs, with privacy guardrails baked in. Use when the user asks to \"总结群聊\", \"群聊精华\", \"群聊摘要\", \"summarize group chat\", \"group chat digest\", mentions a WeChat group name with a time range, says \"帮我看看 XX 群最近聊了什么\", \"XX 群有什么值得看的\", or asks to \"回溯画像\" / \"初始化画像\" / \"backfill profiles\". Adds the roast version when the user says \"毒舌版\", \"roast 版\", \"再来个毒舌的\", or similar.",
+      "description": "Summarizes WeChat group chat highlights into a structured digest using the local wx-cli binary (https://github.com/jackwener/wx-cli). Generates a normal digest by default; a roast (毒舌) version is opt-in. Maintains per-group history (history.json + history-digests.jsonl), per-user profiles, and per-group fact memory (memory.md) across runs, with privacy guardrails baked in. Use when the user asks to \"总结群聊\", \"群聊精华\", \"群聊摘要\", \"summarize group chat\", \"group chat digest\", mentions a WeChat group name with a time range, says \"帮我看看 XX 群最近聊了什么\", \"XX 群有什么值得看的\", or asks to \"回溯画像\" / \"初始化画像\" / \"backfill profiles\". Adds the roast version when the user says \"毒舌版\", \"roast 版\", \"再来个毒舌的\", or similar.",
       "category": "Content/Publishing",
       "tier": "community",
       "source": "baoyu-skills",
@@ -12412,7 +12412,7 @@
     {
       "path": "external/claude-plugins-official/frontend-design",
       "name": "frontend-design",
-      "description": "Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, or applications. Generates creative, polished code that avoids generic AI aesthetics.",
+      "description": "Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "claude-plugins-official",
@@ -12504,6 +12504,19 @@
       "path": "external/claude-plugins-official/plugin-structure",
       "name": "plugin-structure",
       "description": "This skill should be used when the user asks to \"create a plugin\", \"scaffold a plugin\", \"understand plugin structure\", \"organize plugin components\", \"set up plugin.json\", \"use ${CLAUDE_PLUGIN_ROOT}\", \"add commands/agents/skills/hooks\", \"configure auto-discovery\", or needs guidance on plugin directory layout, manifest configuration, component organization, file naming conventions, or Claude Code plugin architecture best practices.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "claude-plugins-official",
+      "repo": "https://github.com/anthropics/claude-plugins-official.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "external/claude-plugins-official/project-artifact",
+      "name": "project-artifact",
+      "description": "Generate and publish a project status artifact — an opinionated, tabbed status page for a project too big for one update (overview & success criteria, the workstream sequence, next steps, plus background, plan, risks & open questions, and decisions/FAQ when they earn a tab) — published with the built-in Artifact tool to a default-private claude.ai page the user can share with teammates. Use when a piece of work spans several workstreams and you want a shareable overview kept current. Each artifact is backed by a small per-project config in the plugin data dir, so refreshing it re-gathers live state, redeploys the same URL, and reports only the delta. For software projects whose workstreams are PRs, also read swe.md (the X.Y PR-numbering convention; pulling PR state with gh/git; a per-PR detail block). Needs the built-in Artifact tool (claude.ai login). Not for single-PR changes or public docs.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "claude-plugins-official",
@@ -12956,9 +12969,35 @@
       "triggers": []
     },
     {
-      "path": "external/mattpocock-skills/caveman",
-      "name": "caveman",
-      "description": "Ultra-compressed communication mode. Cuts token usage ~75% by dropping filler, articles, and pleasantries while keeping full technical accuracy. Use when user says \"caveman mode\", \"talk like caveman\", \"use caveman\", \"less tokens\", \"be brief\", or invokes /caveman.",
+      "path": "external/mattpocock-skills/ask-matt",
+      "name": "ask-matt",
+      "description": "Ask which skill or flow fits your situation. A router over the user-invoked skills in this repo.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "external/mattpocock-skills/codebase-design",
+      "name": "codebase-design",
+      "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "external/mattpocock-skills/decision-mapping",
+      "name": "decision-mapping",
+      "description": "Turn a loose idea into a sequenced map of investigation tickets, then drive them to resolution one at a time.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -12982,9 +13021,22 @@
       "triggers": []
     },
     {
-      "path": "external/mattpocock-skills/diagnose",
-      "name": "diagnose",
-      "description": "Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says \"diagnose this\" / \"debug this\", reports a bug, says something is broken/throwing/failing, or describes a performance regression.",
+      "path": "external/mattpocock-skills/diagnosing-bugs",
+      "name": "diagnosing-bugs",
+      "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "external/mattpocock-skills/domain-modeling",
+      "name": "domain-modeling",
+      "description": "Build and sharpen a project's domain model. Use when the user wants to pin down domain terminology or a ubiquitous language, record an architectural decision, or when another skill needs to maintain the domain model.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13023,7 +13075,7 @@
     {
       "path": "external/mattpocock-skills/grill-me",
       "name": "grill-me",
-      "description": "Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use when user wants to stress-test a plan, get grilled on their design, or mentions \"grill me\".",
+      "description": "A relentless interview to sharpen a plan or design.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13036,7 +13088,20 @@
     {
       "path": "external/mattpocock-skills/grill-with-docs",
       "name": "grill-with-docs",
-      "description": "Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions.",
+      "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "external/mattpocock-skills/grilling",
+      "name": "grilling",
+      "description": "Interview the user relentlessly about a plan or design. Use when the user wants to stress-test a plan before building, or uses any 'grill' trigger phrases.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13060,9 +13125,22 @@
       "triggers": []
     },
     {
+      "path": "external/mattpocock-skills/implement",
+      "name": "implement",
+      "description": "Implement a piece of work based on a PRD or set of issues.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
       "path": "external/mattpocock-skills/improve-codebase-architecture",
       "name": "improve-codebase-architecture",
-      "description": "Find deepening opportunities in a codebase, informed by the domain language in CONTEXT.md and the decisions in docs/adr/. Use when the user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled modules, or make a codebase more testable and AI-navigable.",
+      "description": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13101,7 +13179,7 @@
     {
       "path": "external/mattpocock-skills/prototype",
       "name": "prototype",
-      "description": "Build a throwaway prototype to flesh out a design before committing to it. Routes between two branches — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route. Use when the user wants to prototype, sanity-check a data model or state machine, mock up a UI, explore design options, or says \"prototype this\", \"let me play with it\", \"try a few designs\".",
+      "description": "Build a throwaway prototype to flesh out a design — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13128,6 +13206,19 @@
       "path": "external/mattpocock-skills/request-refactor-plan",
       "name": "request-refactor-plan",
       "description": "Create a detailed refactor plan with tiny commits via user interview, then file it as a GitHub issue. Use when user wants to plan a refactor, create a refactoring RFC, or break a refactor into safe incremental steps.",
+      "category": "Content/Publishing",
+      "tier": "core",
+      "source": "mattpocock-skills",
+      "repo": "https://github.com/mattpocock/skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "external/mattpocock-skills/resolving-merge-conflicts",
+      "name": "resolving-merge-conflicts",
+      "description": "Use when you need to resolve an in-progress git merge/rebase conflict.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13166,7 +13257,7 @@
     {
       "path": "external/mattpocock-skills/setup-matt-pocock-skills",
       "name": "setup-matt-pocock-skills",
-      "description": "Sets up an `## Agent skills` block in AGENTS.md/CLAUDE.md and `docs/agents/` so the engineering skills know this repo's issue tracker (GitHub or local markdown), triage label vocabulary, and domain doc layout. Run before first use of `to-issues`, `to-prd`, `triage`, `diagnose`, `tdd`, `improve-codebase-architecture`, or `zoom-out` — or if those skills appear to be missing context about the issue tracker, triage labels, or domain docs.",
+      "description": "Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout. Run once before first use of the other engineering skills.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13192,7 +13283,7 @@
     {
       "path": "external/mattpocock-skills/tdd",
       "name": "tdd",
-      "description": "Test-driven development with red-green-refactor loop. Use when user wants to build features or fix bugs using TDD, mentions \"red-green-refactor\", wants integration tests, or asks for test-first development.",
+      "description": "Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13218,7 +13309,7 @@
     {
       "path": "external/mattpocock-skills/to-issues",
       "name": "to-issues",
-      "description": "Break a plan, spec, or PRD into independently-grabbable issues on the project issue tracker using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementation tickets, or break down work into issues.",
+      "description": "Break a plan, spec, or PRD into independently-grabbable issues on the project issue tracker using tracer-bullet vertical slices.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13231,7 +13322,7 @@
     {
       "path": "external/mattpocock-skills/to-prd",
       "name": "to-prd",
-      "description": "Turn the current conversation context into a PRD and publish it to the project issue tracker. Use when user wants to create a PRD from the current context.",
+      "description": "Turn the current conversation into a PRD and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13244,7 +13335,7 @@
     {
       "path": "external/mattpocock-skills/triage",
       "name": "triage",
-      "description": "Triage issues through a state machine driven by triage roles. Use when user wants to create an issue, triage issues, review incoming bugs or feature requests, prepare issues for an AFK agent, or manage issue workflow.",
+      "description": "Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13258,19 +13349,6 @@
       "path": "external/mattpocock-skills/ubiquitous-language",
       "name": "ubiquitous-language",
       "description": "Extract a DDD-style ubiquitous language glossary from the current conversation, flagging ambiguities and proposing canonical terms. Saves to UBIQUITOUS_LANGUAGE.md. Use when user wants to define domain terms, build a glossary, harden terminology, create a ubiquitous language, or mentions \"domain model\" or \"DDD\".",
-      "category": "Content/Publishing",
-      "tier": "core",
-      "source": "mattpocock-skills",
-      "repo": "https://github.com/mattpocock/skills.git",
-      "branch": "main",
-      "include_in_main": true,
-      "tags": [],
-      "triggers": []
-    },
-    {
-      "path": "external/mattpocock-skills/write-a-skill",
-      "name": "write-a-skill",
-      "description": "Create new agent skills with proper structure, progressive disclosure, and bundled resources. Use when user wants to create, write, or build a new skill.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13307,9 +13385,9 @@
       "triggers": []
     },
     {
-      "path": "external/mattpocock-skills/writing-shape",
-      "name": "writing-shape",
-      "description": "Take a markdown file of raw material and shape it into an article through a conversational session — drafting candidate openings, growing the piece paragraph by paragraph, arguing about format (lists, tables, callouts, quotes) at each step. Use when the user has a pile of notes, fragments, or a rough draft and wants help turning it into something publishable.",
+      "path": "external/mattpocock-skills/writing-great-skills",
+      "name": "writing-great-skills",
+      "description": "Reference for writing and editing skills well — the vocabulary and principles that make a skill predictable.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13320,9 +13398,9 @@
       "triggers": []
     },
     {
-      "path": "external/mattpocock-skills/zoom-out",
-      "name": "zoom-out",
-      "description": "Tell the agent to zoom out and give broader context or a higher-level perspective. Use when you're unfamiliar with a section of code or need to understand how it fits into the bigger picture.",
+      "path": "external/mattpocock-skills/writing-shape",
+      "name": "writing-shape",
+      "description": "Take a markdown file of raw material and shape it into an article through a conversational session — drafting candidate openings, growing the piece paragraph by paragraph, arguing about format (lists, tables, callouts, quotes) at each step. Use when the user has a pile of notes, fragments, or a rough draft and wants help turning it into something publishable.",
       "category": "Content/Publishing",
       "tier": "core",
       "source": "mattpocock-skills",
@@ -13641,7 +13719,7 @@
       "repo": "https://github.com/anthropics/claude-plugins-official.git",
       "branch": "main",
       "tier": "core",
-      "skill_count": 22
+      "skill_count": 23
     },
     "deep-research-skills": {
       "repo": "https://github.com/Weizhena/Deep-Research-skills.git",
@@ -13689,7 +13767,7 @@
       "repo": "https://github.com/mattpocock/skills.git",
       "branch": "main",
       "tier": "core",
-      "skill_count": 29
+      "skill_count": 34
     },
     "startup-pressure-test": {
       "repo": "https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git",
@@ -13717,7 +13795,7 @@
     }
   },
   "categories": {
-    "Content/Publishing": 1032,
+    "Content/Publishing": 1038,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,
