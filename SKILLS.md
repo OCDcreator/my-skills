@@ -1,6 +1,6 @@
 # Skills Catalog
 
-Generated from repository state on 2026-06-22.
+Generated from repository state on 2026-06-23.
 
 This is the **curated** quick-reference index. For the complete list of all 1000+ skills, see [`docs/full-catalog.md`](docs/full-catalog.md).
 
@@ -82,6 +82,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 | `last30days-skill` | `core` | `last30days` | Mirrored from `https://github.com/mvanhorn/last30days-skill.git`. |
 | `last30days-skill-cn` | `community` | `last30days-cn` | Mirrored from `https://github.com/Jesseovo/last30days-skill-cn.git`. |
 | `mattpocock-skills` | `core` | `ask-matt`, `codebase-design`, `decision-mapping`, `design-an-interface`, `diagnosing-bugs`, `domain-modeling`, `edit-article`, `git-guardrails-claude-code`, ... (34 total) | Mirrored from `https://github.com/mattpocock/skills.git`. |
+| `reverse-skill` | `community` | `api-security`, `apk-reverse`, `attack-chain`, `binary-diff`, `browser-automation`, `competition-ad-certificate-abuse`, `competition-agent-cloud`, `competition-android-hooking`, ... (85 total) | Mirrored from `https://github.com/zhaoxuya520/reverse-skill.git`. |
 | `startup-pressure-test` | `community` | `startup-pressure-test` | Mirrored from `https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git`. |
 | `taste-skill` | `community` | `brandkit`, `industrial-brutalist-ui`, `gpt-taste`, `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `minimalist-ui`, `full-output-enforcement`, ... (13 total) | Mirrored from `https://github.com/Leonxlnx/taste-skill.git`. |
 | `ui-ux-pro-max-skill` | `community` | `ckm:banner-design`, `ckm:brand`, `ckm:design`, `ckm:design-system`, `ckm:slides`, `ckm:ui-styling`, `ui-ux-pro-max` | Mirrored from `https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git`. |

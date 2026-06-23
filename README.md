@@ -129,6 +129,7 @@ my-skills/
 | `external/last30days-skill/` | [mvanhorn/last30days-skill](https://github.com/mvanhorn/last30days-skill.git) | 1 个技能（core：高质量官方/精选源） |
 | `external/last30days-skill-cn/` | [Jesseovo/last30days-skill-cn](https://github.com/Jesseovo/last30days-skill-cn.git) | 1 个技能 |
 | `external/mattpocock-skills/` | [mattpocock/skills](https://github.com/mattpocock/skills.git) | 34 个技能（core：高质量官方/精选源） |
+| `external/reverse-skill/` | [zhaoxuya520/reverse-skill](https://github.com/zhaoxuya520/reverse-skill.git) | 85 个技能 |
 | `external/startup-pressure-test/` | [Kappaemme-git/codex-startup-pressure-test-skill](https://github.com/Kappaemme-git/codex-startup-pressure-test-skill.git) | 1 个技能 |
 | `external/taste-skill/` | [Leonxlnx/taste-skill](https://github.com/Leonxlnx/taste-skill.git) | 13 个技能 |
 | `external/ui-ux-pro-max-skill/` | [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git) | 7 个技能 |
