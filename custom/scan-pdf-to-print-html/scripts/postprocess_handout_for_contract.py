@@ -574,6 +574,89 @@ function rebalanceTrailingBlankSheets(root) {
   }
 }
 
+// Final anti-orphan-heading sweep (evolved 2026-06-25). After pagination +
+// rebalance, a heading may still be the LAST block of a non-final sheet
+// ("孤标题"). Fixing it correctly means RE-FLOWING, not cramming: peel the
+// orphan heading off its sheet, then re-run the pagination loop starting from
+// the sheet AFTER it, so every block from the orphan onward naturally flows
+// to the next page / spills to new pages as needed (a heading jump cascades
+// exactly like inserting a line at that point). This is what a human means
+// by "move it to the next page" — the rest of the document shifts, it is not
+// forced into one sheet.
+//
+// Implementation: rebuild the block stream of every sheet from the orphan's
+// NEXT sheet through the end, prepend the peeled orphan heading, and re-pack
+// those sheets from scratch (drop the old trailing sheets, re-append fresh
+// ones via appendBlockToSheet). Chapter/lecture break headings are intended
+// section ends and are never peeled.
+function sweepOrphanHeadings(root, title, sourceLabel) {
+  let changed = true;
+  let outerGuard = 0;
+  // Upper bound on re-flow passes. Each pass fixes >=1 orphan and may create
+  // <=1 new one downstream, so the count is bounded; 200 is a safe ceiling
+  // that still terminates if a pathological oscillation ever appeared.
+  while (changed && outerGuard < 200) {
+    outerGuard += 1;
+    changed = false;
+    const sheets = Array.from(root.querySelectorAll('.sheet'));
+    for (let i = 0; i < sheets.length - 1; i += 1) {
+      const prev = sheets[i];
+      if (prev.matches('.concept-map-sheet,[data-sheet-role="cover"],[data-cover-sheet="true"]')) continue;
+      if (prev.dataset.endsBeforeLecture === 'true') continue;
+      const prevBody = sheetBody(prev);
+      if (!prevBody) continue;
+      const flowBlocks = Array.from(prevBody.querySelectorAll(':scope > .flow-block'));
+      if (flowBlocks.length === 0) continue;
+      const lastBlock = flowBlocks[flowBlocks.length - 1];
+      if (!isHeadingOnlyBlock(lastBlock)) continue;
+      // Do not peel if the next sheet starts with a chapter/lecture break
+      // heading (legitimate section end on THIS sheet).
+      const next = sheets[i + 1];
+      const nextBody = sheetBody(next);
+      const nextFirst = nextBody ? Array.from(nextBody.children).find(
+        (c) => !c.classList.contains('doc-title') && c.getBoundingClientRect().height > 0
+      ) : null;
+      const nextFirstHeading = nextFirst
+        ? (nextFirst.tagName.match(/^H[1-6]$/) ? nextFirst
+           : (nextFirst.tagName === 'DIV' ? nextFirst.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6') : null))
+        : null;
+      if (nextFirstHeading) {
+        const nextText = normalizeTextForBookmark(nextFirstHeading.textContent);
+        if (isLectureHeading(nextText) || (nextFirstHeading.tagName === 'H2' && isChapterBreakHeading(nextText))) continue;
+      }
+
+      // RE-FLOW: peel the orphan, then re-pack from sheet i+1 onward.
+      prevBody.removeChild(lastBlock);
+      setSheetState(prev);
+      // Collect every flow-block from sheet i+1 through the end (in order),
+      // then drop those sheets and rebuild.
+      const reflowBlocks = [lastBlock];
+      for (let j = i + 1; j < sheets.length; j += 1) {
+        const b = sheetBody(sheets[j]);
+        if (!b) continue;
+        Array.from(b.querySelectorAll(':scope > .flow-block')).forEach((fb) => reflowBlocks.push(fb));
+      }
+      // Remove sheets i+1 .. end.
+      for (let j = sheets.length - 1; j > i; j -= 1) {
+        sheets[j].remove();
+      }
+      // Re-pack: start a fresh sheet at i+1 and flow all reflowBlocks.
+      let pageNumber = i + 2;
+      let cur = createSheet(pageNumber, title, sourceLabel, false);
+      root.appendChild(cur);
+      for (const blk of reflowBlocks) {
+        if (appendBlockToSheet(cur, blk)) continue;
+        pageNumber += 1;
+        cur = createSheet(pageNumber, title, sourceLabel, false);
+        root.appendChild(cur);
+        appendBlockToSheet(cur, blk);
+      }
+      changed = true;
+      break; // restart the scan on the rebuilt sheet list
+    }
+  }
+}
+
 
 function isLectureHeading(text) {
   // NOTE: no trailing \b — \b is an ASCII word boundary that fails after a
@@ -933,6 +1016,12 @@ def inject_js_overrides(html: str) -> str:
   // carry-forward blocks up. Runs AFTER the anti-orphan pagination loop and is
   // itself guarded against re-creating orphan headings.
   rebalanceTrailingBlankSheets(printRoot);
+  // Final anti-orphan-heading sweep: peel any heading left as the LAST block
+  // of a non-final sheet and RE-FLOW the document from that point (content
+  // naturally shifts to later pages). Runs LAST so it covers every prior pass
+  // (incl. rebalance) and runtime font-load timing. Shares the validator
+  // gate's judgment so the two agree.
+  sweepOrphanHeadings(printRoot, title, sourceLabel);
   renumberSheets(printRoot);
   attachBookmarkPayload(printRoot, bookmarkEntries);
   sourceRoot.remove();
