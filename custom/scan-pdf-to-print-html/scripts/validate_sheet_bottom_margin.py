@@ -55,18 +55,27 @@ content"), not blank-size-gated. The only exemption is a genuine section break
 (`data-ends-before-lecture="true"` or a next-sheet chapter-shaped h2), where
 the heading is the intended end of a section.
 
-FIGURE-BOUNDARY ANALYSIS (redesigned 2026-06-25): instead of a blanket
-exemption, the gate CALCULATES whether a next-sheet image figure could fit in
-the current trailing gap if narrowed to the width-band minimum (0.8x of its
-current rendered width — the band floor below which readability suffers). The
-figure's minimum-scale block height = tallest image height * 0.8 + fixed
-overhead (figure margins/captions). If that minimum height fits in the gap,
-the blank IS a defect: the figure could have been narrowed and moved up, so
-the gate FAILs with an actionable hint ("shrink the figure within its width
-band and let it move up"). If even the minimum-width figure is taller than the
-gap, the blank is the unavoidable cost of the width-band floor and the sheet is
-exempt. This makes the gate's judgment match a human's: "could this image,
-shrunk a bit, have gone on the previous page? yes -> fix it; no -> leave it."
+FIGURE-BOUNDARY ANALYSIS (redesigned 2026-06-25, band-floor anchored
+2026-06-25): instead of a blanket exemption, the gate CALCULATES whether a
+next-sheet image figure could fit in the current trailing gap if narrowed to
+the width-band FLOOR. The floor is the ABSOLUTE lowest in-band width the
+rendered-contract gate permits for the image's aspect ratio
+(bandFloorFrac = max(0.12, smoothTarget(aspect) - 7pp) - 4pp grace), shared
+verbatim with validate_rendered_handout_contract.py. The figure's minimum
+block height = (tallest image height scaled so its width reaches the band
+floor, aspect preserved) + fixed non-image overhead (figure margins/captions).
+Because the floor is anchored to the band (a constant for a given aspect), the
+estimated min-height does NOT shrink when a weak model narrows the image
+further — which closes the "shrink → hint still satisfiable → shrink again"
+loop the old 0.8x-of-current-height heuristic caused. If that minimum height
+fits in the gap, the blank IS a defect (the figure could have been narrowed to
+its floor and moved up); the gate FAILs with a hint. If even the floor-width
+figure is taller than the gap, the blank is the unavoidable cost of the
+width-band rule and the sheet is exempt. Figure recognition is recursive (no
+:scope >) because the builder nests figures as .transcript-flow > .flow-block >
+figure. This makes the gate's judgment match a human's: "could this image,
+narrowed to its smallest readable width, have gone on the previous page?
+yes -> fix it; no -> leave it."
 """
 
 from __future__ import annotations
@@ -143,38 +152,53 @@ def validate(
                         el.querySelector('.phycat-blockquote') !== null
                     );
                 }
-                // Figure-boundary trade-off (evolved 2026-06-23, refined
-                // 2026-06-24): when the next sheet's FIRST content block is an
-                // image figure (single img, <figure>, or multi-image cluster),
-                // the trailing blank on the current sheet is the unavoidable
-                // cost of the image width-band rule — images cannot be freely
-                // shrunk to fill the gap, so the gap is legitimate regardless
-                // of whether the figure "almost fits". The per-image width
-                // band is enforced by validate_rendered_handout_contract.py,
-                // NOT here; running it in this trailing-blank gate produced
-                // false positives on proportionally-scaled multi-image
-                // clusters (individual siblings dip below their solo band by
-                // design), which tempted weak models to "fix" correct breaks.
                 // Figure-boundary analysis (evolved 2026-06-23, redesigned
-                // 2026-06-25). The next sheet's FIRST content block is an image
-                // figure (single <img>, <figure>, or multi-image cluster). The
-                // image width-band rule allows the image to render anywhere in
-                // its band — including as small as ~0.8x of its current rendered
-                // width (a floor below which readability suffers). So whether
-                // the trailing blank on THIS sheet is a real defect depends on
-                // a CALCULATION, not a blanket exemption:
-                //   - If the figure, shrunk to the band minimum (0.8x), would
-                //     fit in the trailing gap, the blank IS a defect: the image
-                //     could have been narrowed and moved up. FAIL with a hint
-                //     telling the model to shrink the figure (the model knows
-                //     the width band and can pick a smaller in-band width).
-                //   - If even the minimum-width figure is taller than the gap,
-                //     the blank is the unavoidable cost of the width-band floor.
+                // 2026-06-25, band-floor anchored 2026-06-25). The next sheet's
+                // FIRST content block is an image figure (single <img>,
+                // <figure>, or multi-image cluster). The width-band rule allows
+                // the image to render anywhere down to an ABSOLUTE band floor
+                // (bandFloorFrac, shared with validate_rendered_handout_contract.py).
+                // Whether the trailing blank on THIS sheet is a real defect
+                // depends on a CALCULATION, not a blanket exemption:
+                //   - If the figure, narrowed to its band floor (aspect
+                //     preserved, an absolute pixel width), would fit in the
+                //     trailing gap, the blank IS a defect: the image could have
+                //     been narrowed and moved up. FAIL with a hint.
+                //   - If even the floor-width figure is taller than the gap,
+                //     the blank is the unavoidable cost of the width-band rule.
                 //     Exempt — do not flag, do not tempt a weak model to shrink
                 //     past readability.
-                // The minimum-scale factor (0.8) is the band floor: it mirrors
-                // the lowest in-band width the rendered-contract gate permits.
-                const FIGURE_MIN_SCALE = 0.8;
+                // Width-band target as a function of aspect ratio. MUST stay in
+                // sync with validate_rendered_handout_contract.py's
+                // smoothTargetPct — both gates must agree on the same band, or a
+                // model gets contradictory "shrink" / "enlarge" hints and loops
+                // (the exact Kimi 2026-06 failure mode this analysis exists to
+                // prevent).
+                function smoothTargetPct(ar) {
+                    const pts = [
+                        [0.0, 18], [0.7, 22], [0.9, 27], [1.0, 30], [1.2, 35],
+                        [1.5, 45], [2.0, 58], [2.5, 68], [3.5, 78], [6.0, 82],
+                    ];
+                    if (ar <= pts[0][0]) return pts[0][1];
+                    if (ar >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
+                    for (let i = 0; i < pts.length - 1; i++) {
+                        const a0 = pts[i][0], t0 = pts[i][1];
+                        const a1 = pts[i + 1][0], t1 = pts[i + 1][1];
+                        if (a0 <= ar && ar <= a1) {
+                            const r = (ar - a0) / (a1 - a0);
+                            return t0 + (t1 - t0) * r;
+                        }
+                    }
+                    return 30;
+                }
+                // The lowest width-band floor the rendered-contract gate permits,
+                // as a fraction of body width, for a given aspect ratio. Mirrors
+                // validate_rendered_handout_contract.py's classifyAspect: lo =
+                // max(0.12, target - 7pp), then the -4pp "near-is-exempt" grace.
+                function bandFloorFrac(ar) {
+                    const target = smoothTargetPct(ar) / 100;
+                    return Math.max(0.12, target - 0.07) - 0.04;
+                }
                 function analyzeFigureBoundary(nextBody, trailingPx) {
                     if (!nextBody) return null;
                     const first = Array.from(nextBody.children).find(
@@ -182,28 +206,83 @@ def validate(
                     );
                     if (!first) return null;
                     const imgs = first.querySelectorAll('img');
+                    // Figure recognition is RECURSIVE (no :scope >): the builder
+                    // wraps blocks as .transcript-flow > .flow-block > figure, so
+                    // the figure sits two levels below the first content child.
+                    // A :scope > check missed real figures and silently degraded
+                    // to a plain excessive-trailing-blank FAIL.
                     const isFigureBlock = first.tagName === 'FIGURE'
-                        || !!first.querySelector(':scope > figure, :scope > img, :scope > .ocr-image-cluster')
+                        || !!first.querySelector('figure, img, .ocr-image-cluster')
                         || imgs.length > 0;
                     if (!isFigureBlock) return null;
-                    // Block height = tallest image + non-image overhead (figure
-                    // padding/margins/captions, which do NOT scale with image
-                    // width). At the minimum scale, image height scales 0.8x
-                    // (aspect preserved) while overhead stays fixed.
+                    // ABSOLUTE band floor (redesigned 2026-06-25, replacing the
+                    // old 0.8x-of-current-height heuristic). The previous
+                    // formula `tallestImgH * 0.8` scaled relative to the image's
+                    // CURRENT rendered height, so when a weak model followed the
+                    // "shrink the figure" hint and narrowed the image, the
+                    // estimated min-height shrank WITH it — the hint then stayed
+                    // satisfiable forever and the model looped, shrinking the
+                    // image until it was unreadable. The fix is to anchor the
+                    // min-height to the width-band's ABSOLUTE floor: the lowest
+                    // in-band width (bandFloorFrac) gives a fixed pixel width,
+                    // whose height (aspect preserved) is a constant regardless
+                    // of how the model has currently rendered the image. Once
+                    // the image is narrowed to that floor, estHeightAtMin stops
+                    // decreasing and the loop terminates.
+                    let tallestImg = null;
                     let tallestImgH = 0;
+                    let tallestImgW = 0;
                     imgs.forEach((img) => {
-                        tallestImgH = Math.max(tallestImgH, img.getBoundingClientRect().height);
+                        const r = img.getBoundingClientRect();
+                        if (r.height > tallestImgH) {
+                            tallestImgH = r.height;
+                            tallestImgW = r.width;
+                            tallestImg = img;
+                        }
                     });
                     const blockH = first.getBoundingClientRect().height;
                     const overhead = Math.max(0, blockH - tallestImgH);
-                    const estHeightAtMin = tallestImgH * FIGURE_MIN_SCALE + overhead;
+                    // Determine the band-floor height. We need the image's
+                    // rendered width AS A FRACTION OF BODY WIDTH, plus its
+                    // natural aspect ratio (to pick the band). naturalWidth is
+                    // the source of truth for aspect; fall back to rendered
+                    // rect if natural dims are unloaded.
+                    const bodyW = (nextBody.getBoundingClientRect().width) || 1;
+                    const currentFrac = tallestImgW / bodyW;
+                    const ar = (tallestImg && tallestImg.naturalWidth && tallestImg.naturalHeight)
+                        ? tallestImg.naturalWidth / tallestImg.naturalHeight
+                        : (tallestImgH > 0 ? tallestImgW / tallestImgH : 1);
+                    const floorFrac = bandFloorFrac(ar);
+                    // Min image height = scale current height so its width lands
+                    // at the band floor (aspect preserved). This is an ABSOLUTE
+                    // pixel value — it does not shrink when the model shrinks
+                    // the image further, breaking the old loop. Boundary case:
+                    // if the image is ALREADY at or below its band floor (the
+                    // model has already narrowed it as far as the band allows),
+                    // it cannot be narrowed further without leaving the band —
+                    // so its min height is its CURRENT height, not an enlarged
+                    // one. (Scaling by floor/current when current < floor would
+                    // otherwise absurdly demand the image grow.)
+                    let minImgH;
+                    if (currentFrac <= 0) {
+                        minImgH = tallestImgH * 0.8;  // no width signal; fallback
+                    } else if (currentFrac <= floorFrac) {
+                        minImgH = tallestImgH;  // already at/below floor: cannot shrink in-band
+                    } else {
+                        minImgH = tallestImgH * (floorFrac / currentFrac);
+                    }
+                    const estHeightAtMin = minImgH + overhead;
                     return {
                         isFigure: true,
                         blockH: Math.round(blockH),
+                        currentFrac: Number(currentFrac.toFixed(3)),
+                        aspect: Number(ar.toFixed(2)),
+                        bandFloorFrac: Number(floorFrac.toFixed(3)),
                         estHeightAtMin: Math.round(estHeightAtMin),
                         trailingPx: Math.round(trailingPx),
                         // "fits at minimum scale" => the blank is avoidable by
-                        // shrinking the figure within its band; this is a defect.
+                        // narrowing the figure to its band floor and moving it
+                        // up; this is a defect.
                         fitsAtMinScale: estHeightAtMin <= trailingPx,
                     };
                 }
@@ -482,13 +561,16 @@ def validate(
                 )
             elif reason == "figure-could-fit-at-band-min":
                 fa = v.get("figureAnalysis") or {}
+                floor_pct = int(round((fa.get('bandFloorFrac') or 0) * 100))
                 print(
                     f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "
                     f"body {v['bodyHeightPx']}px ({v['fraction'] * 100:.1f}% > "
-                    f"{max_fraction * 100:.1f}%)  [figure on next sheet could fit if "
-                    f"narrowed to band-min: est {fa.get('estHeightAtMin')}px <= gap "
-                    f"{fa.get('trailingPx')}px — shrink the figure within its width "
-                    f"band and let it move up]"
+                    f"{max_fraction * 100:.1f}%)  [figure (aspect {fa.get('aspect')}, "
+                    f"now {int(round((fa.get('currentFrac') or 0) * 100))}% of body) on "
+                    f"next sheet could fit if narrowed to its band floor ~{floor_pct}%: "
+                    f"est {fa.get('estHeightAtMin')}px <= gap {fa.get('trailingPx')}px — "
+                    f"narrow the figure to ~{floor_pct}% body width (the band floor) and "
+                    f"let it move up; do NOT shrink past {floor_pct}%]"
                 )
             else:
                 print(

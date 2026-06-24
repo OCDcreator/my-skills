@@ -408,27 +408,35 @@ def test_bottom_margin_still_fails_real_orphan_when_next_sheet_starts_with_headi
     assert "orphan heading" in result.stdout
 
 
-def _write_figure_boundary_handout(path: Path, *, figure_fits_at_min: bool) -> None:
-    """Two variants of a figure-boundary page for the redesigned gate.
+def _write_figure_boundary_handout(path: Path, *, figure_fits_at_floor: bool) -> None:
+    """Two variants of a figure-boundary page for the band-floor-anchored gate.
 
-    Sheet 2 has a large trailing blank; sheet 3 starts with an <img> figure.
-    - figure_fits_at_min=True: the image is SHORT enough that, at the 0.8x
-      band minimum, it fits in sheet 2's gap -> the gate must FAIL with a
-      "shrink the figure and let it move up" hint.
-    - figure_fits_at_min=False: the image is TALL enough that even at 0.8x it
-      cannot fit -> the gate must EXEMPT (PASS), because the blank is the
-      unavoidable cost of the width-band floor.
+    Sheet 2 has a trailing blank; sheet 3 starts with an <img> figure. Both
+    variants use the SAME square image (aspect 1.0, band floor ~19% of body ≈
+    151px wide → 151px tall, the absolute narrowest the width band allows).
+    The gap on sheet 2 is what differs:
+
+    - figure_fits_at_floor=True: the gap is LARGE (~500px) so the floor-width
+      figure (151px tall) fits -> the gate must FAIL with a "narrow it to the
+      band floor and let it move up" hint.
+    - figure_fits_at_floor=False: the gap is SMALL (~120px, just above the 10%
+      threshold) so even the floor-width figure (151px) does NOT fit -> the
+      gate must EXEMPT (PASS), because narrowing the figure further would
+      leave the width band.
     """
-    # A small square SVG (solid color) renders at the width we set; height
-    # follows aspect (square => height == width).
     svg = (
         "data:image/svg+xml;utf8,"
         "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>"
         "<rect width='200' height='200' fill='%23ccc'/></svg>"
     )
-    # Short figure: 120px tall -> at 0.8x = 96px, fits in the ~500px gap.
-    # Tall figure: 700px tall -> at 0.8x = 560px, does NOT fit in ~500px gap.
-    img_width = "120px" if figure_fits_at_min else "700px"
+    # Image rendered WIDE (so currentFrac > floor and the "narrow to floor"
+    # path is exercised): 400px square on a 794px body ≈ 50% body width.
+    img_width = "400px"
+    # sheet 2 has ONE content block whose height sets the trailing gap
+    # (= body_height 1000px − block_height). LARGE gap (~500px trailing) when
+    # the floor-width figure fits; SMALL gap (~120px trailing, just over the
+    # 10% threshold) when even the floor-width figure is too tall.
+    content_block_height = "500px" if figure_fits_at_floor else "880px"
     path.write_text(
         f"""<!doctype html>
 <html data-handout-ready="true">
@@ -437,8 +445,9 @@ def _write_figure_boundary_handout(path: Path, *, figure_fits_at_min: bool) -> N
 <style>
 .sheet {{ width: 794px; min-height: 1123px; }}
 .sheet-body {{ height: 1000px; }}
-.flow-block {{ height: 120px; }}
-.flow-block.half {{ height: 500px; }}
+.flow-block {{ height: 60px; }}
+.flow-block.gap {{ height: {content_block_height}; }}
+.flow-block.fill {{ height: 880px; }}
 </style>
 </head>
 <body>
@@ -447,12 +456,12 @@ def _write_figure_boundary_handout(path: Path, *, figure_fits_at_min: bool) -> N
     <section class="sheet-body"><div class="flow-block">cover</div></section>
   </article>
   <article class="sheet" data-page-number="2">
-    <section class="sheet-body"><div class="flow-block half">正文，留下约 500px 尾部空白。</div></section>
+    <section class="sheet-body"><div class="flow-block gap">正文，留下尾部空白。</div></section>
   </article>
   <article class="sheet" data-page-number="3">
     <section class="sheet-body">
       <figure style="margin:0;"><img src="{svg}" style="width:{img_width};height:auto;display:block;" alt="fig"/></figure>
-      <div class="flow-block half">图后正文，填充页面避免无关的尾部空白。</div>
+      <div class="flow-block fill">图后正文，填充页面避免无关的尾部空白。</div>
     </section>
   </article>
   <article class="sheet" data-page-number="4">
@@ -467,30 +476,122 @@ def _write_figure_boundary_handout(path: Path, *, figure_fits_at_min: bool) -> N
 
 
 @pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
-def test_bottom_margin_fails_figure_that_could_fit_at_band_min(tmp_path: Path) -> None:
-    """A figure that would fit in the trailing gap at the 0.8x band minimum is
-    a movable defect: the gate FAILs and tells the model to shrink+move it."""
+def test_bottom_margin_fails_figure_that_could_fit_at_band_floor(tmp_path: Path) -> None:
+    """A figure whose band-floor width (the narrowest the width band allows)
+    would fit in the trailing gap is a movable defect: the gate FAILs and tells
+    the model to narrow it to the band floor and move it up."""
     html = tmp_path / "handout.html"
-    _write_figure_boundary_handout(html, figure_fits_at_min=True)
+    _write_figure_boundary_handout(html, figure_fits_at_floor=True)
 
     result = _run_validator(html)
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "Sheet 2" in result.stdout
     assert "could fit" in result.stdout
-    assert "shrink the figure" in result.stdout
+    assert "narrow the figure" in result.stdout
 
 
 @pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
-def test_bottom_margin_exempts_figure_that_cannot_fit_at_band_min(tmp_path: Path) -> None:
-    """A figure that cannot fit in the trailing gap even at the 0.8x band
-    minimum is exempt: the blank is the unavoidable cost of the width-band
-    floor. The gate must PASS and not flag it (weak-model safety)."""
+def test_bottom_margin_exempts_figure_that_cannot_fit_at_band_floor(tmp_path: Path) -> None:
+    """A figure whose band-floor width is still too tall for the (small)
+    trailing gap is exempt: the blank is the unavoidable cost of the width-band
+    floor — narrowing further would leave the band. The gate must PASS and not
+    flag it (weak-model safety: stops the model from shrinking past the band)."""
     html = tmp_path / "handout.html"
-    _write_figure_boundary_handout(html, figure_fits_at_min=False)
+    _write_figure_boundary_handout(html, figure_fits_at_floor=False)
 
     result = _run_validator(html)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "PASS" in result.stdout
     assert "cannot fit" in result.stdout
+
+
+def _write_kimi_loop_handout(path: Path, img_width: str) -> None:
+    """The exact Kimi 2026-06 failure scenario: a MIDDLE page (sheet 2) with a
+    large trailing gap, and the next sheet (3) starts with a tall image figure.
+
+    The image is square (aspect 1.0, band floor ~19% of body). ``img_width``
+    controls how the image is CURRENTLY rendered — the test runs this twice,
+    once wide and once already-narrowed, to prove the band-floor-anchored
+    estimate does NOT shrink when the image is narrowed (which is what closed
+    the Kimi "shrink -> hint still satisfiable -> shrink again" loop).
+    """
+    svg = (
+        "data:image/svg+xml;utf8,"
+        "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>"
+        "<rect width='200' height='200' fill='%23ccc'/></svg>"
+    )
+    path.write_text(
+        f"""<!doctype html>
+<html data-handout-ready="true">
+<head>
+<meta charset="utf-8">
+<style>
+.sheet {{ width: 794px; min-height: 1123px; }}
+.sheet-body {{ height: 1000px; }}
+.flow-block {{ height: 60px; }}
+.flow-block.gap {{ height: 120px; }}
+.flow-block.fill {{ height: 880px; }}
+</style>
+</head>
+<body>
+<main id="handout-print-root">
+  <article class="sheet" data-page-number="1">
+    <section class="sheet-body"><div class="flow-block">cover</div></section>
+  </article>
+  <article class="sheet" data-page-number="2">
+    <section class="sheet-body"><div class="flow-block gap">正文，留下大尾部空白。</div></section>
+  </article>
+  <article class="sheet" data-page-number="3">
+    <section class="sheet-body">
+      <figure style="margin:0;"><img src="{svg}" style="width:{img_width};height:auto;display:block;" alt="fig"/></figure>
+      <div class="flow-block fill">图后正文。</div>
+    </section>
+  </article>
+  <article class="sheet" data-page-number="4">
+    <section class="sheet-body"><div class="flow-block">final page</div></section>
+  </article>
+</main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_bottom_margin_band_floor_estimate_is_invariant_under_shrinking(tmp_path: Path) -> None:
+    """Regression for the Kimi 2026-06 infinite-shrink loop.
+
+    The old heuristic estimated the figure's minimum height as 0.8x of its
+    CURRENT rendered height. When a weak model followed the "narrow the figure"
+    hint, the estimate shrank along with the image, so the hint stayed
+    satisfiable forever and the model looped, shrinking the image until it was
+    unreadable. The band-floor-anchored redesign must produce an estimate that
+    is INVARIANT to how the image is currently rendered (it depends only on the
+    aspect ratio and the absolute band floor). Run the same figure wide and
+    narrow; both must report the same estHeightAtMin.
+    """
+    import re
+
+    estimates = []
+    for i, img_width in enumerate(("400px", "160px")):  # ~50% body, then ~20%
+        html = tmp_path / f"handout_{i}.html"
+        _write_kimi_loop_handout(html, img_width)
+        result = _run_validator(html)
+        # Both must FAIL with the figure-could-fit hint (the gap is large).
+        assert result.returncode == 1, result.stdout + result.stderr
+        m = re.search(r"est (\d+)px", result.stdout)
+        assert m, f"could not parse est height from output:\n{result.stdout}"
+        estimates.append(int(m.group(1)))
+
+    # The core regression assertion: narrowing the image does NOT lower the
+    # estimated minimum height. (They should be exactly equal because the
+    # estimate is anchored to the absolute band floor, not the current size.)
+    assert estimates[0] == estimates[1], (
+        f"band-floor estimate shrank when image was narrowed "
+        f"({estimates[0]}px -> {estimates[1]}px); the Kimi infinite-shrink "
+        f"loop has regressed: the hint would stay satisfiable as the model "
+        f"keeps shrinking the image."
+    )
