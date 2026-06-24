@@ -20,6 +20,33 @@ ratio and is too tall to move up without overflowing. When two hard contracts
 conflict at a page boundary, the rule whose target is met (image width) wins
 over the rule whose target cannot be met without breaking it (trailing blank).
 This is the "near-is-exempt" trade-off for figure-boundary sheets. <!-- evolved 2026-06-23 -->
+
+ORPHAN-HEADING GUARD (evolved 2026-06-24): the blockquote/figure exemptions
+above are about content that genuinely cannot move up. They must NOT excuse a
+sheet that ends with a lone heading ("orphan heading") followed by a large
+blank — that is a pagination defect (the heading should have traveled with the
+next block to the following sheet), not an unavoidable cost. So even when the
+next sheet starts with a blockquote/figure, the current sheet still FAILS when
+its LAST content element is a heading and the trailing blank exceeds the
+threshold. Only a true lecture/chapter break (`data-ends-before-lecture="true"`
+or a next-sheet chapter-shaped h2) keeps an orphan-heading sheet exempt,
+because there the heading is the intended end of a section.
+
+HEADING-BOUNDARY EXEMPTION (evolved 2026-06-24): the symmetric, legitimate
+case. When the NEXT sheet's FIRST content block is a heading AND it is a real
+section start (at least one non-heading content block follows it on that
+sheet), the trailing blank on the current sheet is the cost of the heading
+starting its own section. This blank is NOT a defect: the builder placed the
+heading at the section start, and pulling it up would strand it above a blank
+(re-creating the orphan defect). So a sheet whose next sheet starts with a
+heading (h1-h6) that has following content is exempt. The "has following
+content" requirement keeps the exemption honest: a next sheet that is JUST a
+lone heading is a stranded heading, not a section start, and stays a violation.
+This is the critical weak-model safety valve — it stops a weaker model from
+"tightening spacing" to chase a blank that is actually correct, which would
+only make the layout worse and burn tokens for nothing. The current sheet's
+own orphan-heading guard still runs independently, so a real stranded heading
+on THIS sheet is never hidden by the next sheet's heading.
 """
 
 from __future__ import annotations
@@ -164,6 +191,41 @@ def validate(
                         blockH > trailingPx - Math.max(16, trailingPx * 0.08);
                 }
 
+                // Heading-boundary trade-off (evolved 2026-06-24): when the next
+                // sheet's FIRST content block is a heading AND that heading is a
+                // real section start (it has at least one non-heading content
+                // block after it on the same sheet), the trailing blank on the
+                // current sheet is the unavoidable cost of the heading starting
+                // its own section. Moving the heading up would either strand it
+                // above a blank (an orphan heading) or split its section
+                // awkwardly across the boundary — so this blank is legitimate
+                // and must NOT be flagged. This is the key weak-model safety
+                // valve: it stops a weaker model from "tightening spacing" to
+                // pull a heading up, which would only re-create the
+                // orphan-heading defect or make the layout worse.
+                //
+                // The "has following content" requirement is what keeps the
+                // exemption honest: a sheet whose next sheet is JUST a lone
+                // heading with nothing after it is NOT a section start — that
+                // is a stranded heading, and the current blank stays a violation.
+                // The current sheet's own orphan-heading guard still runs
+                // independently, so a real stranded heading on THIS sheet is
+                // never hidden by the next sheet's heading.
+                function nextStartsHeadingBoundary(nextBody) {
+                    if (!nextBody) return false;
+                    const blocks = Array.from(nextBody.children).filter(
+                        (c) => !c.classList.contains('doc-title') && c.getBoundingClientRect().height > 0
+                    );
+                    if (blocks.length < 2) return false;  // lone heading = not a section start
+                    const first = blocks[0];
+                    const firstIsHeading = /^H[1-6]$/.test(first.tagName)
+                        || (first.tagName === 'DIV' && !!first.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6'));
+                    if (!firstIsHeading) return false;
+                    // At least one more content block follows the heading — a
+                    // real section, not a stranded heading.
+                    return true;
+                }
+
                 function firstContentChild(body) {
                     const children = Array.from(body.children).filter(
                         el => !el.classList.contains('doc-title')
@@ -216,6 +278,37 @@ def validate(
                     return lastBottom;
                 }
 
+                // Orphan-heading guard (evolved 2026-06-24): a sheet whose LAST
+                // content element is a heading, sitting alone above a large
+                // trailing blank, is a pagination defect — the heading should
+                // have followed its content to the next sheet instead of being
+                // stranded at the bottom. This is true regardless of WHY the
+                // blank exists (blockquote/figure on the next page); so a
+                // heading-ending sheet must FAIL unless a real section break
+                // (forced lecture break or next-sheet chapter h2) exempts it.
+                function lastContentChild(body) {
+                    const children = Array.from(body.children).filter(
+                        el => !el.classList.contains('doc-title')
+                    );
+                    for (let i = children.length - 1; i >= 0; i -= 1) {
+                        const rect = children[i].getBoundingClientRect();
+                        if (rect.height > 0) return children[i];
+                    }
+                    return null;
+                }
+                function lastContentHeading(body) {
+                    const last = lastContentChild(body);
+                    if (!last) return null;
+                    if (/^H[1-6]$/.test(last.tagName)) return last;
+                    // The builder wraps each block in a .flow-block; the
+                    // heading sits one level inside it. Look for the first
+                    // heading among the wrapper's direct children.
+                    if (last.tagName === 'DIV') {
+                        return last.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6');
+                    }
+                    return null;
+                }
+
                 const sheets = Array.from(document.querySelectorAll('.sheet'));
                 const lastIndex = sheets.length - 1;
                 const violations = [];
@@ -244,7 +337,33 @@ def validate(
                     const pageNumber = sheet.dataset.pageNumber || String(index + 1);
 
                     const figureBoundary = nextStartsFigureBoundary(nextBody, bodyRect.width, trailing);
-                    const exempt = nextStartsWithBlockquote || endsBeforeLecture || figureBoundary || nextStartsWithChapterH2;
+                    const headingBoundary = nextStartsHeadingBoundary(nextBody);
+
+                    // A real section break — the heading is the intended end
+                    // of a chapter/lecture on this sheet. This is the ONLY
+                    // reason a heading-ending sheet may keep its trailing blank.
+                    const sectionBreak = endsBeforeLecture || nextStartsWithChapterH2;
+
+                    // Orphan-heading guard: if the sheet ends with a heading
+                    // above a large blank, it is a pagination defect unless a
+                    // real section break justifies it. The blockquote/figure/
+                    // heading-boundary exemptions do NOT cover this case — a
+                    // stranded heading must travel with its following content,
+                    // so we surface it as a violation even when those would
+                    // otherwise excuse the blank.
+                    const endsWithHeading = !!lastContentHeading(body);
+                    const orphanHeading =
+                        endsWithHeading &&
+                        fraction > maxFraction &&
+                        !sectionBreak;
+
+                    // Normal exemptions: blank is the unavoidable cost of a
+                    // next-sheet blockquote/figure/heading-boundary, or an
+                    // explicit lecture/chapter break. These exempt the blank
+                    // only when an orphan heading is not present (orphan
+                    // overrides them).
+                    const baseExempt = nextStartsWithBlockquote || endsBeforeLecture || figureBoundary || nextStartsWithChapterH2 || headingBoundary;
+                    const exempt = baseExempt && !orphanHeading;
 
                     measurements.push({
                         pageNumber,
@@ -255,6 +374,9 @@ def validate(
                         endsBeforeLecture,
                         figureBoundary,
                         nextStartsWithChapterH2,
+                        headingBoundary,
+                        endsWithHeading,
+                        orphanHeading,
                     });
 
                     if (!exempt && fraction > maxFraction) {
@@ -263,6 +385,7 @@ def validate(
                             trailingPx: Math.round(trailing),
                             bodyHeightPx: Math.round(bodyHeight),
                             fraction: Number(fraction.toFixed(3)),
+                            orphanHeading,
                         });
                     }
                 });
@@ -288,7 +411,11 @@ def validate(
             exempt_reasons.append("next sheet starts with band-compliant figure")
         if m.get("nextStartsWithChapterH2"):
             exempt_reasons.append("next sheet starts with chapter h2")
+        if m.get("headingBoundary"):
+            exempt_reasons.append("next sheet starts with a heading (section start)")
         exempt_note = f" [exempt: {', '.join(exempt_reasons)}]" if exempt_reasons else ""
+        if m.get("orphanHeading") and exempt_reasons:
+            exempt_note += " [overridden by orphan heading]"
         print(
             f"  Sheet {m['pageNumber']}: trailing {m['trailingPx']}px / "
             f"body {m['bodyHeightPx']}px ({m['fraction'] * 100:.1f}%){exempt_note}"
@@ -297,10 +424,15 @@ def validate(
     if results["violations"]:
         print("FAIL: excessive trailing blank space detected on:")
         for v in results["violations"]:
+            orphan_note = (
+                "  [orphan heading: move the trailing heading to the next sheet]"
+                if v.get("orphanHeading")
+                else ""
+            )
             print(
                 f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "
                 f"body {v['bodyHeightPx']}px ({v['fraction'] * 100:.1f}% > "
-                f"{max_fraction * 100:.1f}%)"
+                f"{max_fraction * 100:.1f}%){orphan_note}"
             )
         return 1
 

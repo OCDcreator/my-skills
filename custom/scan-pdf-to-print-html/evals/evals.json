@@ -41,6 +41,15 @@
         "each sheet whose body starts with 第N章 carries that chapter name in its .sheet-trail-label breadcrumb",
         "cover sheet(s) (when present via a cover fixture) have no .sheet-footer"
       ]
+    },
+    {
+      "id": 5,
+      "name": "orphan-heading-pagination",
+      "fixture": "fixtures/orphan-heading.md",
+      "expectations": [
+        "no non-cover, non-final sheet's last flow-block is a heading (anti-orphan: the trailing heading traveled to the next sheet)",
+        "validate_sheet_bottom_margin passes on the orphan fixture (the repair prevented the defect, nothing left to flag)"
+      ]
     }
   ]
 }

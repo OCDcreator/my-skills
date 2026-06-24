@@ -281,8 +281,48 @@ function applyFigureWidthBands(root) {
 
 BOOKMARK_PAGINATION_HELPERS = """
 function findFirstTopLevelHeading(block) {
-  return block.querySelector(':scope > h2, :scope > h3');
+  return block.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6');
 }
+
+// A .flow-block that contains ONLY a heading (plus whitespace), i.e. it is
+// "heading-only" rather than a heading followed by body paragraphs. Such a
+// block sitting last on a sheet, with its real content pushed to the next
+// sheet, is the orphan-heading defect.
+function isHeadingOnlyBlock(block) {
+  if (!block) return false;
+  const heading = findFirstTopLevelHeading(block);
+  if (!heading) return false;
+  // Reject chapter/lecture break headings — those are intended section ends,
+  // and they already triggered a forced fresh sheet upstream, so they are
+  // never "stranded" content.
+  const text = normalizeTextForBookmark(heading.textContent);
+  if (isLectureHeading(text)) return false;
+  if (heading.tagName === 'H2' && isChapterBreakHeading(text)) return false;
+  // Count non-heading element children with visible content.
+  const meaningful = Array.from(block.children).filter((child) => {
+    if (child === heading) return false;
+    if (/^H[1-6]$/.test(child.tagName)) return false;
+    return normalizeTextForBookmark(child.textContent).length > 0
+      || child.querySelector('img, table, ul, ol');
+  });
+  return meaningful.length === 0;
+}
+
+// Orphan-heading repair (evolved 2026-06-24). Called when `block` has just
+// overflowed off `sheet`: if the sheet's LAST flow-block is heading-only,
+// detach it so the caller can place it ahead of `block` on the next sheet.
+// Returns the detached block (caller prepends it on the next sheet) or null.
+function pullOrphanHeadingForward(sheet) {
+  const body = sheetBody(sheet);
+  if (!body) return null;
+  const flowBlocks = Array.from(body.querySelectorAll(':scope > .flow-block'));
+  if (flowBlocks.length === 0) return null;
+  const lastBlock = flowBlocks[flowBlocks.length - 1];
+  if (!isHeadingOnlyBlock(lastBlock)) return null;
+  body.removeChild(lastBlock);
+  return lastBlock;
+}
+
 
 function isLectureHeading(text) {
   // NOTE: no trailing \b — \b is an ASCII word boundary that fails after a
@@ -568,10 +608,26 @@ def inject_js_overrides(html: str) -> str:
     }
 
     if (!appendBlockToSheet(sheet, block)) {
+      // Anti-orphan-heading (evolved 2026-06-24): when the incoming block
+      // overflows, the sheet we are leaving may end with a lone heading whose
+      // body content is now on the next sheet — a stranded heading ("孤标题")
+      // that leaves an ugly blank. Detect such a trailing heading block and
+      // pull it forward so it travels with its content. Chapter/lecture break
+      // headings are intentionally section ends, so they are NOT moved.
+      const movedHeading = pullOrphanHeadingForward(sheet);
+
       pageNumber += 1;
       sheet = createSheet(pageNumber, title, sourceLabel, false);
       printRoot.appendChild(sheet);
+      if (movedHeading) {
+        appendBlockToSheet(sheet, movedHeading);
+      }
       appendBlockToSheet(sheet, block);
+      // A moved heading now begins the new sheet; reflect that in the bookmark
+      // ledger so the heading is attributed to its real page.
+      if (movedHeading) {
+        collectBlockBookmarks(movedHeading, pageNumber, bookmarkEntries);
+      }
     }
 
     collectBlockBookmarks(block, pageNumber, bookmarkEntries);

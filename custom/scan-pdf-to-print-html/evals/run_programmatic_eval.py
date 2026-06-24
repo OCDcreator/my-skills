@@ -462,11 +462,101 @@ def assert_footer_page_breadcrumb(job_dir: Path, html_path: Path, fixture_md: Pa
     return assertions
 
 
+def assert_orphan_heading_pagination(job_dir: Path, html_path: Path, fixture_md: Path) -> list[Assertion]:
+    """Eval 5: anti-orphan pagination — when a block overflows to a new sheet,
+    a heading that was the previous sheet's LAST content block must travel with
+    its following content instead of being stranded at the page bottom.
+
+    The fixture (orphan-heading.md) deliberately places a non-chapter h2
+    heading ("关键小节") right before a long example blockquote, with enough
+    body text that the blockquote overflows. The postprocess anti-orphan repair
+    should pull that heading forward to begin the next sheet.
+
+    Assertion A (positive contract): NO non-final sheet's last flow-block is a
+    heading. A heading ending a page is the orphan defect itself (or a chapter
+    break, which the exemption covers — the fixture's heading is non-chapter).
+
+    Assertion B (negative / regression guard): the validator gate, run on the
+    same HTML, must not report an orphan-heading violation — because the
+    postprocess repair already prevented it. (If the repair regressed, the
+    stranded heading + blank would surface as a validator FAIL.) This is a
+    mutation-detectable guard: disabling pullOrphanHeadingForward makes the
+    fixture strand the heading, which Assertion A catches.
+    """
+    _ = fixture_md  # signature parity; assertions read the built HTML
+    assertions: list[Assertion] = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(html_path.as_uri(), wait_until="networkidle")
+        wait_for_handout_ready(page)
+
+        sheets = page.evaluate(
+            """() => {
+                const sheets = Array.from(document.querySelectorAll('.sheet'));
+                return sheets.map((s, i) => {
+                    const isCover = s.classList.contains('concept-map-sheet') ||
+                        s.dataset.sheetRole === 'cover' ||
+                        s.dataset.coverSheet === 'true';
+                    const body = s.querySelector('.sheet-body');
+                    const fbs = body ? Array.from(body.querySelectorAll(':scope > .flow-block')) : [];
+                    const last = fbs.length ? fbs[fbs.length - 1] : null;
+                    const lastHeading = last ? (last.querySelector('h1,h2,h3,h4') ?
+                        last.querySelector('h1,h2,h3,h4').textContent.trim().slice(0, 20) : null) : null;
+                    const firstHeading = null;
+                    return { idx: i, isCover, fbCount: fbs.length, lastHeading };
+                });
+            }"""
+        )
+
+        # Assertion A: no non-cover, non-final sheet ends with a heading block.
+        # The final sheet legitimately may end with a heading; covers are exempt.
+        no_orphan = Assertion("no non-final sheet's last flow-block is a heading (anti-orphan)")
+        stranded = []
+        for idx in range(len(sheets)):
+            s = sheets[idx]
+            if s["isCover"]:
+                continue
+            if idx == len(sheets) - 1:
+                continue  # final sheet may end with a heading
+            if s["lastHeading"]:
+                stranded.append((s["idx"], s["lastHeading"]))
+        if not stranded:
+            no_orphan.ok(
+                f"{len(sheets)} sheet(s); no stranded heading found"
+            )
+        else:
+            no_orphan.fail(
+                f"stranded heading(s) at sheet bottoms: {stranded} "
+                "(postprocess anti-orphan repair did not pull the heading forward)"
+            )
+        assertions.append(no_orphan)
+        browser.close()
+
+    # Assertion B: the bottom-margin gate must be clean on this fixture
+    # (the anti-orphan repair prevented the defect, so nothing is left to flag).
+    gate = Assertion("validate_sheet_bottom_margin passes on the orphan fixture")
+    proc = subprocess.run(
+        [sys.executable, str(SKILL_ROOT / "scripts" / "validate_sheet_bottom_margin.py"),
+         "--html", str(html_path)],
+        capture_output=True, text=True,
+    )
+    if proc.returncode == 0:
+        gate.ok("validator exit=0 (no orphan-heading / trailing-blank violation)")
+    else:
+        gate.fail(f"validator exit={proc.returncode}; {proc.stdout.strip()[:200]}")
+    assertions.append(gate)
+
+    return assertions
+
+
 EVAL_DISPATCH = {
     "example-blockquote-coverage": assert_example_blockquote,
     "svg-cover-injection": assert_cover_injection,
     "chapter-h2-pagination": assert_chapter_pagination,
     "footer-page-and-breadcrumb": assert_footer_page_breadcrumb,
+    "orphan-heading-pagination": assert_orphan_heading_pagination,
 }
 
 
