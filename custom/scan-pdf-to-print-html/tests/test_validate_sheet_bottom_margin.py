@@ -59,7 +59,7 @@ def _write_handout(path: Path, *, terminal_attrs: str = "") -> None:
     <section class="sheet-body"><div class="flow-block">short lecture tail</div></section>
   </article>
   <article class="sheet" data-page-number="3">
-    <section class="sheet-body"><div class="flow-block tall"><h2>大招 2</h2></div></section>
+    <section class="sheet-body"><div class="flow-block tall">content filling the page (no heading, ~5% trailing)</div></section>
   </article>
   <article class="sheet" data-page-number="4">
     <section class="sheet-body"><div class="flow-block">final page</div></section>
@@ -275,7 +275,10 @@ def test_bottom_margin_keeps_orphan_heading_exempt_for_real_chapter_break(tmp_pa
     </section>
   </article>
   <article class="sheet" data-page-number="3">
-    <section class="sheet-body"><div class="flow-block fill"><h2>第二章 新内容</h2></div></section>
+    <section class="sheet-body">
+      <div class="flow-block"><h2>第二章 新内容</h2></div>
+      <div class="flow-block fill">新章节正文（让标题不是最后一行）。</div>
+    </section>
   </article>
   <article class="sheet" data-page-number="4">
     <section class="sheet-body"><div class="flow-block">final page</div></section>
@@ -403,3 +406,91 @@ def test_bottom_margin_still_fails_real_orphan_when_next_sheet_starts_with_headi
     assert result.returncode == 1, result.stdout + result.stderr
     assert "Sheet 2" in result.stdout
     assert "orphan heading" in result.stdout
+
+
+def _write_figure_boundary_handout(path: Path, *, figure_fits_at_min: bool) -> None:
+    """Two variants of a figure-boundary page for the redesigned gate.
+
+    Sheet 2 has a large trailing blank; sheet 3 starts with an <img> figure.
+    - figure_fits_at_min=True: the image is SHORT enough that, at the 0.8x
+      band minimum, it fits in sheet 2's gap -> the gate must FAIL with a
+      "shrink the figure and let it move up" hint.
+    - figure_fits_at_min=False: the image is TALL enough that even at 0.8x it
+      cannot fit -> the gate must EXEMPT (PASS), because the blank is the
+      unavoidable cost of the width-band floor.
+    """
+    # A small square SVG (solid color) renders at the width we set; height
+    # follows aspect (square => height == width).
+    svg = (
+        "data:image/svg+xml;utf8,"
+        "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>"
+        "<rect width='200' height='200' fill='%23ccc'/></svg>"
+    )
+    # Short figure: 120px tall -> at 0.8x = 96px, fits in the ~500px gap.
+    # Tall figure: 700px tall -> at 0.8x = 560px, does NOT fit in ~500px gap.
+    img_width = "120px" if figure_fits_at_min else "700px"
+    path.write_text(
+        f"""<!doctype html>
+<html data-handout-ready="true">
+<head>
+<meta charset="utf-8">
+<style>
+.sheet {{ width: 794px; min-height: 1123px; }}
+.sheet-body {{ height: 1000px; }}
+.flow-block {{ height: 120px; }}
+.flow-block.half {{ height: 500px; }}
+</style>
+</head>
+<body>
+<main id="handout-print-root">
+  <article class="sheet" data-page-number="1">
+    <section class="sheet-body"><div class="flow-block">cover</div></section>
+  </article>
+  <article class="sheet" data-page-number="2">
+    <section class="sheet-body"><div class="flow-block half">正文，留下约 500px 尾部空白。</div></section>
+  </article>
+  <article class="sheet" data-page-number="3">
+    <section class="sheet-body">
+      <figure style="margin:0;"><img src="{svg}" style="width:{img_width};height:auto;display:block;" alt="fig"/></figure>
+      <div class="flow-block half">图后正文，填充页面避免无关的尾部空白。</div>
+    </section>
+  </article>
+  <article class="sheet" data-page-number="4">
+    <section class="sheet-body"><div class="flow-block">final page</div></section>
+  </article>
+</main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_bottom_margin_fails_figure_that_could_fit_at_band_min(tmp_path: Path) -> None:
+    """A figure that would fit in the trailing gap at the 0.8x band minimum is
+    a movable defect: the gate FAILs and tells the model to shrink+move it."""
+    html = tmp_path / "handout.html"
+    _write_figure_boundary_handout(html, figure_fits_at_min=True)
+
+    result = _run_validator(html)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "Sheet 2" in result.stdout
+    assert "could fit" in result.stdout
+    assert "shrink the figure" in result.stdout
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_bottom_margin_exempts_figure_that_cannot_fit_at_band_min(tmp_path: Path) -> None:
+    """A figure that cannot fit in the trailing gap even at the 0.8x band
+    minimum is exempt: the blank is the unavoidable cost of the width-band
+    floor. The gate must PASS and not flag it (weak-model safety)."""
+    html = tmp_path / "handout.html"
+    _write_figure_boundary_handout(html, figure_fits_at_min=False)
+
+    result = _run_validator(html)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+    assert "cannot fit" in result.stdout

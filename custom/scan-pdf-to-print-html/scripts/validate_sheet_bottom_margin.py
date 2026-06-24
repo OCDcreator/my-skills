@@ -47,6 +47,26 @@ This is the critical weak-model safety valve — it stops a weaker model from
 only make the layout worse and burn tokens for nothing. The current sheet's
 own orphan-heading guard still runs independently, so a real stranded heading
 on THIS sheet is never hidden by the next sheet's heading.
+
+ORPHAN-HEADING RULE (redesigned 2026-06-25): a heading is NEVER allowed to be
+the last line/block of a page. This FAILs regardless of how large the trailing
+blank is — the rule is structural ("a heading must travel with its following
+content"), not blank-size-gated. The only exemption is a genuine section break
+(`data-ends-before-lecture="true"` or a next-sheet chapter-shaped h2), where
+the heading is the intended end of a section.
+
+FIGURE-BOUNDARY ANALYSIS (redesigned 2026-06-25): instead of a blanket
+exemption, the gate CALCULATES whether a next-sheet image figure could fit in
+the current trailing gap if narrowed to the width-band minimum (0.8x of its
+current rendered width — the band floor below which readability suffers). The
+figure's minimum-scale block height = tallest image height * 0.8 + fixed
+overhead (figure margins/captions). If that minimum height fits in the gap,
+the blank IS a defect: the figure could have been narrowed and moved up, so
+the gate FAILs with an actionable hint ("shrink the figure within its width
+band and let it move up"). If even the minimum-width figure is taller than the
+gap, the blank is the unavoidable cost of the width-band floor and the sheet is
+exempt. This makes the gate's judgment match a human's: "could this image,
+shrunk a bit, have gone on the previous page? yes -> fix it; no -> leave it."
 """
 
 from __future__ import annotations
@@ -135,39 +155,57 @@ def validate(
                 // false positives on proportionally-scaled multi-image
                 // clusters (individual siblings dip below their solo band by
                 // design), which tempted weak models to "fix" correct breaks.
-                function nextStartsFigureBoundary(nextBody, bodyWidth, trailingPx) {
-                    if (!nextBody) return false;
+                // Figure-boundary analysis (evolved 2026-06-23, redesigned
+                // 2026-06-25). The next sheet's FIRST content block is an image
+                // figure (single <img>, <figure>, or multi-image cluster). The
+                // image width-band rule allows the image to render anywhere in
+                // its band — including as small as ~0.8x of its current rendered
+                // width (a floor below which readability suffers). So whether
+                // the trailing blank on THIS sheet is a real defect depends on
+                // a CALCULATION, not a blanket exemption:
+                //   - If the figure, shrunk to the band minimum (0.8x), would
+                //     fit in the trailing gap, the blank IS a defect: the image
+                //     could have been narrowed and moved up. FAIL with a hint
+                //     telling the model to shrink the figure (the model knows
+                //     the width band and can pick a smaller in-band width).
+                //   - If even the minimum-width figure is taller than the gap,
+                //     the blank is the unavoidable cost of the width-band floor.
+                //     Exempt — do not flag, do not tempt a weak model to shrink
+                //     past readability.
+                // The minimum-scale factor (0.8) is the band floor: it mirrors
+                // the lowest in-band width the rendered-contract gate permits.
+                const FIGURE_MIN_SCALE = 0.8;
+                function analyzeFigureBoundary(nextBody, trailingPx) {
+                    if (!nextBody) return null;
                     const first = Array.from(nextBody.children).find(
                         (c) => !c.classList.contains('doc-title') && c.getBoundingClientRect().height > 0
                     );
-                    if (!first) return false;
-                    // A figure boundary is any first-block that is an image
-                    // figure — a single <img>, a <figure>, or a multi-image
-                    // cluster. The block's own aspect-ratio width-band rule
-                    // means the images cannot be freely shrunk to fill the
-                    // trailing gap, so the gap is the unavoidable cost of that
-                    // rule regardless of whether the figure "almost fits".
-                    //
-                    // NOTE (evolved 2026-06-24): we deliberately do NOT run
-                    // the per-image band check here. A multi-image cluster is
-                    // proportionally scaled to fit one row, so individual
-                    // siblings can dip below their own solo band — that is the
-                    // intended cluster behavior, not a violation, and flagging
-                    // it produced false positives (the real per-image width
-                    // gate lives in validate_rendered_handout_contract.py).
-                    // Requiring per-image band compliance here let a correct
-                    // cluster figure-boundary page be FAILed, which tempted
-                    // weak models to "fix" a correct break into a worse one.
+                    if (!first) return null;
+                    const imgs = first.querySelectorAll('img');
                     const isFigureBlock = first.tagName === 'FIGURE'
                         || !!first.querySelector(':scope > figure, :scope > img, :scope > .ocr-image-cluster')
-                        || !!first.querySelector('img');
-                    if (!isFigureBlock) return false;
-                    // "Almost fits" counts: even when the figure is within ~8%
-                    // of fitting, the gap is still genuinely caused by the
-                    // image width-band rule (the image cannot be shrunk below
-                    // its band to fill the gap). trailingPx*0.08 grace.
+                        || imgs.length > 0;
+                    if (!isFigureBlock) return null;
+                    // Block height = tallest image + non-image overhead (figure
+                    // padding/margins/captions, which do NOT scale with image
+                    // width). At the minimum scale, image height scales 0.8x
+                    // (aspect preserved) while overhead stays fixed.
+                    let tallestImgH = 0;
+                    imgs.forEach((img) => {
+                        tallestImgH = Math.max(tallestImgH, img.getBoundingClientRect().height);
+                    });
                     const blockH = first.getBoundingClientRect().height;
-                    return blockH > trailingPx - Math.max(16, trailingPx * 0.08);
+                    const overhead = Math.max(0, blockH - tallestImgH);
+                    const estHeightAtMin = tallestImgH * FIGURE_MIN_SCALE + overhead;
+                    return {
+                        isFigure: true,
+                        blockH: Math.round(blockH),
+                        estHeightAtMin: Math.round(estHeightAtMin),
+                        trailingPx: Math.round(trailingPx),
+                        // "fits at minimum scale" => the blank is avoidable by
+                        // shrinking the figure within its band; this is a defect.
+                        fitsAtMinScale: estHeightAtMin <= trailingPx,
+                    };
                 }
 
                 // Heading-boundary trade-off (evolved 2026-06-24): when the next
@@ -315,7 +353,14 @@ def validate(
                     const fraction = trailing / bodyHeight;
                     const pageNumber = sheet.dataset.pageNumber || String(index + 1);
 
-                    const figureBoundary = nextStartsFigureBoundary(nextBody, bodyRect.width, trailing);
+                    const figureAnalysis = analyzeFigureBoundary(nextBody, trailing);
+                    // figureExempt: the next sheet starts with an image figure
+                    // that cannot fit in the trailing gap even at the band
+                    // minimum (0.8x) — the blank is the unavoidable cost of the
+                    // width-band floor. figureDefect: the figure COULD fit if
+                    // narrowed to its band minimum — the blank is avoidable.
+                    const figureExempt = !!(figureAnalysis && figureAnalysis.isFigure && !figureAnalysis.fitsAtMinScale);
+                    const figureDefect = !!(figureAnalysis && figureAnalysis.isFigure && figureAnalysis.fitsAtMinScale);
                     const headingBoundary = nextStartsHeadingBoundary(nextBody);
 
                     // A real section break — the heading is the intended end
@@ -323,26 +368,22 @@ def validate(
                     // reason a heading-ending sheet may keep its trailing blank.
                     const sectionBreak = endsBeforeLecture || nextStartsWithChapterH2;
 
-                    // Orphan-heading guard: if the sheet ends with a heading
-                    // above a large blank, it is a pagination defect unless a
-                    // real section break justifies it. The blockquote/figure/
-                    // heading-boundary exemptions do NOT cover this case — a
-                    // stranded heading must travel with its following content,
-                    // so we surface it as a violation even when those would
-                    // otherwise excuse the blank.
+                    // Orphan-heading guard: a sheet ending with a heading is a
+                    // pagination defect (the heading must travel with its
+                    // following content) unless a real section break justifies
+                    // it. NOTE: a heading as the last block is a defect EVEN
+                    // when the trailing blank is small — the rule is "a heading
+                    // is never the last line of a page", not "a heading above a
+                    // big blank". So this does NOT gate on fraction > maxFraction.
                     const endsWithHeading = !!lastContentHeading(body);
-                    const orphanHeading =
-                        endsWithHeading &&
-                        fraction > maxFraction &&
-                        !sectionBreak;
+                    const orphanHeading = endsWithHeading && !sectionBreak;
 
                     // Normal exemptions: blank is the unavoidable cost of a
-                    // next-sheet blockquote/figure/heading-boundary, or an
-                    // explicit lecture/chapter break. These exempt the blank
-                    // only when an orphan heading is not present (orphan
-                    // overrides them).
-                    const baseExempt = nextStartsWithBlockquote || endsBeforeLecture || figureBoundary || nextStartsWithChapterH2 || headingBoundary;
-                    const exempt = baseExempt && !orphanHeading;
+                    // next-sheet blockquote / non-fitting figure / heading-
+                    // boundary, or an explicit lecture/chapter break. A figure
+                    // that COULD fit (figureDefect) is NOT exempt.
+                    const baseExempt = nextStartsWithBlockquote || endsBeforeLecture || figureExempt || nextStartsWithChapterH2 || headingBoundary;
+                    const exempt = baseExempt && !orphanHeading && !figureDefect;
 
                     measurements.push({
                         pageNumber,
@@ -351,20 +392,44 @@ def validate(
                         fraction: Number(fraction.toFixed(3)),
                         nextStartsWithBlockquote,
                         endsBeforeLecture,
-                        figureBoundary,
+                        figureExempt,
+                        figureDefect,
                         nextStartsWithChapterH2,
                         headingBoundary,
                         endsWithHeading,
                         orphanHeading,
+                        figureAnalysis,
                     });
 
-                    if (!exempt && fraction > maxFraction) {
+                    // A sheet violates when:
+                    //  (a) orphan heading — a heading is the last line (always
+                    //      a defect, regardless of blank size); or
+                    //  (b) a figure that could fit at band-minimum width sits
+                    //      on the next sheet above a real trailing gap; or
+                    //  (c) a non-exempt sheet whose trailing blank exceeds the
+                    //      threshold.
+                    let violated = false;
+                    let reason = '';
+                    if (orphanHeading) {
+                        violated = true;
+                        reason = 'orphan-heading';
+                    } else if (figureDefect && fraction > maxFraction) {
+                        violated = true;
+                        reason = 'figure-could-fit-at-band-min';
+                    } else if (!exempt && fraction > maxFraction) {
+                        violated = true;
+                        reason = 'excessive-trailing-blank';
+                    }
+                    if (violated) {
                         violations.push({
                             pageNumber,
                             trailingPx: Math.round(trailing),
                             bodyHeightPx: Math.round(bodyHeight),
                             fraction: Number(fraction.toFixed(3)),
+                            reason,
                             orphanHeading,
+                            figureDefect,
+                            figureAnalysis,
                         });
                     }
                 });
@@ -386,33 +451,51 @@ def validate(
             exempt_reasons.append("next sheet starts with blockquote")
         if m["endsBeforeLecture"]:
             exempt_reasons.append("forced lecture break")
-        if m.get("figureBoundary"):
-            exempt_reasons.append("next sheet starts with an image figure (width-band cost)")
+        if m.get("figureExempt"):
+            fa = m.get("figureAnalysis") or {}
+            exempt_reasons.append(
+                f"next sheet starts with a figure that cannot fit at band-min "
+                f"(est {fa.get('estHeightAtMin')}px > gap {fa.get('trailingPx')}px)"
+            )
         if m.get("nextStartsWithChapterH2"):
             exempt_reasons.append("next sheet starts with chapter h2")
         if m.get("headingBoundary"):
             exempt_reasons.append("next sheet starts with a heading (section start)")
         exempt_note = f" [exempt: {', '.join(exempt_reasons)}]" if exempt_reasons else ""
-        if m.get("orphanHeading") and exempt_reasons:
-            exempt_note += " [overridden by orphan heading]"
         print(
             f"  Sheet {m['pageNumber']}: trailing {m['trailingPx']}px / "
             f"body {m['bodyHeightPx']}px ({m['fraction'] * 100:.1f}%){exempt_note}"
         )
 
     if results["violations"]:
-        print("FAIL: excessive trailing blank space detected on:")
+        print("FAIL: trailing-blank / orphan-heading / movable-figure defects:")
         for v in results["violations"]:
-            orphan_note = (
-                "  [orphan heading: move the trailing heading to the next sheet]"
-                if v.get("orphanHeading")
-                else ""
-            )
-            print(
-                f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "
-                f"body {v['bodyHeightPx']}px ({v['fraction'] * 100:.1f}% > "
-                f"{max_fraction * 100:.1f}%){orphan_note}"
-            )
+            reason = v.get("reason", "excessive-trailing-blank")
+            if reason == "orphan-heading":
+                # Orphan headings FAIL regardless of blank size — the rule is
+                # "a heading is never the last line of a page", so do not show
+                # a misleading "> threshold%" clause.
+                print(
+                    f"  - Sheet {v['pageNumber']}: heading is the last line "
+                    f"(trailing {v['trailingPx']}px)  [orphan heading: move "
+                    f"the trailing heading to the next sheet]"
+                )
+            elif reason == "figure-could-fit-at-band-min":
+                fa = v.get("figureAnalysis") or {}
+                print(
+                    f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "
+                    f"body {v['bodyHeightPx']}px ({v['fraction'] * 100:.1f}% > "
+                    f"{max_fraction * 100:.1f}%)  [figure on next sheet could fit if "
+                    f"narrowed to band-min: est {fa.get('estHeightAtMin')}px <= gap "
+                    f"{fa.get('trailingPx')}px — shrink the figure within its width "
+                    f"band and let it move up]"
+                )
+            else:
+                print(
+                    f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "
+                    f"body {v['bodyHeightPx']}px ({v['fraction'] * 100:.1f}% > "
+                    f"{max_fraction * 100:.1f}%)"
+                )
         return 1
 
     print(
