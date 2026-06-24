@@ -157,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
         if local_name(el.tag) == "rect"
         and "bg" not in class_tokens(el)
         and "label-shield" not in class_tokens(el)
+        and "shadow" not in class_tokens(el)
         and not has_ancestor_class(parent_map, el, "formula-fit")
     ]
     for el in rects:

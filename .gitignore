@@ -19,6 +19,11 @@ custom/knowledge-to-print-html/.venv-print/
 .syncthing.*.tmp
 *.sync-conflict-*
 .stfolder/
+
+# Windows NUL device name accidentally materialized as a file under Git Bash
+# (e.g. `cmd ... > nul` or `2>nul` creates a literal file named `nul` instead
+# of discarding output). These are never intentional; ignore and prevent.
+nul
 .stversions/
 automation/**/__pycache__/
 automation/**/*.pyc
