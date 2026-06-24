@@ -93,8 +93,39 @@ NEW_MATH_WAIT = """
     if (window.renderMathInElement) {
       window.renderMathInElement(root, window.KATEX_RENDER_OPTIONS);
     }
-    if (document.fonts && document.fonts.ready) {
-      await document.fonts.ready;
+    // KaTeX renders math with its own web fonts (KaTeX_Main, KaTeX_Math,
+    // KaTeX_Size*, etc.) loaded on demand from the CDN via katex.min.css.
+    // Those fonts are NOT requested until renderMathInElement() actually emits
+    // .katex markup, so they start downloading only AFTER the line above.
+    // The first render therefore uses fallback metrics and is SHORTER; once
+    // the KaTeX fonts arrive, every formula reflows TALLER. If pagination
+    // measures the short (pre-font) heights, the fixed-height .sheet-body
+    // grid + overflow:hidden silently clips the last line once fonts settle
+    // — which is exactly why Chrome (cold CDN, late fonts) clips pages that
+    // Quick Look / Playwright (warm/cached fonts) show fine (evolved 2026-06-24).
+    // Fix: explicitly load every KaTeX font family, wait for them, THEN let
+    // pagination measure. This makes the measurement match the final laid-out
+    // height across all browsers.
+    if (document.fonts && typeof document.fonts.load === 'function') {
+      const katexFamilies = [
+        '1em KaTeX_Main', '1em KaTeX_Math', '1em KaTeX_Caligraphic',
+        '1em KaTeX_Fraktur', '1em KaTeX_SansSerif', '1em KaTeX_Script',
+        '1em KaTeX_Typewriter', '1em KaTeX_Size1', '1em KaTeX_Size2',
+        '1em KaTeX_Size3', '1em KaTeX_Size4', '1em KaTeX_AMS',
+      ];
+      try {
+        await Promise.all(katexFamilies.map((f) => document.fonts.load(f).catch(() => {})));
+      } catch (_fontErr) {
+        // Keep print flow alive even if a KaTeX font fails to load.
+      }
+      // Re-render now that fonts are present, so the final laid-out heights
+      // (which pagination measures) reflect the real KaTeX metrics.
+      if (window.renderMathInElement) {
+        window.renderMathInElement(root, window.KATEX_RENDER_OPTIONS);
+      }
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
     }
   } catch (_err) {
     // Keep print flow alive even if KaTeX reports an issue.

@@ -531,7 +531,36 @@ function sheetOverflows(sheet) {
   if (!body) {
     return false;
   }
-  return body.scrollHeight > body.clientHeight + 1;
+  // Hard overflow: scrollHeight exceeds the fixed grid row. Under
+  // overflow:hidden scrollHeight still reports the true content height, so
+  // this catches content that genuinely does not fit.
+  if (body.scrollHeight > body.clientHeight + 1) {
+    return true;
+  }
+  // Geometry headroom (evolved 2026-06-24): the BOTTOM of the last flow-block
+  // must stay a small fixed distance clear of the body's bottom edge. Even
+  // with the KaTeX-font-wait fix (postprocess NEW_MATH_WAIT), different
+  // browsers can render CJK text + KaTeX a hair taller than the paginator's
+  // own Chromium; because .sheet-body is overflow:hidden inside a fixed 297mm
+  // grid, that hair clips the last line silently in e.g. Chrome while the
+  // Playwright-rendered PDF looks fine. scrollHeight alone cannot enforce a
+  // margin: under overflow:hidden it is clamped to clientHeight, so a filled
+  // (non-overflowing) sheet reads scrollHeight==clientHeight and a naive
+  // `> clientHeight - margin` would flag EVERY filled sheet as overflow
+  // (the 1743-page regression). Measuring the last block's rect instead gives
+  // the true content extent below the clamp, so a modest ~12px safety margin
+  // is enough to absorb cross-browser metric drift without bloating page
+  // count.
+  const margin = 12;
+  const blocks = body.querySelectorAll(':scope > .flow-block');
+  if (blocks.length === 0) return false;
+  const bodyBottom = body.getBoundingClientRect().bottom;
+  let contentBottom = body.getBoundingClientRect().top;
+  for (const b of blocks) {
+    const r = b.getBoundingClientRect();
+    if (r.height > 0) contentBottom = Math.max(contentBottom, r.bottom);
+  }
+  return contentBottom > bodyBottom - margin;
 }
 
 function setSheetState(sheet) {
