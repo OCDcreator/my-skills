@@ -602,6 +602,15 @@ function renumberSheets(root) {
       }
       const trailLabel = sheet.querySelector('.sheet-trail-label');
       if (trailLabel) {
+        // A page with no heading of its own is a continuation page (content
+        // spilled from the previous page). It still belongs to the current
+        // chapter/level, so inherit the running global stack snapshot rather
+        // than showing an empty breadcrumb. This is the "同章节页都显示该
+        // 章节面包屑" rule: only pages before ANY heading (or after a
+        // completed subtree) legitimately have no breadcrumb.
+        if (!pageStackSnapshot && stack.length) {
+          pageStackSnapshot = stack.map((entry) => entry.title);
+        }
         if (pageStackSnapshot && pageStackSnapshot.length) {
           // Render the path as "前 › 前 › 前 › <emph>最后一级</emph>" — every
           // segment except the last is muted, the last (current) level is
