@@ -123,72 +123,51 @@ def validate(
                         el.querySelector('.phycat-blockquote') !== null
                     );
                 }
-                // Figure-boundary trade-off (evolved 2026-06-23): when the
-                // next sheet's FIRST content block contains an image that
-                // satisfies its aspect-ratio width band AND that block is too
-                // tall to fit in the current sheet's trailing blank, the blank
-                // is the unavoidable cost of the image-width rule. Exempt the
-                // current sheet rather than letting the two hard contracts
-                // fight — the rule whose target is met (image width) wins over
-                // the rule whose target cannot be met without breaking it.
-                function smoothTargetPct(ar) {
-                    const pts = [
-                        [0.0, 18], [0.7, 22], [0.9, 27], [1.0, 30], [1.2, 35],
-                        [1.5, 45], [2.0, 58], [2.5, 68], [3.5, 78], [6.0, 82],
-                    ];
-                    if (ar <= pts[0][0]) return pts[0][1];
-                    if (ar >= pts[pts.length - 1][0]) return pts[pts.length - 1][1];
-                    for (let i = 0; i < pts.length - 1; i++) {
-                        const a0 = pts[i][0], t0 = pts[i][1];
-                        const a1 = pts[i + 1][0], t1 = pts[i + 1][1];
-                        if (a0 <= ar && ar <= a1) {
-                            const r = (ar - a0) / (a1 - a0);
-                            return t0 + (t1 - t0) * r;
-                        }
-                    }
-                    return 30;
-                }
-                function classifyAspect(nw, nh) {
-                    const ar = nw / Math.max(nh, 1);
-                    const target = smoothTargetPct(ar) / 100;
-                    const lo = Math.max(0.12, target - 0.07);
-                    const hi = Math.min(0.92, target + 0.07);
-                    return { lo, hi };
-                }
-                function imgBandOk(img, bodyWidth) {
-                    if (!img || !img.naturalWidth || !img.naturalHeight) return false;
-                    // Each image — whether alone or one of several in a side-by-side
-                    // figure/cluster — is judged against its OWN aspect-ratio band,
-                    // capped by its OWN natural width (no upscaling). A multi-image
-                    // row does not justify enlarging each sibling to fill the row.
-                    const natFrac = img.naturalWidth / Math.max(bodyWidth, 1);
-                    const band = classifyAspect(img.naturalWidth, img.naturalHeight);
-                    let lo = band.lo, hi = band.hi;
-                    if (natFrac <= band.lo) {
-                        lo = Math.max(0.12, natFrac - 0.07); hi = natFrac + 0.07;
-                    } else {
-                        hi = Math.min(band.hi, Math.max(band.lo, natFrac));
-                    }
-                    const frac = img.getBoundingClientRect().width / Math.max(bodyWidth, 1);
-                    return frac >= lo - 0.04 && frac <= hi + 0.04;
-                }
+                // Figure-boundary trade-off (evolved 2026-06-23, refined
+                // 2026-06-24): when the next sheet's FIRST content block is an
+                // image figure (single img, <figure>, or multi-image cluster),
+                // the trailing blank on the current sheet is the unavoidable
+                // cost of the image width-band rule — images cannot be freely
+                // shrunk to fill the gap, so the gap is legitimate regardless
+                // of whether the figure "almost fits". The per-image width
+                // band is enforced by validate_rendered_handout_contract.py,
+                // NOT here; running it in this trailing-blank gate produced
+                // false positives on proportionally-scaled multi-image
+                // clusters (individual siblings dip below their solo band by
+                // design), which tempted weak models to "fix" correct breaks.
                 function nextStartsFigureBoundary(nextBody, bodyWidth, trailingPx) {
                     if (!nextBody) return false;
                     const first = Array.from(nextBody.children).find(
                         (c) => !c.classList.contains('doc-title') && c.getBoundingClientRect().height > 0
                     );
                     if (!first) return false;
-                    const img = first.querySelector('img');
-                    if (!img) return false;
-                    // The image must satisfy its band (this is the rule that
-                    // wins the trade-off). The block must be too tall to move
-                    // up — but "almost fits" also counts: if moving the figure
-                    // would overflow by only a few percent, the blank is still
-                    // genuinely caused by that figure. trailingPx*0.08 lets a
-                    // figure that is within ~8% of fitting stay a boundary.
+                    // A figure boundary is any first-block that is an image
+                    // figure — a single <img>, a <figure>, or a multi-image
+                    // cluster. The block's own aspect-ratio width-band rule
+                    // means the images cannot be freely shrunk to fill the
+                    // trailing gap, so the gap is the unavoidable cost of that
+                    // rule regardless of whether the figure "almost fits".
+                    //
+                    // NOTE (evolved 2026-06-24): we deliberately do NOT run
+                    // the per-image band check here. A multi-image cluster is
+                    // proportionally scaled to fit one row, so individual
+                    // siblings can dip below their own solo band — that is the
+                    // intended cluster behavior, not a violation, and flagging
+                    // it produced false positives (the real per-image width
+                    // gate lives in validate_rendered_handout_contract.py).
+                    // Requiring per-image band compliance here let a correct
+                    // cluster figure-boundary page be FAILed, which tempted
+                    // weak models to "fix" a correct break into a worse one.
+                    const isFigureBlock = first.tagName === 'FIGURE'
+                        || !!first.querySelector(':scope > figure, :scope > img, :scope > .ocr-image-cluster')
+                        || !!first.querySelector('img');
+                    if (!isFigureBlock) return false;
+                    // "Almost fits" counts: even when the figure is within ~8%
+                    // of fitting, the gap is still genuinely caused by the
+                    // image width-band rule (the image cannot be shrunk below
+                    // its band to fill the gap). trailingPx*0.08 grace.
                     const blockH = first.getBoundingClientRect().height;
-                    return imgBandOk(img, bodyWidth) &&
-                        blockH > trailingPx - Math.max(16, trailingPx * 0.08);
+                    return blockH > trailingPx - Math.max(16, trailingPx * 0.08);
                 }
 
                 // Heading-boundary trade-off (evolved 2026-06-24): when the next
@@ -408,7 +387,7 @@ def validate(
         if m["endsBeforeLecture"]:
             exempt_reasons.append("forced lecture break")
         if m.get("figureBoundary"):
-            exempt_reasons.append("next sheet starts with band-compliant figure")
+            exempt_reasons.append("next sheet starts with an image figure (width-band cost)")
         if m.get("nextStartsWithChapterH2"):
             exempt_reasons.append("next sheet starts with chapter h2")
         if m.get("headingBoundary"):
