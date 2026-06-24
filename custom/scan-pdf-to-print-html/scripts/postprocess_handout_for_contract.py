@@ -161,36 +161,46 @@ TIGHTEN_VERTICAL_SPACING = """
 .transcript-flow h2,
 .transcript-flow h3,
 .transcript-flow h4 {
-  margin-bottom: 2.2mm !important;
+  margin-bottom: 1.8mm !important;
 }
 
 .transcript-flow p,
 .transcript-flow li {
-  margin-bottom: 0.48em !important;
+  margin-bottom: 0.34em !important;
 }
 
 .transcript-flow ul,
 .transcript-flow ol {
-  margin-bottom: 0.62em !important;
+  margin-bottom: 0.5em !important;
 }
 
 .transcript-flow table {
-  margin: 2.2mm 0 3mm !important;
+  margin: 1.8mm 0 2.4mm !important;
 }
 
 .transcript-flow figure,
 .transcript-flow .ocr-image-cluster {
-  margin: 2.2mm auto !important;
+  margin: 1.8mm auto !important;
 }
 
 .transcript-flow .phycat-blockquote {
-  margin: 2.4mm 0 3mm !important;
-  padding: 2.4mm 2.8mm !important;
+  margin: 1.9mm 0 2.4mm !important;
+  padding: 2.1mm 2.5mm !important;
 }
 
 .transcript-flow .phycat-blockquote p,
 .transcript-flow .phycat-blockquote li {
-  margin-bottom: 0.42em !important;
+  margin-bottom: 0.28em !important;
+}
+
+/* Tighten dense math prose enough to reduce avoidable page-tail gaps. */
+.transcript-flow p:has(.katex-display) {
+  margin-bottom: 0.18em !important;
+}
+
+.transcript-flow p + p:has(.katex-display),
+.transcript-flow p:has(.katex-display) + p {
+  margin-top: -0.14em !important;
 }
 """
 
@@ -245,7 +255,20 @@ function configureImageGroup(group, imgs, refWidth) {
   group.style.margin = '3mm auto';
 
   imgs.forEach((img, index) => {
-    applySingleImageWidth(img, refWidth, targets[index] * scale);
+    const wrapper = img.parentElement;
+    const targetPct = targets[index] * scale;
+    if (wrapper && wrapper !== group && wrapper.tagName === 'DIV') {
+      wrapper.style.flex = `${Math.max(0.35, targetPct / 100)} 1 0`;
+      wrapper.style.maxWidth = 'none';
+      wrapper.style.width = `${Math.min(95, targetPct).toFixed(1)}%`;
+      img.style.width = '100%';
+      img.style.maxWidth = `${img.naturalWidth}px`;
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.margin = '0';
+      return;
+    }
+    applySingleImageWidth(img, refWidth, targetPct);
     img.style.margin = '0';
   });
 }
@@ -302,6 +325,10 @@ function isChapterBreakHeading(text) {
 
 function normalizeTextForBookmark(text) {
   return (text || '').replace(/\\s+/g, ' ').trim();
+}
+
+function blockTextContent(block) {
+  return ((block && (block.innerText || block.textContent)) || '').replace(/\\s+/g, ' ').trim();
 }
 
 function firstMeaningfulParagraph(block) {
@@ -404,6 +431,98 @@ function cloneBlockPreservingMeta(block) {
   return clone;
 }
 
+function splitOverlongQuestionCallout(block) {
+  const quote = block.querySelector(':scope > blockquote.phycat-blockquote');
+  if (!quote) return [block];
+  const text = normalizeTextForBookmark(quote.textContent);
+  const charBudget = 700;
+  const nodeBudget = 6;
+  const childNodes = Array.from(quote.childNodes).filter((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return (node.textContent || '').trim();
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const text = normalizeTextForBookmark(node.textContent || '');
+    return text || node.querySelector('img,svg,canvas,table,.katex,math');
+  });
+  if (text.length <= charBudget && childNodes.length <= nodeBudget) return [block];
+
+  const [lead, ...rest] = childNodes;
+  if (!lead || !rest.length) return [block];
+  const chunks = [];
+  const firstBlock = cloneBlockPreservingMeta(block);
+  const firstQuote = firstBlock.querySelector(':scope > blockquote.phycat-blockquote');
+  if (!firstQuote) return [block];
+  firstQuote.replaceChildren(lead.cloneNode(true));
+  chunks.push(firstBlock);
+
+  const supportBlock = document.createElement('div');
+  supportBlock.className = 'flow-block question-support-block';
+  if (block.dataset && block.dataset.sourcePage) {
+    supportBlock.dataset.sourcePage = block.dataset.sourcePage;
+  }
+  rest.forEach((node) => {
+    supportBlock.appendChild(node.cloneNode(true));
+  });
+  chunks.push(supportBlock);
+  return chunks;
+}
+
+function splitQuestionSupportBlocks(block) {
+  if (!block.classList.contains('question-support-block')) return [block];
+  const children = Array.from(block.children);
+  if (children.length <= 1) return [block];
+  return children.map((child) => {
+    const next = document.createElement('div');
+    next.className = 'flow-block question-support-block';
+    if (block.dataset && block.dataset.sourcePage) {
+      next.dataset.sourcePage = block.dataset.sourcePage;
+    }
+    next.appendChild(child.cloneNode(true));
+    return next;
+  });
+}
+
+function isConnectorOnlyBlock(block) {
+  const text = normalizeTextForBookmark(block ? block.textContent : '');
+  return /^(因此|所以|从而|于是|则|故|可得)$/.test(text);
+}
+
+function isDisplayMathOnlyBlock(block) {
+  if (!block) return false;
+  const meaningfulChildren = Array.from(block.children).filter((child) => {
+    const text = normalizeTextForBookmark(child.textContent || '');
+    return text || child.querySelector('img,svg,canvas,table,.katex,math');
+  });
+  if (!meaningfulChildren.length) return false;
+  return meaningfulChildren.every((child) => {
+    if (child.querySelector('img,svg,canvas,table')) return false;
+    if (child.querySelector('.katex-display, math[display="block"]')) return true;
+    const text = (child.textContent || '').trim();
+    return text.startsWith('$$') && text.endsWith('$$');
+  });
+}
+
+function mergeConnectorWithFollowingMath(blocks) {
+  const merged = [];
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i];
+    const next = blocks[i + 1];
+    if (isConnectorOnlyBlock(block) && isDisplayMathOnlyBlock(next)) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flow-block question-support-block';
+      if (block.dataset && block.dataset.sourcePage) {
+        wrapper.dataset.sourcePage = block.dataset.sourcePage;
+      }
+      Array.from(block.children).forEach((child) => wrapper.appendChild(child.cloneNode(true)));
+      Array.from(next.children).forEach((child) => wrapper.appendChild(child.cloneNode(true)));
+      merged.push(wrapper);
+      i += 1;
+      continue;
+    }
+    merged.push(block);
+  }
+  return merged;
+}
+
 function headingLevelNumber(tagName) {
   const m = /H([1-6])/.exec(tagName || '');
   return m ? Number(m[1]) : 6;
@@ -467,6 +586,68 @@ function injectConceptCover(root) {
   root.dataset.coverInjected = 'true';
   return true;
 }
+
+function meaningfulFlowBlocks(sheet) {
+  const body = sheetBody(sheet);
+  if (!body) return [];
+  return Array.from(body.querySelectorAll(':scope > .flow-block')).filter((block) => {
+    const text = blockTextContent(block);
+    return text || block.querySelector('img,svg,canvas,table,.katex,math');
+  });
+}
+
+function trailingBlankRatio(sheet) {
+  const body = sheetBody(sheet);
+  const blocks = meaningfulFlowBlocks(sheet);
+  if (!body || !blocks.length) return 0;
+  const bodyRect = body.getBoundingClientRect();
+  const lastRect = blocks[blocks.length - 1].getBoundingClientRect();
+  return bodyRect.height ? Math.max(0, bodyRect.bottom - lastRect.bottom) / bodyRect.height : 0;
+}
+
+function isCarryForwardProtected(block) {
+  if (!block) return true;
+  if (block.querySelector(':scope > .phycat-blockquote, :scope > h2, :scope > h3, :scope > h4')) return true;
+  if (block.querySelector(':scope > figure, :scope > img, :scope > svg, :scope > canvas')) return true;
+  if (isDisplayMathOnlyBlock(block)) return false;
+  return false;
+}
+
+function rebalanceTrailingBlankSheets(root) {
+  const sheets = Array.from(root.querySelectorAll('.sheet'));
+  for (let i = 0; i < sheets.length - 1; i += 1) {
+    const prev = sheets[i];
+    const next = sheets[i + 1];
+    if (prev.matches('.concept-map-sheet,[data-sheet-role="cover"],[data-cover-sheet="true"]')) continue;
+    if (prev.dataset.endsBeforeLecture === 'true') continue;
+
+    let moved = true;
+    while (moved) {
+      moved = false;
+      const ratio = trailingBlankRatio(prev);
+      if (ratio <= 0.10) break;
+
+      const nextBody = sheetBody(next);
+      const nextBlocks = meaningfulFlowBlocks(next);
+      if (!nextBody || nextBlocks.length < 2) break;
+      const candidate = nextBlocks[0];
+      if (isCarryForwardProtected(candidate)) break;
+
+      const prevBody = sheetBody(prev);
+      const anchor = candidate.nextSibling;
+      prevBody.appendChild(candidate);
+      if (sheetOverflows(prev)) {
+        nextBody.insertBefore(candidate, anchor);
+        setSheetState(prev);
+        setSheetState(next);
+        break;
+      }
+      setSheetState(prev);
+      setSheetState(next);
+      moved = true;
+    }
+  }
+}
 """
 
 
@@ -513,7 +694,8 @@ def inject_js_overrides(html: str) -> str:
             raise SystemExit("paginateHandout title marker not found in handout.html")
         html = html.replace(marker, "  applyFigureWidthBands(sourceRoot);\n\n" + marker, 1)
 
-    old_paginate_tail = """  const title = printRoot.dataset.title || '';
+    old_paginate_tails = [
+        """  const title = printRoot.dataset.title || '';
   const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
   const blocks = collectFlowBlocks(sourceRoot);
   printRoot.replaceChildren();
@@ -536,12 +718,40 @@ def inject_js_overrides(html: str) -> str:
   sourceRoot.remove();
   document.documentElement.dataset.handoutReady = 'true';
 }
-"""
+""",
+        """  const title = printRoot.dataset.title || '';
+  const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
+  const blocks = collectFlowBlocks(sourceRoot);
+  printRoot.replaceChildren();
+
+  let pageNumber = 1;
+  let sheet = createSheet(pageNumber, title, sourceLabel, true);
+  printRoot.appendChild(sheet);
+
+  for (const block of blocks) {
+    if (appendBlockToSheet(sheet, block)) {
+      continue;
+    }
+    pageNumber += 1;
+    sheet = createSheet(pageNumber, title, sourceLabel, false);
+    printRoot.appendChild(sheet);
+    appendBlockToSheet(sheet, block);
+  }
+
+  renumberSheets(printRoot);
+  sourceRoot.remove();
+  document.documentElement.dataset.handoutReady = 'true';
+}""",
+    ]
 
     new_paginate_tail = """  const title = printRoot.dataset.title || '';
   const hasCover = !!printRoot.dataset.coverHref;
   const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
-  const blocks = mergeExampleRuns(collectFlowBlocks(sourceRoot));
+  const blocks = mergeConnectorWithFollowingMath(
+    mergeExampleRuns(collectFlowBlocks(sourceRoot))
+      .flatMap(splitOverlongQuestionCallout)
+      .flatMap(splitQuestionSupportBlocks)
+  );
   const bookmarkEntries = [];
   printRoot.replaceChildren();
 
@@ -583,6 +793,7 @@ def inject_js_overrides(html: str) -> str:
       entry.page += 1;
     });
   }
+  rebalanceTrailingBlankSheets(printRoot);
   renumberSheets(printRoot);
   attachBookmarkPayload(printRoot, bookmarkEntries);
   sourceRoot.remove();
@@ -591,7 +802,8 @@ def inject_js_overrides(html: str) -> str:
 """
 
     if new_paginate_tail not in html:
-        if old_paginate_tail not in html:
+        old_paginate_tail = next((candidate for candidate in old_paginate_tails if candidate in html), None)
+        if old_paginate_tail is None:
             raise SystemExit("paginateHandout tail block not found in handout.html")
         html = html.replace(old_paginate_tail, new_paginate_tail, 1)
 
