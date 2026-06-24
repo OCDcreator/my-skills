@@ -1,12 +1,25 @@
 {
   "meta": {
-    "generated_at": "2026-06-23T13:04:51.571668+00:00",
-    "total_skills": 1136,
-    "custom_skills": 38,
+    "generated_at": "2026-06-24T12:16:31.155343+00:00",
+    "total_skills": 1137,
+    "custom_skills": 39,
     "external_skills": 1098,
     "sources_count": 19
   },
   "skills": [
+    {
+      "path": "custom/a4-novak-html-cover",
+      "name": "a4-novak-html-cover",
+      "description": "Use when analyzing a document (lecture notes, textbook chapter, PDF/markdown) and generating a printable A4 portrait Novak/tree concept map cover as HTML. Produces a single-page handout cover with HTML cards, SVG bezier connector overlay, and KaTeX math formulas. Choose this over the SVG-cover skill whenever the cover must be edited by changing text/formulas (not coordinates), or whenever formulas must render at full fidelity without pre-rendering to SVG paths. Use whenever the user asks for a 概念图 / 知识图 / 封面 / mind map / Novak cover / 讲义首页 from a document — even if they don't say \"HTML\".",
+      "category": "Content/Publishing",
+      "tier": "custom",
+      "source": "custom",
+      "repo": "git@github.com:OCDcreator/my-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
     {
       "path": "custom/a4-novak-svg-cover",
       "name": "a4-novak-svg-cover",
@@ -14902,11 +14915,11 @@
       "repo": "git@github.com:OCDcreator/my-skills.git",
       "branch": "main",
       "tier": "custom",
-      "skill_count": 38
+      "skill_count": 39
     }
   },
   "categories": {
-    "Content/Publishing": 1123,
+    "Content/Publishing": 1124,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,

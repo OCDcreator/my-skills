@@ -1,13 +1,13 @@
 # Full Skills Catalog
 
-Generated from repository state on 2026-06-23.
+Generated from repository state on 2026-06-24.
 
 This file contains the **complete** index of all skills in the repository, including bulk sources. For the curated quick-reference, see [`SKILLS.md`](../SKILLS.md).
 
 ## Stats
 
-- **Total skills**: 1136
-- **Custom skills**: 38
+- **Total skills**: 1137
+- **Custom skills**: 39
 - **External sources**: 18
 - **External skills**: 1098
 
@@ -15,6 +15,7 @@ This file contains the **complete** index of all skills in the repository, inclu
 
 | Path | Name | Category | Use when |
 |---|---|---|---|
+| `custom/a4-novak-html-cover` | `a4-novak-html-cover` | Content/Publishing | Use when analyzing a document (lecture notes, textbook chapter, PDF/markdown) and generating a printable A4 portrait Novak/tree concept map cover as HTML. Produces a single-page handout cover with HTML cards, SVG bezier connector overlay, and KaTeX math formulas. Choose this over the SVG-cover skill whenever the cover must be edited by changing text/formu... |
 | `custom/a4-novak-svg-cover` | `a4-novak-svg-cover` | Content/Publishing | Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text collisions, or off-center card text. |
 | `custom/codex-autopilot-scaffold` | `codex-autopilot-scaffold` | Content/Publishing | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrades. Do not use for one-shot fixes or existing OpenCode Loop... |
 | `custom/design-reference-router` | `design-reference-router` | Frontend/UI | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. |
@@ -1293,6 +1294,7 @@ Duplicate names are expected for external sources; select by path and source, no
 
 | Path | Name | Category | Tier | Use when | Source repo | Source branch | Source subdir | Install hint |
 |---|---|---|---|---|---|---|---|---|
+| `custom/a4-novak-html-cover` | `a4-novak-html-cover` | Content/Publishing | custom | Use when analyzing a document (lecture notes, textbook chapter, PDF/markdown) and generating a printable A4 portrait Novak/tree concept map cover as HTML. Produces a single-page handout cover with HTML cards, SVG bezier connector overlay, and KaTeX math formulas. Choose this over the SVG-cover skill whenever the cover must be edited by changing text/formu... | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/a4-novak-html-cover` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/a4-novak-html-cover` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `custom/a4-novak-svg-cover` | `a4-novak-svg-cover` | Content/Publishing | custom | Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text collisions, or off-center card text. | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/a4-novak-svg-cover` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/a4-novak-svg-cover` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `custom/codex-autopilot-scaffold` | `codex-autopilot-scaffold` | Content/Publishing | custom | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrades. Do not use for one-shot fixes or existing OpenCode Loop... | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/codex-autopilot-scaffold` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/codex-autopilot-scaffold` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |
 | `custom/design-reference-router` | `design-reference-router` | Frontend/UI | custom | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. | `git@github.com:OCDcreator/my-skills.git` | `main` | `custom/design-reference-router` | Clone `git@github.com:OCDcreator/my-skills.git` at `main` and copy `custom/design-reference-router` to `.claude/skills/`, `.agents/skills/`, and `.opencode/skills/` as needed. |

@@ -1,6 +1,6 @@
 # Skills Catalog
 
-Generated from repository state on 2026-06-23.
+Generated from repository state on 2026-06-24.
 
 This is the **curated** quick-reference index. For the complete list of all 1000+ skills, see [`docs/full-catalog.md`](docs/full-catalog.md).
 
@@ -26,6 +26,7 @@ This is the **curated** quick-reference index. For the complete list of all 1000
 
 | Path | Name | Use when |
 |---|---|---|
+| `custom/a4-novak-html-cover` | `a4-novak-html-cover` | Use when analyzing a document (lecture notes, textbook chapter, PDF/markdown) and generating a printable A4 portrait Novak/tree concept map cover as HTML. Produces a single-page handout cover with HTML cards, SVG bezier connector overlay, and KaTeX math formulas. Choose this over the SVG-cover skill whenever the cover must be edited by changing text/formulas (not coordinates), or whenever formulas must render at f... |
 | `custom/a4-novak-svg-cover` | `a4-novak-svg-cover` | Use when creating or fixing an A4 portrait SVG cover for a printable handout, especially Novak/tree concept maps, homepage knowledge graphs, full-page SVG covers, math/Chinese handouts, or SVGs that must survive HTML/PDF rendering without overlap, tofu glyphs, tiny scaling, black fills, line-text collisions, or off-center card text. |
 | `custom/codex-autopilot-scaffold` | `codex-autopilot-scaffold` | Use when a user wants to add, refresh, or operate a repo-local unattended Codex autopilot scaffold in a repository, especially queue-driven refactor/quality/bugfix work, review-gated rounds, Windows/macOS bootstrap, health checks, remote Mac rollout, or preserving lane docs during scaffold upgrades. Do not use for one-shot fixes or existing OpenCode Loop runs. |
 | `custom/design-reference-router` | `design-reference-router` | Use when the user wants a page or UI to follow a real product or brand style, mentions DESIGN.md, getdesign.md, or awesome-design-md, or asks for a non-generic design that should start from concrete reference sites before implementation. |

@@ -366,3 +366,15 @@ Session rework trace (user messages, chronologic):
 - Wheel #3 (chapter-heading regex, `isChapterShapedText`/`isChapterBreakHeading`): duplicated in postprocess + validate_sheet_bottom_margin. Lower priority because it's only 2 copies and both were just synced in session 5. Worth folding into a shared module if a 3rd copy appears.
 
 **SKILL.md note:** did NOT add a "reuse handout_browser" rule this session — the wheel's existence + the 3 refactored call sites already model the pattern. If future scripts start inlining launch+wait again, THAT is the signal to add a rule (data-driven, per the user's "先看数据" principle).
+
+## 2026-06-24 — cover switched from SVG to HTML-rendered PNG (方案 C)
+- candidate: Handout concept-map covers should be generated as HTML by the new `a4-novak-html-cover` skill (HTML cards + SVG connector overlay + KaTeX), rendered to a full-A4 `concept-map.png`, and auto-injected by `postprocess_handout_for_contract.py`. Cover-candidate priority flipped to **PNG-first** (`concept-map.png` > `concept-map.svg` > `concept-map-preview.png`) so HTML-cover jobs win; SVG remains a legacy fallback.
+  verdict: strengthen
+  reason: Pure-SVG covers repeatedly failed (coordinate drift, MathJax pre-rendering, line-over-text). The HTML流派 (validated A/B on the 数列 cover) makes editing a card = changing text and lets drawEdges compute geometry from live DOM, cutting 848 hand-tuned coordinates to 6 and fixing long-formula overflow via autoFitFormula. Chose PNG-injection (方案 C) over inlining the cover HTML because inlining pollutes the handout's global CSS/JS (`.card`, `.formula`, `id="map"`, `* {}` reset, KaTeX double-load, `data-handout-ready` semantics) — 8 isolation problems. The PNG keeps the cover isolated while `concept-map.html` preserves editability one level up. Core script change is one line (candidate order); `injectConceptCover`, the builder, and the evals are untouched.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: first
+  written:
+    - `scripts/postprocess_handout_for_contract.py`: `inject_cover_metadata` candidate order → PNG-first.
+    - `SKILL.md`: cover note (Markdown-Source Mode), step 3 inject bullet, Files (postprocess line), read-list → point at `references/cover-workflow.md`; cover wording generalized off "SVG".
+    - `references/cover-workflow.md`: new — end-to-end cover flow, candidate priority, revision, migration.
+    - `a4-novak-html-cover/SKILL.md`: Handout Consumption Contract (`concept-map.png` required, editable `.html` source, no stale `.svg`).

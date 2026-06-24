@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-handout-ready="false">
+<!--
+  a4-novak-html-cover 模板 (HTML 流派 A4 Novak 概念图)
+  ============================================================
+  这是骨架模板。生成具体封面时:
+  1. 替换 {{TITLE}} / {{SUBTITLE}} / 各卡片文字 / 各公式 TeX
+  2. 调整卡片的 left/top/width/height (mm 单位，A4 画布 210x297)
+  3. 保留 <style> 和 <script> 的引擎逻辑不动 (drawEdges + autoFitFormula + KaTeX)
+  4. 连线关系靠 data-node 名称引用，在 <script> 的 EDGES 配置里声明
+
+  公式写法: <div class="formula" data-tex="a_n=S_n-S_{n-1}"></div>
+  KaTeX 会自动渲染；autoFitFormula 会让超宽公式自动缩放字号。
+-->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{TITLE}}</title>
+
+<!-- KaTeX 本地化：生成封面时需在封面同目录提供 vendor/katex/ -->
+<!-- 或用 CDN: https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css + .js -->
+<link rel="stylesheet" href="vendor/katex/dist/katex.min.css">
+<script src="vendor/katex/dist/katex.min.js"></script>
+
+<style>
+  :root {
+    --bg: #fbfaf6;
+    --ink: #172033;
+    --ink-soft: #4f5968;
+    --ink-faint: #6b7482;
+    --line: #c9d1dc;
+    --line-strong: #aeb8c8;
+    --card-border: #c9c3b8;
+    --card-border-faint: #d7d0c3;
+    /* 四列分支配色 */
+    --blue-fill: #e8eef7;   --blue-stroke: #244c7f;
+    --orange-fill: #f7ede5; --orange-stroke: #b66635;
+    --green-fill: #e7f1ed;  --green-stroke: #397161;
+    --violet-fill: #eeeaf6; --violet-stroke: #65528f;
+    --core-fill: #f6efd9;   --core-stroke: #8a6b24;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 210mm; height: 297mm;
+    background: var(--bg);
+    font-family: SimSun, "Source Han Serif SC", "Noto Serif CJK SC", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .map { position: relative; width: 210mm; height: 297mm; background: var(--bg); overflow: hidden; }
+
+  /* 连线层：viewBox 0 0 210 297，与卡片同一 mm 空间 */
+  .edges { position: absolute; inset: 0; width: 210mm; height: 297mm; z-index: 0; pointer-events: none; }
+  .layer-cards { position: absolute; inset: 0; z-index: 2; }
+
+  .card {
+    position: absolute;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; gap: 0.4mm;
+    padding: 0.8mm 1mm;
+    border-radius: 2.2mm;
+    background: #fffdf9;
+    border: 0.5mm solid var(--card-border);
+    box-shadow: 0 0.65mm 0 0 rgba(23,32,51,0.08);
+  }
+  .card .title { font-weight: 700; color: var(--ink); line-height: 1.15; }
+  .card .note  { color: var(--ink-soft); line-height: 1.2; }
+  .card .formula { color: #2f3744; line-height: 1.1; font-size: 3.1mm; max-width: 100%; display: inline-block; transform-origin: center center; }
+  .card .formula .katex { font-size: 1em; }
+
+  .card.root { background: var(--ink); border-color: var(--ink); border-width: 0.75mm; border-radius: 4.5mm; color: #fffdf9; }
+  .card.root .title { color: #fffdf9; font-size: 5.8mm; }
+  .card.root .subtitle { color: #d9e1ef; font-size: 2.8mm; }
+
+  .card.core { background: var(--core-fill); border-color: var(--core-stroke); border-width: 0.64mm; border-radius: 3mm; }
+  .card.core .title { font-size: 4.2mm; }
+  .card.core .note  { font-size: 2.55mm; }
+
+  .card.branch { border-radius: 2.8mm; border-width: 0.62mm; }
+  .card.branch .title { font-size: 3.65mm; }
+  .card.branch .note  { font-size: 2.45mm; }
+  .card.branch.blue   { background: var(--blue-fill);   border-color: var(--blue-stroke); }
+  .card.branch.orange { background: var(--orange-fill); border-color: var(--orange-stroke); }
+  .card.branch.green  { background: var(--green-fill);  border-color: var(--green-stroke); }
+  .card.branch.violet { background: var(--violet-fill); border-color: var(--violet-stroke); }
+
+  .card.leaf .title { font-size: 3.8mm; }
+  .card.leaf .note  { font-size: 2.35mm; }
+
+  .card.method { align-items: stretch; text-align: left; border-radius: 2mm; border-width: 0.42mm; border-color: var(--card-border-faint); padding: 1.6mm 2mm; gap: 0.9mm; }
+  .card.method .title { font-size: 3.35mm; text-align: center; }
+  .card.method .step  { font-size: 2.35mm; color: var(--ink-soft); line-height: 1.25; }
+
+  .label-shield { position: absolute; z-index: 1; background: var(--bg); border-radius: 1.2mm; padding: 0.5mm 0.9mm; font-size: 2.15mm; color: var(--ink-faint); transform: translate(-50%, -50%); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="map" id="map">
+
+  <svg class="edges" id="edges" viewBox="0 0 210 297" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"></svg>
+
+  <div class="layer-cards">
+
+    <!-- ===== 标题卡 ===== -->
+    <div class="card root" data-node="root" style="left:42mm; top:12mm; width:126mm; height:17mm;">
+      <div class="title">{{TITLE}}</div>
+      <div class="subtitle">{{SUBTITLE}}</div>
+    </div>
+
+    <!-- ===== 核心卡 ===== -->
+    <div class="card core" data-node="core" style="left:44mm; top:40mm; width:122mm; height:22mm;">
+      <div class="title">{{CORE_TITLE}}</div>
+      <div class="note">{{CORE_NOTE_1}}</div>
+      <div class="note">{{CORE_NOTE_2}}</div>
+    </div>
+
+    <!-- ===== 四个分支头 ===== -->
+    <div class="card branch blue"   data-node="branch-blue"   style="left:12mm;  top:78mm; width:42mm; height:18mm;">
+      <div class="title">{{BRANCH_BLUE_TITLE}}</div>
+      <div class="note">{{BRANCH_BLUE_NOTE}}</div>
+    </div>
+    <div class="card branch orange" data-node="branch-orange" style="left:58mm;  top:78mm; width:44mm; height:18mm;">
+      <div class="title">{{BRANCH_ORANGE_TITLE}}</div>
+      <div class="note">{{BRANCH_ORANGE_NOTE}}</div>
+    </div>
+    <div class="card branch green"  data-node="branch-green"  style="left:106mm; top:78mm; width:48mm; height:18mm;">
+      <div class="title">{{BRANCH_GREEN_TITLE}}</div>
+      <div class="note">{{BRANCH_GREEN_NOTE}}</div>
+    </div>
+    <div class="card branch violet" data-node="branch-violet" style="left:158mm; top:78mm; width:40mm; height:18mm;">
+      <div class="title">{{BRANCH_VIOLET_TITLE}}</div>
+      <div class="note">{{BRANCH_VIOLET_NOTE}}</div>
+    </div>
+
+    <!-- ===== 蓝列叶子 (示例：4 张) ===== -->
+    <div class="card leaf" data-node="leaf-1" style="left:12mm; top:112mm; width:42mm; height:20mm;">
+      <div class="title">{{LEAF1_TITLE}}</div>
+      <div class="formula" data-tex="{{LEAF1_TEX}}"></div>
+      <div class="note">{{LEAF1_NOTE}}</div>
+    </div>
+    <!-- ... 其余叶子卡同理，data-node 用唯一名称 ... -->
+
+    <!-- ===== 底部方法轨 (可选) ===== -->
+    <div class="card method" data-node="method" style="left:20mm; top:245mm; width:170mm; height:31mm;">
+      <div class="title">{{METHOD_TITLE}}</div>
+      <div class="step">{{STEP_1}}</div>
+      <div class="step">{{STEP_2}}</div>
+      <div class="step">{{STEP_3}}</div>
+      <div class="step">{{STEP_4}}</div>
+    </div>
+
+    <!-- ===== 连线上的 label shield (可选) ===== -->
+    <span class="label-shield" style="left:33mm;  top:70mm;">{{SHIELD_1}}</span>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   引擎逻辑 (验证过，生成封面时不要改动):
+   1) EDGES 配置声明连线关系 (按 data-node 名称引用)
+   2) KaTeX 同步渲染 + autoFitFormula 长公式自适应
+   3) drawEdges 根据 DOM 实际位置画贝塞尔连线
+   ============================================================ */
+(function () {
+  const map = document.getElementById('map');
+  const svg = document.getElementById('edges');
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const MM_W = 210, MM_H = 297;
+
+  /* ---- EDGES 配置：声明式连线 ----
+     - 'tree':  [parent, child] 父子竖向连线
+     - 'cross': {from, fs, to, ts} 跨列斜向 (fs/ts = top/bottom/left/right)
+     生成封面时按实际拓扑修改这一段即可，无需算坐标。 */
+  const EDGES = {
+    tree: [
+      ['root', 'core', {strong:true}],
+      ['core', 'branch-blue'],
+      ['core', 'branch-orange'],
+      ['core', 'branch-green'],
+      ['core', 'branch-violet'],
+      ['core', 'method'],
+      // 分支 -> 叶子链 (每列纵向)
+      ['branch-blue', 'leaf-1'],
+      // ... 按实际叶子卡补全
+    ],
+    cross: [
+      // {from:'leaf-1', fs:'right', to:'leaf-2', ts:'left', dash:true},
+    ],
+  };
+
+  // ---- KaTeX 渲染 ----
+  function renderFormulas() {
+    document.querySelectorAll('.formula[data-tex]').forEach(f => {
+      const tex = f.getAttribute('data-tex');
+      try { katex.render(tex, f, { throwOnError: false, displayMode: false }); }
+      catch (e) { f.textContent = tex; }
+    });
+  }
+  // ---- 长公式自适应：超宽则缩字号 ----
+  function autoFitFormula() {
+    document.querySelectorAll('.card').forEach(card => {
+      const f = card.querySelector('.formula');
+      if (!f) return;
+      f.style.fontSize = '';
+      const cs = getComputedStyle(card);
+      const availW = card.getBoundingClientRect().width
+        - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      let formW = f.getBoundingClientRect().width;
+      if (formW > availW) {
+        const basePx = parseFloat(getComputedStyle(f).fontSize);
+        f.style.fontSize = (basePx * (availW / formW) * 0.98).toFixed(2) + 'px';
+      }
+    });
+  }
+
+  // ---- 连线 ----
+  function rectMm(el) {
+    const r = el.getBoundingClientRect(); const m = map.getBoundingClientRect();
+    const sx = MM_W / m.width, sy = MM_H / m.height;
+    const x = (r.left - m.left) * sx, y = (r.top - m.top) * sy;
+    const w = r.width * sx, h = r.height * sy;
+    return { x, y, w, h, cx: x + w/2, top: y, bottom: y + h };
+  }
+  function node(n) { return document.querySelector('[data-node="' + n + '"]'); }
+  function edge(a, b, opts={}) {
+    const my = ((opts.fromBottom ? a.bottom : a.y) + (opts.toTop ? b.top : b.y)) / 2;
+    const x1 = a.cx, y1 = opts.fromBottom ? a.bottom : a.y + a.h;
+    const x2 = b.cx, y2 = opts.toTop ? b.top : b.y;
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', `M ${x1.toFixed(2)} ${y1.toFixed(2)} C ${x1.toFixed(2)} ${my.toFixed(2)} ${x2.toFixed(2)} ${my.toFixed(2)} ${x2.toFixed(2)} ${y2.toFixed(2)}`);
+    p.setAttribute('fill','none');
+    p.setAttribute('stroke', opts.strong ? '#aeb8c8' : '#c9d1dc');
+    p.setAttribute('stroke-width', opts.strong ? '0.48' : '0.42');
+    p.setAttribute('stroke-opacity', opts.strong ? '0.64' : '0.58');
+    p.setAttribute('stroke-linecap','round'); p.setAttribute('stroke-linejoin','round');
+    if (opts.dash) p.setAttribute('stroke-dasharray','2.2 2.2');
+    return p;
+  }
+  function sidePt(r, s) {
+    if (s==='top') return {x:r.cx,y:r.top};
+    if (s==='bottom') return {x:r.cx,y:r.bottom};
+    if (s==='left') return {x:r.x,y:r.y+r.h/2};
+    return {x:r.x+r.w,y:r.y+r.h/2};
+  }
+  function edgeCross(from, fs, to, ts, opts={}) {
+    const a = rectMm(node(from)), b = rectMm(node(to));
+    const p1 = sidePt(a, fs), p2 = sidePt(b, ts), my = (p1.y + p2.y) / 2;
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} C ${p1.x.toFixed(2)} ${my.toFixed(2)} ${p2.x.toFixed(2)} ${my.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`);
+    p.setAttribute('fill','none'); p.setAttribute('stroke','#c9d1dc');
+    p.setAttribute('stroke-width','0.42'); p.setAttribute('stroke-opacity','0.58');
+    p.setAttribute('stroke-linecap','round'); p.setAttribute('stroke-linejoin','round');
+    if (opts.dash) p.setAttribute('stroke-dasharray','2.2 2.2');
+    return p;
+  }
+  function buildEdges() {
+    svg.innerHTML = '';
+    EDGES.tree.forEach(([fn, tn, opt]) => {
+      const a = node(fn), b = node(tn);
+      if (!a || !b) return;
+      svg.appendChild(edge(rectMm(a), rectMm(b), { fromBottom:true, toTop:true, ...(opt||{}) }));
+    });
+    EDGES.cross.forEach(c => {
+      svg.appendChild(edgeCross(c.from, c.fs, c.to, c.ts, { dash: c.dash }));
+    });
+  }
+
+  function finalize() {
+    renderFormulas();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      autoFitFormula();
+      requestAnimationFrame(() => {
+        buildEdges();
+        document.documentElement.dataset.handoutReady = 'true';
+      });
+    }));
+  }
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => { if (window.__coverDone) buildEdges(); }).observe(map);
+  }
+  const fontsP = (document.fonts && document.fonts.ready) || Promise.resolve();
+  fontsP.then(() => { window.__coverDone = true; finalize(); });
+})();
+</script>
+</body>
+</html>

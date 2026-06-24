@@ -599,7 +599,9 @@ def inject_js_overrides(html: str) -> str:
 
 
 def inject_cover_metadata(html_path: Path, html_text: str) -> str:
-    cover_candidates = ("concept-map.svg", "concept-map.png", "concept-map-preview.png")
+    # PNG-first: HTML-cover jobs (a4-novak-html-cover) render concept-map.png;
+    # SVG remains a fallback for legacy jobs that never migrated to the HTML流派.
+    cover_candidates = ("concept-map.png", "concept-map.svg", "concept-map-preview.png")
     cover_path = next((html_path.parent / name for name in cover_candidates if (html_path.parent / name).exists()), None)
     if cover_path is None:
         return html_text
