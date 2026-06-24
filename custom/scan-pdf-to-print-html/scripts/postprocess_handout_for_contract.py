@@ -161,36 +161,46 @@ TIGHTEN_VERTICAL_SPACING = """
 .transcript-flow h2,
 .transcript-flow h3,
 .transcript-flow h4 {
-  margin-bottom: 2.2mm !important;
+  margin-bottom: 1.8mm !important;
 }
 
 .transcript-flow p,
 .transcript-flow li {
-  margin-bottom: 0.48em !important;
+  margin-bottom: 0.34em !important;
 }
 
 .transcript-flow ul,
 .transcript-flow ol {
-  margin-bottom: 0.62em !important;
+  margin-bottom: 0.5em !important;
 }
 
 .transcript-flow table {
-  margin: 2.2mm 0 3mm !important;
+  margin: 1.8mm 0 2.4mm !important;
 }
 
 .transcript-flow figure,
 .transcript-flow .ocr-image-cluster {
-  margin: 2.2mm auto !important;
+  margin: 1.8mm auto !important;
 }
 
 .transcript-flow .phycat-blockquote {
-  margin: 2.4mm 0 3mm !important;
-  padding: 2.4mm 2.8mm !important;
+  margin: 1.9mm 0 2.4mm !important;
+  padding: 2.1mm 2.5mm !important;
 }
 
 .transcript-flow .phycat-blockquote p,
 .transcript-flow .phycat-blockquote li {
-  margin-bottom: 0.42em !important;
+  margin-bottom: 0.28em !important;
+}
+
+/* Tighten dense math prose enough to reduce avoidable page-tail gaps. */
+.transcript-flow p:has(.katex-display) {
+  margin-bottom: 0.18em !important;
+}
+
+.transcript-flow p + p:has(.katex-display),
+.transcript-flow p:has(.katex-display) + p {
+  margin-top: -0.14em !important;
 }
 """
 
@@ -245,7 +255,24 @@ function configureImageGroup(group, imgs, refWidth) {
   group.style.margin = '3mm auto';
 
   imgs.forEach((img, index) => {
-    applySingleImageWidth(img, refWidth, targets[index] * scale);
+    const wrapper = img.parentElement;
+    const targetPct = targets[index] * scale;
+    // When the img is wrapped in a <div> (e.g. an OCR crop cell), size the
+    // wrapper with flex/width so the wrapper's own layout (caption, border)
+    // follows the image, rather than sizing the bare img and leaving the
+    // wrapper at its default width.
+    if (wrapper && wrapper !== group && wrapper.tagName === 'DIV') {
+      wrapper.style.flex = `${Math.max(0.35, targetPct / 100)} 1 0`;
+      wrapper.style.maxWidth = 'none';
+      wrapper.style.width = `${Math.min(95, targetPct).toFixed(1)}%`;
+      img.style.width = '100%';
+      img.style.maxWidth = `${img.naturalWidth}px`;
+      img.style.height = 'auto';
+      img.style.display = 'block';
+      img.style.margin = '0';
+      return;
+    }
+    applySingleImageWidth(img, refWidth, targetPct);
     img.style.margin = '0';
   });
 }
@@ -321,6 +348,199 @@ function pullOrphanHeadingForward(sheet) {
   if (!isHeadingOnlyBlock(lastBlock)) return null;
   body.removeChild(lastBlock);
   return lastBlock;
+}
+
+// --- callout-split / connector-merge / trailing-blank rebalance -----------
+// Absorbed from the parallel feat/postprocess-rebalance-and-callout-split
+// branch (merged 2026-06-24). These run as a post-pagination cleanup pass
+// that complements the anti-orphan repair above: the anti-orphan rule acts
+// DURING pagination (heading travels with its content), while rebalance acts
+// AFTER pagination (pull small carry-forward blocks up to reduce avoidable
+// trailing blank). rebalance is guarded so it never re-creates an orphan
+// heading — it skips protected blocks (headings, blockquotes, figures) and
+// refuses to strip a block from a sheet whose next block is a heading.
+
+function blockTextContent(block) {
+  return ((block && (block.innerText || block.textContent)) || '').replace(/\\s+/g, ' ').trim();
+}
+
+// Split an overlong example/question callout (>700 chars or >6 meaningful
+// nodes) into a lead block (the stem) + a support block (the rest), so the
+// giant quote can paginate instead of overflowing as one unsplittable unit.
+function splitOverlongQuestionCallout(block) {
+  const quote = block.querySelector(':scope > blockquote.phycat-blockquote');
+  if (!quote) return [block];
+  const text = normalizeTextForBookmark(quote.textContent);
+  const charBudget = 700;
+  const nodeBudget = 6;
+  const childNodes = Array.from(quote.childNodes).filter((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return (node.textContent || '').trim();
+    if (node.nodeType !== Node.ELEMENT_NODE) return false;
+    const childText = normalizeTextForBookmark(node.textContent || '');
+    return childText || node.querySelector('img,svg,canvas,table,.katex,math');
+  });
+  if (text.length <= charBudget && childNodes.length <= nodeBudget) return [block];
+
+  const [lead, ...rest] = childNodes;
+  if (!lead || !rest.length) return [block];
+  const chunks = [];
+  const firstBlock = cloneBlockPreservingMeta(block);
+  const firstQuote = firstBlock.querySelector(':scope > blockquote.phycat-blockquote');
+  if (!firstQuote) return [block];
+  firstQuote.replaceChildren(lead.cloneNode(true));
+  chunks.push(firstBlock);
+
+  const supportBlock = document.createElement('div');
+  supportBlock.className = 'flow-block question-support-block';
+  if (block.dataset && block.dataset.sourcePage) {
+    supportBlock.dataset.sourcePage = block.dataset.sourcePage;
+  }
+  rest.forEach((node) => {
+    supportBlock.appendChild(node.cloneNode(true));
+  });
+  chunks.push(supportBlock);
+  return chunks;
+}
+
+// A support block (produced by splitOverlongQuestionCallout) holds several
+// child nodes in one div; split it into one flow-block per child so each can
+// paginate independently.
+function splitQuestionSupportBlocks(block) {
+  if (!block.classList.contains('question-support-block')) return [block];
+  const children = Array.from(block.children);
+  if (children.length <= 1) return [block];
+  return children.map((child) => {
+    const next = document.createElement('div');
+    next.className = 'flow-block question-support-block';
+    if (block.dataset && block.dataset.sourcePage) {
+      next.dataset.sourcePage = block.dataset.sourcePage;
+    }
+    next.appendChild(child.cloneNode(true));
+    return next;
+  });
+}
+
+function isConnectorOnlyBlock(block) {
+  const text = normalizeTextForBookmark(block ? block.textContent : '');
+  return /^(因此|所以|从而|于是|则|故|可得)$/.test(text);
+}
+
+function isDisplayMathOnlyBlock(block) {
+  if (!block) return false;
+  const meaningfulChildren = Array.from(block.children).filter((child) => {
+    const childText = normalizeTextForBookmark(child.textContent || '');
+    return childText || child.querySelector('img,svg,canvas,table,.katex,math');
+  });
+  if (!meaningfulChildren.length) return false;
+  return meaningfulChildren.every((child) => {
+    if (child.querySelector('img,svg,canvas,table')) return false;
+    if (child.querySelector('.katex-display, math[display="block"]')) return true;
+    const childText = (child.textContent || '').trim();
+    return childText.startsWith('$$') && childText.endsWith('$$');
+  });
+}
+
+// Merge a lone connector word block ("因此") with the display-math block that
+// follows it, so the connector is not stranded at a page bottom above a blank.
+function mergeConnectorWithFollowingMath(blocks) {
+  const merged = [];
+  for (let i = 0; i < blocks.length; i += 1) {
+    const block = blocks[i];
+    const next = blocks[i + 1];
+    if (isConnectorOnlyBlock(block) && isDisplayMathOnlyBlock(next)) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flow-block question-support-block';
+      if (block.dataset && block.dataset.sourcePage) {
+        wrapper.dataset.sourcePage = block.dataset.sourcePage;
+      }
+      Array.from(block.children).forEach((child) => wrapper.appendChild(child.cloneNode(true)));
+      Array.from(next.children).forEach((child) => wrapper.appendChild(child.cloneNode(true)));
+      merged.push(wrapper);
+      i += 1;
+      continue;
+    }
+    merged.push(block);
+  }
+  return merged;
+}
+
+function meaningfulFlowBlocks(sheet) {
+  const body = sheetBody(sheet);
+  if (!body) return [];
+  return Array.from(body.querySelectorAll(':scope > .flow-block')).filter((block) => {
+    const text = blockTextContent(block);
+    return text || block.querySelector('img,svg,canvas,table,.katex,math');
+  });
+}
+
+function trailingBlankRatio(sheet) {
+  const body = sheetBody(sheet);
+  const blocks = meaningfulFlowBlocks(sheet);
+  if (!body || !blocks.length) return 0;
+  const bodyRect = body.getBoundingClientRect();
+  const lastRect = blocks[blocks.length - 1].getBoundingClientRect();
+  return bodyRect.height ? Math.max(0, bodyRect.bottom - lastRect.bottom) / bodyRect.height : 0;
+}
+
+// A block that must NOT be pulled up by rebalance (doing so would strand a
+// heading, split a quote, or move a figure). Headings are protected at every
+// level h1-h6 to stay consistent with the anti-orphan rule.
+function isCarryForwardProtected(block) {
+  if (!block) return true;
+  if (block.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6')) return true;
+  if (block.querySelector(':scope > .phycat-blockquote')) return true;
+  if (block.querySelector(':scope > figure, :scope > img, :scope > svg, :scope > canvas')) return true;
+  return false;
+}
+
+// Post-pagination cleanup: for each non-cover sheet with >10% trailing blank,
+// try to pull the NEXT sheet's first content block up (with an overflow
+// rollback). This is the active trailing-blank reducer that complements the
+// anti-orphan repair. Guards:
+//  - protected blocks (headings/quotes/figures) are never moved;
+//  - a block is never stripped from a sheet whose first block is a heading
+//    (that would strand the heading — re-creating the orphan defect);
+//  - ends-before-lecture sheets are left as the intended section end.
+function rebalanceTrailingBlankSheets(root) {
+  const sheets = Array.from(root.querySelectorAll('.sheet'));
+  for (let i = 0; i < sheets.length - 1; i += 1) {
+    const prev = sheets[i];
+    const next = sheets[i + 1];
+    if (prev.matches('.concept-map-sheet,[data-sheet-role="cover"],[data-cover-sheet="true"]')) continue;
+    if (prev.dataset.endsBeforeLecture === 'true') continue;
+
+    let moved = true;
+    while (moved) {
+      moved = false;
+      const ratio = trailingBlankRatio(prev);
+      if (ratio <= 0.10) break;
+
+      const nextBody = sheetBody(next);
+      const nextBlocks = meaningfulFlowBlocks(next);
+      if (!nextBody || nextBlocks.length < 2) break;
+      const candidate = nextBlocks[0];
+      if (isCarryForwardProtected(candidate)) break;
+      // Anti-orphan guard for rebalance: do not strip the candidate if the
+      // NEXT block on its sheet is a heading (would leave the heading
+      // stranded). Also refuse if the candidate itself precedes a heading.
+      const followingIsHeading = nextBlocks.length > 1 && isCarryForwardProtected(nextBlocks[1])
+        && nextBlocks[1].querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6');
+      if (followingIsHeading) break;
+
+      const prevBody = sheetBody(prev);
+      const anchor = candidate.nextSibling;
+      prevBody.appendChild(candidate);
+      if (sheetOverflows(prev)) {
+        nextBody.insertBefore(candidate, anchor);
+        setSheetState(prev);
+        setSheetState(next);
+        break;
+      }
+      setSheetState(prev);
+      setSheetState(next);
+      moved = true;
+    }
+  }
 }
 
 
@@ -553,7 +773,11 @@ def inject_js_overrides(html: str) -> str:
             raise SystemExit("paginateHandout title marker not found in handout.html")
         html = html.replace(marker, "  applyFigureWidthBands(sourceRoot);\n\n" + marker, 1)
 
-    old_paginate_tail = """  const title = printRoot.dataset.title || '';
+    # The built handout.html may carry one of two original paginate-tail
+    # variants (with or without the cover/lecture-break fields). Match either
+    # so postprocess is robust across builder versions and already-built HTML.
+    old_paginate_tails = [
+        """  const title = printRoot.dataset.title || '';
   const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
   const blocks = collectFlowBlocks(sourceRoot);
   printRoot.replaceChildren();
@@ -576,12 +800,47 @@ def inject_js_overrides(html: str) -> str:
   sourceRoot.remove();
   document.documentElement.dataset.handoutReady = 'true';
 }
-"""
+""",
+        """  const title = printRoot.dataset.title || '';
+  const hasCover = !!printRoot.dataset.coverHref;
+  const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
+  const blocks = collectFlowBlocks(sourceRoot);
+  printRoot.replaceChildren();
+
+  let pageNumber = 1;
+  let sheet = createSheet(pageNumber, title, sourceLabel, !hasCover);
+  printRoot.appendChild(sheet);
+
+  for (const block of blocks) {
+    if (appendBlockToSheet(sheet, block)) {
+      continue;
+    }
+    pageNumber += 1;
+    sheet = createSheet(pageNumber, title, sourceLabel, false);
+    printRoot.appendChild(sheet);
+    appendBlockToSheet(sheet, block);
+  }
+
+  renumberSheets(printRoot);
+  sourceRoot.remove();
+  document.documentElement.dataset.handoutReady = 'true';
+}
+""",
+    ]
 
     new_paginate_tail = """  const title = printRoot.dataset.title || '';
   const hasCover = !!printRoot.dataset.coverHref;
   const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
-  const blocks = mergeExampleRuns(collectFlowBlocks(sourceRoot));
+  // Build the block stream: merge example runs, split overlong question
+  // callouts into lead+support, split multi-child support blocks, then merge
+  // lone connector words with their following display-math. Splitting happens
+  // BEFORE pagination so the anti-orphan repair below can still pull a heading
+  // forward across any of these (sub)blocks.
+  const blocks = mergeConnectorWithFollowingMath(
+    mergeExampleRuns(collectFlowBlocks(sourceRoot))
+      .flatMap(splitOverlongQuestionCallout)
+      .flatMap(splitQuestionSupportBlocks)
+  );
   const bookmarkEntries = [];
   printRoot.replaceChildren();
 
@@ -639,6 +898,10 @@ def inject_js_overrides(html: str) -> str:
       entry.page += 1;
     });
   }
+  // Post-pagination cleanup: reduce avoidable trailing blank by pulling small
+  // carry-forward blocks up. Runs AFTER the anti-orphan pagination loop and is
+  // itself guarded against re-creating orphan headings.
+  rebalanceTrailingBlankSheets(printRoot);
   renumberSheets(printRoot);
   attachBookmarkPayload(printRoot, bookmarkEntries);
   sourceRoot.remove();
@@ -647,7 +910,8 @@ def inject_js_overrides(html: str) -> str:
 """
 
     if new_paginate_tail not in html:
-        if old_paginate_tail not in html:
+        old_paginate_tail = next((candidate for candidate in old_paginate_tails if candidate in html), None)
+        if old_paginate_tail is None:
             raise SystemExit("paginateHandout tail block not found in handout.html")
         html = html.replace(old_paginate_tail, new_paginate_tail, 1)
 
