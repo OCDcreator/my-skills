@@ -429,9 +429,15 @@ def validate(
                   // where each sibling shares the band) still pass.
                   const ok = frac >= capped.lo - 0.04 && frac <= capped.hi + 0.04;
                   if (!ok) {
+                    // Direction is the single most useful piece of guidance for
+                    // a weak model: the band has two sides, and the fix is
+                    // different on each. Without this, a model that over-shrunk
+                    // an image can read the FAIL and shrink it again.
+                    const direction = frac < capped.lo ? 'TOO SMALL (enlarge)' : 'TOO LARGE (shrink)';
                     widthBandViolations.push({
                       ok,
                       mode: 'single',
+                      direction,
                       cls: band.cls,
                       aspect: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
                       renderedPct: Math.round(frac * 1000) / 10,
@@ -445,15 +451,21 @@ def validate(
                 // side-by-side row does NOT justify enlarging each image to fill
                 // the row — each image keeps the size it would have alone.
                 //
-                // EXCEPTION (evolved 2026-06-23): when the siblings'
-                // independent widths sum to more than 100% of body width, the
-                // row is "over-subscribed" — keeping all siblings on one row
-                // requires shrinking each below its own band. In that case the
-                // group prefers staying on one row (no wrapping) and the
-                // independent-width rule is EXEMPTED for every sibling in that
-                // group, rather than forcing a wrap or flagging each as a
-                // violation. The C27 side-by-side gate still verifies they
-                // stayed in one row.
+                // EXCEPTION (evolved 2026-06-23; threshold relaxed to >0.92
+                // 2026-06-25): when the siblings' independent widths sum to
+                // ~92%+ of body width, the row is "over-subscribed" — keeping
+                // all siblings on one row requires squeezing each toward (or
+                // below) its own band. In that case the group prefers staying on
+                // one row (no wrapping) and the independent-width rule is
+                // EXEMPTED for every sibling in that group, rather than forcing
+                // a wrap or flagging each as a violation. The C27 side-by-side
+                // gate still verifies they stayed in one row. The threshold is
+                // 0.92 (not 1.0) on purpose: the old 1.0 boundary trapped a
+                // model whose row summed to e.g. 0.96 — too wide to fit one row
+                // at each image's band, but not exempt, so it ping-ponged
+                // between "enlarge for C26 → wrap → FAIL C27" and "shrink for
+                // C27 → FAIL C26". The 8pp margin gives the two gates a buffer
+                // so their targets cannot both be unsatisfiable at once. <!-- evolved 2026-06-25 -->
                 for (const [grp, imgs] of groupMap.entries()) {
                   const refWidth = refWidthOf(grp);
                   // sum of each sibling's independent target (capped by its own
@@ -464,7 +476,7 @@ def validate(
                     const capped = capBand(band, naturalFrac(img, refWidth));
                     indepTotal += capped.target || ((capped.lo + capped.hi) / 2);
                   }
-                  const overSubscribed = indepTotal > 1.0;
+                  const overSubscribed = indepTotal > 0.92;
                   for (const img of imgs) {
                     widthBandImages.push(img);
                     if (overSubscribed) continue; // exempt: forced to one row
@@ -474,9 +486,11 @@ def validate(
                     const frac = rect.width / Math.max(refWidth, 1);
                     const ok = frac >= capped.lo - 0.04 && frac <= capped.hi + 0.04;
                     if (!ok) {
+                      const direction = frac < capped.lo ? 'TOO SMALL (enlarge)' : 'TOO LARGE (shrink)';
                       widthBandViolations.push({
                         ok,
                         mode: 'row-sibling',
+                        direction,
                         cls: band.cls,
                         aspect: Math.round((img.naturalWidth / img.naturalHeight) * 100) / 100,
                         renderedPct: Math.round(frac * 1000) / 10,
@@ -517,14 +531,37 @@ def validate(
                 const style = getComputedStyle(group);
                 const allowsWrap = style.flexWrap === 'wrap' || style.flexWrap === 'wrap-reverse';
                 const isVerticalStack = style.display !== 'flex' && style.display !== 'grid';
+                // Diagnostic for the fix hint. When images stack vertically the
+                // root cause is the CONTAINER's display mode (block/static),
+                // never the image width — but a weak model reading only
+                // "stacked" can misread it as "image too large" and keep
+                // shrinking. Surface the real cause so the fix is unambiguous.
+                const groupDisplay = style.display;
+                const groupFlexWrap = style.flexWrap;
                 for (let i = 0; i < imgs.length; i += 1) {
                   for (let j = i + 1; j < imgs.length; j += 1) {
                     if (rectsStacked(imgs[i], imgs[j])) {
                       // Exempt wrapping in a flex-wrap container that is not a
                       // degenerate single-column stack.
                       if (allowsWrap && !isVerticalStack) continue;
+                      // Fix hint drives the model toward the correct repair:
+                      // the container must lay images out on one row (flex /
+                      // grid). Shrinking the images will NOT help and is the
+                      // exact failure loop this gate exists to prevent.
+                      let fixHint;
+                      if (isVerticalStack) {
+                        fixHint = 'set container display:flex; flex-wrap:nowrap (shrinking the images will NOT fix this)';
+                      } else {
+                        // flex/grid already, but still wrapped (nowrap forced a
+                        // squeeze that overflowed) — the move is to allow wrap
+                        // or shrink, not to enlarge.
+                        fixHint = 'container already flex/grid but images still stack; try flex-wrap:wrap or reduce per-image width';
+                      }
                       stackedPairs.push({
                         container: group.tagName.toLowerCase() + (group.className ? '.' + group.className.split(' ')[0] : ''),
+                        containerDisplay: groupDisplay,
+                        containerFlexWrap: groupFlexWrap,
+                        fixHint,
                         srcA: (imgs[i].getAttribute('src') || '').slice(0, 60),
                         srcB: (imgs[j].getAttribute('src') || '').slice(0, 60),
                       });
