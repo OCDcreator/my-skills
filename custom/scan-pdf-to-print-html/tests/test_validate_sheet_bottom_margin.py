@@ -408,6 +408,72 @@ def test_bottom_margin_still_fails_real_orphan_when_next_sheet_starts_with_headi
     assert "orphan heading" in result.stdout
 
 
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_bottom_margin_exempts_figure_inside_protected_blockquote(tmp_path: Path) -> None:
+    """Regression for the 2026-06-25 false-positive figureDefect on in-quote
+    images. Sheet 3's first block is a .phycat-blockquote CONTAINING an image
+    whose band-floor height would fit sheet 2's trailing gap. Before the fix,
+    analyzeFigureBoundary reported figureDefect (FAIL, "narrow the figure"),
+    sending the model into an unbounded shrink/reflow loop — even though
+    narrowing an in-quote image CANNOT move the protected blockquote. After the
+    fix the boundary falls through to the blockquote exemption (PASS), because
+    the blank is the blockquote-integrity cost, not a movable-figure defect.
+    """
+    svg = (
+        "data:image/svg+xml;utf8,"
+        "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>"
+        "<rect width='200' height='200' fill='%23ccc'/></svg>"
+    )
+    html = tmp_path / "handout.html"
+    html.write_text(
+        f"""<!doctype html>
+<html data-handout-ready="true">
+<head>
+<meta charset="utf-8">
+<style>
+.sheet {{ width: 794px; min-height: 1123px; }}
+.sheet-body {{ height: 1000px; }}
+.flow-block {{ height: 60px; }}
+.flow-block.gap {{ height: 500px; }}
+.flow-block.fill {{ height: 880px; }}
+.phycat-blockquote {{ border-left: 3px solid #1b365d; padding: 6px 12px; }}
+</style>
+</head>
+<body>
+<main id="handout-print-root">
+  <article class="sheet" data-page-number="1">
+    <section class="sheet-body"><div class="flow-block">cover</div></section>
+  </article>
+  <article class="sheet" data-page-number="2">
+    <section class="sheet-body"><div class="flow-block gap">正文，留下大尾部空白。</div></section>
+  </article>
+  <article class="sheet" data-page-number="3">
+    <section class="sheet-body">
+      <blockquote class="phycat-blockquote"><p>例题：如图所示，</p><figure style="margin:0;"><img src="{svg}" style="width:300px;height:auto;display:block;" alt="fig"/></figure></blockquote>
+      <div class="flow-block fill">引用块后的正文。</div>
+    </section>
+  </article>
+  <article class="sheet" data-page-number="4">
+    <section class="sheet-body"><div class="flow-block">final page</div></section>
+  </article>
+</main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+    result = _run_validator(html)
+
+    # Must PASS (blockquote exemption), NOT FAIL with a movable-figure hint.
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PASS" in result.stdout
+    assert "narrow the figure" not in result.stdout, (
+        "validator still reports a movable-figure defect for an image inside a "
+        "protected blockquote — the 2026-06-25 false positive has regressed"
+    )
+
+
 def _write_figure_boundary_handout(path: Path, *, figure_fits_at_floor: bool) -> None:
     """Two variants of a figure-boundary page for the band-floor-anchored gate.
 

@@ -215,6 +215,22 @@ def validate(
                         || !!first.querySelector('figure, img, .ocr-image-cluster')
                         || imgs.length > 0;
                     if (!isFigureBlock) return null;
+                    // PROTECTED-BLOCK GUARD (evolved 2026-06-25): when the
+                    // boundary image sits inside a .phycat-blockquote, narrowing
+                    // it CANNOT move the block — the rebalance
+                    // (isCarryForwardProtected) refuses to pull a blockquote up,
+                    // so the "narrow the figure and it will travel into the gap"
+                    // hint is a FALSE POSITIVE. Such a boundary must fall through
+                    // to the existing blockquote exemption (the blank is the
+                    // blockquote-integrity cost), NOT be reported as a
+                    // movable-figure defect. Without this guard the gate sends
+                    // the model into an unbounded shrink/reflow loop on any
+                    // geometry-figure example that lands at a page boundary.
+                    if (first.querySelector('.phycat-blockquote')) return null;
+                    const inProtectedBlock = Array.from(imgs).some(
+                        (img) => !!img.closest('.phycat-blockquote')
+                    );
+                    if (inProtectedBlock) return null;
                     // ABSOLUTE band floor (redesigned 2026-06-25, replacing the
                     // old 0.8x-of-current-height heuristic). The previous
                     // formula `tallestImgH * 0.8` scaled relative to the image's

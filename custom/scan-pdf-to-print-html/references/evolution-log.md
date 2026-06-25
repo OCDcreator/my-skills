@@ -378,3 +378,32 @@ Session rework trace (user messages, chronologic):
     - `SKILL.md`: cover note (Markdown-Source Mode), step 3 inject bullet, Files (postprocess line), read-list → point at `references/cover-workflow.md`; cover wording generalized off "SVG".
     - `references/cover-workflow.md`: new — end-to-end cover flow, candidate priority, revision, migration.
     - `a4-novak-html-cover/SKILL.md`: Handout Consumption Contract (`concept-map.png` required, editable `.html` source, no stale `.svg`).
+
+## 2026-06-25 — run against scan-pdf-to-print-html (figure-in-blockquote validator false positive + gate-conflict loop)
+
+Provenance note: CAPTURE ran in the main orchestrating context (I executed the full jimi-dazhao-111-146 generation session that produced these lessons). The user message was a single meta-trigger ("skill evolution … 根据以上的会话"), so the lessons were extracted from the generation session's own tool outputs (pasted in the trace), not a rework-correction list. All trace fields `(extracted)` — direct from session tool output and files read/written. No long-session loss, no memory-only reconstruction.
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C40 | validate_sheet_bottom_margin.py's analyzeFigureBoundary must NOT report figureDefect when the boundary image is inside a protected .phycat-blockquote (narrowing an in-quote image cannot move the protected block) → code fix + regression test + docs | wrong (validator false positive) | pass | strengthen | principle | **strengthen** (code+test+docs) | first |
+| C41 | Name the conflict band (bottom-margin "narrow to ~X% floor" ↔ width-band "TOO SMALL (enlarge)" on the SAME image) and add a one-round stop rule so the model does not loop; width-band (fidelity) wins | rework | pass | strengthen | principle | **strengthen** | second (re: 2026-06-23 target-met-wins clause) |
+| C42 | When both gates fire, do NOT narrow figures one at a time (each edit reflows + re-flags a different sheet); batch-collect all flagged figures + exact floors + violations into one CSS block, iterate collect→override→re-measure to a fixed point; stop when a figure would drop below its band floor (that sheet is the authorized fidelity-exempt gap) | missing | pass | new | principle | **add_new** | first |
+
+Pairwise conflict check: fast path (≤3 candidates). C40 vs C41 complementary (C40 is the validator bug; C41 is the gate-conflict doc); C40 vs C43 complementary (C43 is the pre-fix workaround method); C41 vs C42 complementary (rule vs method). No contradictions.
+
+Dev Eval (non-regression, validator-equipped):
+- baseline `pytest tests/test_validate_sheet_bottom_margin.py tests/test_validate_rendered_handout_contract.py` → 21 passed.
+- after C40 code fix + new regression test → 22 passed (10 existing bottom_margin + 1 new; 12 rendered-contract). No regression.
+- strongest evidence — ran the FIXED validator on the real job `product/已完成项目/2026-06-18-jimi-dazhao-111-146/handout.html`: the in-blockquote-figure false positives that plagued the session (sheets 5/7/17/21/28) are GONE; only sheet 13 (a BARE <figure>, correctly still FAILing because it is in a genuine conflict band) remains. Fix works at job level.
+
+written:
+- `scripts/validate_sheet_bottom_margin.py`: analyzeFigureBoundary gains a PROTECTED-BLOCK GUARD — returns null when the boundary image is inside a .phycat-blockquote (checked both as first.querySelector('.phycat-blockquote') and any img.closest('.phycat-blockquote')); such a boundary falls through to the existing blockquote exemption instead of being reported as a movable-figure defect.
+- `tests/test_validate_sheet_bottom_margin.py`: new `test_bottom_margin_exempts_figure_inside_protected_blockquote` — next-sheet-first block is a .phycat-blockquote containing an image whose band-floor height fits the gap → must PASS, must NOT say "narrow the figure".
+- `SKILL.md`: trailing-blank hard-contract row strengthened with (a) the in-blockquote-figure-exempt rule + (b) the explicit conflict-band naming + one-round stop rule; Markdown-Source Mode step 8 gains a sub-bullet on the batch/converge method (don't narrow one at a time; batch all + iterate to fixed point; stop below band floor = fidelity-exempt gap).
+- `references/figure-policy.md`: Figure-Boundary section gains two evolved paragraphs (in-blockquote boundary images never a movable-figure defect; the conflict band + shrink↔enlarge loop + batch method).
+
+snapshot: SKILL.md.bak-2026-06-25, references/figure-policy.md.bak-2026-06-25, scripts/validate_sheet_bottom_margin.py.bak-2026-06-25, tests/test_validate_sheet_bottom_margin.py.bak-2026-06-25 (all restored from git HEAD = true pre-edit state).
+
+Verification ceiling note: this run reduced the trust surface by converting the in-blockquote false positive into a code fix with a regression test (C40), and naming the conflict-band loop so a model stops instead of looping (C41/C42). It does NOT eliminate model-self-discipline dependence — if a model ignores the step-8 batch rule it can still loop. Dev Eval verified non-regression + job-level efficacy, not behavior.
+
+Active-context staleness: editing the repo file does NOT change this session's loaded skill text. Recommend a fresh session to exercise the improved skill.
