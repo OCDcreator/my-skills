@@ -19,6 +19,10 @@
 > [!question] 例题2
 > 证明：对任意实数 $x$，有 $x^2 \geq 0$。
 
+<figure><img alt="outside-media-after-example" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 60'><rect width='120' height='60' fill='%23dde8ff'/><circle cx='30' cy='30' r='12' fill='%23467'/><line x1='52' y1='30' x2='98' y2='30' stroke='%23467' stroke-width='4'/></svg>" /></figure>
+
+这张图故意放在例题引用块之后、解析之前，用来卡回归：它在 source 里不属于 blockquote，postprocess 也不能把它吞进 `.phycat-blockquote`。
+
 **解析**
 
 因为 $x^2$ 是实数的平方，平方数非负，故 $x^2 \geq 0$ 恒成立。

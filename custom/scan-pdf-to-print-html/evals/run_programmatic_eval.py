@@ -57,6 +57,14 @@ EXAMPLE_LABEL_RE = re.compile(
     r"(?:例题|练习)\s*[0-9一二三四五六七八九十百零两]+",
 )
 
+CHAPTER_SHAPED_H2_RE = re.compile(
+    r"^(?:第\s*[0-9一二三四五六七八九十百零]+\s*(?:讲|章|节|部分|篇|单元)|"
+    r"单元\s*[0-9一二三四五六七八九十百零]+|"
+    r"大招\s*[0-9一二三四五六七八九十百零]+|"
+    r"[0-9]+\s*[\.、]\s*[\u4e00-\u9fff]|"
+    r"(?:Module|Lesson|Chapter)\s+\d)"
+)
+
 
 def run_script(cmd: list[str], cwd: Path) -> tuple[int, str]:
     """Run a script, return (exit_code, combined_output). Raises on non-zero."""
@@ -124,7 +132,8 @@ def assert_example_blockquote(job_dir: Path, html_path: Path, fixture_md: Path) 
     """Eval 1: every example label is wrapped in .phycat-blockquote after build.
 
     Also runs the pre-build gate directly on the fixture to confirm it reports
-    bare-paragraph examples (the gate is the source-side defense).
+    bare-paragraph examples (the gate is the source-side defense), and verifies
+    that a media-only figure authored AFTER an example stays outside the quote.
     """
     assertions: list[Assertion] = []
 
@@ -199,8 +208,30 @@ def assert_example_blockquote(job_dir: Path, html_path: Path, fixture_md: Path) 
             analysis.ok("no 解析 paragraph found inside any .phycat-blockquote")
         else:
             analysis.fail(f"解析 leaked into blockquote: {leaked[:3]}")
+        assertions.append(analysis)
+
+        media = Assertion("media-only figure after an example stays OUTSIDE .phycat-blockquote")
+        media_info = page.evaluate(
+            """() => {
+                const img = document.querySelector('img[alt="outside-media-after-example"]');
+                if (!img) return { found: false };
+                return {
+                    found: true,
+                    insideQuote: !!img.closest('.phycat-blockquote'),
+                    flowBlockClass: img.closest('.flow-block')?.className || null,
+                    parentTag: img.parentElement ? img.parentElement.tagName : null,
+                };
+            }"""
+        )
+        if media_info.get("found") and not media_info.get("insideQuote"):
+            media.ok(
+                f"outside-media-after-example remained outside quote "
+                f"(flow-block={media_info.get('flowBlockClass')}, parent={media_info.get('parentTag')})"
+            )
+        else:
+            media.fail(f"media figure missing or swallowed into blockquote: {media_info}")
+        assertions.append(media)
         browser.close()
-    assertions.append(analysis)
 
     return assertions
 
@@ -259,13 +290,17 @@ def assert_cover_injection(job_dir: Path, html_path: Path, fixture_md: Path) -> 
 
 
 def assert_chapter_pagination(job_dir: Path, html_path: Path, fixture_md: Path) -> list[Assertion]:
-    """Eval 3: each chapter h2 (except the first) starts a new sheet, and the
-    preceding sheet is marked data-ends-before-lecture."""
+    """Eval 3: each chapter-shaped h2 (except the first) starts a new sheet, and
+    the preceding sheet is marked data-ends-before-lecture."""
     assertions: list[Assertion] = []
 
-    # Count chapter headings in the source (第N章/节 shaped h2).
+    # Count chapter-shaped headings in the source (`第N章/节/...`, `大招 N`, etc.).
     md_text = fixture_md.read_text(encoding="utf-8")
-    chapter_count = len(re.findall(r"^##\s*第[0-9一二三四五六七八九十百零]+[章节]", md_text, re.MULTILINE))
+    chapter_count = sum(
+        1
+        for line in md_text.splitlines()
+        if line.startswith("## ") and CHAPTER_SHAPED_H2_RE.match(line[3:].strip())
+    )
 
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -273,7 +308,7 @@ def assert_chapter_pagination(job_dir: Path, html_path: Path, fixture_md: Path) 
         page.goto(html_path.as_uri(), wait_until="networkidle")
         wait_for_handout_ready(page)
 
-        # Map: for each sheet, does its first content flow-block start with a chapter h2?
+        # Map: for each sheet, does its first content flow-block start with a chapter-shaped h2?
         sheets = page.evaluate(
             """() => {
                 const sheets = Array.from(document.querySelectorAll('.sheet'));
@@ -291,19 +326,19 @@ def assert_chapter_pagination(job_dir: Path, html_path: Path, fixture_md: Path) 
             }"""
         )
 
-        # Assertion A: each chapter h2 (except the first) begins its own sheet.
-        starts = Assertion(f"each of {chapter_count} chapter h2(s) except the first begins a new sheet")
-        chapter_sheets = [s for s in sheets if s["firstH2"] and re.match(r"第[0-9一二三四五六七八九十百零]+[章节]", s["firstH2"])]
-        # The first chapter may share a sheet with prior content; subsequent chapters
-        # should each be the FIRST content of their sheet (which chapter_sheets captures).
+        # Assertion A: each chapter-shaped h2 (except the first) begins its own sheet.
+        starts = Assertion(f"each of {chapter_count} chapter-shaped h2(s) except the first begins a new sheet")
+        chapter_sheets = [s for s in sheets if s["firstH2"] and CHAPTER_SHAPED_H2_RE.match(s["firstH2"])]
+        # The first chapter-shaped heading may share a sheet with prior content;
+        # subsequent ones should each be the FIRST content of their sheet.
         if len(chapter_sheets) >= chapter_count:
-            starts.ok(f"{len(chapter_sheets)} sheets start with a chapter h2 (>= {chapter_count} chapters)")
+            starts.ok(f"{len(chapter_sheets)} sheets start with a chapter-shaped h2 (>= {chapter_count} such headings)")
         else:
-            starts.fail(f"only {len(chapter_sheets)} sheets start with chapter h2, expected >= {chapter_count}; sheets={[(s['idx'], s['firstH2']) for s in sheets if s['firstH2']]}")
+            starts.fail(f"only {len(chapter_sheets)} sheets start with chapter-shaped h2, expected >= {chapter_count}; sheets={[(s['idx'], s['firstH2']) for s in sheets if s['firstH2']]}")
         assertions.append(starts)
 
-        # Assertion B: the sheet BEFORE each non-first chapter is marked ends-before-lecture.
-        marked = Assertion("sheet before each non-first chapter h2 is marked data-ends-before-lecture")
+        # Assertion B: the sheet BEFORE each non-first chapter-shaped heading is marked ends-before-lecture.
+        marked = Assertion("sheet before each non-first chapter-shaped h2 is marked data-ends-before-lecture")
         unmarked = []
         for s in chapter_sheets:
             prev_idx = s["idx"] - 1
@@ -318,33 +353,31 @@ def assert_chapter_pagination(job_dir: Path, html_path: Path, fixture_md: Path) 
             marked.fail(f"predecessor sheets NOT marked ends-before-lecture: {unmarked}")
         assertions.append(marked)
 
-        # Assertion C (NEGATIVE — the one pytest caught that this eval originally
-        # missed): a NON-chapter-shaped h2 (e.g. "大招总结", "补充说明") must NOT
-        # cause its predecessor to be marked ends-before-lecture. If the exemption
-        # is too broad (any h2 triggers it), generic exposition h2 escapes the
-        # trailing-blank check. This guards against re-widening the exemption.
-        non_chapter = Assertion("non-chapter h2 (e.g. 大招总结) does NOT mark its predecessor ends-before-lecture")
-        non_chapter_re = re.compile(
-            r"^(?:第\s*[0-9一二三四五六七八九十百零]+\s*(?:讲|章|节|部分|篇|单元)|单元\s*[0-9一二三四五六七八九十百零]+|[0-9]+\s*[\.、]\s*[\u4e00-\u9fff]|(?:Module|Lesson|Chapter)\s+\d)"
-        )
-        falsely_marked = []
+        # Assertion C (evolved 2026-06-25): the rule changed from "only
+        # chapter-shaped h2 forces a page break" to "ANY h2 forces a page break"
+        # (real handouts use h2 as section dividers regardless of text shape;
+        # confining breaks to chapter-shaped h2 left dividers like "考向2"
+        # stranded mid-page). So now EVERY h2 — including non-chapter-shaped
+        # ones like "大招总结" — must mark its predecessor ends-before-lecture.
+        # This assertion verifies the broadened rule: every h2's predecessor is
+        # marked. (Previously this was a negative assertion guarding the narrow
+        # rule; it is inverted now that the rule broadened.)
+        any_h2 = Assertion("every h2 (incl. non-chapter like 大招总结) marks its predecessor ends-before-lecture")
+        unmarked_any = []
         for s in sheets:
             if not s["firstH2"]:
                 continue
-            if non_chapter_re.match(s["firstH2"]):
-                continue  # chapter-shaped — its predecessor SHOULD be marked, covered by Assertion B
-            # non-chapter h2: its predecessor must NOT be marked ends-before-lecture
             prev_idx = s["idx"] - 1
             if prev_idx < 0:
-                continue
+                continue  # first sheet has no predecessor
             prev = sheets[prev_idx] if prev_idx < len(sheets) else None
-            if prev and prev["endsLecture"]:
-                falsely_marked.append((prev_idx, s["firstH2"]))
-        if not falsely_marked:
-            non_chapter.ok("no non-chapter h2 caused a false ends-before-lecture mark")
+            if prev and not prev["endsLecture"]:
+                unmarked_any.append((prev_idx, s["firstH2"]))
+        if not unmarked_any:
+            any_h2.ok(f"all {sum(1 for s in sheets if s['firstH2'] and s['idx'] > 0)} h2 predecessor(s) marked")
         else:
-            non_chapter.fail(f"non-chapter h2 falsely marked predecessor: {falsely_marked} (exemption too broad)")
-        assertions.append(non_chapter)
+            any_h2.fail(f"h2 predecessor(s) NOT marked ends-before-lecture: {unmarked_any} (rule not broadened to all h2)")
+        assertions.append(any_h2)
 
         browser.close()
     return assertions

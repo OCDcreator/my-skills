@@ -407,3 +407,128 @@ snapshot: SKILL.md.bak-2026-06-25, references/figure-policy.md.bak-2026-06-25, s
 Verification ceiling note: this run reduced the trust surface by converting the in-blockquote false positive into a code fix with a regression test (C40), and naming the conflict-band loop so a model stops instead of looping (C41/C42). It does NOT eliminate model-self-discipline dependence — if a model ignores the step-8 batch rule it can still loop. Dev Eval verified non-regression + job-level efficacy, not behavior.
 
 Active-context staleness: editing the repo file does NOT change this session's loaded skill text. Recommend a fresh session to exercise the improved skill.
+
+## 2026-06-25 — run against scan-pdf-to-print-html (pagination/media-boundary clarifications)
+
+Provenance note: CAPTURE used the user's structured problem retrospective in the current session (`user-pasted`) plus live inspection of the target skill/evals (`extracted`). No memory-only reconstruction was used for the candidate rules.
+
+- candidate: Treat `## 大招 N ...` as an explicit example of a chapter-shaped h2 that must start a fresh sheet, and add positive regression coverage so the rule is not only implied by "chapter-shaped h2".
+  verdict: strengthen
+  reason: Existing SKILL text only said "chapter-shaped `##` headings", while the actual postprocess regex already matched `大招 N`; that gap made the boundary look ambiguous and caused the user to ask "到底该改哪里". This run names the shape directly in the workflow/files text and extends eval 3 to cover the positive `大招 1` case, alongside the existing `大招总结` negative near-miss.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: first
+- candidate: A media-only follow-up block immediately after an example/question must stay OUTSIDE `.phycat-blockquote`; if postprocess swallows it, fix the generator and rerun step 3 instead of hand-patching only the current HTML.
+  verdict: add_new
+  reason: Existing quote rules covered example badges, left rules, and in-blockquote figure boundary exemptions, but they did not document the distinct source-vs-postprocess failure mode where `mergeExampleRuns()` absorbs a standalone `<figure>` that was authored outside the quote. This run adds the rule to Markdown-Source Mode step 3, the Files section, and eval 1.
+  gate: { g1: pass, g2: new, g3: principle }
+  recurrence: first
+- candidate: Clarify the repair boundary between job-local HTML/CSS tweaks and generator-logic defects: styling nits can stay job-local, but postprocess-injected pagination / quote-merge / width-band logic defects must be fixed in skill scripts, and width-curve changes must keep postprocess + validator in lockstep.
+  verdict: strengthen
+  reason: The existing "edit `handout.html` directly, don't rebuild for styling" rule was too easy to over-read as "always patch the current HTML". This run clarifies that ephemeral hand edits are fine for local styling, but reusable generator logic belongs in the skill scripts, with the width-band curve kept synchronized across generator and gate.
+  gate: { g1: pass, g2: strengthen, g3: principle }
+  recurrence: first
+- candidate: Re-add trailing-blank exemptions / conflict-band stop rules / in-blockquote figure false-positive rules as new lessons from the same retrospective.
+  verdict: discard
+  reason: Those rules are already encoded in the current Hard Contract and `references/figure-policy.md` from the earlier 2026-06-25 evolution run. The remaining gap was not missing contract text but missing boundary examples and missing regression coverage, so duplicating the same rules again would bloat the skill without adding protection.
+  gate: { g1: pass, g2: duplicate, g3: principle }
+  recurrence: first
+
+written:
+  - `SKILL.md`: strengthened Markdown-Source Mode step 3, step 8, Files, and Regression Evals coverage to name `大招 N`, the media-after-example boundary, and the "fix scripts vs patch current HTML" split.
+  - `evals/fixtures/examples.md`: added a media-only `<figure>` immediately after `例题2`.
+  - `evals/fixtures/chapter-breaks.md`: added a positive `## 大招 1 ...` chapter-shaped heading alongside the existing `## 大招总结` near-miss.
+  - `evals/run_programmatic_eval.py`: added shared `CHAPTER_SHAPED_H2_RE`, positive `大招 N` chapter counting, and a DOM assertion that the follow-up media figure stays outside `.phycat-blockquote`.
+  - `evals/evals.json`: updated expectation text for the strengthened eval coverage.
+
+snapshot: SKILL.md.bak-2026-06-25-2
+
+## 2026-06-25 — run against scan-pdf-to-print-html (8-point friction retrospective re-submission; all duplicates)
+
+Provenance note: CAPTURE used the user's 8-point friction retrospective pasted in the current session (`user-pasted`). This is the SAME structured retrospective that 2026-06-25 run #2 already processed — the user re-submitted it as a full write-up rather than a correction list. All trace enrichment is `(user-pasted)`; code/eval/validator state verified live against the repo (`extracted`). No memory-only reconstruction.
+
+The 8 friction points mapped one-to-one onto rules + code already on disk from today's earlier runs. Per Hard Contract idempotency and decision-matrix row 3, all 8 are `duplicate → discard` (no new write, no snapshot). This entry exists to make the re-submission detectable so a future identical re-submission shows second+ recurrence.
+
+| # | Friction point (user-pasted) | Maps to existing coverage | G1 | G2 | G3 | Decision | Recurrence |
+|---|---|---|---|---|---|---|---|
+| F1 | `## 大招 N` not recognized as chapter break | C36/C37 (2026-06-23#3) + `大招 N` named in SKILL step3/Files/eval3 (2026-06-25#2) | pass | duplicate | principle | **discard** | second (same substance as 2026-06-25#2 first 大招 N candidate) |
+| F2 | lecture-break trailing blank "looks like validator not working" | Hard Contract exemption clause + C37 | pass | duplicate | principle | **discard** | second |
+| F3 | image swallowed into `.phycat-blockquote` by mergeExampleRuns | C40 media-after-example rule + `blockContainsOnlyMedia`/`extractMediaFromBlockquoteBlocks` in postprocess + eval 1 fixture (2026-06-25#2) | pass | duplicate | principle | **discard** | second |
+| F4 | aspect-ratio band overrides source `max-width` | C26/C29 width-band Hard Contract + `references/figure-policy.md` Rendered Width Contract | pass | duplicate | principle | **discard** | second |
+| F5 | aspect→width curve + smoothstep interpolation | C29 smooth-target redesign (2026-06-23#2); `smoothTargetPct` with `r*r*(3-2*r)` confirmed in BOTH postprocess + validator | pass | duplicate | principle | **discard** | second |
+| F6 | rebalance treats figure as protected, won't move single figure | `isCarryForwardProtected` now protects only headings/blockquotes; figures ARE carry-forward (postprocess L517-527) | pass | duplicate | principle | **discard** | second |
+| F7 | validator hint text self-contradicts ("narrow to ~30% floor" when already 25%) | C40 + `currentFrac <= floorFrac` branch (validator L285-286) pins min-height to current; comment documents the fix | pass | duplicate | principle | **discard** | second |
+| F8 | rebuild overwrites job-local CSS/JS; script-vs-HTML fix boundary | SKILL step 8 sub-bullets (batch/converge, fix-scripts-vs-patch, width-curve lockstep) added 2026-06-25#2 | pass | duplicate | principle | **discard** | second |
+
+Pairwise conflict check: fast path invoked per Step 3 — but note all 8 are discards with no proposed new rule, so there is nothing to conflict. No pairwise contradictions possible.
+
+Dev Eval (non-regression): ran the current eval suite on the live (already-edited) skill to confirm the recorded green state is real, not stale log text:
+- `py -3 evals/run_programmatic_eval.py` → **ALL EVALS PASS, exit 0**. Per-eval evidence: eval 3 asserts 4 chapter-shaped h2 (incl. `大招 1`) each start a fresh sheet + `大招总结` near-miss does NOT mark predecessor; eval 5 asserts no stranded heading + bottom-margin validator exit=0 on orphan fixture.
+- This is a non-regression lint confirming the existing rules still hold; it does NOT verify behavior (a model can still skip step 3). Honest framing per the Verification Ceiling.
+
+Verification summary:
+- F1–F8 code/rule existence: **auditable-evidence-only** (grep + Read against repo files, all 8 mapped to live code/log text; not machine-verified to fire on the user's exact original job because that job's handout.html was not in scope and is `(unverified)`).
+- Non-regression on the eval fixtures: **machine-verified** (eval suite exit 0).
+- Whether the user's *original* generation session would now pass: **unverified** — out of scope for skill-evolution (that is a job-level render, not a skill-rule edit).
+
+written: none (all 8 duplicate → discard). This is a log-only append.
+snapshot: none required (log-only append; no behavior-changing write per Hard Contract).
+active-context staleness: editing the repo file does NOT change this session's loaded skill text. Recommend a fresh session to exercise the skill.
+
+## 2026-06-25 — run against scan-pdf-to-print-html (cluster-boundary hint bug — real fix, not a duplicate)
+
+Provenance note: CAPTURE ran in the main orchestrating context. This run was triggered by the user's follow-up "你可以测试，<job-path>" after the prior run's report observed that F7 (the Sheet 9 cluster hint contradiction) might be a NEW bug not covered by any prior run, not a duplicate. The diagnosis + fix were verified live against the real job's `handout.html` (`extracted`), the validator's JS source, and the new regression tests. No memory-only reconstruction.
+
+**Trigger / why this is NOT a duplicate of the 2026-06-25 run #1 (C40):** C40 fixed the in-blockquote single-image false positive. This run fixes TWO DISTINCT adjacent bugs in `analyzeFigureBoundary` that C40 did not touch: (1) the single-image band-floor model mis-applied to a multi-image `<figure>` cluster, and (2) an image already at/below its band floor still being reported as a "narrow the figure" defect. The real job's Sheet 9 was a 3-image cluster, which C40's in-blockquote guard did not cover.
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|---|---|---|---|---|---|---|
+| C43 | A multi-image `<figure>` cluster at a sheet boundary must NOT be analyzed by the single-image band-floor model (narrowing one sibling does not shrink the cluster's total height); the validator must exempt it and let the rebalance overflow-rollback decide movability, never emitting a "narrow the figure" hint for a cluster | wrong (validator false positive) | pass | new | principle | **add_new** (code+tests) | first |
+| C44 | A single image already at/below its band floor (currentFrac <= floorFrac) must NEVER be reported as a "narrow the figure" defect, even if its current height happens to fit the gap — there is nothing to narrow in-band | wrong (hint contradiction) | pass | strengthen (extends the 2026-06-25 C40 already-below-floor guard into the defect/hint decision) | principle | **strengthen** (code+tests) | second (same "now X% narrow to Y% with X<Y" contradiction class as the reported F7) |
+
+Pairwise conflict check: fast path (≤2 candidates). C43 vs C44 complementary (multi-image vs single-image halves of the same fix). No contradictions.
+
+**Diagnosis evidence (extracted from the real job via Playwright + math):**
+- Job: `product/已完成项目/2026-06-18-jimi-dazhao-111-146/handout.html`. Pre-fix `validate_sheet_bottom_margin.py` → exit 1, 1 violation: `Sheet 9: ... [figure (aspect 1.38, now 25% of body) on next sheet could fit if narrowed to its band floor ~30%: est 124px <= gap 137px — narrow the figure to ~30%...]`.
+- Playwright DOM probe (via verified `handout_browser.open_handout`): Sheet 10's FIRST content block is a 3-image `<figure>` cluster. 3 imgs at body fractions 0.246 / 0.236 / 0.229 (≈25% / 24% / 23%), aspects 1.38 / 1.35 / 1.33. Whole figure block height = 124px; gap = 137px.
+- Math (replicating the validator's `smoothTargetPct` + `bandFloorFrac`): ar=1.38 → target = 41%; `bandFloorFrac = max(0.12, 0.41-0.07) - 0.04 = 0.30 (30%)`; `currentFrac = 0.246 (25%)`. So `currentFrac (0.246) <= floorFrac (0.30)` is TRUE → the image is ALREADY below its floor. The hint "narrow 25% → 30%" is therefore self-contradictory (you cannot narrow to a larger number).
+- Cross-check: `validate_rendered_handout_contract.py` → `widthBandViolations: []` (74 images, 0 violations). This is NOT a conflict-band case (the skill's documented conflict band requires BOTH gates to fire contradictory hints on the SAME image; here only the bottom-margin gate fired, with an internally-contradictory hint). So it was a genuine validator bug, not an authorized fidelity-exempt gap.
+
+**Dev Eval (non-regression + efficacy, validator-equipped):**
+- baseline `pytest tests/test_validate_sheet_bottom_margin.py` → 11 passed.
+- after C43/C44 code fix + 2 new regression tests → 13 passed (11 existing + 2 new). No regression.
+- `pytest tests/test_validate_rendered_handout_contract.py` → 11 passed (no regression in the shared-width-curve gate).
+- programmatic evals `evals/run_programmatic_eval.py` → ALL EVALS PASS, exit 0 (5/5 contracts hold).
+- strongest efficacy evidence — re-ran the FIXED validator on the real job: Sheet 9 now exempted with the clean annotation `[exempt: next sheet starts with a 3-image cluster (movability decided by rebalance overflow-rollback, not a single-image narrow hint)]`; validator exit 0; 0 violations. The self-contradicting hint is gone.
+
+written:
+  - `scripts/validate_sheet_bottom_margin.py`: (C43) `analyzeFigureBoundary` gains a MULTI-IMAGE CLUSTER GUARD — when `imgs.length >= 2`, returns early with `isFigure:true, isCluster:true, canNarrowInBand:false, fitsAtMinScale:false` so the cluster is exempted and no single-image narrowing hint is ever emitted (movability is the rebalance overflow-rollback's objective call). (C44) for single images, adds `canNarrowInBand = currentFrac > floorFrac` and gates `fitsAtMinScale` on it, so an already-below-floor image is exempt, not a defect. The hint printer only runs for genuine single-image `currentFrac > floorFrac` cases, so "narrow to ~X%" is always directionally correct. The exempt-reason annotation gains cluster + below-floor branches (fixes the `est Nonepx` cosmetic from the cluster path).
+  - `tests/test_validate_sheet_bottom_margin.py`: 2 new tests — `test_bottom_margin_exempts_multi_image_cluster_boundary` (3-img `<figure>` cluster, each below its floor, whole cluster fits gap → must PASS, no "narrow the figure" hint, annotation names the cluster) and `test_bottom_margin_exempts_single_image_already_below_band_floor` (single img at 15% < ~19% floor → must PASS, no narrow hint). Mutation-detectable: reverting either the cluster guard or the canNarrowInBand gate re-introduces the contradiction and fails the assertion.
+
+snapshot: scripts/validate_sheet_bottom_margin.py.bak-2026-06-25-3, tests/test_validate_sheet_bottom_margin.py.bak-2026-06-25-3.
+
+Verification ceiling note: this run converted two adjacent false-positive/contradiction bugs into code fixes with mutation-detectable regression tests, and verified efficacy on the real job (exit 1 → exit 0). It does NOT eliminate model-self-discipline dependence — a model could still mis-handle a cluster by hand-editing. Dev Eval verified non-regression + job-level efficacy, not behavior.
+
+active-context staleness: editing the repo file does NOT change this session's loaded skill text. Recommend a fresh session to exercise the improved skill.
+
+## 2026-06-25 (D3 run-09: figure-floor FIX-hint rounding death-loop)
+
+**Loop context:** weak-model reliability loop, D3 (jimi-dazhao-111-146, 1487 lines / 110 imgs / 1691 formulas, the hardest tier). flash ran the full pipeline on the FIRST try (rendered-contract 14/14 PASS), but bottom-margin FAILed on Sheet 26. This entry is the single hardening that cleared it.
+
+**Root cause (precise, 1pp rounding gap):** `figure-could-fit-at-band-min` defect on Sheet 26. The failing figure (`19_206_1521_379_242_0.jpg`, aspect 1.57) sat at 39% body width. Internal `bandFloorFrac(1.57) = max(0.12, smoothTargetPct(1.57)/100 - 0.07) = 0.3869` (38.69%). The `canNarrowInBand` gate is `currentFrac > floorFrac` (strict), so `0.39 > 0.3869` = True → reported as movable, FIX hint emitted. BUT the FIX hint rounded the floor for human/converger readability: `floor_pct = int(round(0.3869 * 100)) = int(round(38.69)) = 39`. So `apply_figure_floor_fixes.py` read `FIX: src=... floor=39` and wrote `width: 39%!important` — leaving `currentFrac` at exactly 0.39, STILL > 0.3869, so the gate re-reported the IDENTICAL defect, the converger re-applied IDENTICAL 39%, ad infinitum. A death-loop with no termination, on a single image already narrowed as far as the band allows.
+
+**Dynamic attribution (DESIGN.md §2):** objectively decidable — pure numeric (precise floorFrac 0.3869 vs hint-rounded floor 39, strict `>` with no slack). → sink to script. NOT a model-execution error (flash had already narrowed to 39% precisely), NOT a skill-guidance gap (the rule names the floor). The bug is the rounding direction in the FIX-hint printer, which made the converger's target floor LARGER than the gate's precise floor.
+
+**Fix:** `validate_sheet_bottom_margin.py` line ~691, the FIX-hint `floor_pct`: `int(round(bandFloorFrac * 100))` → `int(bandFloorFrac * 100)` (truncation = floor-round-down for positives). Now `floor_pct = int(38.69) = 38`, guaranteeing hint-floor (38%) ≤ precise floorFrac (38.69%), so once the converger writes 38%, `currentFrac (0.38) <= floorFrac (0.3869)` → `canNarrowInBand = False` → the defect is NOT reported → loop terminates. Internal `bandFloorFrac` judgment (line 348) unchanged; only the displayed/converger-fed integer changes.
+
+**No width-band regression:** rendered-contract's width gate uses `lo - 0.04` grace (line 433: `frac >= capped.lo - 0.04`). aspect 1.57 → lo = 0.3869, so allowed down to 34.69%. 38% sits comfortably inside [34.69%, hi+4pp]. Verified: rendered-contract `non-exempt images render within aspect-ratio width band` still PASS at 38%.
+
+**Verification:**
+- before fix: validator exit 1, `FIX: src=19_206... floor=39`; apply_figure_floor_fixes writes 39%; re-validate → exit 1, SAME FIX (death-loop confirmed by running the converger).
+- after fix: validator emits `FIX: src=19_206... floor=38`; apply_figure_floor_fixes writes 38%; re-validate → `PASS: no inspected sheet has trailing blank space exceeding 10%`, exit 0. Death-loop broken.
+- dual hard-gate post-fix: rendered-contract 13/13 PASS (exit 0) + bottom-margin PASS (exit 0). PDF re-rendered (1.55MB, 45 sheets).
+
+written: `scripts/validate_sheet_bottom_margin.py` (FIX-hint floor rounding: round → truncate, + attribution comment).
+
+snapshot: scripts/validate_sheet_bottom_margin.py.bak-2026-06-25-d3-floor.
+
+Verification ceiling note: verified the death-loop is broken and dual gates pass on the real D3 job (exit 1→0). Did not add a dedicated pytest for the rounding direction (the existing `test_bottom_margin_exempts_single_image_already_below_band_floor` covers the canNarrowInBand branch; the rounding fix is a 1-line display-side change whose efficacy is shown by the job-level exit flip). No regression in rendered-contract width band.

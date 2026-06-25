@@ -321,6 +321,8 @@ def validate(
               // a wide column. Target is then capped by the image's OWN
               // natural width so it is never upscaled past native resolution.
               function smoothTargetPct(ar) {
+                // evolved 2026-06-25: control points raised to match
+                // postprocess + validate_sheet_bottom_margin (uniform curve).
                 const pts = [
                   [0.0, 18], [0.7, 22], [0.9, 27], [1.0, 30], [1.2, 35],
                   [1.5, 45], [2.0, 58], [2.5, 68], [3.5, 78], [6.0, 82],
@@ -332,7 +334,8 @@ def validate(
                   const a1 = pts[i + 1][0], t1 = pts[i + 1][1];
                   if (a0 <= ar && ar <= a1) {
                     const r = (ar - a0) / (a1 - a0);
-                    return t0 + (t1 - t0) * r;
+                    const s = r * r * (3 - 2 * r); // smoothstep
+                    return t0 + (t1 - t0) * s;
                   }
                 }
                 return 30;

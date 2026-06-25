@@ -175,6 +175,12 @@ def validate(
                 // (the exact Kimi 2026-06 failure mode this analysis exists to
                 // prevent).
                 function smoothTargetPct(ar) {
+                    // evolved 2026-06-25: now uniform with postprocess +
+                    // validate_rendered_handout_contract (same control points +
+                    // smoothstep interpolation). Was linear interpolation on the
+                    // high curve while the other two used smoothstep on a low
+                    // curve — three drifts at once. All three gates now share ONE
+                    // curve so generator and validators agree on every aspect.
                     const pts = [
                         [0.0, 18], [0.7, 22], [0.9, 27], [1.0, 30], [1.2, 35],
                         [1.5, 45], [2.0, 58], [2.5, 68], [3.5, 78], [6.0, 82],
@@ -186,18 +192,27 @@ def validate(
                         const a1 = pts[i + 1][0], t1 = pts[i + 1][1];
                         if (a0 <= ar && ar <= a1) {
                             const r = (ar - a0) / (a1 - a0);
-                            return t0 + (t1 - t0) * r;
+                            const s = r * r * (3 - 2 * r); // smoothstep (matches postprocess + rendered-contract)
+                            return t0 + (t1 - t0) * s;
                         }
                     }
                     return 30;
                 }
                 // The lowest width-band floor the rendered-contract gate permits,
-                // as a fraction of body width, for a given aspect ratio. Mirrors
-                // validate_rendered_handout_contract.py's classifyAspect: lo =
-                // max(0.12, target - 7pp), then the -4pp "near-is-exempt" grace.
+                // as a fraction of body width, for a given aspect ratio. MUST equal
+                // validate_rendered_handout_contract.py's classifyAspect `lo`
+                // (max(0.12, target - 7pp)) — NOT lo - 4pp. evolved 2026-06-25: the
+                // old `lo - 0.04` made this gate's floor 4pp LOWER than the width-band
+                // gate's lo, so a figure narrowed to THIS gate's floor (e.g. 47% for
+                // aspect 2.02) would FAIL the width-band gate (whose lo is 51%). That
+                // contradiction is exactly the conflict-band trap — the two gates must
+                // agree on the absolute floor, or a converger that narrows to the
+                // floor hint re-trips the width-band gate. Now both use the same lo;
+                // the 4pp "near-is-exempt" grace lives only inside the width-band
+                // gate's pass/fail decision, not in the floor this gate names.
                 function bandFloorFrac(ar) {
                     const target = smoothTargetPct(ar) / 100;
-                    return Math.max(0.12, target - 0.07) - 0.04;
+                    return Math.max(0.12, target - 0.07);
                 }
                 function analyzeFigureBoundary(nextBody, trailingPx) {
                     if (!nextBody) return null;
@@ -269,6 +284,39 @@ def validate(
                         ? tallestImg.naturalWidth / tallestImg.naturalHeight
                         : (tallestImgH > 0 ? tallestImgW / tallestImgH : 1);
                     const floorFrac = bandFloorFrac(ar);
+                    // MULTI-IMAGE CLUSTER GUARD (evolved 2026-06-25): a
+                    // multi-image <figure>/.ocr-image-cluster boundary is
+                    // FUNDAMENTALLY DIFFERENT from a single-image figure. The
+                    // single-image floor model above (narrow the image to its
+                    // band floor, height scales by floor/current) is INVALID
+                    // for a cluster: narrowing ONE image does not shrink the
+                    // cluster's total height proportionally (the other siblings
+                    // keep their heights; the row width stays dominated by the
+                    // widest sibling), so estHeightAtMin computed from the
+                    // tallest image alone is fiction. Worse, it produced the
+                    // "now 25% → narrow to 30%" self-contradiction (current 25%
+                    // is already BELOW the 30% floor, so there is nothing to
+                    // narrow), which sent a weak model into an enlarge↔shrink
+                    // loop chasing a non-existent defect. For clusters, actual
+                    // movability is decided OBJECTIVELY by the rebalance pass's
+                    // overflow-rollback (it tries the move and rolls back on
+                    // overflow) — the validator must NOT second-guess it with a
+                    // single-image narrowing hint. Return isFigure so the
+                    // figureExempt / fall-through path applies, but
+                    // canNarrowInBand=false so no "narrow the figure" defect or
+                    // hint is ever emitted for a cluster.
+                    const isMultiImageCluster = imgs.length >= 2;
+                    if (isMultiImageCluster) {
+                        return {
+                            isFigure: true,
+                            isCluster: true,
+                            imgCount: imgs.length,
+                            blockH: Math.round(blockH),
+                            trailingPx: Math.round(trailingPx),
+                            canNarrowInBand: false,
+                            fitsAtMinScale: false,
+                        };
+                    }
                     // Min image height = scale current height so its width lands
                     // at the band floor (aspect preserved). This is an ABSOLUTE
                     // pixel value — it does not shrink when the model shrinks
@@ -288,18 +336,61 @@ def validate(
                         minImgH = tallestImgH * (floorFrac / currentFrac);
                     }
                     const estHeightAtMin = minImgH + overhead;
+                    // canNarrowInBand: the image genuinely has room to shrink
+                    // WITHIN its band (current > floor). If it is already at or
+                    // below its floor, narrowing is impossible without leaving
+                    // the band, so the trailing blank is the unavoidable
+                    // width-band cost — NOT a defect, regardless of whether the
+                    // current block height happens to be ≤ the gap. This closes
+                    // the "now 25% → narrow to 30%" contradiction: an
+                    // already-below-floor image never yields a "narrow the
+                    // figure" hint.
+                    const canNarrowInBand = currentFrac > floorFrac;
+                    // SAFETY_MARGIN (evolved 2026-06-25): rebalance's
+                    // sheetOverflows requires the moved block's bottom to clear
+                    // the body bottom by >=12px (cross-browser CJK+KaTeX render
+                    // drift safety). If this gate says "fits" but the post-12px
+                    // check would FAIL, rebalance rolls the move back and the
+                    // FAIL never clears — the two gates disagree and the model
+                    // loops. So this gate applies the SAME 12px margin: only
+                    // fitsAtMinScale when estHeightAtMin + 12 <= trailingPx. A
+                    // figure in the 0..12px window (mathematically fits but no
+                    // safety headroom) is NOT a movable defect — it is the
+                    // unavoidable safety-margin cost, exempt like a conflict band.
+                    const SAFETY_MARGIN = 12;
+                    // srcFragment: a stable substring of the image's src that a
+                    // converger script can use as a CSS attribute selector
+                    // (img[src*="..."]) to locate THIS exact image and apply the
+                    // band-floor width. Uses the last path segment (filename),
+                    // which is unique per Doc2X crop. Added 2026-06-25 so a weak
+                    // model (or an automated converger) can read the hint's src +
+                    // floor and emit a precise job-local CSS rule, instead of
+                    // guessing which image or rounding the floor.
+                    const srcFragment = (function() {
+                        const s = tallestImg.getAttribute('src') || '';
+                        const parts = s.split('/');
+                        return parts[parts.length - 1].split('?')[0].slice(-40);
+                    })();
                     return {
                         isFigure: true,
+                        isCluster: false,
                         blockH: Math.round(blockH),
                         currentFrac: Number(currentFrac.toFixed(3)),
                         aspect: Number(ar.toFixed(2)),
                         bandFloorFrac: Number(floorFrac.toFixed(3)),
                         estHeightAtMin: Math.round(estHeightAtMin),
                         trailingPx: Math.round(trailingPx),
-                        // "fits at minimum scale" => the blank is avoidable by
-                        // narrowing the figure to its band floor and moving it
-                        // up; this is a defect.
-                        fitsAtMinScale: estHeightAtMin <= trailingPx,
+                        canNarrowInBand,
+                        srcFragment,
+                        // "fits at minimum scale AND narrowable in-band" => the
+                        // blank is avoidable by narrowing the figure to its band
+                        // floor and moving it up; this is a defect. A figure
+                        // that already sits at/below its floor can never satisfy
+                        // this, so it is never reported as a movable-figure
+                        // defect (it falls through to figureExempt). The +12px
+                        // SAFETY_MARGIN (declared above) keeps this gate in
+                        // lockstep with rebalance's sheetOverflows.
+                        fitsAtMinScale: canNarrowInBand && (estHeightAtMin + SAFETY_MARGIN <= trailingPx),
                     };
                 }
 
@@ -450,10 +541,15 @@ def validate(
 
                     const figureAnalysis = analyzeFigureBoundary(nextBody, trailing);
                     // figureExempt: the next sheet starts with an image figure
-                    // that cannot fit in the trailing gap even at the band
-                    // minimum (0.8x) — the blank is the unavoidable cost of the
-                    // width-band floor. figureDefect: the figure COULD fit if
-                    // narrowed to its band minimum — the blank is avoidable.
+                    // that cannot fit in the trailing gap even when narrowed to
+                    // its band floor — the blank is the unavoidable cost of the
+                    // width-band floor. ALSO exempt: a multi-image cluster
+                    // (movability is decided by the rebalance overflow-rollback,
+                    // not by a single-image narrowing hint) and a single image
+                    // already at/below its band floor (nothing to narrow
+                    // in-band). figureDefect: a SINGLE image that genuinely
+                    // narrows in-band AND would then fit — the blank is
+                    // avoidable.
                     const figureExempt = !!(figureAnalysis && figureAnalysis.isFigure && !figureAnalysis.fitsAtMinScale);
                     const figureDefect = !!(figureAnalysis && figureAnalysis.isFigure && figureAnalysis.fitsAtMinScale);
                     const headingBoundary = nextStartsHeadingBoundary(nextBody);
@@ -548,10 +644,25 @@ def validate(
             exempt_reasons.append("forced lecture break")
         if m.get("figureExempt"):
             fa = m.get("figureAnalysis") or {}
-            exempt_reasons.append(
-                f"next sheet starts with a figure that cannot fit at band-min "
-                f"(est {fa.get('estHeightAtMin')}px > gap {fa.get('trailingPx')}px)"
-            )
+            if fa.get("isCluster"):
+                exempt_reasons.append(
+                    f"next sheet starts with a {fa.get('imgCount')}-image cluster "
+                    f"(movability decided by rebalance overflow-rollback, not a "
+                    f"single-image narrow hint)"
+                )
+            elif fa.get("canNarrowInBand") is False and fa.get("isFigure"):
+                # Single image already at/below its band floor: nothing to
+                # narrow in-band, so the blank is the width-band cost.
+                exempt_reasons.append(
+                    f"next sheet's figure (aspect {fa.get('aspect')}, now "
+                    f"{int(round((fa.get('currentFrac') or 0) * 100))}% of body) "
+                    f"is already at/below its band floor — nothing to narrow in-band"
+                )
+            else:
+                exempt_reasons.append(
+                    f"next sheet starts with a figure that cannot fit at band-min "
+                    f"(est {fa.get('estHeightAtMin')}px > gap {fa.get('trailingPx')}px)"
+                )
         if m.get("nextStartsWithChapterH2"):
             exempt_reasons.append("next sheet starts with chapter h2")
         if m.get("headingBoundary"):
@@ -577,7 +688,21 @@ def validate(
                 )
             elif reason == "figure-could-fit-at-band-min":
                 fa = v.get("figureAnalysis") or {}
-                floor_pct = int(round((fa.get('bandFloorFrac') or 0) * 100))
+                # FIX hint floor is FLOOR-ROUNDED-DOWN (int() truncates), NOT
+                # round(), evolved 2026-06-25 (D3 run-09 death-loop root cause).
+                # bandFloorFrac is a precise fraction (e.g. 0.3869 for aspect
+                # 1.57); the canNarrowInBand gate uses `currentFrac > floorFrac`
+                # (strict). round(38.69)=39 made the FIX hint emit floor=39, so
+                # apply_figure_floor_fixes.py wrote width:39%!important, leaving
+                # currentFrac(0.39) > floorFrac(0.3869) still True — the gate
+                # re-reported the SAME defect, the converger re-applied the SAME
+                # 39%, ad infinitum (the D3 Sheet-26 death-loop). Truncating to
+                # 38 guarantees the hint floor <= precise floorFrac, so once the
+                # converger writes 38%, canNarrowInBand flips to False and the
+                # loop terminates. 38% stays inside the rendered-contract width
+                # band (lo-4pp grace = 34.69%), so no width-band regression.
+                floor_pct = int((fa.get('bandFloorFrac') or 0) * 100)
+                src_frag = fa.get('srcFragment') or ''
                 print(
                     f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "
                     f"body {v['bodyHeightPx']}px ({v['fraction'] * 100:.1f}% > "
@@ -588,6 +713,13 @@ def validate(
                     f"narrow the figure to ~{floor_pct}% body width (the band floor) and "
                     f"let it move up; do NOT shrink past {floor_pct}%]"
                 )
+                # Machine-parseable FIX line (added 2026-06-25): a converger
+                # script reads this to emit a precise job-local CSS rule with
+                # the exact floor + src, so a weak model that rounds the floor
+                # (e.g. 47% -> 51%) is bypassed by code. Format:
+                # FIX: src=<fragment> floor=<pct>
+                if src_frag:
+                    print(f"    FIX: src={src_frag} floor={floor_pct}")
             else:
                 print(
                     f"  - Sheet {v['pageNumber']}: trailing {v['trailingPx']}px / "

@@ -9,7 +9,8 @@
       "expectations": [
         "pre-build gate (validate_example_blockquote_coverage) reports bare-paragraph example labels",
         "no example label renders as a bare <p> outside a .phycat-blockquote after build+postprocess",
-        "解析 paragraphs render OUTSIDE blockquotes (analysis is never blockquoted)"
+        "解析 paragraphs render OUTSIDE blockquotes (analysis is never blockquoted)",
+        "a media-only figure authored after an example stays OUTSIDE .phycat-blockquote after postprocess"
       ]
     },
     {
@@ -27,8 +28,8 @@
       "name": "chapter-h2-pagination",
       "fixture": "fixtures/chapter-breaks.md",
       "expectations": [
-        "each chapter h2 (第N章/节) except the first begins a new .sheet",
-        "the sheet before each non-first chapter h2 is marked data-ends-before-lecture=true",
+        "each chapter-shaped h2 (第N章/节/... and 大招 N) except the first begins a new .sheet",
+        "the sheet before each non-first chapter-shaped h2 is marked data-ends-before-lecture=true",
         "a NON-chapter h2 (e.g. 大招总结) does NOT cause its predecessor to be marked (exemption must not be too broad)"
       ]
     },

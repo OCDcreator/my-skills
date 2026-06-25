@@ -642,7 +642,13 @@ def test_bottom_margin_band_floor_estimate_is_invariant_under_shrinking(tmp_path
     import re
 
     estimates = []
-    for i, img_width in enumerate(("400px", "160px")):  # ~50% body, then ~20%
+    # Both widths must stay ABOVE the band floor so the figure-could-fit hint
+    # fires in both cases (the test verifies the estHeightAtMin is invariant).
+    # evolved 2026-06-25: the narrow width was 160px (~20%), but after the floor
+    # was raised to match width-band's lo (max(0.12, target-0.07) = 23% for
+    # aspect 1.0), 20% falls below the floor and the hint stops firing. 200px
+    # (~25%) stays above the 23% floor while still exercising the narrowing path.
+    for i, img_width in enumerate(("400px", "200px")):  # ~50% body, then ~25%
         html = tmp_path / f"handout_{i}.html"
         _write_kimi_loop_handout(html, img_width)
         result = _run_validator(html)
@@ -660,4 +666,176 @@ def test_bottom_margin_band_floor_estimate_is_invariant_under_shrinking(tmp_path
         f"({estimates[0]}px -> {estimates[1]}px); the Kimi infinite-shrink "
         f"loop has regressed: the hint would stay satisfiable as the model "
         f"keeps shrinking the image."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Multi-image cluster + already-below-floor single image (evolved 2026-06-25).
+# These two cases closed the "now 25% -> narrow to 30%" self-contradicting hint
+# on a 3-image <figure> cluster boundary (jimi-dazhao-111-146 Sheet 9/10). The
+# single-image band-floor model is INVALID for a cluster: narrowing one sibling
+# does not shrink the cluster's total height, so a "narrow the figure" hint is
+# fiction. And a single image already at/below its band floor has nothing left
+# to narrow in-band, so its trailing blank is the width-band cost, not a defect.
+# Both must PASS with no "narrow the figure" hint. Mutation-detectable:
+# reverting the cluster guard (isMultiImageCluster short-circuit) or the
+# canNarrowInBand gate re-introduces the contradictory defect.
+# ---------------------------------------------------------------------------
+
+def _write_cluster_boundary_handout(path: Path) -> None:
+    """A 3-image <figure> cluster sits as the FIRST content block on sheet 3,
+    above a real trailing gap on sheet 2. Each image is small (aspect ~1.35,
+    rendered ~160px on a 794px body ≈ 20% — already below its ~30% band floor),
+    and the whole cluster (~124px) physically fits in the gap (~137px). The
+    OLD gate reported this as a defect with the self-contradicting hint
+    "now 25% -> narrow to 30%". The FIXED gate must PASS (exempt the cluster:
+    movability is the rebalance overflow-rollback's call, not a single-image
+    narrowing hint)."""
+    # Three distinct SVGs so each <img> has its own natural dimensions
+    # (naturalWidth/Height drive the aspect-ratio band pick).
+    def svg(w: int, h: int) -> str:
+        return (
+            "data:image/svg+xml;utf8,"
+            f"<svg xmlns='http://www.w3.org/2000/svg' width='{w}' height='{h}'>"
+            f"<rect width='{w}' height='{h}' fill='%23ccc'/></svg>"
+        )
+    # Cluster of 3 side-by-side images, each ~160px wide.
+    imgs = (
+        f"<img src='{svg(272, 197)}' style='width:160px;height:auto;' alt='a'/>"
+        f"<img src='{svg(353, 261)}' style='width:155px;height:auto;' alt='b'/>"
+        f"<img src='{svg(357, 268)}' style='width:150px;height:auto;' alt='c'/>"
+    )
+    path.write_text(
+        f"""<!doctype html>
+<html data-handout-ready="true">
+<head>
+<meta charset="utf-8">
+<style>
+.sheet {{ width: 794px; min-height: 1123px; }}
+.sheet-body {{ height: 1000px; }}
+.flow-block {{ height: 60px; }}
+.flow-block.gap {{ height: 863px; }}
+.flow-block.fill {{ height: 980px; }}
+figure {{ margin: 0; display: flex; gap: 8px; }}
+</style>
+</head>
+<body>
+<main id="handout-print-root">
+  <article class="sheet" data-page-number="1">
+    <section class="sheet-body"><div class="flow-block">cover</div></section>
+  </article>
+  <article class="sheet" data-page-number="2">
+    <section class="sheet-body"><div class="flow-block gap">正文，留下约 137px 尾部空白。</div></section>
+  </article>
+  <article class="sheet" data-page-number="3">
+    <section class="sheet-body">
+      <figure>{imgs}</figure>
+      <div class="flow-block fill">图后正文，填充页面避免无关的尾部空白。</div>
+    </section>
+  </article>
+  <article class="sheet" data-page-number="4">
+    <section class="sheet-body"><div class="flow-block fill">final page (filled).</div></section>
+  </article>
+</main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_bottom_margin_exempts_multi_image_cluster_boundary(tmp_path: Path) -> None:
+    """A 3-image <figure> cluster at a sheet boundary, where each image is
+    already below its band floor and the cluster physically fits the gap, must
+    NOT be reported as a "narrow the figure" defect. The single-image
+    band-floor model is invalid for a cluster. The gate PASSES and emits no
+    narrow hint. Regression for the jimi-dazhao Sheet 9 'now 25% -> narrow to
+    30%' self-contradiction."""
+    html = tmp_path / "handout.html"
+    _write_cluster_boundary_handout(html)
+
+    result = _run_validator(html)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "narrow the figure" not in result.stdout, (
+        "a multi-image cluster boundary must not emit a single-image "
+        "'narrow the figure' hint:\n" + result.stdout
+    )
+    assert "cluster" in result.stdout, (
+        "the cluster exemption annotation should name the cluster:\n"
+        + result.stdout
+    )
+
+
+def _write_below_floor_single_image_handout(path: Path) -> None:
+    """A SINGLE <img> figure whose current width (15% of body) is already BELOW
+    its band floor (~19% for aspect 1.0), sitting as the first content block on
+    sheet 3 above a real trailing gap on sheet 2. Even though the figure's
+    current height happens to fit the gap, there is nothing to narrow in-band
+    (it is already at/below floor), so the blank is the width-band cost, not a
+    defect. The gate must PASS with no 'narrow the figure' hint. This is the
+    single-image half of the same fix (the cluster test covers the multi-image
+    half)."""
+    svg = (
+        "data:image/svg+xml;utf8,"
+        "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>"
+        "<rect width='200' height='200' fill='%23ccc'/></svg>"
+    )
+    # 120px wide on a 794px body ≈ 15% — below the ~19% band floor for ar=1.0.
+    img_width = "120px"
+    path.write_text(
+        f"""<!doctype html>
+<html data-handout-ready="true">
+<head>
+<meta charset="utf-8">
+<style>
+.sheet {{ width: 794px; min-height: 1123px; }}
+.sheet-body {{ height: 1000px; }}
+.flow-block {{ height: 60px; }}
+.flow-block.gap {{ height: 800px; }}
+.flow-block.fill {{ height: 980px; }}
+</style>
+</head>
+<body>
+<main id="handout-print-root">
+  <article class="sheet" data-page-number="1">
+    <section class="sheet-body"><div class="flow-block">cover</div></section>
+  </article>
+  <article class="sheet" data-page-number="2">
+    <section class="sheet-body"><div class="flow-block gap">正文，留下尾部空白。</div></section>
+  </article>
+  <article class="sheet" data-page-number="3">
+    <section class="sheet-body">
+      <figure style="margin:0;"><img src="{svg}" style="width:{img_width};height:auto;display:block;" alt="fig"/></figure>
+      <div class="flow-block fill">图后正文，填充页面避免无关的尾部空白。</div>
+    </section>
+  </article>
+  <article class="sheet" data-page-number="4">
+    <section class="sheet-body"><div class="flow-block fill">final page (filled).</div></section>
+  </article>
+</main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.skipif(not _playwright_ready(), reason="Playwright chromium is not available")
+def test_bottom_margin_exempts_single_image_already_below_band_floor(tmp_path: Path) -> None:
+    """A single-image figure already at/below its band floor (current width <
+    floor) must NOT be reported as a 'narrow the figure' defect, even if its
+    current height happens to fit the gap — there is nothing to narrow
+    in-band. The gate PASSES. Closes the 'now 25% -> narrow to 30%'
+    contradiction for the single-image case."""
+    html = tmp_path / "handout.html"
+    _write_below_floor_single_image_handout(html)
+
+    result = _run_validator(html)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "narrow the figure" not in result.stdout, (
+        "an already-below-floor image must not emit a 'narrow the figure' "
+        "hint:\n" + result.stdout
     )

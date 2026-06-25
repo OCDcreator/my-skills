@@ -237,6 +237,14 @@ TIGHTEN_VERTICAL_SPACING = """
 
 IMAGE_WIDTH_HELPERS = """
 function smoothTargetPct(aspectRatio) {
+  // evolved 2026-06-25: control points raised to match validate_sheet_bottom_margin
+  // + validate_rendered_handout_contract (all three gates MUST share one curve, or
+  // the generator sets a width the validator rejects/accepts inconsistently — the
+  // exact "image too narrow at aspect 4.71" defect a real handout exposed: the old
+  // low curve here gave ~45% while bottom-margin's high curve expected ~80%, so the
+  // rendered-contract gate (which used this low curve) rubber-stamped a too-narrow
+  // banner image). Now uniform: square 30%, 2.0→58%, 3.5→78%, 6.0→82%. Interpolation
+  // is smoothstep (smoother than linear, no hard jump at control points).
   const pts = [
     [0.0, 18], [0.7, 22], [0.9, 27], [1.0, 30], [1.2, 35],
     [1.5, 45], [2.0, 58], [2.5, 68], [3.5, 78], [6.0, 82],
@@ -248,7 +256,8 @@ function smoothTargetPct(aspectRatio) {
     const [a1, t1] = pts[i + 1];
     if (a0 <= aspectRatio && aspectRatio <= a1) {
       const r = (aspectRatio - a0) / (a1 - a0);
-      return t0 + (t1 - t0) * r;
+      const s = r * r * (3 - 2 * r); // smoothstep
+      return t0 + (t1 - t0) * s;
     }
   }
   return 30;
@@ -352,10 +361,11 @@ function isHeadingOnlyBlock(block) {
   if (!heading) return false;
   // Reject chapter/lecture break headings — those are intended section ends,
   // and they already triggered a forced fresh sheet upstream, so they are
-  // never "stranded" content.
+  // never "stranded" content. evolved 2026-06-25: ANY h2 is a break heading
+  // (see paginateHandout), so every h2 is rejected here, not just chapter-shaped.
   const text = normalizeTextForBookmark(heading.textContent);
   if (isLectureHeading(text)) return false;
-  if (heading.tagName === 'H2' && isChapterBreakHeading(text)) return false;
+  if (heading.tagName === 'H2') return false;
   // Count non-heading element children with visible content.
   const meaningful = Array.from(block.children).filter((child) => {
     if (child === heading) return false;
@@ -514,13 +524,14 @@ function trailingBlankRatio(sheet) {
 }
 
 // A block that must NOT be pulled up by rebalance (doing so would strand a
-// heading, split a quote, or move a figure). Headings are protected at every
-// level h1-h6 to stay consistent with the anti-orphan rule.
+// heading or split a quote). Headings are protected at every level h1-h6 to
+// stay consistent with the anti-orphan rule. Figures/images are allowed to be
+// carried forward because rebalance itself rolls back any move that causes
+// overflow, and moving a whole figure block preserves its internal layout.
 function isCarryForwardProtected(block) {
   if (!block) return true;
   if (block.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6')) return true;
   if (block.querySelector(':scope > .phycat-blockquote')) return true;
-  if (block.querySelector(':scope > figure, :scope > img, :scope > svg, :scope > canvas')) return true;
   return false;
 }
 
@@ -622,7 +633,9 @@ function sweepOrphanHeadings(root, title, sourceLabel) {
         : null;
       if (nextFirstHeading) {
         const nextText = normalizeTextForBookmark(nextFirstHeading.textContent);
-        if (isLectureHeading(nextText) || (nextFirstHeading.tagName === 'H2' && isChapterBreakHeading(nextText))) continue;
+        // evolved 2026-06-25: any h2 is a break heading (see paginateHandout),
+        // so a next-sheet-first h2 means this sheet is an intended section end.
+        if (isLectureHeading(nextText) || nextFirstHeading.tagName === 'H2') continue;
       }
 
       // RE-FLOW: peel the orphan, then re-pack from sheet i+1 onward.
@@ -663,7 +676,11 @@ function isLectureHeading(text) {
   // CJK character (e.g. "第3讲" ends with 讲, a non-word char to \b, so the
   // boundary never fires). The 第N{讲|章|...} shape is distinctive enough;
   // the trailing group requires a delimiter or end-of-string instead.
-  return /^第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)(?:\\s|$|[：:．、。])/.test((text || '').trim());
+  // Evolved 2026-06-25: also treat job-specific numbered subsection openers
+  // (基本技能 N / 翻译 N / 经典问题 N) as lecture-break headings so each
+  // begins a fresh sheet. These are distinctive CJK prefixes followed by a
+  // number, so they cannot false-match ordinary exposition.
+  return /^(?:第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)|(?:基本技能|翻译|经典问题)\\s*[0-9一二三四五六七八九十百零]+)(?:\\s|$|[：:．、。])/.test((text || '').trim());
 }
 
 // A chapter-shaped h2 that should also force a fresh sheet. Broader than
@@ -671,7 +688,7 @@ function isLectureHeading(text) {
 // Module/Lesson/Chapter. Pure-exposition h2 like "## 补充说明" intentionally
 // does NOT match — only headings that clearly start a new chapter/section.
 function isChapterBreakHeading(text) {
-  return /^(?:第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)|单元\\s*[0-9一二三四五六七八九十百零]+|[0-9]+\\s*[\\.、]\\s*[\\u4e00-\\u9fff]|(?:Module|Lesson|Chapter)\\s+\\d)/.test((text || '').trim());
+  return /^(?:第\\s*[0-9一二三四五六七八九十百零]+\\s*(?:讲|章|节|部分|篇|单元)|单元\\s*[0-9一二三四五六七八九十百零]+|大招\\s*[0-9一二三四五六七八九十百零]+|[0-9]+\\s*[\\.、]\\s*[\\u4e00-\\u9fff]|(?:Module|Lesson|Chapter)\\s+\\d)/.test((text || '').trim());
 }
 
 function normalizeTextForBookmark(text) {
@@ -729,6 +746,41 @@ function ensureExampleQuote(block) {
   return block;
 }
 
+function blockContainsOnlyMedia(block) {
+  if (!block) return false;
+  const meaningfulChildren = Array.from(block.children).filter((child) => {
+    const childText = normalizeTextForBookmark(child.textContent || '');
+    return childText || child.querySelector('img,svg,canvas,table,.katex,math');
+  });
+  if (!meaningfulChildren.length) return false;
+  return meaningfulChildren.every((child) => {
+    return child.tagName === 'FIGURE' || child.tagName === 'IMG' || child.querySelector(':scope > figure, :scope > img');
+  });
+}
+
+function extractMediaFromBlockquoteBlocks(blocks) {
+  const result = [];
+  blocks.forEach((block) => {
+    result.push(block);
+    const quote = block.querySelector(':scope > blockquote.phycat-blockquote');
+    if (!quote) return;
+    const mediaChildren = Array.from(quote.children).filter((child) => {
+      return child.tagName === 'FIGURE' || child.tagName === 'IMG' || child.querySelector('img');
+    });
+    mediaChildren.forEach((mediaChild) => {
+      const mediaBlock = document.createElement('div');
+      mediaBlock.className = 'flow-block media-extracted-block';
+      if (block.dataset && block.dataset.sourcePage) {
+        mediaBlock.dataset.sourcePage = block.dataset.sourcePage;
+      }
+      mediaBlock.appendChild(mediaChild.cloneNode(true));
+      result.push(mediaBlock);
+      quote.removeChild(mediaChild);
+    });
+  });
+  return result;
+}
+
 function mergeExampleRuns(blocks) {
   const merged = [];
   for (let i = 0; i < blocks.length; i += 1) {
@@ -756,6 +808,9 @@ function mergeExampleRuns(blocks) {
     while (cursor < blocks.length) {
       const next = blocks[cursor];
       if (blockStartsExample(next) || blockStartsHeading(next)) break;
+      // Images/figures that follow an example should stay OUTSIDE the blockquote,
+      // otherwise the blockquote swells with media and breaks pagination/width contracts.
+      if (blockContainsOnlyMedia(next)) break;
       const nextParagraph = firstMeaningfulParagraph(next);
       if (paragraphStartsAnalysis(nextParagraph)) break;
       while (next.firstChild) {
@@ -951,6 +1006,16 @@ def inject_js_overrides(html: str) -> str:
   // BEFORE pagination so the anti-orphan repair below can still pull a heading
   // forward across any of these (sub)blocks.
   const blocks = mergeConnectorWithFollowingMath(
+    // evolved 2026-06-25: extractMediaFromBlockquoteBlocks REMOVED from the
+    // pipeline. It was a belt-and-suspenders fallback that force-stripped EVERY
+    // figure/img child out of every .phycat-blockquote — but mergeExampleRuns's
+    // blockContainsOnlyMedia check (L809) already correctly keeps standalone
+    // external media OUT of the quote, so the extract step had no legitimate
+    // target left. Instead it HARMFULLY stripped media that the SOURCE authored
+    // INSIDE the quote (题图 in `> <figure>`, 选项图 in `> |table|`), leaving
+    // example blockquotes containing only the stem while the figure/options
+    // floated outside — exactly the "选项图没放进引用块" defect a real handout
+    // exposed. The function definition is kept below (unused) for traceability.
     mergeExampleRuns(collectFlowBlocks(sourceRoot))
       .flatMap(splitOverlongQuestionCallout)
       .flatMap(splitQuestionSupportBlocks)
@@ -972,7 +1037,12 @@ def inject_js_overrides(html: str) -> str:
       : false;
 
     const isBreakHeading = isLectureHeading(headingText) ||
-      (heading && heading.tagName === 'H2' && isChapterBreakHeading(headingText));
+      (heading && heading.tagName === 'H2');
+    // evolved 2026-06-25: ANY h2 forces a fresh sheet, not just chapter-shaped
+    // h2. Real handouts use h2 as section dividers regardless of whether the
+    // text matches 第N章/大招N; confining forced page breaks to chapter-shaped
+    // h2 left section dividers like "## 考向2" stranded mid-page. isLectureHeading
+    // is kept for h1/h3+ lecture shapes; h2 unconditionally breaks.
     if (heading && isBreakHeading && hasBodyContent) {
       sheet.dataset.endsBeforeLecture = 'true';
       pageNumber += 1;
