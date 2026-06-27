@@ -30,6 +30,7 @@ When rewriting a question block, the subagent MUST read the corresponding passag
 
 ## Rewrite Format (per `canonical-markdown-rules.md`)
 
+- **Document headings (`#`/`##`/`###`) are preserved verbatim — do NOT rewrite or drop them** (CRITICAL for weaker models). The rewrite touches only question-block STRUCTURE; the document's section title hierarchy (`# 文档标题` / `## 第一节` / `### 经典例题`) is NOT a "question block" and must pass through untouched. Weaker models tend to frame "rewrite the question blocks" as "output ONLY the question blocks", silently dropping every heading. Guard against this with a **literal-echo step** (see Step 0 in the Subagent Template below): before rewriting, scan the document for every `#`-prefixed line and copy each one verbatim into the output at its original position/level. Even a heading that looks "unimportant" must be kept. The output is a FULL rewrite of the document, from its first `#` heading to its end, not a extract of the question blocks. <!-- added 2026-06-28 stress-test lesson: weak models drop headings unless given an explicit copy step -->
 - **Title line holds only the label + source** (CRITICAL — most common OCR defect). The `[!question]` title line carries only the `例题N`/`例N`/`练习N` label and its optional source tag (`(2017・新课标 I)`/`【2018全国I】`/year digits/nothing). The stem body (the actual problem — 已知…/设…/若…/求…) MUST begin on the next `>` line. OCR routinely glues the stem's first sentence onto the title line; during rewrite, split it off. The title line must never be both the "题号" and the "题干第一句". Source tags vary across PDFs (round/angle/【】 brackets, year digits, exam names, or none) — judge by the stem, not the source shape. See `canonical-markdown-rules.md` → "Title line holds only the label + source" for good/bad examples. (Enforced by `lint_question_callout_title_attached`.)
 - **Stem** → a single `> [!question]` callout containing the stem, options, and sub-questions together.
 - **Choice options** → markdown table inside the callout (`≤15` chars/option: one row × 4 cols; `>15` chars: two rows × 2 cols). Every table line prefixed with `>`.
@@ -96,6 +97,7 @@ If the subagent reads a passage in `page-transcript.raw.md` and **genuinely doub
 
 Before reporting a rewritten block as done, verify:
 
+- **All document headings preserved**: every `#`/`##`/`###` heading from the original document is still present in the output, at its original level. No section title was dropped or merged. (The most common failure for weaker models.)
 - **Title line is label-only**: the `[!question]` title line contains only the `例题N`/`例N`/`练习N` label and its source tag — the stem body starts on the next `>` line. No stem sentence glued onto the title line.
 - **Option count matches raw**: the number of choice options in the rewritten callout equals the number in the raw transcript passage (no option dropped or invented).
 - **`$` conservation**: count of `$` in the rewritten block equals count in the raw passage (no delimiter added/lost).
@@ -112,6 +114,14 @@ For each chunk of 3-5 question blocks, dispatch a subagent with this prompt:
 You are rewriting question blocks (例题/练习/Q&A) in a math transcript. For each
 question block in your assigned range:
 
+0. PRESERVE DOCUMENT HEADINGS (do this FIRST, before any rewrite). Scan the
+   document for EVERY line that starts with `#`/`##`/`###`. Write each one
+   down verbatim. When you produce your output, copy these heading lines into
+   their original positions and levels, unchanged — even ones that look
+   "unimportant". Your output is a FULL rewrite of the document (from its
+   first `#` heading to its end), NOT an extract of just the question blocks.
+   Weaker models routinely drop section titles here; the explicit copy step
+   is what prevents that.
 1. READ the block's current state in source-transcript.md.
 2. READ the corresponding passage in doc2x/page-transcript.raw.md (locate it by
    page marker / position). The raw transcript is your CONTENT TRUTH.
@@ -142,9 +152,10 @@ question block in your assigned range:
    Compare the new result; if it clarifies the doubt, use it. If it does NOT
    resolve the doubt after one retry, STOP — mark [TO VERIFY: 单页重 OCR 仍不清晰]
    and move on. Do NOT re-OCR again, do NOT expand to neighboring pages.
-9. SELF-CHECK each rewritten block: title line is label+source only (no stem
-   glued on), option count matches raw, $ count matches raw, no analysis
-   paragraph >300 chars, callout closed, no content added.
+9. SELF-CHECK each rewritten block: ALL document headings (#/##/###) preserved
+   verbatim, title line is label+source only (no stem glued on), option count
+   matches raw, $ count matches raw, no analysis paragraph >300 chars, callout
+   closed, no content added.
 
 REPORT:
 - Number of question blocks rewritten
