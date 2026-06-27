@@ -15,6 +15,8 @@ Read these before starting work:
 - `references/proofreading-checklist.md` — quality verification against source page images
 - `references/canonical-markdown-rules.md` — structural formatting rules for the final Markdown
 - `references/analysis-retypesetting.md` — detailed rules and subagent template for Step 2.5 analysis re-typesetting
+- `references/question-block-rewrite-guide.md` — detailed rules and subagent template for Step 2.7 question-block rewrite against the raw transcript
+- `references/emphasis-and-color-rules.md` — bold/italic and semantic-color marking: mis-marked heading downgrade, proactive key-point marking, fixed color palette, formula-conflict handling
 
 Also read the local Obsidian Markdown syntax skill for syntax compatibility reference:
 `C:\Users\lt\Desktop\Write\custom-project\my-skills\external\kepano-obsidian-skills\obsidian-markdown\SKILL.md`.
@@ -244,12 +246,38 @@ Key checks in order:
 
 Doc2X dumps each analysis section as one massive unbroken paragraph. Use subagents to re-typeset each block into clean paragraphs and fix OCR typos.
 
+**Scope of this step**: mechanical paragraph *splitting* inside a single analysis block only (排版). The **whole question-block structure** (stem → callout, options → table, sub-questions → own lines, analysis → paragraphs) is handled separately by Step 2.7. Do not let the two steps overlap.
+
 **Full rules, subagent template, and verification commands**: see `references/analysis-retypesetting.md`.
 
 Quick reference:
 - ≤ 3 examples: do it inline (read and edit each block yourself)
 - > 3 examples: dispatch subagents (3-5 examples per subagent)
 - After completion: verify `$` count, `\begin{array}` count, and callout count are unchanged
+
+### Step 2.7 — Question Block Rewrite (MANDATORY for question-heavy documents)
+
+**This step is MANDATORY for documents containing 例题/练习/Q&A blocks.** It runs after Step 2.5 and before Step 3.
+
+**Why this step exists**: OCR produces structurally messy question blocks — stems dumped as plain paragraphs, options scattered outside the question, sub-parts crammed on one line, analysis as one giant lump, sentences displaced between stem and analysis. Auditing (find problems then fix) is unreliable because the model often fails to notice the problems. **Rewriting is reliable**: the subagent rewrites each question block cleanly against `doc2x/page-transcript.raw.md`, and the rewrite itself fixes every structural defect without needing to detect them first.
+
+**Method** — rewrite, not audit:
+
+1. The main agent scans `source-transcript.md` and locates every question block (each `例题N` / `练习N` / `例` / Q&A unit: stem + options + sub-questions + its analysis).
+2. **For long documents**: reuse the Parallel Chunking page ranges — each chunk's subagent handles the question blocks within its pages. Do not scan twice.
+3. Each subagent:
+   - Reads the block's current state in `source-transcript.md`.
+   - Reads the corresponding passage in `doc2x/page-transcript.raw.md` (locate by page marker/position). **The raw transcript is the content truth.**
+   - Rewrites the block cleanly per `references/question-block-rewrite-guide.md`: stem → `> [!question]` callout, options → markdown table, sub-questions → own lines, analysis → paragraphs `≤300` chars.
+   - Fixes OCR typos and moves displaced sentences back where they belong, by comparing to the raw passage.
+   - **Marks key points** per `references/emphasis-and-color-rules.md`: in each rewritten block, sparingly mark the conclusion sentence (purple `#9370DB`), any 易错/警示 (red), and technique/口诀 names (green) — at most 1-2 marks per block, color spans wrap pure text only (never `$...$`), and headings flagged as not-a-heading-but-emphasis are downgraded to emphasis rather than deleted.
+   - **Single-page re-OCR appeal (escape hatch)**: if and only if the subagent genuinely doubts a symbol/number/word in the raw passage (content doubt, NOT structure mess), it may re-OCR that **one page only** — extract with `extract_and_submit.py --pages <N> --allow-full-pdf`, submit to Doc2X, compare. If the retry does not resolve the doubt, **stop and mark `[TO VERIFY: 单页重 OCR 仍不清晰，疑 PDF 原文模糊]`** — do not re-OCR again, do not expand to neighboring pages. The PDF itself is likely unclear.
+4. The main agent reassembles the subagents' rewritten blocks into `source-transcript.md`.
+5. After assembly, run the existing Step 1-GATE checks and Step 4 validator to confirm formula integrity (`$` count, `\begin{array}` count, callout count) survived the rewrite.
+
+**Do NOT rewrite**: pure knowledge-point narrative (知识点叙述), section intros, summary tables without questions — OCR handles those well enough.
+
+**Full rules, subagent template, single-page re-OCR appeal procedure, and self-checks**: see `references/question-block-rewrite-guide.md`.
 
 ### Step 3 — Structural Format (Canonical Markdown)
 
@@ -263,6 +291,9 @@ Only use `<div class="analysis-block">` when the analysis section contains ZERO 
 **Long formula formatting:**
 For display formulas longer than one line, use `\begin{aligned}` with `\\` line breaks. Split at `=` signs, `+`/`-` operators, or logical boundaries. Every long formula must be readable without horizontal scrolling.
 
+**Emphasis & color:**
+Apply `references/emphasis-and-color-rules.md`. Check two things: (1) any line flagged by the heading validator as not-a-heading but genuinely an emphasis intent is downgraded to bold/italic or a semantic color (not deleted); (2) key points worth marking (conclusions, pitfalls, techniques) are marked per the fixed four-color palette — sparingly, with color spans wrapping pure text only.
+
 ### Step 4 — Auto-Validate & Fix (HARD GATE)
 
 **This step is a HARD GATE.** The validator must return exit code 0 before you can proceed to Step 5 or report completion. If the validator reports FAIL, you MUST fix the issues and re-run until it passes. Do NOT skip this step, do NOT proceed with known failures, and do NOT claim the document is ready if the validator has not passed.
@@ -270,6 +301,7 @@ For display formulas longer than one line, use `\begin{aligned}` with `\\` line 
 The validator now checks:
 - **Fraction nesting** (`lint_fraction_nesting`): `\dfrac` inside another fraction's braces/exponent/subscript/sqrt should be `\tfrac`; `\tfrac` in non-nested context (e.g., `\ln` argument) should be `\dfrac`. This is a brace-depth parser — it catches what regex cannot.
 - **Q&A ordering** (`lint_qa_ordering`): consecutive `[!question]` callouts without analysis between them are flagged. Each question's analysis must follow directly.
+- **Markdown analysis paragraph length** (`lint_markdown_analysis_paragraphs`): this is the **structural evidence that Step 2.7 (question-block rewrite) actually ran**. It flags any plain-Markdown `**解析**` / `**解**` / `**证明**` paragraph whose PROSE exceeds 300 chars (math content stripped before counting, so a long LaTeX display formula with short prose does NOT false-positive). A skipped or sloppy Step 2.7 leaves OCR's one-giant-paragraph analysis dumps intact, and this lint catches exactly that. **This lint is non-auto-fixable** — over-long analysis cannot be fixed by regex; the fix is to re-run Step 2.7 against the raw transcript. If this lint fires, the document is NOT ready.
 
 Run the validator in fix mode to handle any residual mechanical issues:
 
@@ -352,6 +384,8 @@ You MUST check all items below. Do not skip any. If an item is not applicable, w
 - [ ] **Long formulas**: display formulas > 60 chars use `\begin{aligned}` with line breaks
 - [ ] **Horizontal rules**: `---` separators not corrupted to `__________`
 - [ ] **OCR typos fixed**: confusable characters (已/己, 人/入, 末/未) verified in analysis blocks
+- [ ] **Emphasis & color consistency**: semantic colors come only from the fixed palette (purple 结论 / red 易错 / green 口诀 / blue 备注) — same meaning = same color document-wide; color spans wrap pure text only, never `$...$` (verify `rg -n '<span[^>]*color[^>]*>[^<]*\$' source-transcript.md` returns nothing); no over-marking (at most 1-2 marks per analysis block); mis-marked headings were downgraded to emphasis rather than deleted.
+- [ ] **Question-block rewrite (Step 2.7)**: report whether Step 2.7 ran, how many question blocks were rewritten against `page-transcript.raw.md`, whether all subagents carried the raw-transcript reference, and how many single-page re-OCR appeals were made (with outcomes). If the document had question blocks but Step 2.7 was skipped, that is a defect — question-block structure is the most common source of "unclean" output.
 - [ ] **Chunk boundary clean**: if parallel chunks were used, no duplicate headings or bullet points at boundaries, and no bare callouts without `>` prefix
 - [ ] **Q&A ordering**: ✅ Automated by `lint_qa_ordering` (Step 4 validator). Each question's analysis follows directly.
 - [ ] **Image paths**: ✅ Automated by `lint_image_path` (Step 4 validator). Paths use `doc2x/export/images/...`.
@@ -404,9 +438,9 @@ Use this when the document exceeds a single-context threshold (> 6 pages, > 300 
 For each chunk, dispatch a subagent with:
 - The chunk's raw transcript (page range)
 - The chunk's page images
-- Instructions: execute Steps 1 through 2.5 (auto-fix → stop-gate → proofread → **analysis block re-typesetting**) on this chunk only, then apply Step 3 (structural format) formatting rules
-- The current `canonical-markdown-rules.md`, `auto-fix-rules.md`, and `analysis-retypesetting.md` as reference
-- **CRITICAL**: subagent must split fused formulas (Rule 4), re-typeset analysis blocks into logical paragraphs, and fix OCR typos — these are the most commonly missed steps
+- Instructions: execute Steps 1 through 2.7 (auto-fix → stop-gate → proofread → analysis re-typesetting → **question-block rewrite**) on this chunk only, then apply Step 3 (structural format) formatting rules
+- The current `canonical-markdown-rules.md`, `auto-fix-rules.md`, `analysis-retypesetting.md`, and `question-block-rewrite-guide.md` as reference
+- **CRITICAL**: subagent must split fused formulas (Rule 4), re-typeset analysis blocks into logical paragraphs, rewrite each question block's whole structure against the raw transcript (stem → callout, options → table, sub-questions → own lines), and fix OCR typos — these are the most commonly missed steps
 - **BOUNDARY RULE**: the subagent must NOT include content from the next chunk. If the chunk ends mid-page or at a section boundary, the subagent stops at its last assigned line. It must NOT "continue" into the next chunk to "finish the section"
 - Output: cleaned Markdown for the chunk + `[TO VERIFY]` markers encountered
 

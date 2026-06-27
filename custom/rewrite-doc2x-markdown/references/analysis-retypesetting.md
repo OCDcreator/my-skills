@@ -2,6 +2,12 @@
 
 Detailed rules and subagent instructions for Step 2.5 of the main workflow. This reference is loaded when the document contains analysis/solution sections (解析/解/证明).
 
+## Scope Boundary
+
+This guide handles **mechanical paragraph splitting inside a single analysis block only** (排版) — turning Doc2X's one-massive-paragraph dump into readable logical paragraphs and fixing OCR typos within it.
+
+The **whole question-block structure** (题干 → callout, 选项 → table, 子问 → own lines, 解析 → paragraphs, displaced-sentence repositioning) is a separate concern, handled by **Step 2.7 + `question-block-rewrite-guide.md`**. Do not conflate the two: Step 2.5 re-typesets paragraphs; Step 2.7 rewrites the block structure against the raw transcript. When a subagent is dispatched for Step 2.5 and the block it touches is part of a question block, the structural rewrite belongs to Step 2.7 — coordinate so the two steps do not duplicate or conflict.
+
 ## When to Use
 
 - **≤ 3 examples**: do it inline (read and edit each analysis block yourself)

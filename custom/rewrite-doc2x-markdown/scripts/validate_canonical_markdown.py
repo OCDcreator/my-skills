@@ -106,6 +106,14 @@ QA_SUBPART_PATTERN = re.compile(r"^\s*[(（]\s*(?:\d+|[IVXivx]+)\s*[)）]")
 BARE_QUESTION_START_PATTERN = re.compile(
     r"^\s*(?:【\s*)?(?:例题|练习)(?:\s*[0-9一二三四五六七八九十百零]+)?(?:\s*[】)])?(?:\s+\S|[（(])"
 )
+# A plain-Markdown analysis opener: a line that starts (after optional `>` or
+# list marker) with **解析**/**解**/**证明**/**解答**/**分析**. Used by the
+# Step 2.7 paragraph-length lint to find where a Markdown analysis section
+# begins. (Distinct from QA_ANALYSIS_LINE_PATTERN, which matches the marker
+# anywhere on a line.)
+MARKDOWN_ANALYSIS_OPENER_PATTERN = re.compile(
+    r"^\s*(?:>\s*)?(?:[-*]\s+)?\*\*(?:解析|解答|解|证明|分析)\*\*\s*[:：]?\s*$"
+)
 
 
 @dataclass(frozen=True)
@@ -367,6 +375,115 @@ def lint_html_analysis_blocks(
                     )
                 )
         index += 1
+    return messages
+
+
+def strip_math_for_count(text: str) -> str:
+    """Remove math spans from text so paragraph-length checks count prose,
+    not LaTeX. Strips `$$...$$` (DOTALL) first, then `$...$` inline, then
+    `\\(...\\)` / `\\[...\\]` non-Obsidian delimiters. This prevents the
+    "long formula, short prose" false positive — a 200-char LaTeX display
+    formula that renders as half a line must not inflate the prose count.
+
+    Note: per the skill's Hard Contract, `\\(...\\)`/`\\[...\\]` should not
+    appear in canonical output, but stripping them here is harmless defense.
+    """
+    without_display = DISPLAY_MATH_PATTERN.sub("", text)
+    without_inline = INLINE_MATH_PATTERN.sub("", without_display)
+    without_paren = PAREN_MATH_PATTERN.sub("", without_inline)
+    without_bracket = BRACKET_MATH_PATTERN.sub("", without_paren)
+    return without_bracket
+
+
+def lint_markdown_analysis_paragraphs(
+    lines: list[str],
+    max_chars: int = 300,
+) -> list[LintMessage]:
+    """Enforce the Step 2.5 / Step 2.7 rule that no Markdown analysis
+    paragraph exceeds `max_chars` of PROSE (math content excluded).
+
+    Why this lint exists: the existing `lint_html_analysis_blocks` only
+    checks paragraphs inside `<div class="analysis-block">` HTML blocks.
+    But the canonical rules mandate PLAIN Markdown (`**解析**` + `$...$`)
+    for formula-heavy analysis — so most math-doc analysis is never checked.
+    This lint closes that gap. It is the structural signal that Step 2.7
+    (question-block rewrite against the raw transcript) actually ran: a
+    skipped Step 2.7 leaves OCR's one-giant-paragraph dumps intact, which
+    this lint catches.
+
+    Algorithm:
+      1. Find each `**解析**`/`**解**`/`**证明**`/`**解答**`/`**分析**` opener
+         (a line whose stripped form IS just the bold marker, optionally
+         followed by a colon).
+      2. Scan the whole analysis region (until a heading, another opener,
+         a callout, or an 例题/练习 label) and split it into paragraphs on
+         blank lines. A line entirely of math is exempt (does not count,
+         does not split).
+      3. For each paragraph, count prose chars (math stripped). If >
+         `max_chars`, report the paragraph's first line.
+    """
+    messages: list[LintMessage] = []
+    index = 0
+    total = len(lines)
+    while index < total:
+        if not MARKDOWN_ANALYSIS_OPENER_PATTERN.match(lines[index]):
+            index += 1
+            continue
+        # Scan the whole analysis region under this opener.
+        para_start: int | None = None
+        para_lines: list[str] = []
+        scan = index + 1
+
+        def flush_paragraph(start: int | None, collected: list[str]) -> None:
+            if start is None or not collected:
+                return
+            prose = "".join(collected)
+            prose_len = len(re.sub(r"\s+", "", prose))
+            if prose_len > max_chars:
+                messages.append(
+                    LintMessage(
+                        start,
+                        f"analysis paragraph too long after Step 2.7 rewrite; "
+                        f"split into logical paragraphs (prose chars={prose_len}, "
+                        f"math excluded, limit={max_chars})",
+                    )
+                )
+
+        while scan < total:
+            raw = lines[scan]
+            content = strip_quote_marker(raw) if is_quote_line(raw) else raw
+            stripped = content.strip()
+            # Hard exits from the analysis region entirely.
+            if HEADING_LEVEL_PATTERN.match(stripped):
+                break
+            if MARKDOWN_ANALYSIS_OPENER_PATTERN.match(raw):
+                break
+            if CALLOUT_TYPE_PATTERN.match(raw):
+                break
+            if stripped.startswith(("例题", "练习")):
+                break
+            # Blank line: end the current paragraph, but KEEP scanning the
+            # region — the same analysis may contain several paragraphs.
+            if not stripped:
+                flush_paragraph(para_start, para_lines)
+                para_start = None
+                para_lines = []
+                scan += 1
+                continue
+            # Pure display-math line: exempt, skip without splitting.
+            prose_here = strip_math_for_count(stripped).strip()
+            if not prose_here:
+                scan += 1
+                continue
+            if para_start is None:
+                para_start = scan + 1
+                para_lines = [stripped]
+            else:
+                para_lines.append(stripped)
+            scan += 1
+        # Flush the last paragraph if the region ended without a trailing blank.
+        flush_paragraph(para_start, para_lines)
+        index = scan if scan > index else index + 1
     return messages
 
 
@@ -1198,6 +1315,7 @@ def lint_markdown(
     messages.extend(lint_bare_question_starts(lines, blocks))
     messages.extend(lint_fraction_nesting(lines))
     messages.extend(lint_qa_ordering(lines, blocks))
+    messages.extend(lint_markdown_analysis_paragraphs(lines))
     return sorted(messages, key=lambda message: message.line)
 
 
