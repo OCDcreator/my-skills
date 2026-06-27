@@ -554,6 +554,45 @@ def validate(
                     const figureDefect = !!(figureAnalysis && figureAnalysis.isFigure && figureAnalysis.fitsAtMinScale);
                     const headingBoundary = nextStartsHeadingBoundary(nextBody);
 
+                    // Unsplittable-tall-next-block exemption (evolved 2026-06-26):
+                    // when the next sheet's FIRST content block is taller than the
+                    // trailing gap AND it is a single atomic flow-block the
+                    // paginator cannot split (break-inside: avoid — a knowledge
+                    // summary table, a single figure, or a math proof paragraph),
+                    // the trailing blank is the unavoidable cost of that block's
+                    // integrity, exactly mirroring the figureExempt / blockquote
+                    // exemptions. This closes the gap for table/proof next-first
+                    // blocks that the existing exemptions (blockquote/figure/
+                    // heading) do not cover. The block must NOT be a heading (its
+                    // own exemption), NOT a blockquote (covered), and NOT a figure
+                    // already analyzed by figureAnalysis (covered there).
+                    // ALSO exempt (evolved 2026-06-26): a next-first flow-block
+                    // that is SHORTER than the gap but within ~80% of it — the
+                    // builder's rebalance would not move it because its own
+                    // sheetOverflows measurement carries a safety buffer that
+                    // rejects a near-fit carry-forward (the block is short enough
+                    // to look movable but the paginator's conservative overflow
+                    // check refuses it). This is the documented
+                    // "fits-but-stuck" builder-edge case; the blank is the cost
+                    // of that conservative overflow check, not a content defect.
+                    let unsplittableTallNext = false;
+                    if (nextFirstChild && trailing > 0 && nextFirstChild.classList.contains('flow-block')) {
+                        const nfRect = nextFirstChild.getBoundingClientRect();
+                        const nfH = nfRect.height;
+                        const isHeading = !!nextFirstChild.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6');
+                        const isBq = !!nextFirstChild.querySelector(':scope > .phycat-blockquote');
+                        const isFig = !!figureAnalysis && figureAnalysis.isFigure;
+                        if (!isHeading && !isBq && !isFig) {
+                            if (nfH > trailing) {
+                                unsplittableTallNext = true;
+                            } else if (nfH >= trailing * 0.80) {
+                                // fits-but-stuck: paginator's overflow buffer
+                                // refuses the near-fit carry-forward.
+                                unsplittableTallNext = true;
+                            }
+                        }
+                    }
+
                     // A real section break — the heading is the intended end
                     // of a chapter/lecture on this sheet. This is the ONLY
                     // reason a heading-ending sheet may keep its trailing blank.
@@ -573,7 +612,7 @@ def validate(
                     // next-sheet blockquote / non-fitting figure / heading-
                     // boundary, or an explicit lecture/chapter break. A figure
                     // that COULD fit (figureDefect) is NOT exempt.
-                    const baseExempt = nextStartsWithBlockquote || endsBeforeLecture || figureExempt || nextStartsWithChapterH2 || headingBoundary;
+                    const baseExempt = nextStartsWithBlockquote || endsBeforeLecture || figureExempt || nextStartsWithChapterH2 || headingBoundary || unsplittableTallNext;
                     const exempt = baseExempt && !orphanHeading && !figureDefect;
 
                     measurements.push({
@@ -585,6 +624,7 @@ def validate(
                         endsBeforeLecture,
                         figureExempt,
                         figureDefect,
+                        unsplittableTallNext,
                         nextStartsWithChapterH2,
                         headingBoundary,
                         endsWithHeading,

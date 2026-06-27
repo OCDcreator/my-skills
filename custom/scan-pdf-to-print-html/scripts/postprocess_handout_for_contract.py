@@ -936,68 +936,18 @@ def inject_js_overrides(html: str) -> str:
             raise SystemExit("paginateHandout() anchor not found in handout.html")
         html = html.replace(anchor, IMAGE_WIDTH_HELPERS + "\n\n" + BOOKMARK_PAGINATION_HELPERS + "\n\n" + anchor, 1)
 
-    marker = "  const title = printRoot.dataset.title || '';\n"
-    if "applyFigureWidthBands(sourceRoot);" not in html:
-        if marker not in html:
-            raise SystemExit("paginateHandout title marker not found in handout.html")
-        html = html.replace(marker, "  applyFigureWidthBands(sourceRoot);\n\n" + marker, 1)
-
-    # The built handout.html may carry one of two original paginate-tail
-    # variants (with or without the cover/lecture-break fields). Match either
-    # so postprocess is robust across builder versions and already-built HTML.
-    old_paginate_tails = [
-        """  const title = printRoot.dataset.title || '';
-  const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
-  const blocks = collectFlowBlocks(sourceRoot);
-  printRoot.replaceChildren();
-
-  let pageNumber = 1;
-  let sheet = createSheet(pageNumber, title, sourceLabel, true);
-  printRoot.appendChild(sheet);
-
-  for (const block of blocks) {
-    if (appendBlockToSheet(sheet, block)) {
-      continue;
-    }
-    pageNumber += 1;
-    sheet = createSheet(pageNumber, title, sourceLabel, false);
-    printRoot.appendChild(sheet);
-    appendBlockToSheet(sheet, block);
+    new_paginate_function = """async function paginateHandout() {
+  const sourceRoot = document.getElementById('handout-source');
+  const printRoot = document.getElementById('handout-print-root');
+  if (!sourceRoot || !printRoot) {
+    return;
   }
 
-  renumberSheets(printRoot);
-  sourceRoot.remove();
-  document.documentElement.dataset.handoutReady = 'true';
-}
-""",
-        """  const title = printRoot.dataset.title || '';
-  const hasCover = !!printRoot.dataset.coverHref;
-  const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
-  const blocks = collectFlowBlocks(sourceRoot);
-  printRoot.replaceChildren();
+  document.documentElement.dataset.handoutReady = 'loading';
+  await waitForHandoutAssets(sourceRoot);
+  applyFigureWidthBands(sourceRoot);
 
-  let pageNumber = 1;
-  let sheet = createSheet(pageNumber, title, sourceLabel, !hasCover);
-  printRoot.appendChild(sheet);
-
-  for (const block of blocks) {
-    if (appendBlockToSheet(sheet, block)) {
-      continue;
-    }
-    pageNumber += 1;
-    sheet = createSheet(pageNumber, title, sourceLabel, false);
-    printRoot.appendChild(sheet);
-    appendBlockToSheet(sheet, block);
-  }
-
-  renumberSheets(printRoot);
-  sourceRoot.remove();
-  document.documentElement.dataset.handoutReady = 'true';
-}
-""",
-    ]
-
-    new_paginate_tail = """  const title = printRoot.dataset.title || '';
+  const title = printRoot.dataset.title || '';
   const hasCover = !!printRoot.dataset.coverHref;
   const sourceLabel = printRoot.dataset.sourceLabel || 'OCR Transcript';
   // Build the block stream: merge example runs, split overlong question
@@ -1009,13 +959,9 @@ def inject_js_overrides(html: str) -> str:
     // evolved 2026-06-25: extractMediaFromBlockquoteBlocks REMOVED from the
     // pipeline. It was a belt-and-suspenders fallback that force-stripped EVERY
     // figure/img child out of every .phycat-blockquote — but mergeExampleRuns's
-    // blockContainsOnlyMedia check (L809) already correctly keeps standalone
-    // external media OUT of the quote, so the extract step had no legitimate
-    // target left. Instead it HARMFULLY stripped media that the SOURCE authored
-    // INSIDE the quote (题图 in `> <figure>`, 选项图 in `> |table|`), leaving
-    // example blockquotes containing only the stem while the figure/options
-    // floated outside — exactly the "选项图没放进引用块" defect a real handout
-    // exposed. The function definition is kept below (unused) for traceability.
+    // blockContainsOnlyMedia check already correctly keeps standalone external
+    // media OUT of the quote. The extract step therefore only harmed source-
+    // authored in-quote media such as 题图 and 选项表格图片.
     mergeExampleRuns(collectFlowBlocks(sourceRoot))
       .flatMap(splitOverlongQuestionCallout)
       .flatMap(splitQuestionSupportBlocks)
@@ -1082,6 +1028,7 @@ def inject_js_overrides(html: str) -> str:
       entry.page += 1;
     });
   }
+
   // Post-pagination cleanup: reduce avoidable trailing blank by pulling small
   // carry-forward blocks up. Runs AFTER the anti-orphan pagination loop and is
   // itself guarded against re-creating orphan headings.
@@ -1099,11 +1046,16 @@ def inject_js_overrides(html: str) -> str:
 }
 """
 
-    if new_paginate_tail not in html:
-        old_paginate_tail = next((candidate for candidate in old_paginate_tails if candidate in html), None)
-        if old_paginate_tail is None:
-            raise SystemExit("paginateHandout tail block not found in handout.html")
-        html = html.replace(old_paginate_tail, new_paginate_tail, 1)
+    start = html.find("async function paginateHandout() {")
+    if start == -1:
+        raise SystemExit("paginateHandout() function not found in handout.html")
+    end_marker = "\nif (document.readyState === 'loading')"
+    end = html.find(end_marker, start)
+    if end == -1:
+        raise SystemExit("paginateHandout() end marker not found in handout.html")
+    current_function = html[start:end]
+    if current_function != new_paginate_function.rstrip():
+        html = html[:start] + new_paginate_function + html[end:]
 
     return html
 

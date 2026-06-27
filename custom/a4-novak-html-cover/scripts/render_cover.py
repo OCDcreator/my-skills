@@ -19,26 +19,43 @@ import subprocess
 import sys
 from pathlib import Path
 
-def find_renderer() -> Path:
-    """向上查找项目根（含 .git 的目录），再在 .kimi-code/.codex/.zcode 下找
-    scan-pdf-to-print-html 技能的 render_html_to_pdf.py。
-    不硬编码层级号，避免技能目录移动后失效。
+
+def iter_search_roots(html: Path):
+    """优先从调用现场和目标 HTML 所在项目向上搜，再回退到技能文件自身路径。
+
+    这里不能只依赖当前技能文件的真实路径，因为项目里的 `.codex/skills/...`
+    常常是指向共享技能仓库的符号链接；若只沿共享仓库向上找，会错过实际项目中的
+    `.codex/.zcode/.kimi-code` 技能目录。
     """
-    here = Path(__file__).resolve()
-    for parent in [here, *here.parents]:
-        if (parent / ".git").exists():
-            project_root = parent
-            break
-    else:
-        # 兜底：往上找第一个含 skills 目录的祖先
-        project_root = here.parents[3] if len(here.parents) > 3 else here.root
-    for dir_name in (".kimi-code", ".codex", ".zcode"):
-        cand = project_root / dir_name / "skills" / "scan-pdf-to-print-html" / "scripts" / "render_html_to_pdf.py"
-        if cand.exists():
-            return cand
+    seen = set()
+    candidates = [
+        Path.cwd().resolve(),
+        html.resolve().parent,
+        *html.resolve().parents,
+        Path(__file__).resolve().parent,
+        *Path(__file__).resolve().parents,
+    ]
+    for root in candidates:
+        root = root.resolve()
+        if root in seen:
+            continue
+        seen.add(root)
+        yield root
+
+
+def find_renderer(html: Path) -> Path:
+    """查找项目内 scan-pdf-to-print-html 的 render_html_to_pdf.py。"""
+    searched = []
+    for root in iter_search_roots(html):
+        for dir_name in (".kimi-code", ".codex", ".zcode", ".opencode"):
+            cand = root / dir_name / "skills" / "scan-pdf-to-print-html" / "scripts" / "render_html_to_pdf.py"
+            searched.append(str(cand))
+            if cand.exists():
+                return cand
     raise SystemExit(
-        "找不到渲染器 render_html_to_pdf.py（scan-pdf-to-print-html 技能）。"
-        f"已搜索项目根: {project_root}"
+        "找不到渲染器 render_html_to_pdf.py（scan-pdf-to-print-html 技能）。\n"
+        + "已搜索:\n"
+        + "\n".join(f"  - {path}" for path in searched)
     )
 
 
@@ -55,10 +72,9 @@ def main() -> int:
     if not html.exists():
         raise SystemExit(f"HTML 不存在: {html}")
 
-    renderer = find_renderer()
-
     pdf = (args.pdf or html.with_suffix(".pdf")).resolve()
     png = (args.png or html.with_suffix(".png")).resolve()
+    renderer = find_renderer(html)
 
     cmd = [
         sys.executable, str(renderer),
