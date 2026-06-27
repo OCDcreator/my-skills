@@ -532,3 +532,35 @@ written: `scripts/validate_sheet_bottom_margin.py` (FIX-hint floor rounding: rou
 snapshot: scripts/validate_sheet_bottom_margin.py.bak-2026-06-25-d3-floor.
 
 Verification ceiling note: verified the death-loop is broken and dual gates pass on the real D3 job (exit 1→0). Did not add a dedicated pytest for the rounding direction (the existing `test_bottom_margin_exempts_single_image_already_below_band_floor` covers the canNarrowInBand branch; the rounding fix is a 1-line display-side change whose efficacy is shown by the job-level exit flip). No regression in rendered-contract width band.
+
+## 2026-06-27
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C1 | PNG screenshot should default to high-res, not ~96dpi | missing (direct user request) | pass | strengthen (no existing res rule; closest is C9 vector-PDF default) | principle | **strengthen (code default + SKILL note)** | first |
+
+**Provenance:** direct user request, not a post-task retro — `(extracted)` from the user message in this session. No task transcript to CAPTURE.
+
+**Root cause (precise):** `render_html_to_pdf.py:197` `page.screenshot(full_page=True)` rendered at the browser context's default `device_scale_factor`, but `handout_browser.py` created the context with only `viewport=` (no `device_scale_factor`), so Playwright defaulted to `1.0` → PNG at A4 viewport 794×1123 CSS px (~96dpi). This is why the user had to re-request a higher-res PNG every job. The PDF path (`page.pdf()`) is unaffected — it uses the print path and ignores `device_scale_factor`, so the vector-PDF default (C9) is orthogonal and untouched.
+
+**Fix (minimal, isolated):**
+- `handout_browser.py`: `open_handout()` gained `device_scale_factor: float = 1.0` (default 1.0 — the two validators measure CSS-px geometry via `getBoundingClientRect`, so they MUST stay at 1.0; confirmed neither passes it). Passed to `browser.new_context(..., device_scale_factor=device_scale_factor)`.
+- `render_html_to_pdf.py`: new `--screenshot-scale` CLI flag, **default `3.0`** (user-chosen; ≈ A4 @ 288dpi, ~2382×3369px per page), forwarded to `open_handout`. PDF untouched.
+- `SKILL.md`: Markdown-Source step 4 and legacy step 10 now state the default PNG is already high-res (3×) and the model should NOT re-request a higher-res screenshot each job; `--screenshot-scale` is the opt-in override (2/4/1).
+
+**Why scale only the raster path:** Playwright's `page.pdf()` does not read `device_scale_factor` (it honors `@page`/print CSS). So a 3× screenshot leaves the vector PDF identical — verified by extractable-text check (page0 selectable text length 396, 1 embedded content image, not a full-page raster).
+
+**Verification (real end-to-end render on `product/已完成项目/2026-06-09-mst-274-284/handout.html`):**
+- default (3×): PNG width 2382 px = exactly 3× of 794; PDF vector (selectable text, not raster).
+- `--screenshot-scale 1`: PNG width 794 px (= old ~96dpi behaviour) — override reversible.
+- `--screenshot-scale` not passed by either validator → both stay at 1.0 → no geometry drift.
+- programmatic evals: `ALL EVALS PASS` (5/5) after the edit.
+
+**Strongest reason NOT to add this:** 3× full-page PNGs are larger (the test job's full-page PNG was ~6.8MB vs ~1.2MB at 1×). Mitigation: the flag is opt-out (`--screenshot-scale 1`), and the PDF (the primary deliverable) is unaffected. User explicitly chose 3× over 2×/4×.
+
+written: `scripts/handout_browser.py` (+device_scale_factor kwarg), `scripts/render_html_to_pdf.py` (+--screenshot-scale default 3.0), `SKILL.md` (step 4 + step 10 high-res-PNG notes).
+
+snapshots: `scripts/handout_browser.py.bak-2026-06-27`, `scripts/render_html_to_pdf.py.bak-2026-06-27`.
+
+**Active-context staleness:** editing the repo skill files does NOT change this session's already-loaded skill text. Recommend a fresh session to exercise the improved default.
+

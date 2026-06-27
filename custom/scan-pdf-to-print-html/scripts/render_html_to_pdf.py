@@ -38,6 +38,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=1123,
         help="Viewport height in pixels (default: 1123)",
     )
+    parser.add_argument(
+        "--screenshot-scale",
+        type=float,
+        default=3.0,
+        help=(
+            "Rasterization scale for the PNG screenshot, as a multiple of the "
+            "viewport (default: 3.0 ≈ A4 @ 288dpi, ~2382x3369px). Higher is "
+            "sharper but larger. This does NOT affect the PDF: page.pdf() uses "
+            "the print path and ignores device_scale_factor, so the PDF stays "
+            "vector regardless of this value. Use 1.0 for an old-style ~96dpi "
+            "screenshot."
+        ),
+    )
     return parser
 
 
@@ -184,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     with open_handout(
         html_path,
         viewport=(args.viewport_width, args.viewport_height),
+        device_scale_factor=args.screenshot_scale,
         strict_ready=True,
         ready_timeout_ms=60_000,
         fonts_timeout_ms=60_000,

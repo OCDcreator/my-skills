@@ -43,6 +43,7 @@ def open_handout(
     html_path: Path,
     *,
     viewport: tuple[int, int] = (794, 1123),
+    device_scale_factor: float = 1.0,
     collect_errors: bool = False,
     strict_ready: bool = True,
     ready_timeout_ms: int = 60_000,
@@ -56,6 +57,11 @@ def open_handout(
     Args:
         html_path: path to the built handout.html.
         viewport: (width, height) in CSS pixels. Defaults to A4 @ 96dpi (794×1123).
+        device_scale_factor: Playwright context rasterization scale. 1.0 keeps
+            CSS pixels 1:1 (validators measure CSS-px geometry, so they must stay
+            at the default 1.0). Values >1.0 only affect raster output (PNG
+            screenshots); `page.pdf()` uses the print path and ignores this, so a
+            high-res screenshot does NOT change the vector PDF.
         collect_errors: if True, attach pageerror/console-error listeners and
             populate `errors`. render_html_to_pdf doesn't need this; validators
             do (they fail on JS errors).
@@ -89,7 +95,8 @@ def open_handout(
         browser = p.chromium.launch()
         try:
             context = browser.new_context(
-                viewport={"width": viewport[0], "height": viewport[1]}
+                viewport={"width": viewport[0], "height": viewport[1]},
+                device_scale_factor=device_scale_factor,
             )
             page = context.new_page()
 
