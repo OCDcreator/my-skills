@@ -282,3 +282,51 @@ Markdown structure. Four candidates were surfaced and approved by the user.
 - **Recurrence count:** first for the executable gate; the rule text existed since 2026-06-16 but was never enforced.
 - **Active-context staleness:** editing the repo file does not change this session's loaded skill text; recommend a fresh session to exercise the improved gate.
 - **Discarded candidate (this session):** "禁止 [!note] '已在上面保留，不重复抄录' 占位符 callout" — classified `missing` but Gate 1 borderline (single-document content judgment, not a generalizable class) → user did not select it. Substance: redundant-summary placeholder callouts should be silently omitted rather than emitted as `[!note]`. Not written.
+
+---
+
+## 2026-06-28 — batch: 3 lessons from deepseek-v4-flash stress test
+
+- **Trigger (verbatim user message):** "C:\Users\lt\Desktop\Write\math\资料库 将资料库中除了 agents.md 之外，其他所有 Markdown 的例题引用块，都按照你的格式要求去操作。你调用 opencode-go 的 deepseek v4 flash 去测试看看普通模型，能否跑通你的规则验证，你通过不断loop迭代，将技能进化到完美。" → then "轻量直改" (approve lightweight landing) → then "可以" (approve archiving to this log).
+- **Source of evidence (unusual):** NOT a user rework on a real transcript run. The evidence came from a **deliberate stress test**: deepseek-v4-flash (a weaker model) was given a distilled prompt derived from this skill's rules and asked to rewrite 6 adversarial fixtures (5 single-defect + 1 combined-defect). The judge (`product/2026-06-28-skill-stress-test/judge.py`) scored outputs against validator + golden + content-integrity checks. So provenance is `(stress-test-extracted)`, not `(extracted)` from a live rework. This is noted explicitly per the Hard Contract's provenance discipline; the lessons are still evidence-backed (real model outputs), just from an experiment rather than a user correction.
+- **Provenance:** `(stress-test-extracted)` for all trace fields below. No user-pasted transcript.
+- **Round results:** R1 (prompt v1) F1-F5 = 5/5 PASS; R2 (prompt v2) + F6 combined = 5/6 (F6 dropped headings); R3 (prompt v3 literal-echo) = 6/6 structural pass (heading defect fixed; F6's residual flag was a fixture-design QA-ordering artifact, not a rewrite defect).
+
+### Lesson A — `strengthen`: document headings preserved verbatim during rewrite (the headline finding)
+
+- **Classification:** `missing` → `strengthen` (rule was implicit in template, not stated + no executable guard step).
+- **Gate verdict:** `strengthen` (Gate 1 PASS general — any multi-section document / Gate 2 strengthen — `question-block-rewrite-guide.md` Subagent Template assumed context preservation but gave no explicit copy step / Gate 3 principle — structural completeness, verifiable).
+  - **Stress-test evidence (the crux):** deepseek-v4-flash on F6 (combined: `# 导数综合` + `## 第一节 经典例题` + 2 questions) **stably dropped ALL `#`/`##` headings** under prompt v1 AND v2 — even v2's dedicated "preserve all headings" emphasis rule did NOT fix it. Only **prompt v3's literal-echo step** ("scan every `#` line, then copy each verbatim into the output") moved `heading_preservation` check from FAIL → PASS. Provenance: `round-2/F6-combined-mess.json` (heading dropped), `round-3/F6-combined-mess.json` (heading preserved).
+  - **Root cause:** weaker models frame "rewrite the question blocks" as "output ONLY the question blocks", silently discarding section titles. Mere emphasis is ignored; an explicit executable copy step is what works.
+- **Pairwise conflict:** fast path (≤3 candidates).
+- **Dev Eval:** 73/73 pytest pass after change (pure doc edit; no lint logic touched). Heading-preservation has no automated lint yet — this lesson landed as a subagent guard step + self-check, not a validator gate (heading-drop is content-loss, not a structural regex catch). Honest framing: the guard reduces but cannot eliminate the defect for the weakest models.
+- **Landing zone:** `references/question-block-rewrite-guide.md` (new "Document headings preserved verbatim" rule at top of Rewrite Format + new Step 0 literal-echo in Subagent Template + new Self-Check item); `references/canonical-markdown-rules.md` (Page And Heading Shape: new bullet cross-referencing the guard step); `SKILL.md` (no change — already implies full-document output).
+- **Strongest reason NOT to add:** the main orchestrating model is strong and rarely drops headings, so this may be over-indexing on one weak-model failure. **Counter:** the rewrite is dispatched to subagents (per the template), which may be weaker models; the explicit copy step is cheap insurance and the stress test proved emphasis alone fails.
+- **Outcome:** APPROVED (user "轻量直改" then "可以").
+
+### Lesson B — `strengthen`: Step 4 hard gate distinguishes rewrite-structure lints from formula-normalization lints
+
+- **Classification:** `missing` (no existing guidance on sorting validator FAIL lines by family).
+- **Gate verdict:** `strengthen` (Gate 1 PASS general — any validator failure / Gate 2 strengthen — `SKILL.md` Step 4 listed all lints flat with no family distinction / Gate 3 principle — diagnostic correctness, prevents infinite rework loops).
+  - **Stress-test evidence:** F4 output was flagged `FAIL: \dfrac inside sqrt should be \tfrac (nested fraction rule)`, but this is a formula-normalization lint OUTSIDE the rewrite's scope — the rewrite prompt says "preserve every LaTeX construct verbatim", so the model keeping `$\sqrt{1+\dfrac{1}{4}}$` intact is CORRECT and must not be sent back to "re-run the rewrite". Provenance: `round-1/F4-analysis-lump.json` (validator out-of-scope), judge.py `classify_validator_messages` splits in-scope vs out-of-scope.
+- **Pairwise conflict:** none vs Lesson A (different files/sections).
+- **Dev Eval:** N/A — diagnostic-guidance text, no output lint.
+- **Landing zone:** `SKILL.md` Step 4 (new "Two lint families — diagnose them separately" paragraph after the title-line lint bullet, listing the two families with member lints).
+- **Strongest reason NOT to add:** arguably an agent should already know formula lints ≠ rewrite lints. **Counter:** the stress test shows the conflation is a real trap (F4 would have been sent back to re-run Step 2.7 over a formula lint it was told to preserve); explicit family split prevents the loop.
+- **Outcome:** APPROVED (user "轻量直改").
+
+### Lesson C (NOT a skill change — judge-instrumentation finding, recorded for traceability)
+
+- **Finding:** `$`-count conservation is too strict a fidelity check for real rewrites — a faithful rewrite may restructure (inline ↔ display `$$`), changing the raw `$` count without losing content. The stress-test judge iterated 3× (strict $count → ±4 tolerance vs golden → **formula-content-preservation**: extract every meaningful `$...$` from the fixture and check presence in output). Golden calibrated 5/5 PASS. This is a **test-harness design lesson** (lives in `product/2026-06-28-skill-stress-test/judge.py`, NOT in the skill), recorded here only so future stress tests reuse the calibration.
+- **Outcome:** NOT written to skill files. Recorded for trace.
+
+- **Files written (this session, all 3 = commit d4c110f):**
+  - `references/question-block-rewrite-guide.md` (Lesson A: rule + Step 0 + Self-Check)
+  - `SKILL.md` (Lesson B: two-lint-family paragraph in Step 4)
+  - `references/canonical-markdown-rules.md` (Lesson A: Page And Heading Shape bullet)
+- **Snapshots:**
+  - `SKILL.md.bak-2026-06-28`
+  - `references/canonical-markdown-rules.md.bak-2026-06-28`
+  - `references/question-block-rewrite-guide.md.bak-2026-06-28`
+- **Recurrence count:** first for heading-preservation; first for lint-family distinction.
+- **Active-context staleness:** editing the repo file does not change this session's loaded skill text; recommend a fresh session to exercise the improved guard step against a weak model.
