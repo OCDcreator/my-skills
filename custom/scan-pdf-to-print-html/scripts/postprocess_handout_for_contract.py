@@ -833,6 +833,30 @@ function cloneBlockPreservingMeta(block) {
   return clone;
 }
 
+function sheetHasNonHeadingContent(body) {
+  // Returns true only if the sheet already contains REAL (non-heading) content:
+  // a flow-block that has meaningful text or media AFTER stripping its own
+  // top-level heading. A sheet holding only heading blocks (e.g. an h2 followed
+  // immediately by an h3 with no prose) returns false. Used by the h3 pagination
+  // rule so a title cluster never strands its parent heading on a lone page.
+  // (Merged 2026-06-27 from a parallel Mac-side implementation; combined with
+  // the YAML breakH3 intent switch so the rule applies only when the user
+  // opted into h3 pagination.)
+  if (!body) return false;
+  const blocks = Array.from(body.querySelectorAll(':scope > .flow-block'));
+  return blocks.some((block) => {
+    const topHeading = findFirstTopLevelHeading(block);
+    const meaningfulChildren = Array.from(block.children).filter((child) => {
+      if (topHeading && child === topHeading) return false;
+      const childText = normalizeTextForBookmark(child.textContent || '');
+      return childText || child.querySelector('img,svg,canvas,table,.katex,math');
+    });
+    if (meaningfulChildren.length > 0) return true;
+    const text = normalizeTextForBookmark(block.textContent || '');
+    return !topHeading && !!text;
+  });
+}
+
 function headingLevelNumber(tagName) {
   const m = /H([1-6])/.exec(tagName || '');
   return m ? Number(m[1]) : 6;
@@ -992,27 +1016,36 @@ def inject_js_overrides(html: str) -> str:
       ? body.querySelectorAll(':scope > .flow-block').length > 0
       : false;
 
+    // hasRealBodyContent is the stricter check: the sheet has REAL non-heading
+    // content (prose/media), not just a heading-only flow-block. Used for the
+    // h3 "上级须有内容" rule so a title cluster (h2 immediately followed by h3)
+    // keeps its titles together instead of stranding the parent heading.
+    const hasRealBodyContent = sheetHasNonHeadingContent(body);
+
     const isBreakHeading = isLectureHeading(headingText) ||
       (heading && heading.tagName === 'H2') ||
-      (heading && heading.tagName === 'H3' && breakH3);
+      (heading && heading.tagName === 'H3' && breakH3 && hasRealBodyContent);
     // evolved 2026-06-25: ANY h2 forces a fresh sheet, not just chapter-shaped
     // h2. Real handouts use h2 as section dividers regardless of whether the
     // text matches 第N章/大招N; confining forced page breaks to chapter-shaped
     // h2 left section dividers like "## 考向2" stranded mid-page. isLectureHeading
     // is kept for h1/h3+ lecture shapes; h2 unconditionally breaks.
     //
-    // evolved 2026-06-27 (frontmatter-driven): h3 ALSO forces a fresh sheet
-    // when the document's frontmatter sets pagination-level: h3 (surfaced as
-    // <meta name="pagination-level" content="h3"> by build_faithful_handout_html).
-    // Use case: a single section extracted from a larger document is authored
-    // with the section title as the top-level (# / h1->h2 after render) heading,
-    // so its sub-sections live at h3 and must paginate. The "上级须有内容" rule
-    // is enforced by the existing hasBodyContent guard below: if the owning h2
-    // is immediately followed by this h3 with NO body content in between, the
-    // current sheet holds only the h2 heading, hasBodyContent is false, and the
-    // h3 stays on the same sheet — preventing the h2 from becoming a stranded
-    // lone-heading page. Only when the h2 already has body content does the h3
-    // break to a new sheet.
+    // evolved 2026-06-27 (two-layer h3 rule, merged from parallel work):
+    //   - INTENT layer: `breakH3` — only paginate h3 when the document's
+    //     frontmatter sets pagination-level: h3 (surfaced as
+    //     <meta name="pagination-level" content="h3"> by the build step). This
+    //     is the user's explicit opt-in; default h2 jobs never paginate h3.
+    //     Use case: a single section extracted from a larger document, authored
+    //     with the section title at the top and its sub-sections at h3.
+    //   - RULE layer: `hasRealBodyContent` — even when h3 pagination is opted
+    //     into, a h3 breaks only if the current sheet already has REAL non-
+    //     heading content. If an h3 immediately follows an h2/h3 heading
+    //     cluster with no intervening prose, the h3 stays put, preventing the
+    //     parent heading from becoming a stranded lone-heading page (e.g.
+    //     "## 题组" + "### 解法 1" should travel together).
+    // The outer `hasBodyContent` guard still gates ALL break decisions so an
+    // empty sheet never triggers a redundant break.
     if (heading && isBreakHeading && hasBodyContent) {
       sheet.dataset.endsBeforeLecture = 'true';
       pageNumber += 1;
