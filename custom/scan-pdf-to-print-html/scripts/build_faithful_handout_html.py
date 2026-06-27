@@ -6,9 +6,17 @@ from __future__ import annotations
 import argparse
 import html
 import re
+import sys
 from pathlib import Path
 
 from markdown_it import MarkdownIt
+
+# Frontmatter support: parse leading YAML-like metadata from source-transcript.md.
+# Co-located in the same scripts/ dir. Added to sys.path so the script also runs
+# when invoked directly (py -3 scripts/build_faithful_handout_html.py) without
+# an installed package. See references/frontmatter-spec.md for the field spec.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from parse_frontmatter import parse_frontmatter  # noqa: E402
 
 
 PAGE_SPLIT_PATTERN = re.compile(r"^##\s+Page\s+(\d+)\s*$", re.MULTILINE)
@@ -749,7 +757,17 @@ def _strip_callout_display_math_prefixes(text: str) -> str:
 
 
 def clean_markdown(text: str) -> str:
-    normalized = text.replace("\r\n", "\n").strip()
+    normalized = text.replace("\r\n", "\n")
+    # Defensive frontmatter strip (safety net). The authoritative strip happens
+    # in main() before split_pages is called, where the parsed metadata is also
+    # captured for <meta> injection. This second strip ensures that any caller
+    # invoking split_pages/clean_markdown directly (tests, ad-hoc scripts) still
+    # never leaks a ---...--- block into the rendered HTML. parse_frontmatter is
+    # resilient: malformed frontmatter returns the text unchanged (no metadata),
+    # so this can never corrupt a document that has no frontmatter.
+    # See references/frontmatter-spec.md.
+    _meta, normalized = parse_frontmatter(normalized)
+    normalized = normalized.strip()
     literal_segments: list[str] = []
 
     def protect_literal_segment(match: re.Match[str]) -> str:
@@ -1332,12 +1350,25 @@ def build_html_document_from_fragments(
     pages: list[tuple[str, str]],
     title: str,
     source_label: str,
+    metadata: dict[str, str] | None = None,
 ) -> str:
     source_fragments_html: list[str] = []
     for page_number, page_markdown in pages:
         page_body_html = normalize_fragment_semantics(validate_fragment_html(page_number, page_markdown))
         page_body_html = unwrap_page_wrapper_fragment(page_body_html)
         source_fragments_html.append(build_source_fragment_html(page_number, page_body_html))
+
+    # Emit recognized frontmatter switches as <meta> tags in <head>. The
+    # downstream postprocess step (postprocess_handout_for_contract.py) reads
+    # these via document.querySelector('meta[name=...]') to drive pagination /
+    # cover behavior. Default values are NOT emitted — absence means "default",
+    # which keeps old jobs (no frontmatter) producing identical HTML.
+    meta_tags: list[str] = []
+    if metadata:
+        for key, value in metadata.items():
+            meta_tags.append(
+                f'  <meta name="{html.escape(key)}" content="{html.escape(value)}">'
+            )
 
     return "\n".join(
         [
@@ -1346,6 +1377,7 @@ def build_html_document_from_fragments(
             "<head>",
             '  <meta charset="utf-8">',
             '  <meta name="viewport" content="width=device-width, initial-scale=1">',
+            *meta_tags,
             f"  <title>{html.escape(title)}</title>",
             "  <style>",
             "/* Vendored Kami tokens define the document language. */",
@@ -1402,7 +1434,12 @@ def drop_leading_title_heading(
     return [(page_number, remainder), *pages[1:]]
 
 
-def build_html_document(pages: list[tuple[str, str]], title: str, source_label: str) -> str:
+def build_html_document(
+    pages: list[tuple[str, str]],
+    title: str,
+    source_label: str,
+    metadata: dict[str, str] | None = None,
+) -> str:
     pages = drop_leading_title_heading(pages, title)
     md = MarkdownIt("commonmark").enable("table")
     rendered_pages: list[tuple[str, str]] = []
@@ -1412,7 +1449,9 @@ def build_html_document(pages: list[tuple[str, str]], title: str, source_label: 
         page_body = restore_math_segments(md.render(protected_markdown), math_segments)
         rendered_pages.append((page_number, page_body))
 
-    return build_html_document_from_fragments(rendered_pages, title=title, source_label=source_label)
+    return build_html_document_from_fragments(
+        rendered_pages, title=title, source_label=source_label, metadata=metadata
+    )
 
 
 def main() -> int:
@@ -1424,9 +1463,18 @@ def main() -> int:
     if not md_path.exists():
         raise SystemExit(f"Markdown file not found: {md_path}")
 
-    pages = split_pages(md_path.read_text(encoding="utf-8"))
+    # Authoritative frontmatter parse: capture metadata for <meta> injection AND
+    # strip the leading ---...--- block so split_pages never sees it. The body
+    # returned here is frontmatter-free; clean_markdown re-strips defensively
+    # (a no-op when frontmatter was already removed here). See frontmatter-spec.md.
+    raw_text = md_path.read_text(encoding="utf-8")
+    metadata, body_text = parse_frontmatter(raw_text)
+
+    pages = split_pages(body_text)
     title = default_title(pages, args.title)
-    html_document = build_html_document(pages, title=title, source_label=args.source_label)
+    html_document = build_html_document(
+        pages, title=title, source_label=args.source_label, metadata=metadata or None
+    )
 
     out_html.parent.mkdir(parents=True, exist_ok=True)
     out_html.write_text(html_document, encoding="utf-8")

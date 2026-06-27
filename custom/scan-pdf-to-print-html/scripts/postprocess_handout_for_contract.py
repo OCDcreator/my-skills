@@ -973,6 +973,16 @@ def inject_js_overrides(html: str) -> str:
   let sheet = createSheet(pageNumber, title, sourceLabel, !hasCover);
   printRoot.appendChild(sheet);
 
+  // frontmatter-driven pagination level (evolved 2026-06-27). The build step
+  // writes <meta name="pagination-level" content="h2|h3"> from the markdown
+  // frontmatter (see references/frontmatter-spec.md). When h3, h3 headings also
+  // force fresh sheets — used for single-section documents whose sub-sections
+  // live at h3. Default 'h2' preserves the legacy behavior for jobs with no
+  // frontmatter (no <meta> tag present).
+  const paginationLevelMeta = document.querySelector('meta[name="pagination-level"]');
+  const paginationLevel = paginationLevelMeta ? paginationLevelMeta.content : 'h2';
+  const breakH3 = paginationLevel === 'h3';
+
   for (const originalBlock of blocks) {
     const block = cloneBlockPreservingMeta(originalBlock);
     const heading = findFirstTopLevelHeading(block);
@@ -983,12 +993,26 @@ def inject_js_overrides(html: str) -> str:
       : false;
 
     const isBreakHeading = isLectureHeading(headingText) ||
-      (heading && heading.tagName === 'H2');
+      (heading && heading.tagName === 'H2') ||
+      (heading && heading.tagName === 'H3' && breakH3);
     // evolved 2026-06-25: ANY h2 forces a fresh sheet, not just chapter-shaped
     // h2. Real handouts use h2 as section dividers regardless of whether the
     // text matches 第N章/大招N; confining forced page breaks to chapter-shaped
     // h2 left section dividers like "## 考向2" stranded mid-page. isLectureHeading
     // is kept for h1/h3+ lecture shapes; h2 unconditionally breaks.
+    //
+    // evolved 2026-06-27 (frontmatter-driven): h3 ALSO forces a fresh sheet
+    // when the document's frontmatter sets pagination-level: h3 (surfaced as
+    // <meta name="pagination-level" content="h3"> by build_faithful_handout_html).
+    // Use case: a single section extracted from a larger document is authored
+    // with the section title as the top-level (# / h1->h2 after render) heading,
+    // so its sub-sections live at h3 and must paginate. The "上级须有内容" rule
+    // is enforced by the existing hasBodyContent guard below: if the owning h2
+    // is immediately followed by this h3 with NO body content in between, the
+    // current sheet holds only the h2 heading, hasBodyContent is false, and the
+    // h3 stays on the same sheet — preventing the h2 from becoming a stranded
+    // lone-heading page. Only when the h2 already has body content does the h3
+    // break to a new sheet.
     if (heading && isBreakHeading && hasBodyContent) {
       sheet.dataset.endsBeforeLecture = 'true';
       pageNumber += 1;

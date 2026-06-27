@@ -46,6 +46,7 @@ Read these before work:
 - `references/review-gate.md`
 - `references/math-rendering.md` — read before building or post-processing math-heavy HTML; printable HTML/PDF math must use KaTeX by default, with MathJax SVG allowed only as an explicit user-requested exception <!-- evolved 2026-06-17 -->
 - `references/cover-workflow.md` — read when the handout needs a concept-map cover; covers are generated as HTML by `a4-novak-html-cover`, rendered to `concept-map.png`, and auto-injected by the postprocess step <!-- evolved 2026-06-24 -->
+- `references/frontmatter-spec.md` — the YAML frontmatter spec (`pagination-level`, `cover`); `source-transcript.md` may carry a leading `---...---` block recording explicit user intent. scan reads it, rewrite writes it. `build_faithful_handout_html.py` strips it (never leaks into HTML) and emits recognized switches as `<meta>` tags that the postprocess pagination JS reads. <!-- added 2026-06-27 -->
 
 ## Required Workflow
 
@@ -76,6 +77,15 @@ Use markdown-source mode when the input `.md`:
 Note: the builder treats bare adjacent `![](...)` images as OCR crops and clusters them into a ~92mm row. Wrap any intentional multi-image layout in a `<figure>` so it is preserved at its authored size.
 
 Note: authored full-page cover assets, such as a concept map on the handout homepage, are not OCR crops. **Covers are now generated as HTML** via the `a4-novak-html-cover` skill (HTML cards + SVG connector overlay + KaTeX), which renders the cover to `concept-map.png` — that PNG is what the postprocess step auto-injects as the first A4 sheet (do not hand-place an `<img>`; `postprocess_handout_for_contract.py` keys on the `concept-map.png` / `concept-map.svg` filename). The cover-candidate order is **PNG-first** so HTML-cover jobs win over any stale `.svg`. Place `concept-map.png` next to `handout.html`; do not leave a leftover `concept-map.svg` in an HTML-cover job. Verify the rendered HTML/PDF shows the cover filling the first A4 sheet, the cover sheet's screen-preview `left`/`width` aligns with regular A4 sheets, and the first real lecture/chapter heading starts on a fresh sheet. See `references/cover-workflow.md` for the end-to-end cover flow. <!-- evolved 2026-06-17; strengthened 2026-06-22; cover switched SVG→HTML-PNG 2026-06-24 -->
+
+### Frontmatter intent switch (read before building) <!-- added 2026-06-27 -->
+
+Before building HTML, read the frontmatter of `source-transcript.md` (spec: `references/frontmatter-spec.md`). The frontmatter records explicit user intent so you do not re-guess pagination and cover choices.
+
+1. Run `py -3 scripts/parse_frontmatter.py` logic (or read the leading `---...---` block) to get the metadata dict. `build_faithful_handout_html.py` does this internally and strips the block, so frontmatter never leaks into the HTML — but you need the values to drive cover routing and to avoid re-asking.
+2. **Resolve missing fields in ONE batched AskUserQuestion.** For every recognized field absent from the frontmatter (`pagination-level`, `cover`), ask the user once, combining all missing fields into a single question. Defaults if the user declines: `pagination-level: h2`, `cover: false`. After the user answers, write the resolved values back into the frontmatter so the next build does not re-ask.
+3. **Cover routing:** if `cover: true` but the job directory has no `concept-map.png`, do NOT error. Prompt the user whether to route to the `a4-novak-html-cover` skill to generate the cover first; on agreement, invoke that skill to produce `concept-map.png`, then proceed with injection. If `cover: false`, skip the cover even if a PNG exists — the frontmatter is the single authority.
+4. The build emits recognized switches as `<meta>` tags (`<meta name="pagination-level" content="h3">`); the postprocess pagination JS reads them. You do not hand-wire pagination — the `<meta>` is the contract.
 
 Workflow:
 1. Copy the input into the job dir as `source-transcript.md` (it IS the canonical transcript — no `doc2x/` artifacts exist).

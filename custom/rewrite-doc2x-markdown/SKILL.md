@@ -391,6 +391,25 @@ You MUST check all items below. Do not skip any. If an item is not applicable, w
 - [ ] **Image paths**: ✅ Automated by `lint_image_path` (Step 4 validator). Paths use `doc2x/export/images/...`.
 - [ ] **Sweep-on-report**: if the user reports ANY rule violation on a specific instance, you MUST immediately sweep the ENTIRE document for all other instances of the same violation class — do not fix only the one the user pointed out
 
+### Step 6.5 — Write Frontmatter Intent (for handout-bound documents) <!-- added 2026-06-27 -->
+
+If the rewritten `source-transcript.md` is destined for the `scan-pdf-to-print-html` handout pipeline (i.e. it is a handout/讲义-type document, not a one-off note), record the user's pagination and cover intent in the frontmatter so `scan` does not have to re-ask.
+
+1. Use ONE AskUserQuestion (batched) to ask:
+   - **pagination-level**: `h2` (default, each h2 starts a new page) or `h3` (each h2 AND h3 starts a new page; use when the document is a single section whose sub-sections live at h3 — e.g. an extracted chapter where the chapter title is the top heading and its sub-sections are h3).
+   - **cover**: `true` (inject a concept-map cover) or `false` (no cover).
+2. Write the answers as a leading YAML frontmatter block at the very top of `source-transcript.md`:
+   ```yaml
+   ---
+   pagination-level: h3
+   cover: true
+   ---
+   ```
+   Prepend the block before the existing first line (the `# Title`). Do not modify the title or any content.
+3. If the user is unsure or the document is not handout-bound, skip this step — `scan` will ask via its own batched prompt when it finds missing fields.
+
+**Field spec**: see `scan-pdf-to-print-html/references/frontmatter-spec.md`. Only the two fields above are recognized; do not invent others.
+
 ### Step 7 — Report
 
 Report only Markdown status:
