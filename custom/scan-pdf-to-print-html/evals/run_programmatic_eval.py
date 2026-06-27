@@ -584,12 +584,107 @@ def assert_orphan_heading_pagination(job_dir: Path, html_path: Path, fixture_md:
     return assertions
 
 
+def assert_h3_pagination(job_dir: Path, html_path: Path, fixture_md: Path) -> list[Assertion]:
+    """Eval 6: frontmatter-driven h3 pagination with the "上级须有内容" rule.
+
+    The fixture (h3-pagination.md) carries `pagination-level: h3` frontmatter
+    and two distinct h3 placements:
+      - Section 1 ("集合"): h2 with real body content, THEN h3 subsections.
+        Those h3s SHOULD paginate (上级有正文).
+      - Section 2 ("题组"): h2 immediately followed by h3 with NO body content.
+        Those h3s should NOT paginate (titles travel together; the parent h2
+        must not be stranded as a lone-heading page).
+
+    Three assertions:
+      A — h3 after body content DOES break (breakH3 + hasRealBodyContent both true).
+      B — h3 immediately after a heading with no body does NOT break (titles grouped).
+      C — without the frontmatter (default h2), NO h3 forces a break even with body
+          content. Verified by rebuilding the fixture with frontmatter stripped.
+    """
+    assertions: list[Assertion] = []
+
+    def collect_sheets(path: Path) -> list[dict]:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page()
+            page.goto(path.as_uri(), wait_until="networkidle")
+            wait_for_handout_ready(page)
+            data = page.evaluate(
+                """() => {
+                    const sheets = Array.from(document.querySelectorAll('.sheet'));
+                    return sheets.map((s, i) => {
+                        const body = s.querySelector('.sheet-body');
+                        const info = { idx: i, endsLecture: s.dataset.endsBeforeLecture === 'true', firstTag: null, firstText: null };
+                        if (!body) return info;
+                        const firstBlock = body.querySelector(':scope > .flow-block');
+                        if (firstBlock) {
+                            const h = firstBlock.querySelector(':scope > h2, :scope > h3');
+                            if (h) { info.firstTag = h.tagName; info.firstText = h.textContent.trim(); }
+                        }
+                        return info;
+                    });
+                }"""
+            )
+            browser.close()
+        return data
+
+    sheets_h3mode = collect_sheets(html_path)
+
+    # Assertion A: h3 subsections of section 1 (集合 has body) should each begin a sheet.
+    # In the fixture these are "1.1 子集..." and "1.2 交集...". Match by prefix since
+    # the rendered text includes the parenthetical annotation from the fixture.
+    h3_after_body = [s for s in sheets_h3mode if s["firstTag"] == "H3" and (s["firstText"] or "").startswith(("1.1 子集", "1.2 交集"))]
+    a = Assertion("h3 after h2-with-body breaks to a new sheet (breakH3 + hasRealBodyContent)")
+    if len(h3_after_body) >= 2:
+        a.ok(f"{len(h3_after_body)} h3(s) with body content above began their own sheet")
+    else:
+        a.fail(f"expected >=2 h3-after-body sheets, got {len(h3_after_body)}; sheets={[(s['idx'], s['firstTag'], s['firstText']) for s in sheets_h3mode]}")
+    assertions.append(a)
+
+    # Assertion B: h3 subsections of section 2 (题组) should NOT begin their own sheet.
+    # The fixture's section 2 is a pure title cluster: h2 "题组" immediately followed by
+    # h3 "解法一/二/三" with NO body content between any of them. All those h3s must stay
+    # grouped with the h2 so the parent heading is not stranded.
+    h3_in_cluster = [s for s in sheets_h3mode if s["firstTag"] == "H3" and (s["firstText"] or "").startswith(("解法一", "解法二", "解法三"))]
+    b = Assertion("h3 in a heading-only cluster (no body) does NOT break (titles grouped)")
+    if len(h3_in_cluster) == 0:
+        b.ok("no h3-in-title-cluster began its own sheet (grouped with parent)")
+    else:
+        b.fail(f"{len(h3_in_cluster)} h3(s) in a title cluster wrongly broke to a new sheet; sheets={[(s['idx'], s['firstTag'], s['firstText']) for s in sheets_h3mode]}")
+    assertions.append(b)
+
+    # Assertion C: rebuild WITHOUT frontmatter (default h2) — no h3 should break.
+    import re as _re
+    raw = fixture_md.read_text(encoding="utf-8")
+    stripped = _re.sub(r"\A(?:\ufeff)?(?:[ \t]*\r?\n)*---[ \t]*\r?\n.*?---[ \t]*\r?\n", "", raw, count=1, flags=_re.DOTALL)
+    tmp_job = job_dir / "no-fm-rebuild"
+    tmp_job.mkdir(exist_ok=True)
+    # Use a distinct filename; build_and_postprocess copies its input to
+    # <job_dir>/source-transcript.md, so passing a file already named that
+    # would make source == destination.
+    no_fm_md = tmp_job / "no-fm-source.md"
+    no_fm_md.write_text(stripped, encoding="utf-8")
+    no_fm_html = build_and_postprocess(no_fm_md, tmp_job, None)
+    sheets_h2mode = collect_sheets(no_fm_html)
+
+    h3_broke = [s for s in sheets_h2mode if s["firstTag"] == "H3"]
+    c = Assertion("without pagination-level frontmatter (default h2), no h3 forces a break")
+    if len(h3_broke) == 0:
+        c.ok("default h2 mode: no h3 began its own sheet")
+    else:
+        c.fail(f"default h2 mode but {len(h3_broke)} h3(s) broke: {[(s['idx'], s['firstText']) for s in h3_broke]}")
+    assertions.append(c)
+
+    return assertions
+
+
 EVAL_DISPATCH = {
     "example-blockquote-coverage": assert_example_blockquote,
     "svg-cover-injection": assert_cover_injection,
     "chapter-h2-pagination": assert_chapter_pagination,
     "footer-page-and-breadcrumb": assert_footer_page_breadcrumb,
     "orphan-heading-pagination": assert_orphan_heading_pagination,
+    "h3-pagination-with-frontmatter": assert_h3_pagination,
 }
 
 

@@ -30,7 +30,17 @@
       "expectations": [
         "each chapter-shaped h2 (第N章/节/... and 大招 N) except the first begins a new .sheet",
         "the sheet before each non-first chapter-shaped h2 is marked data-ends-before-lecture=true",
-        "a NON-chapter h2 (e.g. 大招总结) does NOT cause its predecessor to be marked (exemption must not be too broad)"
+        "ANY h2 (including non-chapter h2 such as 大招总结) marks its predecessor ends-before-lecture — the rule is not confined to chapter-shaped h2"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "h3-pagination-with-frontmatter",
+      "fixture": "fixtures/h3-pagination.md",
+      "expectations": [
+        "with frontmatter pagination-level: h3, an h3 that follows h2 WITH real body content begins a new .sheet",
+        "with frontmatter pagination-level: h3, an h3 that immediately follows an h2 with NO intervening body content does NOT break (titles travel together, parent h2 is not stranded)",
+        "without pagination-level frontmatter (default h2), no h3 forces a new .sheet even when it follows body content"
       ]
     },
     {
