@@ -115,6 +115,45 @@ MARKDOWN_ANALYSIS_OPENER_PATTERN = re.compile(
     r"^\s*(?:>\s*)?(?:[-*]\s+)?\*\*(?:解析|解答|解|证明|分析)\*\*\s*[:：]?\s*$"
 )
 
+# --- question-callout title-line lint (Step 2.7 structural evidence) ---
+# Matches the example/exercise label at the START of a question callout's
+# title line (after the `[!question]` marker is stripped). The label is the
+# only part that is universal across all math PDFs: 例题N / 例N / 练习N (Arabic
+# or Chinese numerals). We anchor on the label — NOT on the source format —
+# because source labels vary wildly (round/angle brackets, 【】, year digits,
+# exam names like 新课标/全国卷, or no source at all).
+QUESTION_LABEL_PREFIX_PATTERN = re.compile(
+    r"^\s*(?:例题|例|练习)\s*[0-9一二三四五六七八九十百零]+\s*"
+)
+# A loose source suffix that may follow the label: matched repeatedly so the
+# many legal source shapes all collapse to nothing. Brackets (round/angle/【】
+# Chinese) are matched as whole units so their INNER punctuation cannot be
+# mistaken for stem text; year digits and exam/region tokens are also eaten.
+QUESTION_SOURCE_SUFFIX_PATTERN = re.compile(
+    r"(?:"
+    r"\([^()]*\)"            # (...)
+    r"|（[^（）]*）"         # （...）
+    r"|【[^【】]*】"         # 【...】
+    r"|\[[^\[\]]*\]"        # [...]
+    r"|<[^<>]*>"            # <...>
+    r"|・"                  # 中点（2017・新课标 的分隔符）
+    r"|、"
+    r"|\d{4}"               # 年份
+    r"|新课标|全国|课标|卷[ⅠIIII1-3IVX]{1,4}|文科|理科|年|届|省|市"
+    r"|Ⅰ|Ⅱ|III|[I]+"
+    r")"
+)
+# Stem-start signal words: when the prose remaining after stripping the label
+# and source suffix BEGINS with one of these, the title line has glued the
+# stem body to the label — report it. (Chinese math stems overwhelmingly start
+# with one of these.) Kept internal to the validator; the rewrite guide states
+# the rule in prose so subagents rely on semantic understanding, not a list.
+QUESTION_STEM_START_PATTERN = re.compile(
+    r"^(?:已知|设|若|求|求证|如图|记|函数|曲线|椭圆|抛物线|双曲线|三角形|"
+    r"数列|集合|在|某|把|从|过|给定|定义|点|线|面|圆|向量|矩阵|不等式|"
+    r"方程|命题|对于|对任|存在|当|设函数|设数列|已知函数|已知数列|已知集合)"
+)
+
 
 @dataclass(frozen=True)
 class LintMessage:
@@ -484,6 +523,96 @@ def lint_markdown_analysis_paragraphs(
         # Flush the last paragraph if the region ended without a trailing blank.
         flush_paragraph(para_start, para_lines)
         index = scan if scan > index else index + 1
+    return messages
+
+
+def lint_question_callout_title_attached(
+    lines: list[str],
+    blocks: list[QuoteBlock],
+    min_cjk_chars: int = 8,
+) -> list[LintMessage]:
+    """Enforce the rule that a question callout's TITLE line holds only the
+    example/exercise label and its source tag — never the stem body.
+
+    Why this lint exists: OCR frequently glues the stem's first sentence onto
+    the same line as the `例题N (来源)` label, producing
+    `> [!question] 例题 1 (2017・新课标 I ) 已知椭圆 $C: ...$` instead of
+    splitting the stem to its own `>` line. This is a structural defect (the
+    title line is simultaneously the "题号" and the "题干第一句"), and like the
+    over-long-analysis lint it is **non-auto-fixable**: deciding where to
+    break is a semantic judgment, so the fix is to re-run Step 2.7 against the
+    raw transcript.
+
+    Algorithm (anchored on the universal label, NOT on the source format):
+      1. For each question callout, take its first content line (the text
+         after `[!question]`).
+      2. Match the label prefix `例题N` / `例N` / `练习N`. If no label, skip
+         (not a labeled example/exercise).
+      3. Repeatedly strip a LOOSE source suffix — round/angle/【】/[...] brackets
+         as whole units, year digits, and exam/region tokens (新课标/全国/卷/年…).
+         This collapses every legal source shape (`(2017・新课标 I)`,
+         `【2018全国I】`, `2017年`, or none) to nothing.
+      4. After stripping, inspect the remaining prose (math stripped via
+         `strip_math_for_count` so a glued formula's LaTeX does not inflate the
+         CJK count). Report the callout if EITHER:
+           - the remaining prose BEGINS with a stem-start signal word
+             (已知/设/若/求/如图/函数/曲线/椭圆/…) — strong evidence the stem
+             body was glued on; OR
+           - the remaining prose has ≥ `min_cjk_chars` CJK characters — a long
+             tail after the label/source is almost certainly stem text.
+
+    This two-condition test avoids false positives on legit long source labels
+    (e.g. `例题 1 (2017・新课标 I · 文科) 选填题`): after stripping the bracketed
+    source, `选填题` neither begins with a stem signal nor reaches the CJK
+    threshold, so it is not flagged.
+    """
+    messages: list[LintMessage] = []
+    for block in blocks:
+        if not _is_question_callout(block):
+            continue
+        title = _first_content_line_of_block(block)
+        if not title:
+            continue
+        if not QUESTION_LABEL_PREFIX_PATTERN.match(title):
+            # No `例题N`/`例N`/`练习N` label → not in scope (e.g. a bare
+            # `[!question] 题干` title with the stem starting on the same
+            # line is covered by other structure rules, not this one).
+            continue
+        # Strip the label prefix itself.
+        rest = QUESTION_LABEL_PREFIX_PATTERN.sub("", title, count=1)
+        # Repeatedly strip the loose source suffix until a fixed point —
+        # a source tag like `(2017・新课标 I)` is one bracket unit, but
+        # `2017・新课标 I 文科` (no brackets) needs several passes. After each
+        # pass, drop any leading whitespace/punctuation noise (`・`, `、`,
+        # stray spaces) the source tag leaves behind, so the next pass sees
+        # the real remaining content.
+        previous = None
+        while previous != rest and rest:
+            previous = rest
+            rest = QUESTION_SOURCE_SUFFIX_PATTERN.sub("", rest, count=1)
+            rest = re.sub(r"^[・、，,\s]+", "", rest)
+        if not rest:
+            continue
+        # Strip math before judging the remaining prose: a glued formula such
+        # as `$C : \dfrac{x^2}{a^2} + ...$` should not inflate the CJK count.
+        prose = strip_math_for_count(rest).strip()
+        if not prose:
+            continue
+        cjk_count = len(re.findall(r"[\u4e00-\u9fff]", prose))
+        begins_with_stem_signal = bool(QUESTION_STEM_START_PATTERN.match(prose))
+        if begins_with_stem_signal or cjk_count >= min_cjk_chars:
+            reason = (
+                "stem-start signal word" if begins_with_stem_signal
+                else f"≥{min_cjk_chars} CJK chars after label/source ({cjk_count})"
+            )
+            messages.append(
+                LintMessage(
+                    block.start_line,
+                    f"question callout title line has the stem body glued after "
+                    f"the label/source ({reason}); move the stem to its own '>' "
+                    f"line — the title line should hold only the label and source",
+                )
+            )
     return messages
 
 
@@ -1316,6 +1445,7 @@ def lint_markdown(
     messages.extend(lint_fraction_nesting(lines))
     messages.extend(lint_qa_ordering(lines, blocks))
     messages.extend(lint_markdown_analysis_paragraphs(lines))
+    messages.extend(lint_question_callout_title_attached(lines, blocks))
     return sorted(messages, key=lambda message: message.line)
 
 

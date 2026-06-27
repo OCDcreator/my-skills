@@ -82,6 +82,32 @@ Hard rules:
 - **Callout must end with a blank line (no `>`)** before `**解析**` or the next content. If the callout ending is directly followed by `**解析**` without an empty line, Obsidian will render `**解析**` inside the callout.
 - **Every example/exercise labeled paragraph must live inside a callout (blockquote).** A line beginning with `例题N` / `练习N` (with optional `**bold**`, `【】`/`[]` brackets, or Chinese numerals) is an example label. If such a label is NOT on a `>` line, the downstream print builder renders it as a plain paragraph with no `.phycat-blockquote` styling — this is the root cause of "examples have no quote block" defects. The label, the stem, and any sub-questions/choices all belong in the same callout. The analysis (`**解析**`) that follows must stay OUT of the callout per the analysis rule below — only the question side is blockquoted. This extends the existing choice-callout rule from choice questions to ALL examples and exercises. <!-- evolved 2026-06-23 -->
 
+### Title line holds only the label + source <!-- added 2026-06-27 -->
+
+The callout's title line (the `[!question]` line) must contain **only** the example/exercise label and its optional source tag — never the stem body. The stem (the actual problem: 已知…/设…/若…/求…) starts on the **next** `>` line. The title line cannot be simultaneously the "题号" and the "题干第一句".
+
+Source tags come in many shapes across different PDFs — all are legitimate on the title line:
+- `例题 1 (2017・新课标 I )`
+- `例题 1`
+- `练习 2 【2018全国I】`
+- `例 1`
+- `例题 3  (2018 年 · 全国卷 Ⅰ)`
+
+The deciding factor is the **stem**, not the source format: the stem's first sentence must begin on its own `>` line.
+
+**WRONG** (stem glued onto the title line):
+```md
+> [!question] 例题 1 (2017・新课标 I ) 已知椭圆 $C : \dfrac{x^2}{a^2} + \dfrac{y^2}{b^2} = 1\left( {a > b > 0}\right)$，四点 ${P}_{1}\left( {1,1}\right)$。
+```
+
+**RIGHT** (label + source on the title line; stem on the next `>` line):
+```md
+> [!question] 例题 1 (2017・新课标 I )
+> 已知椭圆 $C : \dfrac{x^2}{a^2} + \dfrac{y^2}{b^2} = 1\left( {a > b > 0}\right)$，四点 ${P}_{1}\left( {1,1}\right)$。
+```
+
+This is enforced by `lint_question_callout_title_attached` (Step 4 hard gate). The lint anchors on the universal label (`例题N`/`例N`/`练习N`), strips any source tag, then flags the callout if stem text remains on the title line. It is **non-auto-fixable** — deciding where to break the stem is a semantic judgment, so the fix is to re-split the title line by hand (or re-run Step 2.7 against the raw transcript).
+
 ### Choice Format
 
 Use **Markdown tables** inside the callout for choices. Do not use HTML `<div>` or `<span>` structures — formulas inside HTML tags do not render in Obsidian.

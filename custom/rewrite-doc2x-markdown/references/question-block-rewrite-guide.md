@@ -30,7 +30,8 @@ When rewriting a question block, the subagent MUST read the corresponding passag
 
 ## Rewrite Format (per `canonical-markdown-rules.md`)
 
-- **Stem** → a single `> [!question] 题干` callout containing the stem, options, and sub-questions together.
+- **Title line holds only the label + source** (CRITICAL — most common OCR defect). The `[!question]` title line carries only the `例题N`/`例N`/`练习N` label and its optional source tag (`(2017・新课标 I)`/`【2018全国I】`/year digits/nothing). The stem body (the actual problem — 已知…/设…/若…/求…) MUST begin on the next `>` line. OCR routinely glues the stem's first sentence onto the title line; during rewrite, split it off. The title line must never be both the "题号" and the "题干第一句". Source tags vary across PDFs (round/angle/【】 brackets, year digits, exam names, or none) — judge by the stem, not the source shape. See `canonical-markdown-rules.md` → "Title line holds only the label + source" for good/bad examples. (Enforced by `lint_question_callout_title_attached`.)
+- **Stem** → a single `> [!question]` callout containing the stem, options, and sub-questions together.
 - **Choice options** → markdown table inside the callout (`≤15` chars/option: one row × 4 cols; `>15` chars: two rows × 2 cols). Every table line prefixed with `>`.
 - **Sub-questions** `(1) (2) (3)` → each on its own `>` line, separated by a blank `>` spacer line. Never cram multiple `(N)` onto one line.
 - **Analysis** → outside the callout, `**解析**` / `**解**` in bold, with a blank line between the callout end and `**解析**`. Split into logical paragraphs (`≤300` chars each, formula content excluded).
@@ -95,6 +96,7 @@ If the subagent reads a passage in `page-transcript.raw.md` and **genuinely doub
 
 Before reporting a rewritten block as done, verify:
 
+- **Title line is label-only**: the `[!question]` title line contains only the `例题N`/`例N`/`练习N` label and its source tag — the stem body starts on the next `>` line. No stem sentence glued onto the title line.
 - **Option count matches raw**: the number of choice options in the rewritten callout equals the number in the raw transcript passage (no option dropped or invented).
 - **`$` conservation**: count of `$` in the rewritten block equals count in the raw passage (no delimiter added/lost).
 - **No analysis paragraph > 300 chars** (formula content excluded).
@@ -114,7 +116,11 @@ question block in your assigned range:
 2. READ the corresponding passage in doc2x/page-transcript.raw.md (locate it by
    page marker / position). The raw transcript is your CONTENT TRUTH.
 3. REWRITE the block cleanly against the raw, following these rules:
-   - Stem + options + sub-questions → one > [!question] 题干 callout
+   - TITLE LINE: the > [!question] line holds ONLY the 例题N/例N/练习N label
+     and its source tag (e.g. (2017・新课标 I), 【2018全国I】, year, or none).
+     The stem body (已知…/设…/若…/求…) MUST start on the NEXT > line. OCR
+     often glues the stem's first sentence onto the title line — SPLIT IT OFF.
+   - Stem + options + sub-questions → one > [!question] callout
    - Options → markdown table inside the callout (≤15 chars: 1 row × 4 cols;
      >15 chars: 2 rows × 2 cols); every line prefixed with >
    - Sub-questions (1)(2)(3) → each on its own > line, blank > spacer between
@@ -136,8 +142,9 @@ question block in your assigned range:
    Compare the new result; if it clarifies the doubt, use it. If it does NOT
    resolve the doubt after one retry, STOP — mark [TO VERIFY: 单页重 OCR 仍不清晰]
    and move on. Do NOT re-OCR again, do NOT expand to neighboring pages.
-9. SELF-CHECK each rewritten block: option count matches raw, $ count matches
-   raw, no analysis paragraph >300 chars, callout closed, no content added.
+9. SELF-CHECK each rewritten block: title line is label+source only (no stem
+   glued on), option count matches raw, $ count matches raw, no analysis
+   paragraph >300 chars, callout closed, no content added.
 
 REPORT:
 - Number of question blocks rewritten

@@ -1126,3 +1126,132 @@ def test_image_path_data_uri_ok(tmp_path: Path) -> None:
 """,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+# --- question callout title-line lint (Step 2.7 structural evidence) ---
+# A question callout's title line must hold only the label + source tag; the
+# stem body must start on its own `>` line. The lint anchors on the universal
+# label (例题N/例N/练习N), strips a loose source suffix, then flags a glued
+# stem. See validate_canonical_markdown.py:lint_question_callout_title_attached.
+
+
+def test_callout_title_with_bracketed_source_and_split_stem_ok(tmp_path: Path) -> None:
+    """GOOD: label + `(2017・新课标 I )` source, stem on the next `>` line."""
+    result = run_validator(
+        tmp_path,
+        """# 椭圆
+
+> [!question] 例题 1 (2017・新课标 I )
+> 已知椭圆 $C : \\dfrac{x^2}{a^2} + \\dfrac{y^2}{b^2} = 1$，四点 $P_1(1,1)$。
+>
+> (1)求 $C$ 的方程。
+
+**解析**
+
+由题意可得。
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_callout_title_bare_label_ok(tmp_path: Path) -> None:
+    """GOOD: label with no source tag at all."""
+    result = run_validator(
+        tmp_path,
+        """# 数列
+
+> [!question] 例题 1
+> 设等差数列 $\\{a_n\\}$ 的前 $n$ 项和为 $S_n$。
+
+**解析**
+
+略。
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_callout_title_angle_bracket_source_ok(tmp_path: Path) -> None:
+    """GOOD: 【...】 source tag shape."""
+    result = run_validator(
+        tmp_path,
+        """# 函数
+
+> [!question] 练习 2 【2018全国I】
+> 设函数 $f(x) = x^3$。
+
+**解析**
+
+略。
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_callout_title_stem_glued_with_source_flagged(tmp_path: Path) -> None:
+    """BAD: stem body glued after label + source on the SAME title line."""
+    result = run_validator(
+        tmp_path,
+        """# 椭圆
+
+> [!question] 例题 1 (2017・新课标 I ) 已知椭圆 $C : \\dfrac{x^2}{a^2} + \\dfrac{y^2}{b^2} = 1$。
+
+**解析**
+
+略。
+""",
+    )
+    assert result.returncode == 1
+    assert "title line has the stem body glued" in result.stdout
+
+
+def test_callout_title_stem_glued_no_source_flagged(tmp_path: Path) -> None:
+    """BAD: label directly followed by a stem-start signal word, no source."""
+    result = run_validator(
+        tmp_path,
+        """# 函数
+
+> [!question] 例题 1 设函数 $f(x) = x^3$。
+
+**解析**
+
+略。
+""",
+    )
+    assert result.returncode == 1
+    assert "title line has the stem body glued" in result.stdout
+
+
+def test_callout_title_long_non_stem_tail_ok(tmp_path: Path) -> None:
+    """GOOD: a short non-stem tail (如 选填题) after the source is not flagged."""
+    result = run_validator(
+        tmp_path,
+        """# 集合
+
+> [!question] 例题 1 (2017) 选填题
+> 已知集合 $A = \\{1, 2\\}$。
+
+**解析**
+
+略。
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_callout_title_non_label_not_in_scope(tmp_path: Path) -> None:
+    """GOOD: a `[!question] 题干` title (no 例题N label) is out of scope."""
+    result = run_validator(
+        tmp_path,
+        """# 立体几何
+
+> [!question] 题干
+> 已知 $a \\parallel \\alpha$，求结论。
+
+**解析**
+
+略。
+""",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
