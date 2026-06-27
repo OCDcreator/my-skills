@@ -24,7 +24,9 @@ Usage:
 
 Outputs:
     <output-dir>/doc2x/source-pages.pdf        (the sub-PDF to submit)
-    <output-dir>/doc2x/extract-manifest.json   (audit metadata)
+    <output-dir>/doc2x/extract-manifest.json   (audit metadata, incl. has_outline)
+    <output-dir>/doc2x/outline.md              (heading-level ground truth for rewrite)
+    <output-dir>/doc2x/outline.json            (structured outline, same source data)
 
 Dependencies:
     pip install PyMuPDF  (imported as fitz)
@@ -179,6 +181,103 @@ def _select_pages(args: argparse.Namespace, page_count: int) -> list[int]:
     return valid
 
 
+def extract_outline(
+    toc: list[list], selected: list[int]
+) -> list[dict]:
+    """Filter PDF bookmarks to those covering the selected pages, plus
+    ancestor context so the resulting outline starts at a top-level heading
+    instead of a half-tree subsection.
+
+    Args:
+        toc: ``[[level, title, page], ...]`` as returned by
+            ``fitz.Document.get_toc()``. ``page`` is 1-indexed source page.
+        selected: sorted list of 0-indexed source page numbers actually
+            extracted into the sub-PDF.
+
+    Returns:
+        List of ``{"level", "title", "page", "in_range"}`` dicts in toc
+        order. ``in_range`` marks whether the bookmark's own page falls
+        inside the selected range (``False`` for ancestor-context-only
+        entries that sit just outside the range).
+    """
+    if not toc or not selected:
+        return []
+
+    # 1-indexed source page range covered by the sub-PDF
+    lo = min(selected) + 1
+    hi = max(selected) + 1
+
+    def in_range(page: int) -> bool:
+        return lo <= page <= hi
+
+    # Walk toc tracking the ancestor chain (stack of indices); mark in-range
+    # entries AND their ancestors for inclusion. Siblings of ancestors are
+    # intentionally NOT pulled in — only enough context to avoid a half-tree.
+    keep = [False] * len(toc)
+    stack: list[int] = []
+    for i, entry in enumerate(toc):
+        level = entry[0]
+        while stack and toc[stack[-1]][0] >= level:
+            stack.pop()
+        if in_range(entry[2]):
+            keep[i] = True
+            for anc in stack:
+                keep[anc] = True
+        stack.append(i)
+
+    result: list[dict] = []
+    for i, entry in enumerate(toc):
+        if keep[i]:
+            result.append(
+                {
+                    "level": entry[0],
+                    "title": entry[1],
+                    "page": entry[2],
+                    "in_range": in_range(entry[2]),
+                }
+            )
+    return result
+
+
+def write_outline_md(
+    outline: list[dict], path: Path, page_label: str
+) -> None:
+    """Render the filtered outline as an indented markdown list.
+
+    Indentation depth = bookmark level (2 spaces per nesting). Context-only
+    entries (``in_range == False``) are suffixed with ``（上下文）`` so a
+    human can see they sit outside the extracted range.
+    """
+    lines = [f"# Outline（来自 PDF 书签，范围：{page_label}）", ""]
+    if not outline:
+        lines.append("> 此页码范围内无书签起始点。")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
+    for entry in outline:
+        depth = max(entry["level"], 1)
+        indent = "  " * (depth - 1)
+        suffix = "" if entry["in_range"] else " （上下文）"
+        lines.append(f"{indent}- {entry['title']}{suffix}")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_outline_json(
+    outline: list[dict],
+    path: Path,
+    source_page_count: int,
+    requested: str,
+) -> None:
+    """Write the structured outline (same source data as the .md)."""
+    data = {
+        "source_page_count": source_page_count,
+        "requested_pages": requested,
+        "entries": outline,
+    }
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -237,12 +336,36 @@ def main() -> int:
         finally:
             new_doc.close()
 
+        # Extract PDF bookmarks (outline) for the selected range, with
+        # ancestor context. Used by the rewrite skill as the heading-level
+        # ground truth. Silent degrade when the PDF has no bookmarks.
+        toc = doc.get_toc()
+        outline = extract_outline(toc, selected) if toc else []
+        has_outline = bool(toc)
+        outline_md_path = doc2x_dir / "outline.md"
+        outline_json_path = doc2x_dir / "outline.json"
+        page_label = args.pages if args.pages else "all"
+        if not has_outline:
+            outline_md_path.write_text(
+                "# Outline\n\n"
+                "> 此 PDF 无内嵌书签，跳过 outline 提取。\n",
+                encoding="utf-8",
+            )
+        else:
+            write_outline_md(outline, outline_md_path, page_label)
+        write_outline_json(
+            outline, outline_json_path, page_count, page_label
+        )
+
         manifest = {
             "source_pdf": str(pdf_path),
             "source_page_count": page_count,
             "requested_pages": args.pages if args.pages else "all",
             "extracted_page_count": len(selected),
             "extracted_pdf": "doc2x/source-pages.pdf",
+            "has_outline": has_outline,
+            "outline_entries": len(outline),
+            "outline_md": "doc2x/outline.md" if has_outline else None,
             "timestamp": datetime.now().isoformat(timespec="seconds"),
         }
         manifest_path = doc2x_dir / "extract-manifest.json"
@@ -253,13 +376,18 @@ def main() -> int:
     finally:
         doc.close()
 
-    page_label = args.pages if args.pages else "all"
     print(
         f"OK: Extracted {len(selected)} pages ({page_label}) "
         f"from {page_count}-page PDF."
     )
     print(f"Sub-PDF: {sub_pdf_path}")
     print(f"Manifest: {manifest_path}")
+    if has_outline:
+        print(
+            f"Outline: {outline_md_path} ({len(outline)} entries)"
+        )
+    else:
+        print("Outline: (PDF has no bookmarks — wrote empty outline.md)")
     print()
     print("Next step: Submit the sub-PDF to Doc2X:")
     print(

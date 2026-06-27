@@ -34,6 +34,7 @@ Also read the local Obsidian Markdown syntax skill for syntax compatibility refe
 - **Doc2X is the primary source**: always use `doc2x/page-transcript.raw.md` as your base text. Do NOT use third-party image OCR tools (MCP screenshots, etc.) as a substitute — they produce worse results and miss content. The Doc2X export is the authoritative transcription.
 - **Preserve ALL detail**: never summarize, condense, or remove derivation steps from analysis sections. Every step of every method (法一, 法二, 法三) must be preserved in full. Missing detail is a critical failure.
 - **NEVER upload a full PDF to Doc2X when specific pages are requested**. When the user provides a PDF with a page range (e.g., "pages 6-36"), you MUST use `scripts/extract_and_submit.py --pdf <path> --pages <range> --output-dir <job>` to extract a sub-PDF first, then submit ONLY the sub-PDF to Doc2X. Uploading the full source PDF is a CRITICAL FAILURE that wastes the user's paid OCR quota. The script enforces this with a ratio guard (requests >60% of pages require explicit `--confirm-large`).
+- **PDF outline is the heading-level ground truth**. When `doc2x/outline.md` exists and contains real bookmark entries (i.e. `extract-manifest.json` has `"has_outline": true`), the Markdown's heading depth (`#`/`##`/`###`/…) MUST follow the outline's indentation depth. Headings must not be assigned by feel or by OCR-implied structure alone. When the outline is empty (no PDF bookmarks), fall back to the original semantic judgment. See "标题层级参照" in `references/canonical-markdown-rules.md`.
 
 ## Preconditions & Skill Boundaries
 
@@ -125,7 +126,10 @@ When a user reports a problem (e.g., "the formulas look wrong"):
    - Small (≤ 6 pages or ≤ 300 lines): single-thread, full-file processing.
    - Large (> 6 pages or > 300 lines): use the Parallel Chunking Workflow (see below), then continue with Steps 1-7 on the assembled result.
 3. **Gather inputs**: confirm you have access to the raw transcript, page images for visual comparison, and any existing `source-transcript.md`.
-4. **Verify upstream OCR quality** (GATE — if this fails, stop and inform the user):
+4. **Load the heading-level ground truth**: check whether `doc2x/outline.md` exists and whether `doc2x/extract-manifest.json` reports `"has_outline": true`.
+   - If yes → read `doc2x/outline.md` and treat its indentation depth as the authority for Markdown heading levels throughout this run. Carry it into every chunk and every self-check.
+   - If `outline.md` is absent (older job) or `has_outline: false` (no PDF bookmarks) → proceed without it and fall back to semantic judgment; do NOT block.
+5. **Verify upstream OCR quality** (GATE — if this fails, stop and inform the user):
    - Scan the raw transcript for signs of poor OCR parameters: broken `\frac` commands, missing `\` before LaTeX commands, garbled formula fragments, or unusually low formula count for a math document.
    - If formulas are systematically garbled (not just occasional typos), the OCR parameters were likely wrong (e.g., `formula_level=0` instead of `formula_level=1`). STOP and tell the user the raw input quality is too poor — do not attempt to rewrite garbage.
    - This is a **pre-condition gate**: rewriting cannot fix systematic OCR parameter errors.
@@ -338,7 +342,7 @@ You MUST check all items below. Do not skip any. If an item is not applicable, w
 - [ ] **Subpart line breaks**: every `(1)`/`(2)`/`(3)` question subpart inside a callout is on its own `>` line — no single `>` line contains two or more `(N)` subparts (grep suspect lines with `rg -n '\([0-9]+\)[^(]*\([0-9]+\)'` inside callout regions, then confirm each remaining hit is a false positive like coordinate pairs)
 - [ ] **Comma consistency & spacing**: every English `,` is followed by exactly one space (never glued like `,x`), no double spaces after a comma, and no paragraph/callout mixes `，` and `,` (grep `rg -n ',[^ \n,)]'`; confirm each remaining hit is a math/code false positive like `$f(x,y)$`)
 - [ ] **Simple formula-list comma placement**: simple variable/symbol lists are split into separate inline math spans (`$m$, $n$`, `$\alpha$, $\beta$`, `${x}_{1}$, `${x}_{2} \in D$`); commas inside intervals, coordinates, function arguments, arrays, and complex formulas are preserved.
-- [ ] **Semantic heading hierarchy**: inspect the rendered outline, not only heading-level jumps. Topic headings should own generic children such as `知识点总结`, `经典例题`, `归纳总结`, `特别地`, and `基本规律`; those child labels should not become siblings of their owning topic.
+- [ ] **Semantic heading hierarchy**: inspect the rendered outline, not only heading-level jumps. Topic headings should own generic children such as `知识点总结`, `经典例题`, `归纳总结`, `特别地`, and `基本规律`; those child labels should not become siblings of their owning topic. **When `doc2x/outline.md` exists with real entries** (`has_outline: true`), this check is NOT optional guesswork: verify each Markdown heading's `#`-depth matches the outline entry's indentation depth (Level 1 → `#`, etc., applying the fixed offset from `references/canonical-markdown-rules.md` → "标题层级参照"). Mismatches must be corrected, not deferred to `[TO VERIFY]`.
 - [ ] **解析 bold**: every analysis section has `**解析**` or `**解**` in bold
 - [ ] **Content preservation**: ALL derivation steps preserved — no summarizing of 法一/法二/法三
 - [ ] **Doc2X primacy**: content scope matches `doc2x/page-transcript.raw.md` — no detail removed
@@ -415,7 +419,7 @@ After each batch completes, check for failed chunks (subagent error or timeout >
 3. Check chunk boundaries for:
    - **Duplicate content**: if the last section of chunk N is also the first section of chunk N+1, remove the duplicate. This commonly happens when a section heading appears on the boundary page. Keep the version from the chunk where the section's EXAMPLES/CONTENT live, not the chunk that only has the heading.
    - Truncated formulas or tables at page breaks.
-   - Heading level consistency across chunks (adjacent chunks must not jump levels).
+   - Heading level consistency across chunks (adjacent chunks must not jump levels). **When `doc2x/outline.md` exists**, re-verify the assembled document's heading depths against the outline after concatenation — chunk-local decisions can drift at boundaries.
    - Duplicate or missing `## Page N` markers.
 3. Merge all `[TO VERIFY: ...]` markers from subagent reports into a single list.
 4. Run Step 1-GATE checks on the assembled document (fused formulas, `\$` corruption, `\begin{array}` count, callout count).

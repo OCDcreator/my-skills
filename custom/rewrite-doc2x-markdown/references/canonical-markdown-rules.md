@@ -37,6 +37,26 @@ Regenerate Markdown structure, not source meaning. Fix broken OCR layout, headin
 - Never skip levels or use inconsistent hierarchy.
 - <!-- evolved 2026-06-17 --> Heading hierarchy is semantic, not just numeric. Topic headings and their generic child headings must form a meaningful outline: e.g. `### 指对同构：技巧与模型` may contain `#### 知识点总结`, `#### 经典例题`, and `#### 归纳总结`; those child labels should not appear as siblings of the owning topic. When the user reports heading hierarchy problems, sweep the whole affected chapter/section and inspect the rendered outline semantics, not only heading-level jumps.
 
+#### 标题层级参照（outline.md 作为 ground truth）
+
+When `doc2x/outline.md` exists with real bookmark entries (`extract-manifest.json` reports `"has_outline": true`), the Markdown heading depth is **not** assigned by feel or by OCR-implied structure — it follows the PDF outline's indentation depth. This is the mechanism that fixes the recurring "rewrite 出来的标题层级经常错" defect.
+
+**Depth mapping rule:**
+
+| outline.md indent level | Markdown heading |
+|--------------------------|------------------|
+| Level 1 (top-level, e.g. 第N章) | `#` |
+| Level 2 (e.g. 第N节) | `##` |
+| Level 3 (e.g. 知识点N) | `###` |
+| Level 4+ | `####` / deeper, clamped at 6 |
+
+- Read `doc2x/outline.md` once at Step 0 and carry it through every chunk and every self-check.
+- Each Markdown heading's `#`-depth must equal the outline level of its matching entry. A heading that the outline places at Level 2 must be `##`, not `#` and not `###`.
+- Outline entries suffixed with `（上下文）` sit just outside the extracted page range but still anchor the hierarchy above the in-range content — they establish the ancestor levels and must appear at their correct depth (typically as the document's top `#`/`##`).
+- OCR often mislevels headings (a 知识点 becomes `##` instead of `###`, or a 第N节 collapses to a paragraph). Cross-check every section heading against outline.md during Step 6's "Semantic heading hierarchy" item; correct mismatches rather than deferring to `[TO VERIFY]`.
+- When the outline and OCR disagree on a heading's *existence* (outline has it, OCR dropped it; or vice versa): trust the outline for *level*, but trust OCR content for *presence* — do not invent headings the OCR text does not support just because the outline lists them.
+- When `outline.md` is empty (`has_outline: false`, no PDF bookmarks) or absent (older job), fall back to the semantic judgment rules above. The outline is an authority when present, never a blocker when absent. <!-- added 2026-06-27 -->
+
 ## Question Callouts
 
 Each complete question stem must be one continuous Obsidian callout.
