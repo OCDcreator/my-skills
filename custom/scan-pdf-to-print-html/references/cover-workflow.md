@@ -10,7 +10,7 @@ A pure-SVG cover needs hand-tuned coordinates for every card and pre-rendered Ma
 
 ## End-to-end flow
 
-1. **Generate the cover** with `a4-novak-html-cover`. It produces, in a cover job dir:
+1. **Generate the cover** with `a4-novak-html-cover`. It produces, **directly in the handout job dir** (not a separate `-cover` subdir — see the cover skill's Output Contract), these artifacts:
    - `concept-map.html` — the editable source (cards + `EDGES` config + KaTeX + drawEdges/autoFitFormula engine).
    - `concept-map.png` — the **full-A4-page render** (210mm × 297mm aspect). This is the handout-consumption artifact.
    - `concept-map.pdf` — optional standalone preview.

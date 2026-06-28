@@ -30,7 +30,9 @@ Pure-SVG covers fail repeatedly because every card needs hand-tuned coordinates 
 
 ## Output Contract
 
-For each job, create a directory under `product/` named `日期-任务名-cover` and produce:
+**Output directory rule (revised 2026-06-29):** write the cover artifacts **into the caller-specified directory**, which is normally the chapter's main job directory (the same one that holds `source-transcript.md` / `handout.html`). Do **not** create a separate `日期-任务名-cover` subdirectory when the cover is part of a handout pipeline — the downstream `postprocess_handout_for_contract.py` looks for `concept-map.png` **next to `handout.html`**, so splitting the cover into its own dir leaves `concept-map.png` duplicated and `concept-map.html` orphaned. Only create a standalone `日期-任务名-cover` directory when there is no handout job at all (the cover is the sole deliverable).
+
+Produce, in that directory:
 
 - `concept-map.html` — the self-contained A4 cover (cards + connector overlay + KaTeX).
 - `vendor/katex/` — local KaTeX (css + js + fonts) copied from a vendored copy, so rendering is offline and reproducible.
@@ -102,7 +104,7 @@ vendor/katex/
   dist/fonts/   (woff2/ttf)
 ```
 
-The HTML references `vendor/katex/dist/katex.min.css` and `.js`. A vendored copy lives at `product/2026-06-24-html-cover-trial/node_modules/katex/dist/` — copy that tree into the job's `vendor/katex/`. If no vendored copy exists, `npm install katex@0.16.11 --no-save` and copy `node_modules/katex/dist` → `vendor/katex/dist`.
+The HTML references `vendor/katex/dist/katex.min.css` and `.js`. A vendored copy lives in any existing cover job dir's `vendor/katex/` — copy that tree into the job's `vendor/katex/`. If no vendored copy exists, `npm install katex@0.16.11 --no-save` and copy `node_modules/katex/dist` → `vendor/katex/dist`.
 
 ### 5. Render
 

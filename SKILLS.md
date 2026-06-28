@@ -1,6 +1,6 @@
 # Skills Catalog
 
-Generated from repository state on 2026-06-28.
+Generated from repository state on 2026-06-29.
 
 This is the **curated** quick-reference index. For the complete list of all 1000+ skills, see [`docs/full-catalog.md`](docs/full-catalog.md).
 
