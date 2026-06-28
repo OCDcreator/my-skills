@@ -14,6 +14,9 @@ custom/knowledge-to-print-html/.local-libs/
 custom/knowledge-to-print-html/.local-qpdf/
 custom/knowledge-to-print-html/.venv-print/
 
+# pdf-toc-bookmarker runtime job artifacts (real-book OCR data, per-user, not part of the skill)
+custom/pdf-toc-bookmarker/work/
+
 # Syncthing transient and conflict files
 ~syncthing~*.tmp
 .syncthing.*.tmp

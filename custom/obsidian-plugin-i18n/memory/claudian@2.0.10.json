@@ -1,0 +1,2486 @@
+{
+  "pluginId": "claudian",
+  "lastPluginVersion": "2.0.10",
+  "targetLanguage": "zh-cn",
+  "updatedAt": "2026-06-28",
+  "entries": [
+    {
+      "key": "Notice(\"Failed to save Codex skill\")",
+      "translation": "Notice(\"保存 Codex 技能失败\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "Notice(`Codex skill \"$${entry.name}\" deleted`)",
+      "translation": "Notice(`Codex 技能 \"$${entry.name}\" 已删除`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "Notice(\"Failed to delete Codex skill\")",
+      "translation": "Notice(\"删除 Codex 技能失败\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "Notice(`Codex skill \"$${entry.name}\" ${existing ? \"updated\" : \"created\"}`)",
+      "translation": "Notice(`Codex 技能 \"$${entry.name}\" 已${existing ? \"更新\" : \"创建\"}`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "Notice(\"Failed to steer the queued Codex message. It is still available.\")",
+      "translation": "Notice(\"操作排队的 Codex 消息失败，该消息仍然可用。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Codex environment\"",
+      "translation": "name: \"Codex 环境\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to run a shell command.\"",
+      "translation": "description: \"OpenCode 想要执行一条 shell 命令。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to search indexed code outside the active buffer.\"",
+      "translation": "description: \"OpenCode 想要搜索当前缓冲区以外的索引代码。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to scan file paths with a glob pattern.\"",
+      "translation": "description: \"OpenCode 想要使用 glob 模式扫描文件路径。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to search file contents with a pattern.\"",
+      "translation": "description: \"OpenCode 想要搜索匹配模式的文件内容。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to query language server data.\"",
+      "translation": "description: \"OpenCode 想要查询语言服务器数据。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to switch this session into planning mode.\"",
+      "translation": "description: \"OpenCode 想要将当前会话切换到规划模式。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to leave planning mode and resume implementation.\"",
+      "translation": "description: \"OpenCode 想要退出规划模式并继续实现。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to ask you a direct question before continuing.\"",
+      "translation": "description: \"OpenCode 想在继续之前直接问你一个问题。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to load a skill into the current session.\"",
+      "translation": "description: \"OpenCode 想要加载一个技能到当前会话。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to update the shared task list.\"",
+      "translation": "description: \"OpenCode 想要更新共享任务列表。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to fetch content from a URL.\"",
+      "translation": "description: \"OpenCode 想要从 URL 获取内容。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"OpenCode wants to search the web.\"",
+      "translation": "description: \"OpenCode 想要搜索网络。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Internal Claudian read-only agent for OpenCode auxiliary tasks.\"",
+      "translation": "description: \"用于 OpenCode 辅助任务的 Claudian 内部只读代理。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Internal Claudian no-tool agent for OpenCode auxiliary tasks.\"",
+      "translation": "description: \"用于 OpenCode 辅助任务的 Claudian 内部无工具代理。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"Codex Skills\"",
+      "translation": "text: \"Codex 技能\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"Codex Subagents\"",
+      "translation": "text: \"Codex 子代理\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"Manage vault-level Codex skills stored in .codex/skills/ or .agents/skills/. Home-level skills are excluded here.\"",
+      "translation": "text: \"管理存储在 .codex/skills/ 或 .agents/skills/ 的仓库级 Codex 技能。此处不显示主目录级别的技能。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"Manage vault-level Codex subagents stored in .codex/agents/. Each TOML file defines one custom agent.\"",
+      "translation": "text: \"管理存储在 .codex/agents/ 的仓库级 Codex 子代理。每个 TOML 文件定义一个自定义代理。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"codex mcp\"",
+      "translation": "codex mcp",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"OpenCode Subagents\"",
+      "translation": "text: \"OpenCode 子代理\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"Not currently reported by OpenCode\"",
+      "translation": "text: \"OpenCode 当前未报告此项\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"OpenCode can auto-detect vault-level Claude slash commands from .claude/commands/ and skills from .claude/skills/, .codex/skills/, and .agents/skills/. Manage those entries in the Claude or Codex settings tab. This setting only hides entries from the OpenCode dropdown.\"",
+      "translation": "text: \"OpenCode 可以从 .claude/commands/ 自动检测仓库级 Claude 斜杠命令，以及从 .claude/skills/、.codex/skills/ 和 .agents/skills/ 检测技能。请在 Claude 或 Codex 设置标签页中管理这些条目。此设置仅从 OpenCode 下拉菜单中隐藏条目。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "text: \"Manage vault-level OpenCode subagents from .opencode/agent/ and legacy .opencode/agents/. New entries are saved as subagent-only files and appear in the @mention menu.\"",
+      "translation": "text: \"从 .opencode/agent/ 和旧版 .opencode/agents/ 管理仓库级 OpenCode 子代理。新条目保存为仅子代理文件，显示在 @提及 菜单中。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No Codex skills in vault. Click + to create one.\")",
+      "translation": "setText(\"仓库中没有 Codex 技能。点击 + 创建。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No Codex subagents in vault. Click + to create one.\")",
+      "translation": "setText(\"仓库中没有 Codex 子代理。点击 + 创建。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No OpenCode subagents in vault. Click + to create one.\")",
+      "translation": "setText(\"仓库中没有 OpenCode 子代理。点击 + 创建。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Enable Codex provider\")",
+      "translation": "setName(\"启用 Codex 提供商\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(`Codex CLI path (${hostnameKey})`)",
+      "translation": "setName(`Codex CLI 路径（${hostnameKey}）`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Codex Skills\")",
+      "translation": "setName(\"Codex 技能\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Codex Subagents\")",
+      "translation": "setName(\"Codex 子代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Enable OpenCode\")",
+      "translation": "setName(\"启用 OpenCode\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Agent name Codex uses when spawning (lowercase, hyphens, underscores)\")",
+      "translation": "setDesc(\"Codex 启动时使用的代理名称（小写、连字符、下划线）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"When Codex should use this agent\")",
+      "translation": "setDesc(\"Codex 何时应使用此代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"How Claudian should launch Codex on Windows. Native Windows uses a Windows executable path. WSL launches the Linux CLI inside a selected distro.\")",
+      "translation": "setDesc(\"Claudian 应如何在 Windows 上启动 Codex。原生 Windows 使用 Windows 可执行文件路径，WSL 在所选发行版中启动 Linux CLI。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Append additional Codex model IDs to the picker, one per line. OPENAI_MODEL still takes precedence when set.\")",
+      "translation": "setDesc(\"将额外的 Codex 模型 ID 追加到选择器中，每行一个。设置 OPENAI_MODEL 后仍优先使用。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"OpenCode agent name. Use slash-separated segments for nested agents.\")",
+      "translation": "setDesc(\"OpenCode 代理名称。使用斜杠分隔段表示嵌套代理。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"When OpenCode should use this subagent\")",
+      "translation": "setDesc(\"OpenCode 何时应使用此子代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Launch `opencode acp` as a provider.\")",
+      "translation": "setDesc(\"将 `opencode acp` 作为提供商启动。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional absolute path to the OpenCode CLI for this computer. Leave empty to use `opencode` from PATH.\")",
+      "translation": "setDesc(\"此计算机上 OpenCode CLI 的可选绝对路径。留空则使用 PATH 中的 `opencode`。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Choose which OpenCode models appear in the chat selector. Filter by provider or type to search. The current session model stays pinned even if it is not selected here.\")",
+      "translation": "setDesc(\"选择哪些 OpenCode 模型出现在聊天选择器中。按提供商或类型过滤搜索。即使当前会话模型未在此处选择，也会保持固定。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"gpt-5.4\\ngpt-5.3-codex-spark\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "appendText(\"Codex manages MCP servers via its own CLI. Configure with \")",
+      "translation": "appendText(\"Codex 通过自身的 CLI 管理 MCP 服务器。配置方法：\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"yolo\"",
+      "translation": "name: \"全自动\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"safe\"",
+      "translation": "name: \"安全\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Wie soll Claudian dich nennen?\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Ausgeschlossene Tags\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Medienordner\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Benutzerdefinierter System-Prompt\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Konversationstitel automatisch generieren\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Titel-Generierungsmodell\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Vim-Style Navigationszuordnungen\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Inline-Bearbeitung\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Neuer Tab\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"MCP-Server\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Claude Code-Plugins\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Sub-Agenten\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Name\"",
+      "translation": "name: \"名称\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Benutzer-Claude-Einstellungen laden\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Safe mode\"",
+      "translation": "name: \"安全模式\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Benutzerdefinierte Variablen\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Snippets\"",
+      "translation": "name: \"代码片段\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Benutzerdefinierte Kontextlimits\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Opus 1M Kontextfenster\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Sonnet 1M Kontextfenster\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Custom models\"",
+      "translation": "name: \"自定义模型\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Chrome-Erweiterung aktivieren\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Maximale Chat-Tabs\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Tab-Leiste Position\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Claude CLI-Pfad\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Sprache\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"What should Claudian call you?\"",
+      "translation": "name: \"Claudian 如何称呼你？\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Excluded tags\"",
+      "translation": "name: \"排除的标签\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Media folder\"",
+      "translation": "name: \"媒体文件夹\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Custom system prompt\"",
+      "translation": "name: \"自定义系统提示词\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Auto-generate conversation titles\"",
+      "translation": "name: \"自动生成对话标题\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Title generation model\"",
+      "translation": "name: \"标题生成模型\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Vim-style navigation mappings\"",
+      "translation": "name: \"Vim 风格导航映射\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Inline Edit\"",
+      "translation": "name: \"内联编辑\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Open Chat\"",
+      "translation": "name: \"打开聊天\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"New Session\"",
+      "translation": "name: \"新建会话\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"New Tab\"",
+      "translation": "name: \"新建标签\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Close Tab\"",
+      "translation": "name: \"关闭标签\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Commands and Skills\"",
+      "translation": "name: \"命令和技能\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Hidden Commands and Skills\"",
+      "translation": "name: \"隐藏的命令和技能\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"MCP Servers\"",
+      "translation": "name: \"MCP 服务器\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Claude Code Plugins\"",
+      "translation": "name: \"Claude Code 插件\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Subagents\"",
+      "translation": "name: \"子代理\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Load user Claude settings\"",
+      "translation": "name: \"加载用户 Claude 设置\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Custom variables\"",
+      "translation": "name: \"自定义变量\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Custom Context Limits\"",
+      "translation": "name: \"自定义上下文限制\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Opus 1M context window\"",
+      "translation": "name: \"Opus 1M 上下文窗口\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Sonnet 1M context window\"",
+      "translation": "name: \"Sonnet 1M 上下文窗口\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Enable Chrome extension\"",
+      "translation": "name: \"启用 Chrome 扩展\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Enable bash mode (!)\"",
+      "translation": "name: \"启用 bash 模式 (!)\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Maximum chat tabs\"",
+      "translation": "name: \"最大聊天标签数\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Tab bar position\"",
+      "translation": "name: \"标签栏位置\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Auto-scroll during streaming\"",
+      "translation": "name: \"流式输出时自动滚动\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Open in main editor area\"",
+      "translation": "name: \"在主编辑区打开\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Claude CLI path\"",
+      "translation": "name: \"Claude CLI 路径\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Language\"",
+      "translation": "name: \"语言\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Etiquetas excluidas\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Carpeta de medios\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Prompt de sistema personalizado\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Abrir chat\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Comandos y habilidades\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Comandos y habilidades ocultos\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Servidores MCP\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Plugins de Claude Code\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Subagentes\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Nombre\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Variables personalizadas\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Fragmentos\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Ventana de contexto Opus 1M\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Ventana de contexto Sonnet 1M\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Ruta CLI Claude\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Idioma\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Comment Claudian doit-il vous appeler ?\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Tags exclus\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Mappages de navigation style Vim\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Ouvrir le chat\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Nouvelle session\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Nouvel onglet\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Fermer l'onglet\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Serveurs MCP\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Plugins Claude Code\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Sous-agents\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Nom\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Extraits\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Activer l'extension Chrome\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Maximum d'onglets de chat\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Position de la barre d'onglets\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Chemin CLI Claude\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Langue\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Nova aba\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Fechar aba\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Comandos e habilidades\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Comandos e habilidades ocultos\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Plugins do Claude Code\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Nome\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Limites de contexto personalizados\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Janela de contexto Opus 1M\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Janela de contexto Sonnet 1M\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Caminho CLI Claude\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: 'myTool'",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"claudian-tester\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: `image-${index + 1}`",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Unknown\"",
+      "translation": "name: \"未知\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"claudian\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"compact\"",
+      "translation": "name: \"紧凑\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Hidden Skills\"",
+      "translation": "name: \"隐藏的技能\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"claudian-aux\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: `mcp__${server}__${tool}`",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"tool\"",
+      "translation": "name: \"工具\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"WebSearch\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: `mcp__${item.server}__${item.tool}`",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"TodoWrite\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Environment Variables\"",
+      "translation": "name: \"环境变量\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"clear\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"add-dir\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"resume\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"fork\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Agents\"",
+      "translation": "name: \"代理\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Shared environment\"",
+      "translation": "name: \"共享环境\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Open chat view\"",
+      "translation": "name: \"打开聊天视图\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Inline edit\"",
+      "translation": "name: \"内联编辑\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"New tab\"",
+      "translation": "name: \"新建标签\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"New session (in current tab)\"",
+      "translation": "name: \"新建会话（在当前标签中）\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "name: \"Close current tab\"",
+      "translation": "name: \"关闭当前标签\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Meta-schema for $data reference (JSON AnySchema extension proposal)\"",
+      "translation": "description: \"$data 引用的元模式（JSON AnySchema 扩展提案）\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"The default agent. Executes tools based on configured permissions.\"",
+      "translation": "description: \"默认代理。根据配置的权限执行工具。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Safe mode. Asks before shell commands and file edits.\"",
+      "translation": "description: \"安全模式。执行 shell 命令和文件编辑前询问。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Plan mode. Disallows all edit tools.\"",
+      "translation": "description: \"计划模式。禁止所有编辑工具。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Beschreibung\"",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Description\"",
+      "translation": "description: \"描述\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Fast and efficient\"",
+      "translation": "description: \"快速高效\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Balanced performance\"",
+      "translation": "description: \"性能均衡\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Balanced performance (1M context window)\"",
+      "translation": "description: \"性能均衡（1M 上下文窗口）\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Most capable\"",
+      "translation": "description: \"能力最强\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Most capable (1M context window)\"",
+      "translation": "description: \"能力最强（1M 上下文窗口）\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Custom model\"",
+      "translation": "description: \"自定义模型\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Compact conversation history\"",
+      "translation": "description: \"紧凑的对话历史\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Approve and store an exec policy amendment.\"",
+      "translation": "description: \"批准并存储执行策略修订。\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: `Apply a ${networkPolicyAmendment.action} rule for ${host}.`",
+      "translation": "description: `为 ${host} 应用 ${networkPolicyAmendment.action} 规则。`",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"ACP runtime\"",
+      "translation": "description: \"ACP 运行时\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Configured model\"",
+      "translation": "description: \"已配置的模型\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Selected in an existing session\"",
+      "translation": "description: \"在现有会话中选择\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Start a new conversation\"",
+      "translation": "description: \"开始新对话\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Add external context directory\"",
+      "translation": "description: \"添加外部上下文目录\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Resume a previous conversation\"",
+      "translation": "description: \"恢复之前的对话\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "description: \"Fork entire conversation to new session\"",
+      "translation": "description: \"复制整个对话到新会话\"",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Connection failed\")",
+      "translation": "setText(\"连接失败\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`Available Tools (${this.result.tools.length})`)",
+      "translation": "setText(`可用工具（${this.result.tools.length}）`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No tools information available. Tools will be loaded when used in chat.\")",
+      "translation": "setText(\"没有可用的工具信息。工具将在聊天中使用时加载。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Disable All\")",
+      "translation": "setText(\"全部禁用\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText('No MCP servers configured. Click \"Add\" to add one.')",
+      "translation": "setText('添加')",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No Claude Code plugins found. Enable plugins via the Claude CLI.\")",
+      "translation": "setText(\"未找到 Claude Code 插件。请通过 Claude CLI 启用插件。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Project Plugins\")",
+      "translation": "setText(\"项目插件\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"User Plugins\")",
+      "translation": "setText(\"用户插件\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Claude command catalog is unavailable.\")",
+      "translation": "setText(\"Claude 命令目录不可用。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No commands or skills configured. Click + to create one.\")",
+      "translation": "setText(\"未配置命令或技能。点击 + 创建。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`/${cmd.name}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`$${entry.name}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Unavailable\")",
+      "translation": "setText(\"不可用\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No matching commands\")",
+      "translation": "setText(\"没有匹配的命令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`${item.displayPrefix}${item.name}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Thinking 0s...\")",
+      "translation": "setText(\"思考 0 秒...\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`Thinking ${elapsed}s...`)",
+      "translation": "setText(`思考 ${elapsed} 秒...`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`Thought for ${durationSeconds}s`)",
+      "translation": "setText(`思考了 ${durationSeconds} 秒`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Your input:\")",
+      "translation": "setText(\"你的输入：\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Your response:\")",
+      "translation": "setText(\"你的回复：\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Refined snippet:\")",
+      "translation": "setText(\"优化后的片段：\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Preview\")",
+      "translation": "setText(\"预览\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Edit\")",
+      "translation": "setText(\"编辑\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Plan complete\")",
+      "translation": "setText(\"计划完成\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`... ${remaining} more lines`)",
+      "translation": "setText(`... 还有 ${remaining} 行`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"No changes\")",
+      "translation": "setText(\"没有更改\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`${key}: ${displayValue}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Tasks updated\")",
+      "translation": "setText(\"任务已更新\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`$ ${command}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Running...\")",
+      "translation": "setText(\"运行中...\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Initializing\")",
+      "translation": "setText(\"初始化中\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Running in background\")",
+      "translation": "setText(\"后台运行中\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Orphaned\")",
+      "translation": "setText(\"已孤立\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`+${stats.added}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`-${stats.removed}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Writing...\")",
+      "translation": "setText(\"写入中...\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"DONE\")",
+      "translation": "setText(\"完成\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"copied!\")",
+      "translation": "setText(\"已复制！\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`@${item.name}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`@${item.name}/`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`@${item.id}`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`@${item.path}/`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Effort:\")",
+      "translation": "setText(\"投入度：\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Thinking:\")",
+      "translation": "setText(\"思考：\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"External Contexts\")",
+      "translation": "setText(\"外部上下文\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"Click folder icon to add\")",
+      "translation": "setText(\"点击文件夹图标添加\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(\"MCP Servers\")",
+      "translation": "setText(\"MCP 服务器\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setText(`${usage.percentage}%`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Server name\")",
+      "translation": "setName(\"服务器名称\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Type\")",
+      "translation": "setName(\"类型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Enabled\")",
+      "translation": "setName(\"已启用\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Context-saving mode\")",
+      "translation": "setName(\"节省上下文模式\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Command\")",
+      "translation": "setName(\"命令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Environment variables\")",
+      "translation": "setName(\"环境变量\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"URL\")",
+      "translation": "URL",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Headers\")",
+      "translation": "setName(\"请求头\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Command name\")",
+      "translation": "setName(\"命令名称\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Description\")",
+      "translation": "setName(\"描述\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Argument hint\")",
+      "translation": "setName(\"参数提示\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Model override\")",
+      "translation": "setName(\"模型覆盖\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Allowed tools\")",
+      "translation": "setName(\"允许的工具\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Disable model invocation\")",
+      "translation": "setName(\"禁用模型调用\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Disable user invocation\")",
+      "translation": "setName(\"禁用用户调用\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Context\")",
+      "translation": "setName(\"上下文\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Agent\")",
+      "translation": "setName(\"代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Prompt template\")",
+      "translation": "setName(\"提示词模板\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(`${t(\"settings.cliPath.name\")} (${hostnameKey})`)",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Directory\")",
+      "translation": "setName(\"目录\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Skill name\")",
+      "translation": "setName(\"技能名称\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Instructions\")",
+      "translation": "setName(\"指令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Name\")",
+      "translation": "setName(\"名称\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Model\")",
+      "translation": "setName(\"模型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Reasoning effort\")",
+      "translation": "setName(\"推理投入度\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Sandbox mode\")",
+      "translation": "setName(\"沙箱模式\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Nickname candidates\")",
+      "translation": "setName(\"昵称候选\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Developer instructions\")",
+      "translation": "setName(\"开发者指令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Installation method\")",
+      "translation": "setName(\"安装方式\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"WSL distro override\")",
+      "translation": "setName(\"WSL 发行版覆盖\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Custom models\")",
+      "translation": "setName(\"自定义模型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Reasoning summary\")",
+      "translation": "setName(\"推理摘要\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Variant\")",
+      "translation": "setName(\"变体\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Temperature\")",
+      "translation": "setName(\"温度\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Top P\")",
+      "translation": "Top P",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Color\")",
+      "translation": "setName(\"颜色\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Steps\")",
+      "translation": "setName(\"步数\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Hide From @mention\")",
+      "translation": "setName(\"在 @提及中隐藏\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Disable Agent\")",
+      "translation": "setName(\"禁用代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Enabled Tools (JSON)\")",
+      "translation": "setName(\"已启用的工具 (JSON)\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Permission (JSON)\")",
+      "translation": "setName(\"权限 (JSON)\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Options (JSON)\")",
+      "translation": "setName(\"选项 (JSON)\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Prompt\")",
+      "translation": "setName(\"提示词\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Setup\")",
+      "translation": "setName(\"设置\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(`CLI Path (${hostnameKey})`)",
+      "translation": "setName(`CLI 路径 (${hostnameKey})`)",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Models\")",
+      "translation": "setName(\"模型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Visible Models\")",
+      "translation": "setName(\"可见模型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Commands and Skills\")",
+      "translation": "setName(\"命令和技能\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setName(\"Subagents\")",
+      "translation": "setName(\"子代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Unique identifier for this server\")",
+      "translation": "setDesc(\"此服务器的唯一标识符\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Server connection type\")",
+      "translation": "setDesc(\"服务器连接类型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Whether this server is active\")",
+      "translation": "setDesc(\"此服务器是否激活\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Hide tools from agent unless @-mentioned (saves context window)\")",
+      "translation": "setDesc(\"除非 @提及，否则对代理隐藏工具（节省上下文窗口）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Full command with arguments\")",
+      "translation": "setDesc(\"带参数的完整命令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"KEY=VALUE per line (optional)\")",
+      "translation": "setDesc(\"每行 KEY=VALUE（可选）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"HTTP headers (KEY=VALUE per line)\")",
+      "translation": "setDesc(\"HTTP 请求头（每行 KEY=VALUE）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Command or skill\")",
+      "translation": "setDesc(\"命令或技能\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc('The name used after / (e.g., \"review\" for /review)')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional description shown in dropdown\")",
+      "translation": "setDesc(\"可选描述，显示在下拉菜单中\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc('Placeholder text for arguments (e.g., \"[file] [focus]\")')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional model to use for this command\")",
+      "translation": "setDesc(\"此命令使用的可选模型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Comma-separated list of tools to allow (empty = all)\")",
+      "translation": "setDesc(\"逗号分隔的允许工具列表（空 = 全部）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Prevent the model from invoking this command itself\")",
+      "translation": "setDesc(\"阻止模型自行调用此命令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Prevent the user from invoking this skill directly\")",
+      "translation": "setDesc(\"阻止用户直接调用此技能\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Run in a subagent (fork)\")",
+      "translation": "setDesc(\"在子代理中运行（fork）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Subagent type when context is fork\")",
+      "translation": "setDesc(\"上下文为 fork 时的子代理类型\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Use $ARGUMENTS, $1, $2, @file, !`bash`\")",
+      "translation": "setDesc(\"使用 $ARGUMENTS、$1、$2、@file、!`bash`\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Where to store the skill\")",
+      "translation": "setDesc(\"技能存储位置\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc('The name used after $ (e.g., \"analyze\" for $analyze)')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"The skill instructions (SKILL.md content)\")",
+      "translation": "setDesc(\"技能指令（SKILL.md 内容）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Model override (leave empty to inherit)\")",
+      "translation": "setDesc(\"模型覆盖（留空继承）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Model reasoning effort level\")",
+      "translation": "setDesc(\"模型推理投入度级别\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Sandbox restriction for this agent\")",
+      "translation": "setDesc(\"此代理的沙箱限制\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Comma-separated display nicknames (e.g., Atlas, Delta, Echo)\")",
+      "translation": "setDesc(\"逗号分隔的显示昵称（例如 Atlas、Delta、Echo）\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Core instructions that define the agent's behavior\")",
+      "translation": "setDesc(\"定义代理行为的核心指令\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional advanced override. Leave empty to infer the distro from a \\\\\\\\wsl$ workspace path when possible, otherwise use the default WSL distro.\")",
+      "translation": "setDesc(\"可选高级覆盖。留空则尽可能从 \\\\\\\\\\\\\\\\wsl$ 工作区路径推断发行版，否则使用默认 WSL 发行版。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Show a summary of the model's reasoning process in the thinking block.\")",
+      "translation": "setDesc(\"在思考块中显示模型推理过程的摘要。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Model override in provider/model format\")",
+      "translation": "setDesc(\"模型覆盖，格式为 provider/model\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Model variant override\")",
+      "translation": "setDesc(\"模型变体覆盖\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional sampling temperature\")",
+      "translation": "setDesc(\"可选采样温度\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional nucleus sampling value\")",
+      "translation": "setDesc(\"可选核采样值\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Hex color or theme token\")",
+      "translation": "setDesc(\"十六进制颜色或主题令牌\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Maximum agentic iterations before forcing text-only output\")",
+      "translation": "setDesc(\"强制纯文本输出前的最大代理迭代次数\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Hide this subagent from the @ autocomplete menu\")",
+      "translation": "setDesc(\"从 @ 自动补全菜单中隐藏此子代理\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Disable the agent without deleting the file\")",
+      "translation": "setDesc(\"禁用代理而不删除文件\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc('Optional deprecated tools map, e.g. {\"write\":false,\"edit\":false}')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc('Optional permission config, e.g. {\"edit\":\"deny\",\"bash\":\"allow\"}')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Optional custom agent options\")",
+      "translation": "setDesc(\"可选自定义代理选项\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"Markdown body used as the agent prompt\")",
+      "translation": "setDesc(\"用作代理提示词的 Markdown 正文\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"my-mcp-server\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"http://localhost:3000/sse\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"review-code\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"claude-sonnet-4-5\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"code-reviewer\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"analyze-code\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"code_reviewer\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"Reviews code for correctness and security\")",
+      "translation": "setPlaceholder(\"审查代码的正确性和安全性\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"Ubuntu\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"review\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"Reviews code for correctness and maintainability\")",
+      "translation": "setPlaceholder(\"审查代码的正确性和可维护性\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"anthropic/claude-sonnet-4-20250514\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"high\")",
+      "translation": "setPlaceholder(\"高\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"#FF5733\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder('{\\n  \"write\": false,\\n  \"edit\": false\\n}')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder('{\\n  \"edit\": \"deny\"\\n}')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder('{\\n  \"focus\": \"security\"\\n}')",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"system\\nprivate\\ndraft\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"attachments\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setPlaceholder(\"map w scrollUp\\nmap s scrollDown\\nmap i focusInput\")",
+      "translation": "",
+      "status": "stale",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    },
+    {
+      "key": "setDesc(\"When enabled, Codex models appear in the model selector for new conversations. Existing Codex sessions are preserved.\")",
+      "translation": "setDesc(\"启用后，Codex 模型会出现在新对话的模型选择器中。现有 Codex 会话保持不变。\")",
+      "status": "active",
+      "updatedAt": "2026-06-28",
+      "createdAt": "2026-06-28"
+    }
+  ]
+}

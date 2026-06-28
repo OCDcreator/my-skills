@@ -564,3 +564,35 @@ snapshots: `scripts/handout_browser.py.bak-2026-06-27`, `scripts/render_html_to_
 
 **Active-context staleness:** editing the repo skill files does NOT change this session's already-loaded skill text. Recommend a fresh session to exercise the improved default.
 
+## 2026-06-29 (session: ch06 平面向量 — cover/handout/print + 资料库入库)
+
+| # | Candidate | Classify | G1 | G2 | G3 | Decision | Recurrence |
+|---|-----------|----------|----|----|----|----------|------------|
+| C3 | Step 9 image-hosting: choose script by image-path type (local paths → `migrate-md-local-images.py`, not the `.ps1` whose regex only matches `https?://`) | rework | pass | strengthen | principle | **strengthen** | first |
+| C4 | One chapter = one job directory; do NOT spin off `-cover`/`-handout` subdirs (postprocess looks for concept-map.png next to handout.html) | rework | pass | new | principle | **add_new** | first |
+
+### C3 — strengthen (local-image script branch)
+- candidate: Step 9 image-hosting must branch on image-path type — remote CDN URLs use `migrate-md-images.ps1`; local paths (`doc2x/export/images/*.jpg`) use `migrate-md-local-images.py`. The `.ps1` regex `https?://` silently exits "no remote images" on local-path markdown.
+- evidence: this session's ch06 `source-transcript.md` had 52 local-path image refs; `migrate-md-images.ps1` would have matched 0 (regex confirmed in script source). Used `migrate-md-local-images.py` → 52 uploaded, 0 remaining local refs.
+- gate reasoning: G2 strengthen (existing step 9 rule present but silent on local paths); G3 principle (silent script failure is a correctness defect, not preference).
+- strongest reason NOT to add: step 9 is opt-in/most-jobs-skip — adding detail bloats an optional step. Outweighed: silent failure repeats the trap on every local-image job.
+- written: `SKILL.md` step 9 (+script-branch guidance).
+- Dev Eval: N/A — documentation rule, not script logic; evals cover code-logic regressions only.
+
+### C4 — add_new (one-chapter-one-dir Hard Contract)
+- candidate: All artifacts from one source document (transcript, cover, handout, doc2x intermediates) must live in the same job directory; do not spin off `-cover`/`-handout` subdirs.
+- evidence: this session's ch06 cover was generated into a separate `-cover` subdir (per a4-novak-html-cover's old Output Contract), orphaning `concept-map.html` and duplicating `concept-map.png` (md5-identical copies in two dirs). grep: scan SKILL.md had no chapter-cohabitation rule; only cover-workflow.md:19 mentioned "place next to handout.html" (cover-specific, not a general rule).
+- gate reasoning: G1 pass (applies to every multi-artifact chapter); G2 new (no general rule in skill — AGENTS.md has it project-level, but the skill itself did not); G3 principle (postprocess has a physical dependency on concept-map.png's location — this is a technical constraint, not taste).
+- strongest reason NOT to add: directory layout is usually project-level (AGENTS.md) convention, not a single skill's concern. Outweighed: scan produces the most scattered artifacts AND postprocess has a hard physical dependency on co-location, so this is the skill's own technical contract.
+- note: a4-novak-html-cover's Output Contract (line 33) was also fixed in-session to point covers at the main dir; this C4 rule adds the symmetric constraint on scan's side.
+- written: `SKILL.md` Hard Contract (new bullet).
+
+snapshot: `SKILL.md.bak-2026-06-29`.
+
+**Active-context staleness:** editing the repo skill file does NOT change this session's already-loaded skill text. Recommend a fresh session to exercise the improved rules.
+
+### Discarded this session
+- C1 (cover→main dir, target a4-novak-html-cover): duplicate — already fixed in-session at a4-novak-html-cover line 33.
+- C2 (simple list-formula commas outside `$`): duplicate — `canonical-markdown-rules.md:200` already has the full rule; this was an `ignored`-class compliance miss, not a missing rule.
+- C5 (headless opencode run async-subagent non-assembly): NOT a skill defect — root cause was the omo default agent (Sisyphus) dispatching async subagents; using the `build` agent avoids it. Recorded to memory.md as ops guidance, not to any skill.
+

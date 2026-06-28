@@ -1,8 +1,8 @@
 {
   "meta": {
-    "generated_at": "2026-06-28T16:54:16.613720+00:00",
-    "total_skills": 1137,
-    "custom_skills": 39,
+    "generated_at": "2026-06-28T18:10:44.656055+00:00",
+    "total_skills": 1138,
+    "custom_skills": 40,
     "external_skills": 1098,
     "sources_count": 19
   },
@@ -180,6 +180,19 @@
       "path": "custom/obsidian-plugin-debug-logging",
       "name": "obsidian-plugin-debug-logging",
       "description": "Use this when developing or retrofitting an Obsidian plugin and the user mentions 调试日志, debug logging, 控制台日志, console logs, diagnostic report, 诊断报告, 日志开关, 日志分级, 默认静默, 模块日志开关, 子模块调试开关, 高频日志刷新频率, 故障排查, 最近日志缓存, 日志导出, 环境快照, BUILD_ID, version/build logs, or wants a maintainable logging/diagnostics system. Trigger even if the user only asks to make plugin logs quieter, copy troubleshooting info, export logs, add a debug toggle, add per-module logging controls, add refresh-rate controls for noisy logs, or support Windows/macOS console instructions.",
+      "category": "Content/Publishing",
+      "tier": "custom",
+      "source": "custom",
+      "repo": "git@github.com:OCDcreator/my-skills.git",
+      "branch": "main",
+      "include_in_main": true,
+      "tags": [],
+      "triggers": []
+    },
+    {
+      "path": "custom/obsidian-plugin-i18n",
+      "name": "obsidian-plugin-i18n",
+      "description": "Use when the user wants to translate/localize an Obsidian plugin into Chinese (or another language) — extract all user-facing strings from a plugin's main.js, translate them, optionally pop up a native GUI review window for human to approve/edit translations, then either rewrite main.js in place or export an i18n translation table. Trigger on phrasings like \"汉化插件\", \"翻译这个插件\", \"plugin i18n\", \"把 XX 插件变中文\", \"审核译文\", \"extract translatable strings from plugin\", or when a plugin path is given with a translation request. Also use for re-running translation after a plugin updates.",
       "category": "Content/Publishing",
       "tier": "custom",
       "source": "custom",
@@ -14915,11 +14928,11 @@
       "repo": "git@github.com:OCDcreator/my-skills.git",
       "branch": "main",
       "tier": "custom",
-      "skill_count": 39
+      "skill_count": 40
     }
   },
   "categories": {
-    "Content/Publishing": 1124,
+    "Content/Publishing": 1125,
     "crm": 3,
     "Automation/Agents": 2,
     "e-commerce": 2,

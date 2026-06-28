@@ -44,6 +44,9 @@ Rules for the subagent:
 - Return only JSON, no Markdown.
 - Mark uncertain titles with `[?]`.
 
+<!-- evolved 2026-06-29 -->
+**Confirm the subagent can actually ingest each image before trusting its JSON.** Many vision tools accept only REMOTE URLs, not local file paths. If a subagent reports a vision-tool error (e.g. HTTP 400) but still returns JSON, that JSON is almost always FABRICATED — discard it, do not write bookmarks from it. When local paths are rejected, upload the rendered image to an image host and pass the URL: `piclist-upload` (`http://127.0.0.1:36677/upload`) → `pic.ltreen.tech` is the standard host in this repo. Treat any subagent OCR output whose acquisition you cannot confirm as `unverified`.
+
 6. Save the JSON as a working file, normally `<workdir>/toc_items.json`. If the TOC was split into batches, merge batch JSON files in page order.
 7. Before writing the PDF, inspect the JSON:
    - count items,
@@ -101,6 +104,7 @@ Do not trust a low-resolution page-footer contact sheet when anchors conflict. R
 
 - Never overwrite the input PDF. Always write a new output file.
 - Reject bookmark targets outside the PDF page range.
+- <!-- evolved 2026-06-29 --> Never write bookmarks from OCR data whose acquisition you could not confirm. A subagent that hit a vision-tool error and still returned JSON produced fabricated titles and page numbers — this is silent corruption, not a partial read.
 - Keep intermediate TOC images and JSON so the user can inspect or correct recognition results.
 - Report warnings for uncertain titles (`[?]`) or decreasing printed page numbers before final delivery.
 - Prefer PyMuPDF (`fitz`) for rendering and outline writing.
