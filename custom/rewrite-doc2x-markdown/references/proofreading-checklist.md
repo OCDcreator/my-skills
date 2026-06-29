@@ -35,6 +35,7 @@ Compare the page image against the auto-fixed transcript. Look for:
 
 - [ ] **English/math typos**: Check for OCR confusions:
   - `l` (letter) vs `1` (number) vs `|` (pipe)
+  - `i` (imaginary unit) vs `1` — **high-risk in complex-number/algebra/trig chapters**; a swapped `i`/`1` silently corrupts every formula (e.g. `-1` OCR'd as `-i`, or `i^{2020}` losing its base, or `cos θ + sin θ` dropping the `i`). In any document containing the imaginary unit, verify each `i`/`1` occurrence against the page image, not just the ones that "look wrong".
   - `O` vs `0`
   - `S` vs `5`
   - `B` vs `8`

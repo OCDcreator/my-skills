@@ -298,6 +298,17 @@ rg -n ',[^ \n,)]' source-transcript.md
 
 This rule is **model-enforced**, not a validator regex — comma placement across mixed math/HTML/code contexts is semantic (per Forbidden Pattern F1) and a naive regex would misfire on function arguments like `$f(x, y)$`.
 
+## Imaginary-Unit Notation (`\mathrm{i}`) <!-- added 2026-06-29 -->
+
+In any document containing the imaginary unit (复数/代数/三角章节), normalize **every** imaginary-unit `i` to `\mathrm{i}` and ensure it is inside math delimiters. Doc2X emits `i` inconsistently (sometimes `\mathrm{i}`, sometimes bare `i`, sometimes a bare `i` in prose outside any `$...$`), and an italic `i` renders as a variable while an upright `\mathrm{i}` reads as the constant — the inconsistency is a real readability defect, not taste.
+
+- **Inside `$...$` / `$$...$$`**: bare imaginary-unit `i` → `\mathrm{i}`. Covers both algebraic form (`(2+i)` → `(2+\mathrm{i})`, `{2i}` → `{2\mathrm{i}}`, `1-i` → `1-\mathrm{i}`) and trigonometric form (`cos θ + i sin θ` → `cos θ + \mathrm{i}\sin θ`).
+- **In prose outside math**: a bare `i` mentioning the unit → `$\mathrm{i}$`; a half-wrapped `$b$ i` → `$b\mathrm{i}$`; a bare real number in vector/complex context (`得到 -1 的向量`) → `$-1$`.
+- **Do NOT touch** the `i` inside `\sin` / `\cos` / `\tan` / `\ln` / `\lim` / `\operatorname{...}` etc. — those are LaTeX command names, not the imaginary unit. Deciding whether an `i` is the unit vs a command letter vs a variable requires reading the context — this is **semantic**, not regex-able (Forbidden Pattern F1).
+- **Do NOT** change any value, sign, exponent, or structural macro — only the `i`→`\mathrm{i}` rendering and the prose-math wrapping. This rule layers on top of F3 (no unauthorized LaTeX conversions); it changes the *font command* of a single letter, not the formula structure.
+
+This rule is **model-enforced**. Self-check after applying: a scan for bare imaginary-unit `i` inside math (excluding `\sin`/`\cos`/`\ln` internals) should return 0. Note the validator's prose-length counter (`lint_markdown_analysis_paragraphs`) can glitch on `\mathrm{}` tokens — see SKILL.md Step 4's known-glitch note.
+
 ## Analysis Block Re-typesetting
 
 Detailed re-typesetting rules, OCR typo fixing procedures, subagent dispatch templates, and formula integrity verification commands are in **`references/analysis-retypesetting.md`**.

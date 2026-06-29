@@ -330,3 +330,105 @@ Markdown structure. Four candidates were surfaced and approved by the user.
   - `references/question-block-rewrite-guide.md.bak-2026-06-28`
 - **Recurrence count:** first for heading-preservation; first for lint-family distinction.
 - **Active-context staleness:** editing the repo file does not change this session's loaded skill text; recommend a fresh session to exercise the improved guard step against a weak model.
+
+---
+
+## 2026-06-29 — batch: 4 lessons (A–D) from 复数 ch07 i/1 OCR session
+
+Session cleaning `product/2026-06-26-mst-bixiu2-ch07-复数/source-transcript.md` produced
+a user-reported OCR-symbol defect plus two follow-up correctness/consistency findings.
+The trigger was the user pasting an `i×i=-1` / `(-i)×(-i)=1` block and suspecting an
+OCR `i`/`1` swap. Four candidates extracted, all approved by user ("上一轮的四个候选也强化进去").
+
+- **Trigger (verbatim user messages):**
+  - U2: "[pasted i×i=-1 / (-i)×(-i)=1 block] 这一块似乎有问题 OCR 的时候把 i 这个虚数单位识别为1了，你看看是不是这样，排查下其余所有的内容，可以让 deepseek 去全面排查。"
+  - U3: "是这样的吗？...我把1 改成 i 了，我以为是正确的，结果是错的吗？然后就是这里面有的 i 是 \mathrm{i} 有的不是，有的甚至没有被 包裹在 $ 符号里，将他们统一为 \mathrm{i}"
+- **Provenance:** `(extracted)` — full session transcript in-context.
+- **Key correction (U3):** the user initially *edited* `-1` → `-i` believing it correct; byte-check against raw (`page-transcript.raw.md:684` = `(-1)×(-1)=1`) + math-sense (`(-i)×(-i)=i²=-1`, not `1`) confirmed the raw `-1` was right. This became the evidence for Candidate C (active math-sense audit) and reframed Candidate A.
+
+### Candidate A — `strengthen`: OCR confusion list add `i`(imaginary unit) ↔ `1`
+
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** `strengthen` (Gate 1 PASS general — any complex-number/algebra/trig doc / Gate 2 strengthen / Gate 3 principle — verifiable OCR char fidelity).
+  - Gate 2 evidence: `references/proofreading-checklist.md:36-42` listed `l/1/|`, `O/0`, `S/5`, `B/8` but **omitted** `i`(imaginary)↔`1` — the exact pair that failed this session.
+  - Adversarial: "the list already has `l/1`." Counter: `i` is a different glyph and the single highest-value swap in complex-number docs (corrupts every formula); the user empirically hit it.
+- **Landing zone:** `references/proofreading-checklist.md` (added bullet under English/math typos, with the high-risk complex-number context note).
+- **Strongest reason NOT to add:** arguably covered by general "verify against page image". Counter: an explicit high-risk pair is what makes the proofreader actually look; implicit coverage failed this session.
+
+### Candidate B — `add_new`: `\mathrm{i}` normalization rule
+
+- **Classification:** `missing` → `add_new` (Gate 3 was **borderline** — surfaced explicitly, user approved).
+- **Gate verdict:** `add_new` (Gate 1 PASS general / Gate 2 `new` — grep `\mathrm{i}|虚数单位统一` → 0 hits in skill / Gate 3 borderline→approved).
+  - Gate 3 borderline reasoning: italic `i`(variable) vs upright `\mathrm{i}`(constant) is math-typography consensus, BUT the skill previously enforced `\mathrm{}` on no other single symbol — so this is a *new* typographic standard, not a restatement. Surfaced per Hard Contract; user approved.
+  - Adversarial: "preference, not principle." Counter: the inconsistency is a real readability defect (Doc2X emits `i` 3 ways: `\mathrm{i}`, bare `i`, bare `i` in prose), and the user explicitly requested it; lands as a doc-scoped rule with a self-check, not a validator regex.
+- **Landing zone:** `references/canonical-markdown-rules.md` (new "## Imaginary-Unit Notation (`\mathrm{i}`)" section after Punctuation Consistency).
+- **Strongest reason NOT to add:** single-symbol `\mathrm{}` mandate has no precedent in the skill. Counter: scoped to imaginary-unit docs only; rule is model-enforced with a self-check, no validator coupling.
+
+### Candidate C — `add_new`: active math-sense consistency audit (Step 2)
+
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** `add_new` (Gate 1 PASS general — any OCR math doc / Gate 2 `new` — grep `math-sense|数理自洽|consistency check` → 0 hits; F4 covers *reactive* byte-check, not *active* audit / Gate 3 principle — math correctness is the highest-fidelity concern).
+  - Session evidence: raw `page-transcript.raw.md:488` `i^{10+10+1}` (garbled exponent) and `:447` `(i²)^{505}=-2^{1010}` (sign/factor error) — both transcription-faithful but mathematically impossible; fixed by math-sense, not by raw trust.
+  - Adversarial: "hard to mechanize." Counter: it is the *active* form of F4; the session proved 2 real formulas needed it; framed as a model check with a `[TO VERIFY]` escape, not a validator.
+- **Landing zone:** `SKILL.md` Step 2 (new key check #7).
+- **Strongest reason NOT to add:** F4 already demands byte-level verification. Counter: F4 is *reactive* (only when a user complains); C is *proactive* (scan every chain), and the session showed 2 defects that no user complaint had surfaced.
+
+### Candidate D — `add_new`: validator math-stripper glitch note (Step 4)
+
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** `add_new` (Gate 1 PASS general — any validator run over `\mathrm{}`-bearing analysis / Gate 2 `new` — grep `stripper.*glitch|prose.*count.*mathrm` → 0 hits; 2026-06-28 Step-4 lint-family note covers formula-vs-rewrite, not this counter glitch / Gate 3 principle — diagnostic correctness prevents rework loops).
+  - Session evidence: validator reported `line 665: prose chars=312, limit=300` on a line whose true prose was ~15 chars — the math-stripper mis-split on `\mathrm{i}\sin`, counting LaTeX fragments as prose. Confirmed by byte-diffing line 665-666 before/after (only `i`→`\mathrm{i}` changed; prose unchanged).
+  - Adversarial: "single validator bug, too narrow." Counter: it triggered a real false FAIL and would have caused a wasted re-run-Step-2.7 loop; a 4-line note stops the bleed.
+- **Landing zone:** `SKILL.md` Step 4 (new "Known validator glitch" paragraph after the two-lint-family paragraph).
+- **Strongest reason NOT to add:** arguably the validator should be fixed, not documented. Counter: the note is the immediate止血 while the validator fix is deferred; the note also tells the model the correct *structural* fix (blank line between sub-answers) without deleting `\mathrm{}`.
+
+### Batch metadata
+
+- **Pairwise conflict check:** 4 candidates, all 6 pairs checked (A↔B detect-then-render; A↔C char-vs-chain; A↔D unrelated; B↔C render-vs-correctness; B↔D rule-vs-tool; C↔D unrelated). No conflicts.
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **85 passed** (unchanged from baseline; pure doc edits). Validator on the corrected source-transcript.md → `OK` (exit 0).
+- **Outcome:** APPROVED (user "上一轮的四个候选也强化进去").
+- **Files written:**
+  - `references/proofreading-checklist.md` (Candidate A)
+  - `references/canonical-markdown-rules.md` (Candidate B)
+  - `SKILL.md` (Candidate C: Step 2 check #7; Candidate D: Step 4 glitch note)
+  - `references/evolution-log.md` (this entry)
+- **Snapshots (same-day, after the OpenCode-agent wiring snapshots):**
+  - `SKILL.md.bak-2026-06-29-2`
+  - `references/proofreading-checklist.md.bak-2026-06-29`
+  - `references/canonical-markdown-rules.md.bak-2026-06-29-2`
+- **Recurrence count:** All 4 first occurrence (no prior `i/1` OCR, `\mathrm{i}`, math-sense, or stripper-glitch entries in this log).
+- **Verification summary:** Dev Eval machine-verified (pytest 85 pass + validator OK) for non-regression; the 4 lessons themselves are auditable-evidence-only (doc/rule edits, no new lint logic) — Candidate D is a *note about* a validator glitch, not a fix to the validator.
+- **Active-context staleness:** editing the repo file does not change this session's loaded skill text; recommend a fresh session to exercise the improved rules.
+
+---
+
+## 2026-06-29 — progressive-disclosure refactor (SKILL.md 514 → 229 lines)
+
+- **Trigger (verbatim user message):** "使用 skill-creator 做一次技能的渐进式披露的结构的梳理，避免主 skill.md 过于臃肿，影响效果。"
+- **Classification:** `style-pref` (structural cleanup) → executed directly via `skill-creator` methodology, NOT a rule candidate. This is a *refactor* (move content, preserve behavior), recorded for traceability. (skill-evolution's gate pipeline is for rule candidates; a pure restructure is logged as an event, not gated.)
+- **Provenance:** `(extracted)` — full session in-context.
+- **Problem:** SKILL.md had grown to **514 lines / 45.5KB**, exceeding the `skill-creator` Layer-2 target of <500 lines. Bloat sources: F1–F5 (~45 lines), Step 1-GATE bash block (~40 lines), Step 6 self-check (~45 lines), Parallel Chunking Workflow (~55 lines) — all inlined despite the skill's established "defer detail to `references/`" pattern.
+- **Method (per `skill-creator` progressive-disclosure guidance):** moved 4 large inlined blocks to **new standalone Layer-3 reference files** (one concern per file, matching the existing `auto-fix-rules.md`/`proofreading-checklist.md` pattern):
+  1. `references/forbidden-patterns.md` — F1–F5 (full reasoning + code examples)
+  2. `references/auto-fix-gate.md` — Step 1-GATE 7 mandatory checks (commands)
+  3. `references/self-check.md` — Step 6 checklist (10 evidence + 18 judgment items; added the Imaginary-unit notation check from this session's Candidate B)
+  4. `references/parallel-chunking.md` — Parallel Chunking Workflow (chunk planning + dispatch table + assembly)
+- **SKILL.md now a lean orchestrator**: kept the workflow skeleton (Steps 0–7), Hard Contract, Preconditions, Inputs — each step reduced to its orchestration logic + a one-line pointer to its reference file. Added a consolidated "References (read on demand, per step)" list at the top.
+- **Content-preservation verification:**
+  - All 5 Forbidden Patterns present (5 `## F[1-5]` headings in forbidden-patterns.md)
+  - All 10 Hard Contract items still in SKILL.md
+  - All 13 workflow step headings still in SKILL.md (Step 0, 0-A, 1, 1-GATE, 2, 2.5, 2.7, 3, 4, 5, 6, 6.5, 7)
+  - This session's Candidate C (math-sense) and D (stripper-glitch) both still present in SKILL.md
+  - All 12 reference pointers resolve (the one "MISSING" — `frontmatter-spec.md` — is a correct cross-skill ref to `scan-pdf-to-print-html/references/`, which exists)
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **85 passed** (unchanged — pure doc move, no lint logic touched).
+- **Outcome:** APPROVED (user selected "激进：拆 4 块" + "新建独立文件").
+- **Files written:**
+  - `SKILL.md` (rewritten: 514 → 229 lines / 45.5KB → 21.1KB)
+  - `references/forbidden-patterns.md` (new)
+  - `references/auto-fix-gate.md` (new)
+  - `references/self-check.md` (new)
+  - `references/parallel-chunking.md` (new)
+  - `references/evolution-log.md` (this entry)
+- **Snapshot:** `SKILL.md.bak-pre-refactor-20260629-125509` (full pre-refactor state).
+- **Recurrence count:** first structural refactor of SKILL.md (prior entries added/edited rules; this one restructured layout).
+- **Active-context staleness:** editing the repo file does not change this session's loaded skill text; the refactored SKILL.md (229-line orchestrator + pointers) takes effect in a fresh session.
