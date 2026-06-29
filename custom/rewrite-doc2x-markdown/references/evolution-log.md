@@ -529,3 +529,41 @@ Five candidates landed; C5/C6 discarded.
 - **Recurrence count:** All first occurrence as rules. The *pattern* "guidance exists, no executable gate" recurs across 2026-06-23 / 2026-06-28 / this session — C1/C2/C4 are the third strike of that pattern; this run finally mechanized it for formula-comma/truncation/long-chain rather than relying on self-check.
 - **Verification summary:** Dev Eval machine-verified (pytest 88 pass + ch09 validator false-positive check). The 5 lessons are: C1/C2/C4 = executable lint (machine-enforced); C3 = rule+self-check (auditable-evidence); C7/C8 = process/subagent guards (auditable-evidence only — no automated gate, honest framing per Verification Ceiling).
 - **Active-context staleness:** editing the repo file does not change this session's loaded skill text; the new lints (C1/C2/C4) take effect immediately when the validator script runs, but the Step 2-Dispatch (C7) and Step 2.8 (C8) subagent guards take effect in a fresh rewrite session.
+
+---
+
+## 2026-06-30 — 概率 chapter (必修二10：概率) post-task retro
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context session (not a subagent). Trace fields tagged `(extracted)`. The probability job ran rewrite-doc2x-markdown (Phase 1, 3 sub-passes) → a4-novak-html-cover (Phase 2) → scan-pdf-to-print-html (Phase 3) → 3 parallel format reviews, all via `opencode run --model opencode-go/deepseek-v4-flash` subagents. All 3 targets are under `custom/` (soft-linked from `my-skills/custom/`).
+
+### Candidate B9 — `strengthen`: `--fix` vs frontmatter corruption (3× recurrence in one job)
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS — any frontmatter-bearing `source-transcript.md` / G2 `strengthen` — existing rule at `SKILL.md:211` "Known limitations: `--fix` may corrupt `---` → `__________` (Rule 5) — verify separators after" was too passive / G3 principle — silent data corruption that breaks downstream pagination).
+  - **Evidence (3× recurrence in one job, extracted):** Phase 1b subagent ran `--fix` → frontmatter fences `---` became `__________` (1st); orchestrator hand-fixed. Phase 1c subagent ran `--fix` again → fences corrupted again (2nd); orchestrator hand-fixed. During this retro's own Dev Eval, orchestrator ran `--fix` once more → fences corrupted a 3rd time (3rd); hand-fixed. Each corruption made `parse_frontmatter()` return `{}` — `pagination-level`/`cover` intent silently lost, which would have broken the user's core "每讲从新页" requirement.
+  - **Diagnosis:** `weak` — rule existed (L211) but was a passive "verify after" note, not an actionable "don't run --fix blindly / re-assert fences" instruction. The existing line lumped frontmatter fences together with generic section separators, hiding that frontmatter corruption is *silent* (no error, just empty parse).
+- **Landing zone:** `SKILL.md` Step 4 (split the old "Known limitations" line: keep the `fix_callout_prefixes.py` clause as-is; expand the `--fix` clause into a dedicated "**`--fix` vs frontmatter — do not learn this the hard way**" block with the strip-and-restore / re-assert-and-reparse procedure + the post-`--fix` verification requirement). Tier-1 cascade: existing Step 4 section; SKILL.md at 266 lines (not near cap).
+- **Strongest reason NOT to add:** makes Step 4 longer. **Counter:** 3 recurrences in one job (including by the orchestrator who *knew* the rule) proves the passive warning is insufficient; an actionable procedure is cheaper than the rework it prevents.
+- **Outcome:** APPROVED (user "全部批准").
+
+### Candidate C10 — `add_new`: back up before rewriting
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — any in-place rewrite of the sole canonical transcript / G2 `new` — grep `backup|备份|\.bak|snapshot|copy.*before` across SKILL.md = 0 hits; none of the 12 Hard Contract items mandate a backup / G3 principle — guard against irreversible edits; user explicitly required it: "清洗前先备份该文件，避免造成不可挽回的错误").
+  - **Evidence (extracted):** the orchestrator created `source-transcript.md.bak-preclean-20260629` before Phase 1; that backup is what made the 3 frontmatter re-fixes safe (always restorable). User message U1 verbatim required the backup. The skill had no such rule, so a less cautious subagent could skip it.
+- **Landing zone:** `SKILL.md` Hard Contract (new item after the "PDF outline" rule, before the "Forbidden Patterns" section). Tier-1 cascade: the rule governs main-workflow safety → belongs in SKILL.md, and Hard Contract is the right home for an "always do this" mandate.
+- **Strongest reason NOT to add:** backups are "common sense", may be redundant. **Counter:** user explicitly required it AND the backup concretely rescued 3 corruptions this job; an explicit rule prevents a future subagent from skipping the step. The cost (one `cp`) is negligible vs the cost (irrecoverable canonical transcript).
+- **Outcome:** APPROVED (user "全部批准").
+
+### Discarded candidates
+- **A (orchestrator over-asking / plan-mode instead of working)** — `discard` (Gate 1 fail + Gate 3 preference): the user's complaint ("他不是主动去工作，而是立刻进入规划模式，然后就开始问我问题") is an **orchestrator/host behavior**, not in scope of any of the 3 content skills (rewrite/cover/scan). grep across all 3 SKILL.mds for "plan mode / ask / autonomy" = no rule to strengthen. The correct home is the host system-prompt / skill-creator's "Improving the skill" guidance ("if the model is doing busywork, cut, don't add"), which is outside `custom/` skill-evolution scope. Discarded per Step 4 row 2 (Gate 1 fail). **Required discard reasoning (per Step 4 row 5):** user quote cited; why it is out-of-scope (orchestrator layer, not content-skill); existing coverage lives in skill-creator (a different skill); safe to discard because forcing a "don't ask" rule into a content skill would be overfit pollution; recurrence = 0 (first occurrence).
+
+### Batch metadata
+- **Pairwise conflict check:** Fast path — 3 candidates, no pairwise check needed. B9 and C10 are complementary (C10 makes B9's failures recoverable; B9 reduces the failures). A is orthogonal (discard).
+- **Dev Eval:** `validate_canonical_markdown.py --md <corrected source-transcript.md> --fix` → triggered the **pre-existing Rule-5 frontmatter-corruption bug** (3rd occurrence, hand-fixed) — this is a pre-existing validator bug, NOT a regression introduced by these skill-text edits (the edits change instructions, not validator code). Dev Eval gives no semantic signal here (validator is a structural lint, not a behavior tester) — flagged honestly per Verification Ceiling. The edits are rule-text, auditable-evidence only.
+- **Outcome:** APPROVED (user "全部批准" — both B9 strengthen + C10 add_new).
+- **Files written:**
+  - `SKILL.md` (B9: expanded L211 "Known limitations" into the dedicated "`--fix` vs frontmatter" block at the Step-4 area; C10: new Hard Contract item "Back up before rewriting")
+  - `references/evolution-log.md` (this entry)
+- **Snapshot (same-day, 1st):** `SKILL.md.bak-2026-06-30`
+- **Recurrence count:** B9 = first occurrence *as a strengthened rule* (the underlying `--fix`-corrupts-frontmatter pattern is new to the log; the passive note existed since before 2026-06-29 but was never logged as a lesson). C10 = first occurrence. A = first occurrence (discarded).
+- **Verification summary:** No machine verification possible (both edits are instruction text, not executable code). B9 + C10 = auditable-evidence only (the 3× recurrence is extracted session evidence; the backup's rescue role is extracted session evidence). Dev Eval could not confirm non-regression because the pre-existing Rule-5 bug fires on any `--fix` run — this is honestly a validator limitation, not a skill-text regression.
+- **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/SKILL.md` does not change this session's loaded rewrite-doc2x-markdown skill text (it was loaded at Phase 1). The new rules (C10 backup mandate, B9 frontmatter-safe `--fix` procedure) take effect in a **fresh rewrite session**. Recommend a fresh session to exercise the improved skill.

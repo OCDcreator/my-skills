@@ -41,6 +41,7 @@ Also read the local Obsidian Markdown syntax skill for syntax compatibility refe
 - **Preserve ALL detail**: never summarize, condense, or remove derivation steps from analysis sections. Every step of every method (法一, 法二, 法三) must be preserved in full. Missing detail is a critical failure.
 - **NEVER upload a full PDF to Doc2X when specific pages are requested**. When the user provides a PDF with a page range (e.g., "pages 6-36"), you MUST use `scripts/extract_and_submit.py --pdf <path> --pages <range> --output-dir <job>` to extract a sub-PDF first, then submit ONLY the sub-PDF to Doc2X. Uploading the full source PDF is a CRITICAL FAILURE that wastes the user's paid OCR quota. The script enforces this with a ratio guard (requests >60% of pages require explicit `--confirm-large`).
 - **PDF outline is the heading-level ground truth**. When `doc2x/outline.md` exists and contains real bookmark entries (i.e. `extract-manifest.json` has `"has_outline": true`), the Markdown's heading depth (`#`/`##`/`###`/…) MUST follow the outline's indentation depth. Headings must not be assigned by feel or by OCR-implied structure alone. When the outline is empty (no PDF bookmarks), fall back to the original semantic judgment. See "标题层级参照" in `references/canonical-markdown-rules.md`.
+- **Back up before rewriting.** Before any rewrite/clean pass that edits `source-transcript.md` in place, create a timestamped backup beside it (`source-transcript.md.bak-YYYY-MM-DD`, suffix `-2`/`-3` if a same-day backup exists). The rewrite touches the only canonical transcript; a bad auto-fix or an over-eager `--fix` is irreversible without the backup. <!-- evolved 2026-06-30 — rework: user explicitly required backup; rescued 3 frontmatter corruptions in the 概率 job -->
 
 ## Forbidden Patterns (always in force)
 
@@ -208,7 +209,11 @@ py -3 scripts/validate_canonical_markdown.py --md "C:\path\source-transcript.md"
 py -3 scripts/fix_callout_prefixes.py --md "C:\path\source-transcript.md" --fix
 ```
 
-**Known limitations**: `--fix` may corrupt `---` → `__________` (Rule 5) — verify separators after. `fix_callout_prefixes.py` may wrongly prefix `##`/`###` lines — verify headings after.
+**Known limitations**: `fix_callout_prefixes.py` may wrongly prefix `##`/`###` lines — verify headings after.
+
+**`--fix` vs frontmatter — do not learn this the hard way** (evolved 2026-06-30, recurred 3× in one 概率 job): `validate_canonical_markdown.py --fix` applies Rule 5 (`---` → `__________`) indiscriminately — **including the frontmatter `---` fences**, not just section separators. Corrupted frontmatter is silent: `parse_frontmatter()` returns `{}`, so `pagination-level`/`cover` intent vanishes and downstream pagination breaks with no error message. Therefore:
+- If `source-transcript.md` has frontmatter, **do not run `--fix` on it blindly.** Either (a) strip the frontmatter block, run `--fix`, then restore the frontmatter; or (b) run `--fix`, then immediately re-assert both fences are still `---` (not `__________`) and re-parse with `parse_frontmatter()` to confirm the metadata dict is non-empty.
+- After any `--fix` run on a frontmatter-bearing file, the first 5 lines MUST still parse as frontmatter. Re-fix the fences before declaring the file clean. This is a verification step, not optional.
 
 ### Step 5 — Quality Validation
 
