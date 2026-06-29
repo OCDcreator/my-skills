@@ -432,3 +432,100 @@ OCR `i`/`1` swap. Four candidates extracted, all approved by user ("上一轮的
 - **Snapshot:** `SKILL.md.bak-pre-refactor-20260629-125509` (full pre-refactor state).
 - **Recurrence count:** first structural refactor of SKILL.md (prior entries added/edited rules; this one restructured layout).
 - **Active-context staleness:** editing the repo file does not change this session's loaded skill text; the refactored SKILL.md (229-line orchestrator + pointers) takes effect in a fresh session.
+
+---
+
+## 2026-06-29 — batch: 5 candidates (C1-C4, C7, C8) from ch09 统计 session
+
+Session rewriting `product/2026-06-26-mst-bixiu2-ch09-统计/source-transcript.md` produced
+≥7 user rework corrections. The user's framing was strategic: "用哪种方案从根上避免——
+多Agent / 代码验证 / 硬约束？" Analysis classified the 7 corrections into **3 root causes**
+and chose a defense per root cause ("万箭齐发" — multiple methods, divided by root cause).
+Five candidates landed; C5/C6 discarded.
+- **Trigger (verbatim user messages):**
+  - U1: "选项没有转为表格，还有选项错误的加入 ## 标题…需要全面排查…弄一个专门的子代理"
+  - U2: "例题缺少的图我给换了一个本地的你记得上传到图床"
+  - U3: "${60}\% , {60}\% …公式内逗号问题并没有解决…非常多"
+  - U4: "例题19公式过长也没有用 array 对齐换行"
+  - U5: "…=$ 0.0296 为什么这个后面不在公式里…公式总是不完整"
+  - U6: "③相应的频率=样本容量…原文是频数除以相应的频率等于样本容量"
+  - U7: "$\lbrack {5.31}, {5.33})…区间之间分隔逗号还有漏的" + "总结…分析到底应该采取哪种方案"
+- **Provenance:** `(extracted)` — full session in-context.
+- **Root-cause → defense mapping (the core analysis):**
+  - **Root cause A (Step 2.7 skipped at dispatch)** — U1/U2/U3(part): rule "2.7 MANDATORY" existed but was ignored. Adding a louder rule is ineffective for `ignored` (landing-zone-rules.md). → **defense = ③dispatch-time guard** (candidate C7), NOT a louder rule.
+  - **Root cause B (structural defect, guidance exists but no executable gate)** — U3/U5/U7/U4: self-check had judgment items but no lint. → **defense = ②code validation** (candidates C1/C2/C3/C4), the highest-value fix. Matches evolution-log's recurring lesson (2026-06-23 adjacent-figure, 2026-06-28 heading): "self-check alone fails; executable gate is the durable fix."
+  - **Root cause C (raw OCR math-wrong, no math-sense)** — U6: code validators cannot judge math truth. → **defense = ①multi-agent cross-examination** (candidate C8), a fresh subagent re-derives formulas.
+
+### Candidate C1 — `add_new`: lint_formula_dangling_tail (formula truncation)
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — any OCR math doc / G2 `new` — grep `dangling|腰斩|truncat` → only proofreading-checklist.md:76 cross-page note, no output lint / G3 principle — formula completeness is verifiable).
+  - Session evidence: ch09 L761 `${s}^{2}=...= 0.0296` — the `0.0296` tail leaked out of `$` as prose because the span closed at `=$`.
+- **Landing zone:** `scripts/validate_canonical_markdown.py` (new `lint_formula_dangling_tail`, registered in dispatch); `tests/test_validate_canonical_markdown.py` (regression test).
+- **Strongest reason NOT to add:** naive regex may misfire on `$f(x,y)$` or `\left\lbrack...\right\rbrack`. **Counter:** the lint uses a conservative heuristic (span ends with a dangling operator AND the text after `$` looks like a stray value, with a prose allowlist); ch09 verified 0 false-positives on the corrected spans.
+- **Outcome:** APPROVED (user "全要 C1+C2+C3").
+
+### Candidate C2 — `add_new`: lint_list_inside_math (list of units in one span)
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS / G2 `new` — rule canonical-markdown-rules.md:200 listed `$m$, $n$` and single `$(0,1)$` but no multi-interval-list example and no lint / G3 principle).
+  - Session evidence: ch09 L349/L363/L630 — multiple intervals crammed in one `$...$` (`$\lbrack 5.31,5.33), \lbrack 5.33,5.35), \cdots$`).
+- **Landing zone:** `scripts/validate_canonical_markdown.py` (new `lint_list_inside_math`); `references/canonical-markdown-rules.md` (multi-interval-list example); `tests/` (regression).
+- **Strongest reason NOT to add:** single interval `$(0,1)$` or function arg `$f(x,y)$` could false-positive. **Counter:** the lint requires a REPEATING unit (≥2 openers separated by commas), so a single unit never fires; ch09 single-interval verified unflagged.
+- **Outcome:** APPROVED.
+
+### Candidate C3 — `strengthen`: comma-placement rule + self-check gain multi-interval-list sub-case
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 strengthen — self-check item 28 + canonical-rules:200 existed but only covered `$m$, $n$`, not multi-interval lists / G3 principle).
+- **Landing zone:** `references/canonical-markdown-rules.md:200` (multi-interval-list sub-bullet); `references/self-check.md` (item 28 area — new "list-of-units" check).
+- **Outcome:** APPROVED.
+
+### Candidate C4 — `add_new`: lint_long_inline_formula (multi-equality chain, coarse)
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS / G2 `new` — self-check item 36 existed but no lint / G3 principle, borderline — aligned quality is semantic, so lint is COARSE).
+  - Session evidence: ch09 例19 s₁²/s₂² long sums not folded.
+  - **Calibration incident:** first version flagged any `$...$` >60 chars → 16 ch09 hits, most were legitimate single-`=` sums (false-positive noise). Tightened to "length>90 AND ≥2 equalities" (a chain), which targets only `a=b=c` chains that genuinely need `\begin{aligned}`. A single long expression is a legit inline span.
+- **Landing zone:** `scripts/validate_canonical_markdown.py` (new `lint_long_inline_formula`); `references/canonical-markdown-rules.md` (new multi-equality-chain rule); `references/self-check.md` (item 36 strengthened); `tests/`.
+- **Strongest reason NOT to add:** when-to-fold is semantic. **Counter:** coarse "long chain" signal is enough to point the model at the spot; context-judgment still applies (lint message says so).
+- **Outcome:** APPROVED (user "lint化 粗粒度").
+
+### Candidate C7 — `add_new`: Step 2-Dispatch declare-which-steps guard
+- **Classification:** `missing` (process/dispatch) → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — any dispatched rewrite / G2 `new` — grep `dispatch.*declare|2\.5.*2\.7` → no dispatch-time step-naming rule (the "2.7 MANDATORY" rule is step-level, not dispatch-level) / G3 principle — the 2026-06-29 session empirically skipped 2.7 at dispatch).
+  - Diagnosis: this is root cause A — the rule existed and was `ignored`. Per landing-zone-rules.md, a louder rule rarely fixes `ignored`; the fix is forcing the dispatcher to NAME the steps. So this is a dispatch-time guard, not a louder "2.7 is mandatory".
+- **Landing zone:** `SKILL.md` (new "Step 2-Dispatch" section between Step 1-GATE and Step 2.5, with the document-shape→steps table + the anti-pattern); `references/self-check.md` (new "Dispatch declared its steps" check).
+- **Strongest reason NOT to add:** may over-constrain. **Counter:** the failure (running only 2.5) really happened; a one-line dispatch declaration is cheap insurance.
+- **Outcome:** APPROVED (user "加显式dispatch约束").
+
+### Candidate C8 — `add_new`: Step 2.8 Math-sense cross-review subagent
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — any formula-heavy chapter / G2 `new` — Step 2 math-sense is the rewriter's INLINE check; C8 is a SEPARATE cross-examining subagent, a distinct mechanism (multi-agent defense ①) / G3 principle — math truth is the highest-fidelity concern).
+  - Session evidence: ch09 `③频率=样本容量` survived all structural lints (structure was clean; only re-deriving the math caught it as OCR-wrong).
+- **Landing zone:** `SKILL.md` (new "Step 2.8" section after Step 2.7, before Step 3); `references/self-check.md` (new "Math-sense cross-review ran" check).
+- **Strongest reason NOT to add:** a strong rewriter already does math-sense inline. **Counter:** the rewriter is anchored to its own assumptions and can rationalize past a math error (it trusted the raw OCR's `频率=样本容量`); a fresh subagent is not so anchored. This is the user's explicit "交叉质询" request and the only defense against root cause C (code validators provably cannot judge math truth).
+- **Outcome:** APPROVED (user "加交叉审查子代理").
+
+### Discarded candidates
+- **C5 (math-sense strengthen)** — `duplicate`: 2026-06-29 prior batch already added the Step 2 inline math-sense check. This session's U6 was an *execution* failure of that existing rule, not a rule gap → routed to C8 (the separate subagent) rather than restating the rule.
+- **C6 (Step 2.7 louder rule)** — `duplicate` + `ignored` diagnosis: SKILL.md L139 already marked 2.7 MANDATORY; the failure was dispatch ignoring it, which C7 addresses at the right layer (dispatch, not the rule text).
+
+### Batch metadata
+- **Pairwise conflict check:** 7 candidates, all pairs checked; no conflicts. C1/C2/C3 are comma/truncation family but land in different files (lint vs rule vs self-check) — complementary. C7 (dispatch) and C8 (cross-review) target different root causes (A vs C).
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **88 passed** (was 85; +3 regression tests for C1/C2/C4). Validator on ch09 corrected output: dangling-tail & list-inside-math = **0 false-positives** (corrected spans clean); long-inline-formmula flags 16 real multi-equality chains still un-folded in ch09 (lint correctly pointing at unfinished cleanup).
+- **Outcome:** APPROVED (user answered the 4 scope questions: C1+C2+C3 全要 / C4 lint化粗粒度 / C7 加dispatch约束 / 根因C 加交叉审查子代理).
+- **Files written:**
+  - `scripts/validate_canonical_markdown.py` (C1 lint_formula_dangling_tail, C2 lint_list_inside_math, C4 lint_long_inline_formula + all 3 registered in lint_markdown dispatch)
+  - `references/canonical-markdown-rules.md` (C3 multi-interval-list sub-bullet + C1 truncation rule + C4 multi-equality-chain rule, all near line 200)
+  - `references/self-check.md` (C3 list-of-units + truncation checks; C7 dispatch-declared check; C8 cross-review-ran check)
+  - `SKILL.md` (C7 new "Step 2-Dispatch" section; C8 new "Step 2.8" section)
+  - `tests/test_validate_canonical_markdown.py` (3 regression tests)
+  - `references/evolution-log.md` (this entry)
+- **Snapshots (same-day, 3rd):**
+  - `SKILL.md.bak-2026-06-29-3`
+  - `scripts/validate_canonical_markdown.py.bak-2026-06-29-3`
+  - `references/canonical-markdown-rules.md.bak-2026-06-29-3`
+  - `references/self-check.md.bak-2026-06-29-3`
+  - `references/question-block-rewrite-guide.md.bak-2026-06-29-3` (snapshot taken, not edited)
+  - `references/parallel-chunking.md.bak-2026-06-29-3` (snapshot taken, not edited)
+  - `references/opencode-agent-invocation.md.bak-2026-06-29-3` (snapshot taken, not edited)
+- **Recurrence count:** All first occurrence as rules. The *pattern* "guidance exists, no executable gate" recurs across 2026-06-23 / 2026-06-28 / this session — C1/C2/C4 are the third strike of that pattern; this run finally mechanized it for formula-comma/truncation/long-chain rather than relying on self-check.
+- **Verification summary:** Dev Eval machine-verified (pytest 88 pass + ch09 validator false-positive check). The 5 lessons are: C1/C2/C4 = executable lint (machine-enforced); C3 = rule+self-check (auditable-evidence); C7/C8 = process/subagent guards (auditable-evidence only — no automated gate, honest framing per Verification Ceiling).
+- **Active-context staleness:** editing the repo file does not change this session's loaded skill text; the new lints (C1/C2/C4) take effect immediately when the validator script runs, but the Step 2-Dispatch (C7) and Step 2.8 (C8) subagent guards take effect in a fresh rewrite session.

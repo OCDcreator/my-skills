@@ -126,6 +126,22 @@ Read `references/proofreading-checklist.md` and compare the auto-fixed transcrip
 
 **Key checks**: (1) per-page image comparison; (2) Chinese/English typos (易知 not 易如, 必须有 not 必需有, 根据 not 根); (3) structure integrity; (4) cross-page integrity; (5) `[TO VERIFY]` marker management; (6) paragraph length ≤ 300 chars; (7) **Math-sense consistency** (added 2026-06-29): OCR can produce formula chains that are *transcription-faithful but mathematically impossible* — e.g. `i^{10+10+1}`, `(i²)^{505} = -2^{1010}`, `cos θ + sin θ` (dropped `i`). Do **not** blindly trust the raw transcript for *math correctness* — it is authoritative for *characters*, not for *math*. Scan each chain: does it hold? If impossible AND recoverable from context, fix and note it; if unrecoverable, mark `[TO VERIFY: 公式 OCR 损坏，数理不自洽]`. This is the *active* counterpart to F4's reactive byte-level check.
 
+### Step 2-Dispatch — Declare Which Rewrite Steps Run (MANDATORY, added 2026-06-29)
+
+<!-- evolved 2026-06-29 — recurrence: a dispatched rewrite subagent ran Step 2.5 only and skipped Step 2.7, leaving every question-block structural defect (options not in tables, ##-residue, OCR-split stems) unfixed. The rule "Step 2.7 is MANDATORY" already existed but was ignored at dispatch time. This is a dispatch-time guard, not a louder rule. -->
+
+Steps 2.5 (analysis re-typesetting) and 2.7 (question-block rewrite) are **complementary, not interchangeable** — 2.5 fixes *analysis paragraphs*, 2.7 fixes *question-block structure* (stems→callout, options→table, OCR-split stems merged). Running only one leaves the other half of the document's OCR damage in place.
+
+**Before dispatching any rewrite subagent, explicitly declare which steps it must run**, and verify the document actually needs each:
+
+| document shape | run |
+|---|---|
+| has 例题/练习/Q&A blocks | **2.5 AND 2.7** (both — most common case) |
+| has analysis/解析 but NO question blocks | 2.5 only |
+| has question blocks but analysis is already clean | 2.7 only |
+
+**Anti-pattern (the 2026-06-29 failure)**: a subagent is told "clean the markdown" and runs only Step 2.5 (mechanical paragraph splits), because 2.5 is cheaper — silently skipping 2.7, so all question-block structure stays broken. The fix is NOT a louder rule; it is forcing the dispatcher to **name the steps**. When you dispatch, the prompt MUST state "Run Step 2.5 AND Step 2.7" (or name the specific subset with a one-line reason), and after the subagent returns, the self-check (item: "Step 2.7 ran?") confirms it. If the document has question blocks and 2.7 did not run, that is a defect — re-dispatch for 2.7.
+
 ### Step 2.5 — Analysis Block Re-typesetting (Subagent-Driven)
 
 **MANDATORY for documents with analysis/solution sections (解析/解/证明).** Doc2X dumps each analysis section as one massive unbroken paragraph; re-typeset each block into clean paragraphs and fix OCR typos.
@@ -147,6 +163,22 @@ Read `references/proofreading-checklist.md` and compare the auto-fixed transcrip
 **Full rules, subagent template, single-page re-OCR appeal procedure, and self-checks**: read `references/question-block-rewrite-guide.md`.
 
 **Dispatch runtime**: host-native subagent (default) or the pre-registered OpenCode `question-block-rewriter` agent (if detected). See `references/opencode-agent-invocation.md`.
+
+### Step 2.8 — Math-Sense Cross-Review Subagent (MANDATORY for formula-heavy docs, added 2026-06-29)
+
+<!-- evolved 2026-06-29 — recurrence (root cause C): the rewriter trusted raw OCR for *math correctness*, not just characters. "③ 频率 = 样本容量" survived because the raw transcript itself was OCR-garbled and no one re-derived it. A validator cannot judge math truth; a second model reading the formulas with fresh eyes can. This is the multi-agent cross-examination defense the user requested. -->
+
+Code validators (Step 4) catch *structural* defects (truncated formulas, wrong delimiters) but **cannot judge math truth** — whether `频率 = 样本容量` is a valid identity, whether a sign/exponent makes the equation balance, whether a derived value follows from the given data. The 2026-06-29 `③频率=样本容量` defect (raw OCR dropped "频数/") survived all structural lints because the structure was clean; only re-deriving the math caught it.
+
+**For formula-heavy documents** (statistics, probability, calculus, complex numbers — any chapter with computation), after Steps 2.5/2.7, dispatch a **separate cross-review subagent** whose ONLY job is math-sense verification — it does NOT rewrite structure, it audits each formula chain for mathematical self-consistency:
+
+- **Re-derive, don't eyeball**: for each result/answer, walk the computation from the given data and confirm the printed value is what the formula produces (e.g. `12 × 25% = 3`, `s² = (1/n)Σ(xᵢ−x̄)² = 0.036`). If the printed result ≠ the derived result, that is a defect.
+- **Identity check**: does each stated equality hold? `频率 = 样本容量` fails (频率 = 频数/样本容量); `样本容量 = 频数/频率` holds. Flag identities that are mathematically false even if OCR-faithful.
+- **Sign/exponent/unit sanity**: a variance is non-negative; a probability is in [0,1]; a percentage × count gives a count. Impossible values signal OCR or derivation error.
+- **Cross-reference against `doc2x/page-transcript.raw.md`**: when a formula is mathematically impossible, check whether the raw OCR is itself garbled (the `③` case: raw said `频率 = 样本容量`, which is OCR-wrong). If raw is wrong, re-derive the correct form from context (the `①` rule `面积=组距×频率/组距=频率` implies `样本容量=频数/频率`); if unrecoverable, mark `[TO VERIFY: raw OCR 数理不自洽，未能恢复]`.
+- **Report**: list each audited chain, its derived-vs-printed status, and any fix applied. Flag unrecoverable cases for human review.
+
+This is independent from the Step 2 math-sense check (which the rewriter does inline) — a fresh subagent is not anchored to the rewriter's assumptions and catches what the rewriter rationalized past. The cross-review runs BEFORE Step 3 so structural formatting is applied to already-correct math.
 
 ### Step 3 — Structural Format (Canonical Markdown)
 

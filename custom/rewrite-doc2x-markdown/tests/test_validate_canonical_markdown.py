@@ -1255,3 +1255,96 @@ def test_callout_title_non_label_not_in_scope(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
 
+
+def test_rejects_formula_with_dangling_tail_outside_math(tmp_path: Path) -> None:
+    """A formula that ends with '=' (or another operator) inside `$...$` but
+    has its trailing value left outside as plain prose is truncated.
+    Regression: 2026-06-29 ch09 统计, the s^2=...=$ 0.0296 defect."""
+    result = run_validator(
+        tmp_path,
+        """# 方差
+
+方差 ${s}^{2} = \\dfrac{1}{100}\\left[\\cdots\\right] =$ 0.0296,
+
+所以标准差 $s = \\sqrt{0.0296}$.
+""",
+    )
+    assert result.returncode == 1
+    assert "truncated" in result.stdout or "trailing value" in result.stdout
+
+    # A clean single span with the value inside is fine.
+    ok_result = run_validator(
+        tmp_path,
+        """# 方差
+
+方差 ${s}^{2} = \\dfrac{1}{100}\\left[\\cdots\\right] = {0.0296}$,
+
+所以标准差 $s = \\sqrt{0.0296}$.
+""",
+    )
+    assert ok_result.returncode == 0, ok_result.stdout + ok_result.stderr
+
+
+def test_rejects_list_of_intervals_inside_one_math_span(tmp_path: Path) -> None:
+    """Multiple independent intervals crammed into one `$...$` with separators
+    inside must be split; each unit gets its own `$...$`, comma outside.
+    Regression: 2026-06-29 ch09 统计 L349/L363/L630."""
+    result = run_validator(
+        tmp_path,
+        """# 分组
+
+分为 9 组: $\\lbrack {5.31}, {5.33}), \\lbrack {5.33}, {5.35}), \\cdots , \\lbrack {5.45}, {5.47}), \\left\\lbrack {{5.47}, {5.49}}\\right\\rbrack$.
+""",
+    )
+    assert result.returncode == 1
+    assert "independent math units" in result.stdout
+
+    # A single interval with its internal comma is NOT flagged.
+    ok_result = run_validator(
+        tmp_path,
+        """# 单区间
+
+落在区间 $\\lbrack {5.43}, {5.47})$ 内.
+""",
+    )
+    assert ok_result.returncode == 0, ok_result.stdout + ok_result.stderr
+
+
+def test_rejects_overlong_inline_formula_span(tmp_path: Path) -> None:
+    """A multi-equality chain inline `$...$` span that is also long is flagged
+    as better-fitted to a `$$...$$` aligned block. A single long expression
+    (one `=` or none) is NOT flagged."""
+    # long chain: a = b = c = ... (>= 90 chars, >= 2 equalities)
+    chain = " + ".join([str(i) for i in range(1, 16)])
+    long_body = f"s = \\dfrac{{1}}{{n}}\\left({chain}\\right) = {sum(range(1,16))}"
+    result = run_validator(
+        tmp_path,
+        f"""# 求和
+
+求和 {chain[:5]}: ${long_body}$.
+""",
+    )
+    assert result.returncode == 1
+    assert "display block" in result.stdout or "equalities" in result.stdout
+
+    # A single long expression (one '=') is a legit inline span — NOT flagged.
+    single_long = "\\dfrac{1}{" + "n".join([str(i) for i in range(1, 25)]) + "}"
+    ok_result = run_validator(
+        tmp_path,
+        f"""# 单一长表达式
+
+显然 $x = {single_long}$ 成立.
+""",
+    )
+    assert ok_result.returncode == 0, ok_result.stdout + ok_result.stderr
+
+    # A short inline formula is fine.
+    ok2 = run_validator(
+        tmp_path,
+        """# 短公式
+
+显然 $x = 1$ 成立.
+""",
+    )
+    assert ok2.returncode == 0, ok2.stdout + ok2.stderr
+

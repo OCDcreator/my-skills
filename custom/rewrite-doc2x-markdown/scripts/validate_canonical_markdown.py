@@ -1411,6 +1411,153 @@ def _first_content_line_of_block(block: QuoteBlock) -> str:
     return ""
 
 
+def lint_formula_dangling_tail(lines: list[str]) -> list[LintMessage]:
+    """C1 (2026-06-29): catch a formula that ends mid-expression with its tail
+    left outside math delimiters. The classic OCR/cleaning defect is
+    `$...=$ 0.0296` or `$...+$ x` where the trailing operand/result leaked
+    out as plain prose because the inline span was closed too early.
+
+    Conservative structural heuristic (NOT a LaTeX parser):
+    - scan each inline `$...$` span;
+    - if the span body ENDS with a dangling operator or relation
+      (`=`, `+`, `-`, `\times`, `\div`, `\cdot`, `\approx`, `\le`, `\ge`,
+      `\Rightarrow`, `\sim`, `>`, `<`) followed by nothing meaningful;
+    - AND the text right after the closing `$` looks like a stray value
+      (a number, a `{...}` group, or math-looking token), not punctuation/
+      prose;
+    -> flag it. The fix is to extend the `$` span to include the tail
+    (or move the whole thing to a `$$...$$` block).
+    Acceptable prose after `$` (Chinese punctuation, `，`, `。`, `；`, a
+    space + Chinese/English word, `**`, `<`) does NOT trigger.
+    """
+    messages: list[LintMessage] = []
+    # operators/relations that signal "equation continues" if they are the
+    # last meaningful token inside the span.
+    dangling_ops = [
+        "=", "+", "-", r"\times", r"\div", r"\cdot", r"\approx",
+        r"\le", r"\ge", r"\leq", r"\geq", r"\Rightarrow", r"\rightarrow",
+        r"\sim", ">", "<", r"\ne", r"\neq",
+    ]
+    # what counts as a "stray value tail" right after the closing `$`
+    tail_value = re.compile(r"^\s*(?:-?\d|[0-9.]+|\{|\\|[a-zA-Z]\b)")
+    # what is acceptable prose after `$` (no flag)
+    safe_after = re.compile(r"^\s*(?:[，。；：、）》」』\]\)\.\,]|\*\*|<|$|\s+[^\d{\\])")
+    for index, raw in enumerate(lines, start=1):
+        line_without_mathml = strip_mathml(raw)
+        cursor = 0
+        for match in INLINE_MATH_PATTERN.finditer(line_without_mathml):
+            body = match.group(1).strip()
+            if not body:
+                continue
+            # does the body end with a dangling operator/relation?
+            body_ends_dangling = any(body.rstrip().endswith(op) for op in dangling_ops)
+            if not body_ends_dangling:
+                continue
+            after = line_without_mathml[match.end():]
+            if safe_after.match(after):
+                continue
+            if tail_value.match(after):
+                messages.append(
+                    LintMessage(
+                        index,
+                        "formula appears truncated: it ends with an operator/relation "
+                        "inside `$...$` but its trailing value is left outside as plain "
+                        "text (e.g. `$...=$ 0.0296`). Extend the math span to include the "
+                        "tail, or move the whole equation to a `$$...$$` display block.",
+                    )
+                )
+                break
+    return messages
+
+
+def lint_list_inside_math(lines: list[str]) -> list[LintMessage]:
+    """C2 (2026-06-29): a list of independent math UNITS crammed into one
+    inline `$...$` span, separated by commas that should be OUTSIDE the math.
+    Patterns this session hit:
+      - multiple intervals: `$\\lbrack 5.31, 5.33), \\lbrack 5.33, 5.35), \\cdots$`
+      - percentage/value series: `${60}\\% , {60}\\% , {65}\\%$`
+    Each unit should be its own `$...$` with the separator comma outside:
+      `$\\lbrack 5.31, 5.33)$, $\\lbrack 5.33, 5.35)$, $\\cdots$`
+
+    Conservative heuristic — flag ONLY when one inline span contains a
+    REPEATING structure joined by commas: a unit token appearing 2+ times
+    with `, ` separators between distinct instances. A single interval
+    `$(0,1)$` or a function arg `$f(x,y)$` must NOT be flagged (those commas
+    are internal to one unit). This is the 'list of units' shape, not a
+    naive comma-count.
+    """
+    messages: list[LintMessage] = []
+    # candidate repeating-unit openers: a bracket/brace-delimited value, or a
+    # number+percent, that appears 2+ times separated by ", " inside ONE span.
+    # interval opener: \lbrack / \left\lbrack / [ ; percent tail: }%
+    unit_openers = [
+        re.compile(r"\\lbrack|\\left\\lbrack"),
+        re.compile(r"\\\}\\\\?%|\\}\\\\?%|\}%"),
+    ]
+    for index, raw in enumerate(lines, start=1):
+        line_without_mathml = strip_mathml(raw)
+        for match in INLINE_MATH_PATTERN.finditer(line_without_mathml):
+            body = match.group(1)
+            # need at least 2 commas to be a list of >=3-ish units (avoid 2-unit noise)
+            if body.count(",") < 2:
+                continue
+            flagged = False
+            for opener in unit_openers:
+                hits = opener.findall(body)
+                if len(hits) >= 2:
+                    # confirm the openers are separated by commas (a list), not a
+                    # single nested expression: count ", " between first and last hit
+                    first = body.find(hits[0]) if hits else -1
+                    last = body.rfind(hits[-1]) if hits else -1
+                    segment = body[first:last] if first >= 0 and last > first else ""
+                    if segment.count(",") >= 1:
+                        flagged = True
+                        break
+            if flagged:
+                messages.append(
+                    LintMessage(
+                        index,
+                        "a list of independent math units (intervals / values) is crammed "
+                        "into one `$...$` span with separators inside; split each unit into "
+                        "its own `$...$` with the comma outside, e.g. "
+                        "`$\\lbrack 5.31, 5.33)$, $\\lbrack 5.33, 5.35)$, $\\cdots$`. "
+                        "A single interval `$(0,1)$` or function arg `$f(x,y)$` is fine "
+                        "and is NOT flagged.",
+                    )
+                )
+                break
+    return messages
+
+
+def lint_long_inline_formula(lines: list[str]) -> list[LintMessage]:
+    """C4 (2026-06-29, coarse): a CHAIN inline `$...$` span — long AND with
+    multiple equalities (an `a = b = c` chain) — is hard to read on one line
+    and should be a `$$...$$` display block folded with `\\begin{aligned}`.
+    Targeted, not blanket-long: a single long expression (one `=` or none),
+    like a big `\\frac{1}{N}\\sum...`, is a legitimate inline span and is NOT
+    flagged — only multi-equality chains are. Judge in context regardless.
+    """
+    messages: list[LintMessage] = []
+    min_length = 90
+    min_equals = 2
+    for index, raw in enumerate(lines, start=1):
+        line_without_mathml = strip_mathml(raw)
+        for match in INLINE_MATH_PATTERN.finditer(line_without_mathml):
+            body = match.group(1)
+            if len(body) > min_length and body.count("=") >= min_equals:
+                messages.append(
+                    LintMessage(
+                        index,
+                        f"inline math span is {len(body)} chars with {body.count('=')} "
+                        "equalities; a multi-equality chain reads better as a `$$...$$` "
+                        "display block folded with `\\begin{aligned}`. (coarse signal — "
+                        "judge in context)",
+                    )
+                )
+                break
+    return messages
+
+
 def lint_markdown(
     markdown_text: str,
     max_analysis_lines: int,
@@ -1446,6 +1593,9 @@ def lint_markdown(
     messages.extend(lint_qa_ordering(lines, blocks))
     messages.extend(lint_markdown_analysis_paragraphs(lines))
     messages.extend(lint_question_callout_title_attached(lines, blocks))
+    messages.extend(lint_formula_dangling_tail(lines))
+    messages.extend(lint_list_inside_math(lines))
+    messages.extend(lint_long_inline_formula(lines))
     return sorted(messages, key=lambda message: message.line)
 
 
