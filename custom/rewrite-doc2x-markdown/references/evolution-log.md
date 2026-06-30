@@ -987,3 +987,94 @@ This is the "tool exists but the flow doesn't use it" gap the user flagged.
 - **Recurrence count:** first occurrence of the integration (the measure tool itself was added 2026-06-30; this is the flow-sync that makes it actually used).
 - **Verification summary:** Dev Eval machine-verified (pytest 101 pass). The three doc edits are auditable-evidence-only (the flow is now self-consistent: Step 3 → canonical-rules → three bands → measure tool → self-check confirms).
 - **Active-context staleness:** editing the repo files does NOT change this session's loaded skill text. The integrated flow takes effect in a **fresh rewrite session**.
+
+---
+
+## 2026-07-01 — strengthen: hard-enforce blank-line paragraph separators (whole-doc)
+
+- **Trigger (verbatim user message):** "我关于 rewrite-doc2x-markdown 技能换行让人头疼，就是他只有一个换行，但是你像obsidian如果不是两个换行，他还是同一段的给我混在一段里。"
+- **Classification:** `rework` (output renders wrong in the declared renderer).
+- **Provenance:** `(extracted)` — user message is the only turn for this candidate
+  in-session; no preceding assistant turn to paste (first invocation on this skill
+  this session). Gate reasoning cites real file:line evidence from references.
+- **Two user revisions during the run (both shaped the final scope):**
+  1. "有没有硬约束，这个代码应该很好检测才对" → routed the candidate from a
+     prose-only rule to a prose rule **+ a hard validator lint**. (The user was
+     right: the defect is mechanically detectable.)
+  2. "不只是解析区的问题，包裹 引用块，也包括所有正文内容" → expanded the lint
+     scope from analysis-only to **whole-document** (body prose + callout prose
+     + analysis prose). I had initially scoped it to the `**解析**` region to
+     reuse the safest existing pattern; the user overrode that.
+- **Gate verdict:** `strengthen` (G1 PASS general — applies to every
+  `source-transcript.md`, Obsidian/Typora/CommonMark are the declared renderers
+  per `canonical-markdown-rules.md:187-190`; G2 strengthen — existing rule
+  `canonical-markdown-rules.md:82` only covers the callout→analysis transition,
+  the analysis-split rules never define the paragraph *separator* as a blank
+  line, and `lint_markdown_analysis_paragraphs` only catches the merged blob
+  *indirectly* when it exceeds 300 chars; G3 principle — CommonMark §5.1
+  paragraph behavior, not personal taste).
+- **Pairwise conflict:** fast path (1 candidate).
+- **Dev Eval:** MACHINE-VERIFIED (the honest regression gate, made real by
+  revision #1). After writing the lint + tests:
+  - `py -3 -m pytest tests/test_validate_canonical_markdown.py -q` → **82 passed**
+    (77 pre-existing + 5 new; 1 pre-existing fixture,
+    `test_fix_removes_leading_orphan_punctuation`, updated to use blank lines —
+    its 3 orphan-punctuation lines were joined by single `\n` and the new lint
+    correctly flagged them; the orphan-punctuation fix behavior is unchanged).
+  - `py -3 -m pytest tests/ -q` (other files) → **24 passed**.
+  - Manual `--only lint_paragraph_separator` on bad/good samples: bad body →
+    FAIL line 4; good body → OK; bad callout (bare `>`) → FAIL; good callout
+    (blank `>`) → OK; HTML table + fenced code → OK (exempt).
+  - **Two real false-positive bugs found and fixed DURING the eval** (this is
+    exactly what Dev Eval is for): (a) `> [!question]` callout-type opener was
+    being treated as prose — fixed by exempting `CALLOUT_TYPE_PATTERN` lines;
+    (b) Markdown pipe-table rows INSIDE a callout (`> | :---: |`) were not
+    exempt because the table regex anchored on `^\s*\|` not `> |` — fixed by
+    also exempting callout lines whose content matches the pipe-table regex.
+- **Landing zone:** Tier-2 reference-domain + script. Primary rule in
+  `references/canonical-markdown-rules.md` (analysis "Key principles" bullet,
+  generalized to whole-doc); the enforcer is `scripts/validate_canonical_markdown.py`
+  `lint_paragraph_separator` (registered, so `--only` can select it);
+  `SKILL.md` Step 4 names it in the rewrite-structure lint family so executors
+  know to expect it.
+- **Strongest reason NOT to add:** the existing 300-char analysis lint arguably
+  already catches merged paragraphs *when long*, and callout rule line 82 covers
+  the callout→analysis case. **Counter:** the user hit the failure
+  empirically; short merged paragraphs (≤300 chars combined) slip past the
+  length lint, and body/callout prose was never covered at all. Only a
+  purpose-built separator lint catches the defect regardless of length.
+- **Outcome:** APPROVED (user approved revise#2 packet: whole-doc scope + hard lint).
+- **Files written:**
+  - `scripts/validate_canonical_markdown.py` (new `lint_paragraph_separator` fn
+    + registry entry; whole-doc scope with HTML/code/frontmatter/table/math/
+    list/heading exemptions; callout-type-opener + callout-pipe-table exemptions)
+  - `tests/test_validate_canonical_markdown.py` (5 new tests: body-bad,
+    analysis-bad, callout-bad, callout-good, HTML+code-exempt; + 1 fixture
+    updated to blank-line-separated)
+  - `references/canonical-markdown-rules.md` (1 new bullet in analysis Key
+    principles, whole-doc phrasing, names the enforcer lint)
+  - `SKILL.md` (Step 4 rewrite-structure lint family list — adds
+    `lint_paragraph_separator` with a one-clause description)
+- **Snapshots (2026-07-01):**
+  - `scripts/validate_canonical_markdown.py.bak-2026-07-01`
+  - `tests/test_validate_canonical_markdown.py.bak-2026-07-01`
+  - `references/canonical-markdown-rules.md.bak-2026-07-01-2`
+  - `SKILL.md.bak-2026-07-01-2`
+- **Recurrence count:** 0 (first). Closest precedent 2026-06-15 "subparts one
+  per line" was structural (`(1)`/`(2)` on own lines), not paragraph-separator.
+- **Verification summary:** Dev Eval **machine-verified** (pytest 82+24 pass;
+  manual bad/good samples behave correctly; 2 real FP bugs caught+fixed during
+  eval). The 2 doc-line edits (canonical-rules bullet, SKILL.md Step 4 line)
+  are auditable-evidence-only.
+- **Known limitation (carried forward):** the lint is a *structural* detector —
+  it sees two prose lines joined by `\n`, it cannot tell whether they are
+  *meant* to be one paragraph (legitimate soft-wrapped prose) or two. It
+  assumes the skill's convention that distinct thoughts get blank lines; a
+  deliberately soft-wrapped long line (trailing-two-spaces hard break, or just
+  a wrapped sentence) would need the exemption list extended. Current
+  exemptions cover the known structural contexts (HTML/code/table/math/list/
+  heading/frontmatter); prose hard-breaks (`  \n`) are NOT specially handled —
+  if that pattern appears in real transcripts, add a follow-up exemption.
+- **Active-context staleness:** editing the repo files does NOT change this
+  session's loaded skill text. The new lint takes effect in a **fresh rewrite
+  session** that re-reads `SKILL.md` Step 4 and runs the validator.

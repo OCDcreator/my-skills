@@ -331,6 +331,7 @@ Key principles (summary):
 - Maximum 300 characters per paragraph (formula content excluded)
 - Fix OCR typos (已/己/巳, 人/入, 末/未, etc.) during re-typesetting
 - For math-heavy content: use plain Markdown (`**解析**` with `$...$` / `$$...$$`), NOT `<div class="analysis-block">` HTML blocks
+- **Separate paragraphs with a blank line, never a single line break — everywhere.** Obsidian/Typora/CommonMark merge two lines joined by a single `\n` into the SAME paragraph; only a blank line (`\n\n`) ends a body paragraph, and only a blank `>` line ends a callout paragraph. Applies to body prose, callout prose, and analysis (`**解析**`) alike. Hard-enforced by `lint_paragraph_separator`. <!-- evolved 2026-07-01 -->
 
 ## Tables
 

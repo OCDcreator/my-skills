@@ -481,6 +481,76 @@ def test_rejects_dense_analysis_paragraph(tmp_path: Path) -> None:
     assert "analysis paragraph is too dense" in result.stdout
 
 
+def test_rejects_body_paragraphs_joined_by_single_newline(tmp_path: Path) -> None:
+    # Two body-prose lines joined by a single `\n` (no blank line between) merge
+    # into one paragraph in Obsidian/CommonMark — the whole-doc hard detector
+    # for the "separate paragraphs with a blank line" rule.
+    result = run_validator(
+        tmp_path,
+        "# 章节\n\n"
+        "本节介绍平行关系的基本性质。\n"
+        "由这些性质可以推出若干重要结论。\n",
+    )
+    assert result.returncode == 1
+    assert "missing blank line between paragraphs" in result.stdout
+
+
+def test_rejects_analysis_paragraphs_joined_by_single_newline(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 章节\n\n"
+        "**解析**\n"
+        "由题意可知 $a \\parallel b$，故结论成立。\n"
+        "因此本题选择 A，无需进一步讨论。\n",
+    )
+    assert result.returncode == 1
+    assert "missing blank line between paragraphs" in result.stdout
+
+
+def test_rejects_callout_paragraphs_joined_by_bare_quote_line(tmp_path: Path) -> None:
+    # Inside a callout, two `>` prose lines without a blank `>` line between
+    # them merge into one paragraph.
+    result = run_validator(
+        tmp_path,
+        "# 章节\n\n"
+        "> [!question] 例题1\n"
+        "> 题干第一句，已知条件如下。\n"
+        "> 题干第二句，要求求解。\n",
+    )
+    assert result.returncode == 1
+    assert "missing blank `>` line between callout paragraphs" in result.stdout
+
+
+def test_accepts_callout_paragraphs_separated_by_blank_quote_line(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        "# 章节\n\n"
+        "> [!question] 例题1\n"
+        "> 题干第一句，已知条件如下。\n"
+        ">\n"
+        "> 题干第二句，要求求解。\n",
+    )
+    assert "missing blank `>` line between callout paragraphs" not in result.stdout
+
+
+def test_separator_lint_exempts_html_table_and_code(tmp_path: Path) -> None:
+    # HTML table rows, HTML block lines, and fenced code are intentionally
+    # continuous and must NOT be flagged as merged paragraphs.
+    result = run_validator(
+        tmp_path,
+        "# 章节\n\n"
+        "<table>\n"
+        "  <tr><td>A</td><td>B</td></tr>\n"
+        "  <tr><td>C</td><td>D</td></tr>\n"
+        "</table>\n\n"
+        "```\n"
+        "code line 1\n"
+        "code line 2\n"
+        "```\n",
+    )
+    assert "missing blank line between paragraphs" not in result.stdout
+
+
 def test_rejects_markdown_math_inside_html_content(tmp_path: Path) -> None:
     result = run_validator(
         tmp_path,
@@ -772,7 +842,9 @@ def test_fix_removes_leading_orphan_punctuation(tmp_path: Path) -> None:
     result = run_fix(tmp_path, """# 空间几何
 
 ）例题
+
 ））例题2
+
 。文本开头
 """)
     assert result.returncode == 0

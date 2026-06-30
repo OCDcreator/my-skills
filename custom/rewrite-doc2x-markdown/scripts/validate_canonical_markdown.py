@@ -535,6 +535,170 @@ def lint_markdown_analysis_paragraphs(
     return messages
 
 
+def lint_paragraph_separator(lines: list[str]) -> list[LintMessage]:
+    """Flag two PROSE lines joined by a single `\\n` anywhere in the document.
+
+    Obsidian/Typora/CommonMark treat a single line break as a SOFT break and
+    merge the next line into the SAME paragraph; only a blank line ends a
+    paragraph. This is the whole-document hard-enforcer for the skill rule
+    "separate paragraphs with a blank line, never a single `\\n`" — added
+    2026-07-01 (rework: user reported the "换行让人头疼，一个换行混在一段里"
+    failure where Obsidian merged single-`\\n`-joined lines into one paragraph).
+
+    Scope: ALL prose — body narrative, callout (`> `) prose, AND analysis
+    paragraphs (`**解析**`/`**解**`/...). Inside a callout the required
+    paragraph separator is a blank `>` line (`>\\n> prose`), not a bare `>`.
+
+    False-positive guards (these intentionally use single `\\n` between
+    consecutive lines and are EXEMPT — never flagged):
+      - YAML frontmatter (between the first two `---` fences)
+      - fenced / indented code blocks
+      - HTML blocks (anywhere html_depth_delta keeps depth > 0): <table>,
+        <div>, <span>, <figure>, <math>, etc.
+      - Markdown pipe-table rows (lines starting with `|`)
+      - display-math blocks (`$$...$$`) and math-only lines
+      - list items (`-`, `*`, `+`, `1.`)
+      - heading lines (`#`)
+    """
+    messages: list[LintMessage] = []
+    in_frontmatter = False
+    fence: str | None = None  # current code-fence delimiter char run or None
+    html_depth = 0
+    in_display_math = False
+    # Track the last prose line number (1-based) per channel. A naked blank line
+    # resets the body channel; a blank `>` line resets the callout channel.
+    prev_body_prose: int | None = None
+    prev_callout_prose: int | None = None
+    list_item_re = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)")
+    pipe_table_re = re.compile(r"^\s*\|")
+    display_math_re = re.compile(r"^\$\$")
+    html_inline_re = re.compile(r"^\s*<")
+    fence_open_re = re.compile(r"^(\s*)(`{3,}|~{3,})")
+    for index, raw in enumerate(lines):
+        line_no = index + 1
+        stripped_raw = raw.strip()
+        # --- YAML frontmatter (only at the very top of the file) ---
+        if index == 0 and stripped_raw == "---":
+            in_frontmatter = True
+            continue
+        if in_frontmatter:
+            if stripped_raw == "---":
+                in_frontmatter = False
+            continue  # everything inside frontmatter is exempt
+        # --- fenced code blocks ---
+        fence_match = fence_open_re.match(raw)
+        if fence_match:
+            delim_char = fence_match.group(2)[0]
+            delim = delim_char * len(fence_match.group(2))
+            if fence is None:
+                fence = delim
+            elif raw.lstrip().startswith(delim):
+                fence = None
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        if fence is not None:
+            continue  # inside a fenced code block
+        # --- indented code block (4+ spaces, not a list item) ---
+        if re.match(r"^    \S", raw) and not list_item_re.match(raw):
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        # --- HTML block depth tracking (quote-marker stripped first) ---
+        content_for_html = strip_quote_marker(raw) if is_quote_line(raw) else raw
+        delta = html_depth_delta(content_for_html)
+        if html_depth > 0 or delta > 0:
+            html_depth += delta
+            if html_depth < 0:
+                html_depth = 0
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        # --- display math toggle (single-line $$X$$ is self-contained) ---
+        if display_math_re.match(stripped_raw):
+            if stripped_raw.endswith("$$") and len(stripped_raw) > 4:
+                pass  # single-line $$X$$ — self contained, no region toggle
+            else:
+                in_display_math = not in_display_math
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        if in_display_math:
+            continue
+        # --- headings ---
+        if HEADING_LEVEL_PATTERN.match(stripped_raw):
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        # --- pipe-table rows ---
+        if pipe_table_re.match(raw):
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        # --- list items ---
+        if list_item_re.match(raw):
+            prev_body_prose = None
+            prev_callout_prose = None
+            continue
+        # --- naked blank line ends a body paragraph ---
+        if not stripped_raw:
+            prev_body_prose = None
+            continue
+        is_callout = is_quote_line(raw)
+        if is_callout:
+            # A callout TYPE opener (e.g. `> [!question] 例题1`) is a block
+            # boundary, not paragraph prose — it does not start/continue a
+            # prose run, and does not merge with the line that follows.
+            if CALLOUT_TYPE_PATTERN.match(raw):
+                prev_callout_prose = None
+                continue
+            callout_content = strip_quote_marker(raw)
+            callout_stripped = callout_content.strip()
+            # A `>` line with empty content = blank-callout-line → paragraph
+            # separator INSIDE the callout; resets the callout prose run.
+            if callout_stripped == "":
+                prev_callout_prose = None
+                continue
+            # Exempt callout lines that are HTML (choice-grid, etc.), a Markdown
+            # pipe-table row (`> | ... |`), or math-only.
+            prose_here = strip_math_for_count(callout_stripped).strip()
+            if (
+                html_inline_re.match(callout_stripped)
+                or pipe_table_re.match(callout_content)
+                or not prose_here
+            ):
+                prev_callout_prose = None
+                continue
+            if prev_callout_prose is not None:
+                messages.append(
+                    LintMessage(
+                        line_no,
+                        "missing blank `>` line between callout paragraphs: two `>` prose "
+                        "lines joined by a single `\\n` render as ONE paragraph in "
+                        "Obsidian/CommonMark — separate with a blank `>` line",
+                    )
+                )
+            prev_callout_prose = line_no
+            continue
+        # --- body prose line ---
+        prose_here = strip_math_for_count(stripped_raw).strip()
+        # HTML-inline-only or math-only body line: exempt, resets run.
+        if html_inline_re.match(stripped_raw) or not prose_here:
+            prev_body_prose = None
+            continue
+        if prev_body_prose is not None:
+            messages.append(
+                LintMessage(
+                    line_no,
+                    "missing blank line between paragraphs: two prose lines joined by a "
+                    "single `\\n` render as ONE paragraph in Obsidian/Typora/CommonMark "
+                    "— separate paragraphs with a blank line (`\\n\\n`)",
+                )
+            )
+        prev_body_prose = line_no
+    return messages
+
+
 def lint_question_callout_title_attached(
     lines: list[str],
     blocks: list[QuoteBlock],
@@ -1651,6 +1815,7 @@ def lint_markdown(
         ("lint_fraction_nesting", lambda: lint_fraction_nesting(lines)),
         ("lint_qa_ordering", lambda: lint_qa_ordering(lines, blocks)),
         ("lint_markdown_analysis_paragraphs", lambda: lint_markdown_analysis_paragraphs(lines)),
+        ("lint_paragraph_separator", lambda: lint_paragraph_separator(lines)),
         ("lint_question_callout_title_attached", lambda: lint_question_callout_title_attached(lines, blocks)),
         ("lint_formula_dangling_tail", lambda: lint_formula_dangling_tail(lines)),
         ("lint_list_inside_math", lambda: lint_list_inside_math(lines)),
