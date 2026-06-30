@@ -1348,3 +1348,37 @@ def test_rejects_overlong_inline_formula_span(tmp_path: Path) -> None:
     )
     assert ok2.returncode == 0, ok2.stdout + ok2.stderr
 
+
+def test_accepts_verbose_but_short_render_formula(tmp_path: Path) -> None:
+    """A formula whose SOURCE is long (verbose LaTeX macros: \\overrightarrow,
+    \\dfrac, etc.) but whose RENDERED width is short must NOT be flagged.
+
+    This is the case the pre-2026-06-30 `len(body) > 90` source-char judge
+    false-flagged: verbose macros inflate source length without inflating render
+    width (\\overrightarrow{CM} = 18 source chars, 1 render glyph). The
+    render-width judge (estimate_render_width) must recognize the collapse.
+
+    Note: a formula that is BOTH verbose-source AND genuinely wide-render
+    (e.g. a real long derivation chain like sin β at ~53 render width with 4
+    equalities) WILL still be flagged — correctly, since it IS a long chain.
+    Whether to fold such a chain to aligned is a JUDGE-IN-CONTEXT call
+    documented in SKILL.md, not a forced lint FAIL. This test pins the
+    verbose-source / SHORT-render case (the false-positive the judge fixes).
+    """
+    # 131 source chars (old >90 judge would FLAG), 15 render width, 2 equalities
+    body = (
+        r"\overrightarrow{AB} = \overrightarrow{CD} + \overrightarrow{EF} "
+        r"= \dfrac{1}{2}\overrightarrow{GH} + \dfrac{1}{2}\overrightarrow{IJ}"
+    )
+    result = run_validator(
+        tmp_path,
+        f"""# 向量分解
+
+所以 ${body}$.
+""",
+    )
+    assert result.returncode == 0, (
+        f"verbose-but-short-render formula must NOT be flagged. "
+        f"stdout: {result.stdout}"
+    )
+

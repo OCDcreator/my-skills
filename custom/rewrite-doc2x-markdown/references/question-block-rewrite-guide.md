@@ -1,11 +1,17 @@
-# Question Block Rewrite Guide
+# Question Block Rewrite Guide (LEGACY FALLBACK)
 
-Detailed rules and subagent instructions for **Step 2.7 — Question Block Rewrite** of the main workflow. Loaded when the document contains examples/exercises/Q&A blocks (例题/练习/题).
+<!-- evolved 2026-06-30 — this guide is now the FALLBACK path. The default Step 2.7 path is the fine-grained refinement chain in `refinement-agent-chain.md` (8 single-responsibility roles). This guide covers the legacy monolithic `question-block-rewriter` agent, retained for when OpenCode subagents are requested but the fine-grained agents are unavailable, or for a tiny-document fast path where the user wants one agent doing the whole job. -->
+
+> **DEFAULT PATH**: `references/refinement-agent-chain.md` (8 roles: source-merger / subparts / options-table / analysis-retypesetter / comma-splitter / typo / displacement / key-point). Use that instead for any normal run.
+>
+> **THIS GUIDE**: detailed rules for the **legacy single-agent `question-block-rewriter`** (one agent doing title + options + subparts + analysis together). Use it only as a fallback.
+
+Detailed rules and subagent instructions for the **legacy `question-block-rewriter`** fallback agent. The legacy agent bundles the whole question-block structure job that the chain now splits into 8 roles; this guide is its full spec.
 
 This guide and `analysis-retypesetting.md` have **separate responsibilities**:
 
-- `analysis-retypesetting.md` → mechanical paragraph splitting inside a single analysis block (排版 only)
-- this guide → the **whole question-block structure** (题干 → callout, 选项 → table, 子问 → own lines, 解析 → paragraphs), rewritten against the raw transcript
+- `analysis-retypesetting.md` → mechanical paragraph splitting inside a single analysis block (排版 only) — this is chain role ⑤'s domain
+- this guide → the **whole question-block structure** (题干 → callout, 选项 → table, 子问 → own lines, 解析 → paragraphs), rewritten against the raw transcript — the legacy bundled job (in the chain, this is split across roles ①②④⑤)
 
 ## Why Rewrite Instead of Audit
 

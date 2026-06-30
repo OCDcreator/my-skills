@@ -11,17 +11,18 @@ This SKILL.md is the **orchestrator**. Detailed rules live in `references/` (Lay
 
 ## References (read on demand, per step)
 
+- `references/refinement-agent-chain.md` — **the refinement chain (Steps 1.5 + 2.7)**: 9 single-responsibility roles (skeleton → source-merger → subparts → options-table → analysis-retypesetter → comma-splitter → typo → displacement → key-point), each with a path-independent `--only` self-check. **Read this before Step 1.5 and Step 2.7.** This is the single source for both the main-agent path (default) and the subagent path (opt-in).
 - `references/auto-fix-rules.md` — Step 1 mechanical text transformations
 - `references/auto-fix-gate.md` — Step 1-GATE 7 mandatory verification checks (commands)
 - `references/proofreading-checklist.md` — Step 2 quality verification against source page images
-- `references/analysis-retypesetting.md` — Step 2.5 analysis re-typesetting rules + subagent template
-- `references/question-block-rewrite-guide.md` — Step 2.7 question-block rewrite rules + subagent template
+- `references/analysis-retypesetting.md` — Step 2.5 analysis re-typesetting rules + subagent template (analysis is the SOLE domain of the `analysis-retypesetter` role in the chain)
+- `references/question-block-rewrite-guide.md` — **fallback** rules for the legacy single-agent `question-block-rewriter` (the fine-grained chain in `refinement-agent-chain.md` is now the default; this guide is the fallback path)
 - `references/canonical-markdown-rules.md` — Step 3 structural formatting spec for the final Markdown
 - `references/emphasis-and-color-rules.md` — bold/italic and semantic-color marking (used in Steps 2.7 & 3)
 - `references/forbidden-patterns.md` — F1–F5 failure patterns (LESSONS LEARNED), always in force
 - `references/self-check.md` — Step 6 self-check checklist (evidence + judgment items)
 - `references/parallel-chunking.md` — Parallel Chunking Workflow for large documents (> 6 pages / > 300 lines)
-- `references/opencode-agent-invocation.md` — **optional** high-performance dispatch path: three pre-registered OpenCode agents (`md-cleaner` / `question-block-rewriter` / `analysis-retypesetter`) that run Steps 1 / 2.7 / 2.5 with model + permissions + distilled prompt pre-configured. Use when the host detects `opencode` + the project's `.opencode/agents/`; fall back to host-native subagent otherwise.
+- `references/opencode-agent-invocation.md` — **optional** dispatch path: OpenCode agents (`md-cleaner`, the 8 refinement-chain roles, plus the legacy `question-block-rewriter`/`analysis-retypesetter`) with model + permissions + distilled prompt pre-configured. Use when the host detects `opencode` + the project's `.opencode/agents/`; fall back to host-native subagent otherwise.
 
 Also read the local Obsidian Markdown syntax skill for syntax compatibility reference:
 `C:\Users\lt\Desktop\Write\custom-project\my-skills\external\kepano-obsidian-skills\obsidian-markdown\SKILL.md`.
@@ -42,6 +43,8 @@ Also read the local Obsidian Markdown syntax skill for syntax compatibility refe
 - **NEVER upload a full PDF to Doc2X when specific pages are requested**. When the user provides a PDF with a page range (e.g., "pages 6-36"), you MUST use `scripts/extract_and_submit.py --pdf <path> --pages <range> --output-dir <job>` to extract a sub-PDF first, then submit ONLY the sub-PDF to Doc2X. Uploading the full source PDF is a CRITICAL FAILURE that wastes the user's paid OCR quota. The script enforces this with a ratio guard (requests >60% of pages require explicit `--confirm-large`).
 - **PDF outline is the heading-level ground truth**. When `doc2x/outline.md` exists and contains real bookmark entries (i.e. `extract-manifest.json` has `"has_outline": true`), the Markdown's heading depth (`#`/`##`/`###`/…) MUST follow the outline's indentation depth. Headings must not be assigned by feel or by OCR-implied structure alone. When the outline is empty (no PDF bookmarks), fall back to the original semantic judgment. See "标题层级参照" in `references/canonical-markdown-rules.md`.
 - **Back up before rewriting.** Before any rewrite/clean pass that edits `source-transcript.md` in place, create a timestamped backup beside it (`source-transcript.md.bak-YYYY-MM-DD`, suffix `-2`/`-3` if a same-day backup exists). The rewrite touches the only canonical transcript; a bad auto-fix or an over-eager `--fix` is irreversible without the backup. <!-- evolved 2026-06-30 — rework: user explicitly required backup; rescued 3 frontmatter corruptions in the 概率 job -->
+- **Default executor is the main agent; subagents are opt-in.** Every refinement role (Steps 1.5 + 2.7) is executed by the main agent itself by default — reading each role's logic from `references/refinement-agent-chain.md` and running that role's `--only` self-check inline. Dispatch to `.opencode/agents/*.md` happens **only when the user explicitly asks to use subagents** (e.g. "用子代理 / dispatch agents / parallelize"). The choice is the user's, never the skill's — do not auto-dispatch based on document size. <!-- evolved 2026-06-30 — rework: user feedback that the main agent can do these jobs itself; subagents made the task simpler per-role but are not the default path -->
+- **Path-independent self-check after every role.** Whichever executor runs a refinement role (main agent OR subagent), it MUST run that role's `--only` lint (`py -3 scripts/validate_canonical_markdown.py --md <file> --only <role's lints>`) right after editing, fix any FAIL in place, and retry up to 3 times. Still-failing after 3 retries → mark `[TO VERIFY: <role> self-check 未通过]` and move on (do NOT loop forever). This minimizes rework: a defect is caught inside the role before the next role ever sees it. **BUT: a passing `--only` lint is necessary, not sufficient — the lints are coarse nets with known blind spots.** For the semantic roles this matters most: ③'s `lint_list_inside_math` is SILENT on point/equation/variable fusion (`$A(...),B(...)$`, `$f=1,g=2$`, `$A,B,C$`); ⑤'s `lint_markdown_analysis_paragraphs` only checks paragraph *length*, not whether you actually re-typeset; ⑥'s `--check-proofreading` returns 100+ FAILs where most are known false positives that can hide a real defect. A role-③/⑤ pass that does **nothing** can still return a clean lint. Therefore the executor MUST hand-verify the role's actual deliverable (see each role's "Anti-shortcut clause" in `.opencode/agents/*.md` and `references/refinement-agent-chain.md`) — do NOT treat a green lint as proof the role is complete (F4). <!-- evolved 2026-06-30 — rework #2: a prior run passed every `--only` lint and self-declared all 8 roles done, yet ③ had left ~90 fused formulas un-split and ⑤ had done zero retypesetting. The lints cannot see these; only the executor can. -->
 
 ## Forbidden Patterns (always in force)
 
@@ -108,6 +111,10 @@ py -3 scripts/extract_pdf_pages.py ^
 
 ### Step 1 — Auto-Fix (Mechanical Cleanup)
 
+<!-- evolved 2026-06-30 — rework: orchestrator ran md-cleaner on an already-generated
+     source-transcript.md, wasting a pass; md-cleaner is for raw OCR input only. -->
+**Input boundary — md-cleaner / Step 1 runs on RAW OCR markdown only.** If `source-transcript.md` already exists, do NOT re-run Step 1 / md-cleaner on it — "cleaning" a generated canonical transcript means re-running the **Step 2.7 refinement chain** (①②③④⑤⑥⑦⑧), not md-cleaner. md-cleaner removes Doc2X noise and standardizes delimiters; once the transcript is canonical, those artifacts are already gone and the work is refinement (question structure, analysis retypesetting, formula commas), which is the chain's job.
+
 Read `references/auto-fix-rules.md` and apply its rules in exact execution order (remove residual symbols → remove noise → normalize delimiters → split formulas → fix spacing → standardize fractions → normalize blanks → fix OCR characters). These are mechanical text transformations — execute without hesitation.
 
 **Critical notes**:
@@ -119,6 +126,14 @@ Read `references/auto-fix-rules.md` and apply its rules in exact execution order
 
 Before proceeding to Step 2, run the **7 mandatory verification checks** in `references/auto-fix-gate.md`. If ANY check fails, fix before continuing. This gate runs again after Step 2.7 assembly — formula integrity (`$` count, `\begin{array}` count, callout count) must survive every rewrite pass.
 
+### Step 1.5 — Build Source Skeleton (the first refinement-chain role)
+
+Read `references/refinement-agent-chain.md` (role ★) before acting. This step establishes the `source-transcript.md` **skeleton** — the correct `#`/`##`/`###` heading hierarchy (from `doc2x/outline.md` when `has_outline: true`, else by semantic judgment) and question-block boundaries — so every later refinement role operates on a structurally stable base. This is the layer that was missing before (the old pipeline edited raw directly and let heading-level alignment drift).
+
+**Executor**: by default the main agent does this itself, reading role ★'s logic from `refinement-agent-chain.md`; dispatch `source-skeleton-builder` only if the user explicitly asked for subagents.
+
+**Self-check** after the skeleton is written: `py -3 scripts/validate_canonical_markdown.py --md <file> --only "lint_headings_and_print_noise,lint_numeric_outline_labels"`. Fix FAILs in place, retry ≤3, then proceed to Step 2.
+
 ### Step 2 — Proofread (Quality Verification)
 
 Read `references/proofreading-checklist.md` and compare the auto-fixed transcript against source page images page by page. Use the Step 0-A images (`pdf-pages/page-*.png`) if extracted, else whatever the user provided.
@@ -127,43 +142,56 @@ Read `references/proofreading-checklist.md` and compare the auto-fixed transcrip
 
 **Key checks**: (1) per-page image comparison; (2) Chinese/English typos (易知 not 易如, 必须有 not 必需有, 根据 not 根); (3) structure integrity; (4) cross-page integrity; (5) `[TO VERIFY]` marker management; (6) paragraph length ≤ 300 chars; (7) **Math-sense consistency** (added 2026-06-29): OCR can produce formula chains that are *transcription-faithful but mathematically impossible* — e.g. `i^{10+10+1}`, `(i²)^{505} = -2^{1010}`, `cos θ + sin θ` (dropped `i`). Do **not** blindly trust the raw transcript for *math correctness* — it is authoritative for *characters*, not for *math*. Scan each chain: does it hold? If impossible AND recoverable from context, fix and note it; if unrecoverable, mark `[TO VERIFY: 公式 OCR 损坏，数理不自洽]`. This is the *active* counterpart to F4's reactive byte-level check.
 
-### Step 2-Dispatch — Declare Which Rewrite Steps Run (MANDATORY, added 2026-06-29)
+### Step 2-Dispatch — Declare Executor + Which Roles Run (MANDATORY)
 
-<!-- evolved 2026-06-29 — recurrence: a dispatched rewrite subagent ran Step 2.5 only and skipped Step 2.7, leaving every question-block structural defect (options not in tables, ##-residue, OCR-split stems) unfixed. The rule "Step 2.7 is MANDATORY" already existed but was ignored at dispatch time. This is a dispatch-time guard, not a louder rule. -->
+<!-- evolved 2026-06-30 — strengthened: the chain now splits Step 2.7 into 8 single-responsibility roles; the dispatch decision now also covers (a) who executes (main agent default vs subagent opt-in) and (b) which roles each dispatched subagent runs. The 2026-06-29 anti-pattern (subagent ran only 2.5, skipped 2.7) is now prevented by naming the roles explicitly. -->
 
-Steps 2.5 (analysis re-typesetting) and 2.7 (question-block rewrite) are **complementary, not interchangeable** — 2.5 fixes *analysis paragraphs*, 2.7 fixes *question-block structure* (stems→callout, options→table, OCR-split stems merged). Running only one leaves the other half of the document's OCR damage in place.
+The refinement chain (`references/refinement-agent-chain.md`) runs as a fixed sequence of single-responsibility roles. Two decisions apply to every run:
 
-**Before dispatching any rewrite subagent, explicitly declare which steps it must run**, and verify the document actually needs each:
+**Decision 1 — who executes (default: main agent; opt-in: subagent).** By default the main agent runs every role itself, reading each role's logic from `refinement-agent-chain.md` and running that role's `--only` self-check inline. Dispatch to `.opencode/agents/*.md` happens **only when the user explicitly asks** (e.g. "用子代理 / dispatch agents / parallelize"). Do NOT auto-dispatch by document size — the choice is the user's.
 
-| document shape | run |
+**Decision 2 — which roles each executor runs.** The chain's 8 refinement roles (①source-merger → ④subparts → ②options-table → ⑤analysis-retypesetter → ③comma-splitter → ⑥typo → ⑦displacement → ⑧key-point) cover question-block structure + analysis. Verify the document needs each before running it:
+
+| document shape | roles to run |
 |---|---|
-| has 例题/练习/Q&A blocks | **2.5 AND 2.7** (both — most common case) |
-| has analysis/解析 but NO question blocks | 2.5 only |
-| has question blocks but analysis is already clean | 2.7 only |
+| has 例题/练习/Q&A blocks (most common) | **all 8** (①②④⑥⑦⑧ for question blocks + ⑤ for analysis + ③ for formulas) |
+| has analysis/解析 but NO question blocks | ⑤ (analysis) + ③ (formulas) only |
+| has question blocks but analysis already clean | ①②④⑥⑦⑧ + ③ (skip ⑤) |
 
-**Anti-pattern (the 2026-06-29 failure)**: a subagent is told "clean the markdown" and runs only Step 2.5 (mechanical paragraph splits), because 2.5 is cheaper — silently skipping 2.7, so all question-block structure stays broken. The fix is NOT a louder rule; it is forcing the dispatcher to **name the steps**. When you dispatch, the prompt MUST state "Run Step 2.5 AND Step 2.7" (or name the specific subset with a one-line reason), and after the subagent returns, the self-check (item: "Step 2.7 ran?") confirms it. If the document has question blocks and 2.7 did not run, that is a defect — re-dispatch for 2.7.
+**Anti-pattern (the 2026-06-29 failure, restated for the chain)**: an executor told vaguely "clean the markdown" runs only the cheap roles (e.g. ⑤ analysis splitting) and silently skips the question-block roles (①②④), leaving structure broken. The fix is forcing the executor to **name the roles**. When dispatching, the prompt MUST state the exact role list (e.g. "Run roles ①②④⑥⑦⑧ + ③"), and the post-return self-check (item: "all named roles ran?") confirms it. If the document has question blocks and the question-block roles did not run, that is a defect — re-run them.
 
-### Step 2.5 — Analysis Block Re-typesetting (Subagent-Driven)
+### Step 2.5 — Analysis Block Re-typesetting (refinement-chain role ⑤)
 
-**MANDATORY for documents with analysis/solution sections (解析/解/证明).** Doc2X dumps each analysis section as one massive unbroken paragraph; re-typeset each block into clean paragraphs and fix OCR typos.
+**MANDATORY for documents with analysis/solution sections (解析/解/证明).** This is refinement-chain role ⑤ (`references/refinement-agent-chain.md`), and ⑤ is the **SOLE owner of analysis paragraphs** — no other role splits or reflows analysis (the old redundancy with `question-block-rewriter` is removed). Doc2X dumps each analysis section as one massive unbroken paragraph; ⑤ re-typesets each block into clean ≤300-char paragraphs and fixes OCR typos inside the analysis.
 
-**Scope**: mechanical paragraph *splitting* inside a single analysis block only (排版). The whole question-block structure is handled separately by Step 2.7 — do not let the two overlap.
+**Scope**: mechanical paragraph *splitting* inside a single analysis block only (排版). Question-block structure is handled by roles ①②④ — do not let them overlap.
 
-**Full rules, subagent template, and verification commands**: read `references/analysis-retypesetting.md`. Quick reference: ≤ 3 examples → do it inline; > 3 examples → dispatch subagents (3-5 per subagent); after completion verify `$` count, `\begin{array}` count, and callout count are unchanged.
+**Full rules and verification commands**: read `references/analysis-retypesetting.md`. **Executor**: by default the main agent runs ⑤ itself; dispatch the `analysis-retypesetter` agent only if the user explicitly asked for subagents. **Self-check**: `--only "lint_markdown_analysis_paragraphs,lint_analysis"` (path-independent contract).
 
-**Dispatch runtime**: host-native subagent (default) or the pre-registered OpenCode `analysis-retypesetter` agent (if detected). See `references/opencode-agent-invocation.md`.
+### Step 2.7 — Refinement Chain (MANDATORY for question-heavy documents)
 
-### Step 2.7 — Question Block Rewrite (MANDATORY for question-heavy documents)
+<!-- evolved 2026-06-30 — rework: the old single-agent question-block-rewriter bundled 4 jobs and weaker models skipped/collided them. Split into 8 single-responsibility roles (chain), each with its own --only self-check. Main agent is the default executor; subagents are opt-in (user must ask). -->
 
-**MANDATORY for documents containing 例题/练习/Q&A blocks.** Runs after Step 2.5, before Step 3. OCR produces structurally messy question blocks (stems as plain paragraphs, options scattered, sub-parts crammed, analysis as one lump). **Rewriting is reliable** where auditing is not: the subagent rewrites each block cleanly against `doc2x/page-transcript.raw.md`, fixing every structural defect.
+**MANDATORY for documents containing 例题/练习/Q&A blocks.** Runs after Step 1.5 (skeleton), before Step 3. OCR produces structurally messy question blocks; the refinement chain fixes them one role at a time, each role with a single responsibility and a path-independent `--only` self-check that catches its own defects before the next role starts. This split replaced the old monolithic `question-block-rewriter` (which bundled title/options/subparts/analysis into one agent and was unreliable on weaker models).
 
-**Method** (rewrite, not audit): main agent locates every question block; each subagent reads the block's current state + the raw passage, rewrites per `references/question-block-rewrite-guide.md` (stem → `> [!question]` callout, options → table, sub-questions → own lines, analysis → ≤300-char paragraphs), fixes OCR typos, marks key points per `references/emphasis-and-color-rules.md` (≤2 per block), and may use the single-page re-OCR escape hatch on genuine content doubt. Main agent reassembles, then re-runs Step 1-GATE + Step 4 validator to confirm formula integrity survived.
+**Read `references/refinement-agent-chain.md` before acting** — it is the single source for the 8 roles' logic, the role→lint map, the IRON LAW, and the path-independent self-check contract. The chain order:
 
-**Do NOT rewrite**: pure knowledge-point narrative, section intros, summary tables without questions.
+```
+① question-source-merger     (title line = label + source only)
+④ question-subparts-splitter ((1)(2)(3) onto own lines)
+② question-options-to-table  (A/B/C/D → table)
+⑤ analysis-retypesetter      (analysis paragraphs — SOLE owner; Step 2.5)
+③ math-comma-splitter        (split commas out of $...$)
+⑥ ocr-typo-fixer             (己/已/巳, 人/入, 末/未, i↔1)
+⑦ sentence-displacement-fixer(return stem-tail/analysis-opener to place)
+⑧ key-point-marker           (≤2 marks/block, palette, pure-text spans)
+```
 
-**Full rules, subagent template, single-page re-OCR appeal procedure, and self-checks**: read `references/question-block-rewrite-guide.md`.
+**Executor**: by default the main agent runs each role itself, reading the role's logic from `refinement-agent-chain.md` and running that role's `--only` lint right after (fix FAILs in place, retry ≤3, mark `[TO VERIFY]` if still failing). Dispatch to `.opencode/agents/*.md` (①②③④⑥⑦⑧ each have a matching agent file; ⑤ uses `analysis-retypesetter`) **only when the user explicitly asks for subagents**.
 
-**Dispatch runtime**: host-native subagent (default) or the pre-registered OpenCode `question-block-rewriter` agent (if detected). See `references/opencode-agent-invocation.md`.
+**Do NOT refine**: pure knowledge-point narrative, section intros, summary tables without questions (OCR handles those well enough).
+
+**Fallback**: the legacy `question-block-rewriter` agent (single-agent, all jobs bundled) is retained in `references/question-block-rewrite-guide.md` for when OpenCode subagents are requested but the fine-grained chain is unavailable, or for a tiny document where the user wants the fast single-agent path. It is NOT the default.
 
 ### Step 2.8 — Math-Sense Cross-Review Subagent (MANDATORY for formula-heavy docs, added 2026-06-29)
 
@@ -187,7 +215,21 @@ Read `references/canonical-markdown-rules.md` and apply it to the proofread tran
 
 **Parser choice**: for formula-heavy math content, use **plain Markdown** for analysis (`**解析**`/`**解**` with paragraph breaks), NOT `<div class="analysis-block">` HTML (which requires MathML for all formulas — impractical). Use the HTML form only for zero-formula pure-text analysis.
 
-**Long formulas**: display formulas > one line use `\begin{aligned}` with `\\` breaks, split at `=`/`+`/`-`/logical boundaries.
+<!-- evolved 2026-06-30 — rework: user reported HTML <table> cells with $...$ render as
+     raw text; Markdown processors pass HTML blocks through without scanning $ for KaTeX. -->
+**HTML blocks (`<table>`, `<div>`) do NOT render `$...$`** — the Markdown processor passes HTML through verbatim, never scanning `$` for KaTeX. This generalizes the `<div class="analysis-block">` rule above to ALL HTML blocks (tables especially). If an HTML block contains formulas, either (a) **convert it to a Markdown table** (`| ... |`) so `$...$` renders (preferred — consistent with the rest of the document), or (b) hand-write the formulas as **MathML** (`<math>...</math>` — KaTeX's `ignoredTags` includes `math`, so the browser renders it natively; but `mathvariant` browser support is uneven, so prefer option (a) unless the table's styling is load-bearing). Doc2X often emits definition/property tables as HTML `<table>` with plain-text math inside `<td>` — these are the prime candidates for conversion.
+
+**Long formulas**: display formulas > one line use `\begin{aligned}` with `\\` breaks, split at `=`/`+`/`-`/logical boundaries. **Whether an inline `$...$` chain is "too long" is judged by RENDERED WIDTH, not source characters** — see `references/canonical-markdown-rules.md` (Formulas → "long multi-equality chain") for the three-band classifier (short ≤464px keep inline / long >625px convert to aligned / medium 464–625px judge in context; A4 text ≈695px).
+
+<!-- evolved 2026-07-01 — the three-band rule + measure tool now live in canonical-markdown-rules.md
+     (single source); SKILL.md keeps only the pointer + the one command. -->
+When `lint_long_inline_formula` (Step 4, coarse signal — estimates width by macro folding, over-flags verbose-but-short formulas like the sin β chain: 275 source chars, ~360px render) flags a formula, **measure the true width** before converting:
+
+```
+py -3 scripts/measure_inline_formula_width.py --md <file> --band medium,long --dedup
+```
+
+This is a standalone tool (plain KaTeX print + headless Chromium, ~1s) — NOT wired into the per-role `--only` self-check; call it once when the coarse lint flags something. Do NOT blindly convert every lint FLAG to aligned.
 
 **Emphasis & color**: apply `references/emphasis-and-color-rules.md`. Downgrade mis-marked headings to bold/italic/color (don't delete); mark key points (conclusions/pitfalls/techniques) sparingly per the fixed four-color palette, color spans wrapping pure text only.
 
@@ -214,6 +256,10 @@ py -3 scripts/fix_callout_prefixes.py --md "C:\path\source-transcript.md" --fix
 **`--fix` vs frontmatter — do not learn this the hard way** (evolved 2026-06-30, recurred 3× in one 概率 job): `validate_canonical_markdown.py --fix` applies Rule 5 (`---` → `__________`) indiscriminately — **including the frontmatter `---` fences**, not just section separators. Corrupted frontmatter is silent: `parse_frontmatter()` returns `{}`, so `pagination-level`/`cover` intent vanishes and downstream pagination breaks with no error message. Therefore:
 - If `source-transcript.md` has frontmatter, **do not run `--fix` on it blindly.** Either (a) strip the frontmatter block, run `--fix`, then restore the frontmatter; or (b) run `--fix`, then immediately re-assert both fences are still `---` (not `__________`) and re-parse with `parse_frontmatter()` to confirm the metadata dict is non-empty.
 - After any `--fix` run on a frontmatter-bearing file, the first 5 lines MUST still parse as frontmatter. Re-fix the fences before declaring the file clean. This is a verification step, not optional.
+
+<!-- evolved 2026-06-30 — rework: Rule 5 also corrupts Markdown TABLE separator rows
+     (| :---: | → | :__________: |), not just frontmatter; lint_tables is silent on this. -->
+**Rule 5 also corrupts Markdown table separator rows** (`| :---: |` → `| :__________: |`), not just frontmatter fences. After any `--fix` run, also grep for underscore-corrupted separators (`rg '^>?\s*\|.*_{5,}'`) and restore them to `---`. `lint_tables` does NOT catch underscore separators (it checks column count / option integrity, not the separator characters) — you MUST verify by eye. Two such corruptions were found in one 立体几何 job (one inside a callout `> | :__________: |`).
 
 ### Step 5 — Quality Validation
 

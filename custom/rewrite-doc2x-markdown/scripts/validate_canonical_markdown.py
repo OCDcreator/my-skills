@@ -179,6 +179,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fix", action="store_true", help="Auto-fix mechanical issues in the markdown file")
     parser.add_argument("--dry-run", action="store_true", help="Preview --fix changes without writing")
     parser.add_argument("--check-proofreading", action="store_true", help="Run proofreading quality checks")
+    parser.add_argument(
+        "--only",
+        help=(
+            "Comma-separated lint function names to run (e.g. 'lint_fraction_nesting,lint_tables'). "
+            "When set, only those lints execute; everything else is skipped. "
+            "Used by the refinement-agent-chain self-check so each role sees only its own lints. "
+            "Unknown names are reported and abort the run."
+        ),
+    )
     return parser
 
 
@@ -1529,26 +1538,69 @@ def lint_list_inside_math(lines: list[str]) -> list[LintMessage]:
     return messages
 
 
+def estimate_render_width(body: str) -> int:
+    """Coarse estimate of how wide a LaTeX math body renders, in glyph units.
+
+    The raw `len(body)` source-char count badly over-estimates render width
+    because LaTeX macros are verbose but render compactly: `\\overrightarrow{CM}`
+    is 18 source chars but renders as one arrow-vector glyph (~1 unit wide);
+    `\\dfrac{a}{b}` is ~13 source chars but renders as a fraction ~max(a,b)
+    wide. This collapses macros to their rendered width so the long-formula
+    lint stops false-flagging short-render formulas with verbose LaTeX. Evolved
+    2026-06-30 — was the old `len(body) > 90` judge that flagged a 275-source-char
+    / 41-render-width vector formula (sin β chain) as "long".
+    """
+    w = body
+    # Arrow vectors render as one glyph: \overrightarrow{X} -> V
+    w = re.sub(r"\\overrightarrow\{[^{}]*\}", "V", w)
+    w = re.sub(r"\\overrightarrow", "V", w)
+    # Fractions -> inline a/b for width purposes (iter for nesting)
+    for _ in range(4):
+        w = re.sub(r"\\[dt]frac\{([^{}]*)\}\{([^{}]*)\}", r"\1/\2", w)
+    for _ in range(4):
+        w = re.sub(r"\\sqrt\{([^{}]*)\}", r"√(\1)", w)
+    w = re.sub(r"\\lvert", "|", w)
+    w = re.sub(r"\\rvert", "|", w)
+    # Command names render as their semantic glyph (~1 unit), strip the name
+    w = re.sub(r"\\(sin|cos|tan|cot|sec|csc|ln|log|lim|cdot|times|div|pm|mp|le|ge|neq|equiv|approx|propto|sim|perp|parallel|bot|cap|cup|in|notin|subset|supset|forall|exists|angle|langle|rangle|quad|qquad)\b", "", w)
+    w = re.sub(r"\\math(?:bf|bb|rm|it|cal)\{([^{}]*)\}", r"\1", w)
+    w = re.sub(r"\\(lambda|mu|nu|alpha|beta|gamma|delta|epsilon|varepsilon|theta|varphi|phi|psi|omega|pi|tau|eta|zeta|iota|kappa|chi|rho|sigma|upsilon|xi|Lambda|Gamma|Delta|Theta|Pi|Omega)\b", "G", w)
+    # Structural chars that don't add render width
+    w = re.sub(r"[{}\\]", "", w)
+    # super/subscript markers: x_1 / x^2 — keep the operand, drop the marker
+    w = re.sub(r"[_^]([a-zA-Z0-9])", r"\1", w)
+    w = re.sub(r"[_^]", "", w)
+    w = re.sub(r"\s+", "", w)
+    return len(w)
+
+
 def lint_long_inline_formula(lines: list[str]) -> list[LintMessage]:
-    """C4 (2026-06-29, coarse): a CHAIN inline `$...$` span — long AND with
-    multiple equalities (an `a = b = c` chain) — is hard to read on one line
-    and should be a `$$...$$` display block folded with `\\begin{aligned}`.
-    Targeted, not blanket-long: a single long expression (one `=` or none),
-    like a big `\\frac{1}{N}\\sum...`, is a legitimate inline span and is NOT
-    flagged — only multi-equality chains are. Judge in context regardless.
+    """C4 (2026-06-29, coarse; reworked 2026-06-30): a CHAIN inline `$...$` span
+    — long AND with multiple equalities (an `a = b = c` chain) — is hard to read
+    on one line and should be a `$$...$$` display block folded with
+    `\\begin{aligned}`. Targeted, not blanket-long: a single long expression
+    (one `=` or none) is a legitimate inline span and is NOT flagged.
+
+    Reworked 2026-06-30: the length judge now uses ESTIMATED RENDER WIDTH
+    (`estimate_render_width`), not raw source-char count. The old `len(body) > 90`
+    badly over-estimated because LaTeX macros are verbose (\\overrightarrow{CM} =
+    18 source chars, 1 render glyph). It false-flagged a 275-source-char /
+    41-render-width vector formula (sin β chain) as "long". Render width is the
+    quantity that actually affects readability. Judge in context regardless.
     """
     messages: list[LintMessage] = []
-    min_length = 90
+    min_render_width = 50   # evolved 2026-06-30: was min_length=90 source chars
     min_equals = 2
     for index, raw in enumerate(lines, start=1):
         line_without_mathml = strip_mathml(raw)
         for match in INLINE_MATH_PATTERN.finditer(line_without_mathml):
             body = match.group(1)
-            if len(body) > min_length and body.count("=") >= min_equals:
+            render_width = estimate_render_width(body)
+            if render_width > min_render_width and body.count("=") >= min_equals:
                 messages.append(
                     LintMessage(
                         index,
-                        f"inline math span is {len(body)} chars with {body.count('=')} "
+                        f"inline math span renders ~{render_width} wide with {body.count('=')} "
                         "equalities; a multi-equality chain reads better as a `$$...$$` "
                         "display block folded with `\\begin{aligned}`. (coarse signal — "
                         "judge in context)",
@@ -1563,39 +1615,64 @@ def lint_markdown(
     max_analysis_lines: int,
     max_analysis_paragraphs: int,
     max_analysis_line_chars: int,
+    only: str | None = None,
 ) -> list[LintMessage]:
     lines = markdown_text.splitlines()
     blocks = collect_quote_blocks(lines)
+
+    # Build the full lint registry as (name, callable) pairs. Keeping this as a
+    # named registry (instead of a flat messages.extend chain) is what lets the
+    # `--only` filter select individual lints by name — see the refinement-agent-chain
+    # role->lint mapping in references/refinement-agent-chain.md.
+    registry: list[tuple[str, callable]] = [
+        ("lint_headings_and_print_noise", lambda: lint_headings_and_print_noise(lines)),
+        ("lint_tables", lambda: lint_tables(lines, blocks)),
+        ("lint_images", lambda: lint_images(lines)),
+        ("lint_image_path", lambda: lint_image_path(lines)),
+        ("lint_multi_image_figures", lambda: lint_multi_image_figures(lines)),
+        ("lint_adjacent_figures_must_merge", lambda: lint_adjacent_figures_must_merge(lines)),
+        ("lint_formulas", lambda: lint_formulas(lines)),
+        ("lint_inline_math_spacing", lambda: lint_inline_math_spacing(lines)),
+        ("lint_html_math", lambda: lint_html_math(lines)),
+        ("lint_numeric_outline_labels", lambda: lint_numeric_outline_labels(lines, blocks)),
+        ("lint_bare_blank_splits", lambda: lint_bare_blank_splits(lines)),
+        (
+            "lint_analysis",
+            lambda: lint_analysis(
+                lines,
+                blocks,
+                max_analysis_lines,
+                max_analysis_paragraphs,
+                max_line_chars=max_analysis_line_chars,
+            ),
+        ),
+        ("lint_choice_options", lambda: lint_choice_options(lines, blocks)),
+        ("lint_bare_question_starts", lambda: lint_bare_question_starts(lines, blocks)),
+        ("lint_fraction_nesting", lambda: lint_fraction_nesting(lines)),
+        ("lint_qa_ordering", lambda: lint_qa_ordering(lines, blocks)),
+        ("lint_markdown_analysis_paragraphs", lambda: lint_markdown_analysis_paragraphs(lines)),
+        ("lint_question_callout_title_attached", lambda: lint_question_callout_title_attached(lines, blocks)),
+        ("lint_formula_dangling_tail", lambda: lint_formula_dangling_tail(lines)),
+        ("lint_list_inside_math", lambda: lint_list_inside_math(lines)),
+        ("lint_long_inline_formula", lambda: lint_long_inline_formula(lines)),
+    ]
+
+    # Apply the --only filter when set. Unknown names are a caller bug (a stale
+    # role->lint mapping), so fail loudly rather than silently running nothing.
+    if only:
+        wanted = {name.strip() for name in only.split(",") if name.strip()}
+        known = {name for name, _ in registry}
+        unknown = wanted - known
+        if unknown:
+            raise SystemExit(
+                f"ERROR: --only has unknown lint name(s): {sorted(unknown)}. "
+                f"Known: {sorted(known)}"
+            )
+        registry = [item for item in registry if item[0] in wanted]
+
     messages: list[LintMessage] = []
-    messages.extend(lint_headings_and_print_noise(lines))
-    messages.extend(lint_tables(lines, blocks))
-    messages.extend(lint_images(lines))
-    messages.extend(lint_image_path(lines))
-    messages.extend(lint_multi_image_figures(lines))
-    messages.extend(lint_adjacent_figures_must_merge(lines))
-    messages.extend(lint_formulas(lines))
-    messages.extend(lint_inline_math_spacing(lines))
-    messages.extend(lint_html_math(lines))
-    messages.extend(lint_numeric_outline_labels(lines, blocks))
-    messages.extend(lint_bare_blank_splits(lines))
-    messages.extend(
-        lint_analysis(
-            lines,
-            blocks,
-            max_analysis_lines,
-            max_analysis_paragraphs,
-            max_line_chars=max_analysis_line_chars,
-        )
-    )
-    messages.extend(lint_choice_options(lines, blocks))
-    messages.extend(lint_bare_question_starts(lines, blocks))
-    messages.extend(lint_fraction_nesting(lines))
-    messages.extend(lint_qa_ordering(lines, blocks))
-    messages.extend(lint_markdown_analysis_paragraphs(lines))
-    messages.extend(lint_question_callout_title_attached(lines, blocks))
-    messages.extend(lint_formula_dangling_tail(lines))
-    messages.extend(lint_list_inside_math(lines))
-    messages.extend(lint_long_inline_formula(lines))
+    for _name, fn in registry:
+        messages.extend(fn())
     return sorted(messages, key=lambda message: message.line)
 
 
@@ -1714,6 +1791,7 @@ def main() -> int:
         max_analysis_lines=args.max_analysis_lines,
         max_analysis_paragraphs=args.max_analysis_paragraphs,
         max_analysis_line_chars=args.max_analysis_line_chars,
+        only=args.only,
     )
     messages.extend(lint_rewrite_plan(job_dir, md_path))
 

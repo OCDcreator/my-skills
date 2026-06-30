@@ -567,3 +567,423 @@ Five candidates landed; C5/C6 discarded.
 - **Recurrence count:** B9 = first occurrence *as a strengthened rule* (the underlying `--fix`-corrupts-frontmatter pattern is new to the log; the passive note existed since before 2026-06-29 but was never logged as a lesson). C10 = first occurrence. A = first occurrence (discarded).
 - **Verification summary:** No machine verification possible (both edits are instruction text, not executable code). B9 + C10 = auditable-evidence only (the 3× recurrence is extracted session evidence; the backup's rescue role is extracted session evidence). Dev Eval could not confirm non-regression because the pre-existing Rule-5 bug fires on any `--fix` run — this is honestly a validator limitation, not a skill-text regression.
 - **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/SKILL.md` does not change this session's loaded rewrite-doc2x-markdown skill text (it was loaded at Phase 1). The new rules (C10 backup mandate, B9 frontmatter-safe `--fix` procedure) take effect in a **fresh rewrite session**. Recommend a fresh session to exercise the improved skill.
+
+---
+
+## 2026-06-30 — 9-role refinement chain + path-independent self-check (structural refactor)
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context session (not a subagent). Trace fields tagged `(extracted)`. The refactor was driven by user feedback across prior sessions ("3 subagents worked poorly; more single-responsibility subagents worked better") + a `grill-me`/`grilling` interview in this session that resolved the design tree (skeleton layer, role split, executor policy, self-check contract). All targets are under `custom/` (soft-linked from `my-skills/custom/`).
+
+### Retro
+- **U1 (verbatim, extracted):** "关于 rewrite 技能，本来是三个子代理，但在之前的两次对话中使用时，发现效果不好。后来我自己增加了更多子代理，测试由单个子代理单独处理文本，效果反而更好，因为任务变得更简单了。所以我需要你根据 [skill-evolution] 技能去重构该 [rewrite-doc2x-markdown] 技能，同时保持 [skill-creator] 的渐进式披露原则。"
+- **U2 (verbatim, extracted, grilling correction 1):** "当前的新的代理是否能够涵盖这个重构的流程，我建造的这几个新代理是在旧的代理重写之后产生的，但是其实有一些职能是没有的，比如说像经典的解析块重写就没有。所以我的想法可能是需要把旧的进行拆分。"
+- **U3 (verbatim, extracted, grilling correction 2 — executor policy):** "我说的deepseek-v4就是flash" + "就是我可以选择不用子代理只用主代理，原理是一样的…但是当我需要用子代理的时候，才用子代理"
+- **U4 (verbatim, extracted, grilling correction 3 — self-check):** "opencode 这些代理自己做完工作后，可以调用 脚本 然后爬一下有没有匹配的错误，这样可以最大化减少返工的情况"
+- **U5 (verbatim, extracted, grilling correction 4 — skeleton gap):** "难道没有专门的子代理用于从 raw Markdown 变为 source Markdown 然后才开始有这一连串的子代理开始精修吗？" (rooted in a real gap — verified by Explore agent: SKILL.md:40 used raw as base text directly, no skeleton stage)
+- **Provenance:** `(extracted)` — full session in-context. Hard-evidence files (the 3 user-created agents `question-source-merger`/`question-options-to-table`/`math-comma-splitter`, timestamps 6/30) confirmed on disk.
+- **Root-cause → defense mapping:**
+  - **Root cause A (bundled jobs on weak models)** — U1/U2: the legacy `question-block-rewriter` bundled title+options+subparts+analysis; weaker models skipped/collided them. → **defense = single-responsibility role chain** (R1).
+  - **Root cause B (missing skeleton)** — U5: raw edited directly, heading-level alignment drifted across roles. → **defense = skeleton role ★** (R4).
+  - **Root cause C (no feedback loop)** — U4: validator output non-structured, re-dispatch was prose-only. → **defense = `--only` flag + path-independent per-role self-check** (R5).
+  - **Root cause D (over-eager dispatch)** — U3: the skill auto-dispatched by document size, but the user wants the main agent as default. → **defense = main-agent-default policy** (R6).
+
+### Candidate R1 — `strengthen`: Step 2.7 single-agent → 8-role refinement chain
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS — any question-heavy OCR doc / G2 `strengthen` — SKILL.md:160-171 "Method" existed but described single-agent whole-block rewrite; the chain is its decomposition / G3 principle — single-responsibility = verifiable reliability principle, not taste).
+- **Landing zone:** new `references/refinement-agent-chain.md` (single source for all 8 roles); SKILL.md Step 2.7 rewritten to point at it (290 lines, under cap). Legacy `question-block-rewrite-guide.md` demoted to fallback.
+- **Strongest reason NOT to add:** 8 roles may over-fragment. **Counter:** each role's `--only` self-check pins failures to the exact role; the old bundle had no such attribution. User explicitly requested the split (U1/U2).
+- **Outcome:** APPROVED.
+
+### Candidate R2 — `add_new`: opencode-agent-invocation.md register the 9 agents
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS / G2 `new` — grep `source-merger|options-to-table|comma-splitter` in opencode-agent-invocation.md = 0 hits; "three agents" hardcoded / G3 principle).
+- **Landing zone:** `references/opencode-agent-invocation.md` ("three agents" → "nine agents + 1 legacy"; detection command updated; new executor-policy section + per-role self-check section).
+- **Outcome:** APPROVED.
+
+### Candidate R3 — `strengthen`: Step 2-Dispatch fine-grained + user-triggered
+- **Classification:** `missing` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 `strengthen` — Step 2-Dispatch table existed at SKILL.md:130-144 (C7); R3 extends to role-level + corrects the executor trigger / G3 principle).
+- **Landing zone:** SKILL.md Step 2-Dispatch rewritten (Decision 1: who executes; Decision 2: which roles; document-shape→roles table).
+- **Outcome:** APPROVED.
+
+### Candidate R4 — `add_new`: skeleton role ★ (source-skeleton-builder)
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — any doc needing stable heading hierarchy / G2 `new` — grep `skeleton|骨架` across SKILL.md = 0; SKILL.md:40 used raw as base text directly / G3 principle — fills a verified gap, root cause B).
+- **Landing zone:** `references/refinement-agent-chain.md` (role ★); new `.opencode/agents/source-skeleton-builder.md`; SKILL.md new Step 1.5.
+- **Strongest reason NOT to add:** adds a stage. **Counter:** the gap (U5) is real and verified; heading drift was a documented recurring nuisance.
+- **Outcome:** APPROVED.
+
+### Candidate R5 — `add_new`: validator `--only` flag + path-independent self-check
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — every refinement role / G2 `new` — `LintMessage` dataclass (`validate_canonical_markdown.py:158-162`) had only `line`/`text`, no category; grep `--only` = 0 / G3 principle — minimizes rework per U4).
+- **Landing zone:** `scripts/validate_canonical_markdown.py` (`--only` arg + registry-based filter in `lint_markdown`); `tests/test_only_flag.py` (5 new tests); every role's self-check documented in `refinement-agent-chain.md` + each agent `.md`.
+- **Strongest reason NOT to add:** a role could just run full validator and ignore others. **Counter:** the user explicitly wanted scripts agents call themselves (U4); `--only` makes the self-check path-independent and pins FAILs to the owning role — full-validator-everywhere loses attribution.
+- **Outcome:** APPROVED.
+
+### Candidate R6 — `strengthen`: main-agent-default (subagents opt-in)
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 `strengthen` — `parallel-chunking.md` / `opencode-agent-invocation.md` implied auto-dispatch by size; R6 corrects to user-triggered / G3 principle — user's explicit control per U3).
+- **Landing zone:** SKILL.md Hard Contract (new "Default executor is the main agent" item); Step 2-Dispatch Decision 1; `opencode-agent-invocation.md` top section; `parallel-chunking.md` dispatch note.
+- **Strongest reason NOT to add:** may under-use subagents on big docs. **Counter:** the user is explicit (U3) that the main agent can do the jobs and dispatch is opt-in; auto-dispatch violated their stated preference.
+- **Outcome:** APPROVED.
+
+### Discarded candidates
+- (none this session — all 6 candidates survived the gate; the grilling corrections were absorbed into R1/R4/R5/R6 rather than spawning separate discards.)
+
+### Batch metadata
+- **Pairwise conflict check:** Fast path — 6 candidates, all pairs reviewed; no conflicts. R1 (chain) and R4 (skeleton) are complementary (skeleton is role ★ of the chain). R5 (`--only`) is the enabler for R1's per-role self-check. R6 (executor policy) governs how R1/R2/R4 are invoked. R3 (dispatch) operationalizes R6.
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **93 passed** (was 88; +5 for `test_only_flag.py`). The `--only` filter verified: named subset runs, unknown names abort loudly, default behavior unchanged. Validator non-regression confirmed. The skill-text edits (R1/R2/R3/R4/R6) are instruction text — auditable-evidence only, no machine verification of their *behavioral* effect (Verification Ceiling applies).
+- **Outcome:** APPROVED (user approved the plan after 2 revision rounds incorporating the grilling corrections on executor policy + skeleton layer + self-check path-independence).
+- **Files written:**
+  - `scripts/validate_canonical_markdown.py` (`--only` arg in `build_parser`; `lint_markdown` rewritten to a named `(name, callable)` registry + filter; `main` passes `args.only`)
+  - `tests/test_only_flag.py` (NEW: 5 tests — runs-named-only, comma-list, unknown-aborts, default-unchanged, clean-subset-OK)
+  - `references/refinement-agent-chain.md` (NEW: the single source — 9-role chain, universal IRON LAW, path-independent self-check contract, role→lint map, per-role logic)
+  - `.opencode/agents/source-skeleton-builder.md` (NEW: role ★)
+  - `.opencode/agents/question-subparts-splitter.md` (NEW: role ④)
+  - `.opencode/agents/ocr-typo-fixer.md` (NEW: role ⑥)
+  - `.opencode/agents/sentence-displacement-fixer.md` (NEW: role ⑦)
+  - `.opencode/agents/key-point-marker.md` (NEW: role ⑧)
+  - `SKILL.md` (References list +refinement-agent-chain pointer; Hard Contract +2 items [main-agent-default, path-independent self-check]; new Step 1.5; Step 2-Dispatch rewritten; Step 2.5 aligned to role ⑤; Step 2.7 rewritten to the chain). 266 → 290 lines.
+  - `references/opencode-agent-invocation.md` (top: main-agent-default section; detection cmd 9 agents; "three agents"→"nine agents +1 legacy" table; per-role self-check section; pitfall updated)
+  - `references/self-check.md` (+3 items: skeleton-ran, per-role-only-self-check, executor-choice)
+  - `references/question-block-rewrite-guide.md` (top: demoted to LEGACY FALLBACK with default-path pointer)
+  - `references/parallel-chunking.md` (dispatch note: user-triggered, not auto; references the chain)
+  - `references/evolution-log.md` (this entry)
+- **Snapshots (same-day, 2nd):**
+  - `SKILL.md.bak-2026-06-30-2`
+  - `scripts/validate_canonical_markdown.py.bak-2026-06-30`
+  - `references/opencode-agent-invocation.md.bak-2026-06-30`
+  - `references/self-check.md.bak-2026-06-30`
+  - `references/question-block-rewrite-guide.md.bak-2026-06-30`
+  - `references/parallel-chunking.md.bak-2026-06-30`
+- **Recurrence count:** All 6 first occurrence as rules. The *pattern* "monolithic agent unreliable on weak models → split into single-responsibility roles" is new to the log.
+- **Verification summary:** R5 = machine-verified (pytest 93 pass; `--only` filter behavior locked by tests). R1/R2/R3/R4/R6 = auditable-evidence only (instruction text; the role-split, skeleton layer, executor policy, and dispatch rules have no automated behavior tester — honest framing per Verification Ceiling). The 3 user-created agents on disk (`question-source-merger`/`question-options-to-table`/`math-comma-splitter`) are extracted hard evidence that the split direction is what the user wanted.
+- **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/*` does NOT change this session's loaded rewrite-doc2x-markdown skill text (loaded at session start). The new chain, skeleton role, `--only` self-check, and main-agent-default policy take effect in a **fresh rewrite session**. The `--only` flag itself takes effect immediately when the validator script runs (it is executable code, not loaded skill text). Recommend a fresh session to exercise the improved skill end-to-end.
+
+---
+
+## 2026-06-30 — ch12 session: 3 anti-shortcut lessons + symlink architecture event
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context session
+(not a subagent). Trace fields tagged `(extracted)`. Session ran the 8-role refinement
+chain on `product/2026-06-26-mst-bixiu2-ch12-直线和圆的方程/`, then a user-driven
+retro exposed three "lint-ceiling / anti-shortcut" defects, then a follow-up
+investigation produced a symlink architecture change for `.opencode/agents/`.
+
+### Candidate L1 — `strengthen`: multi-point/multi-equation formula fusion (③ role blind spot)
+
+- **Trigger (verbatim, extracted):** "$A(0,0), B(3,-2), C(5,1), D(2,3)$ 我发现这种公式中间的逗号，没有被分析出来" + "每一个坐标点本来就是不同的坐标点，你为什么要把它们放到同一个公式当中呢？这没有理由。" (with additional examples `$|AC|=\sqrt{26}, |BD|=\sqrt{26}$` and `$k, l_1$`).
+- **Classification:** `rework` — ③ left ~90 fused formulas un-split.
+- **Provenance:** `(extracted)` — full session in-context + lint output as hard evidence.
+- **Root cause:** `lint_list_inside_math` (added 2026-06-29 C2) only matches **interval-list** patterns (`[a,b), [c,d)`). It is **SILENT** on three other fusion shapes: (a) multiple labeled coordinate points, (b) multiple independent equations, (c) multi-variable lists. The role-③ pass that split nothing returned a clean `--only` self-check (verified: `lint_list_inside_math` on the un-split file reported only line 103's interval-union, missing all point/equation/variable fusions).
+- **Gate verdict:** `strengthen` (G1 PASS — any math OCR doc with enumerated objects / G2 strengthen — 2026-06-29 C2/C3 covered interval-list only; the chain reference + math-comma-splitter agent had no point/equation/variable example / G3 principle — formula delimiter hygiene, verifiable by depth-aware splitting).
+- **Landing zone:** `references/refinement-agent-chain.md` (③ role: named the 3 fusion shapes + Ceiling note); `.opencode/agents/math-comma-splitter.md` (new A2 section with before/after examples + anti-over-inhibition clause in Critical distinction). NOTE: the agent edits originally landed in the PROJECT copy; the 2026-06-30 symlink migration (below) moved the canonical source to the skill repo `agents/`, so the edits now live in the truth source.
+- **Strongest reason NOT to add:** the rule "split enumerated commas" arguably already exists. **Counter:** the lint's silence + the user's 3 distinct shape examples prove the implicit coverage + lint signal were both insufficient; the model empirically skipped all 90.
+- **Outcome:** APPLIED during-session (chain ref + agent); logged here for trace.
+
+### Candidate L2 — `strengthen`: anti-shortcut clause (lint-ceiling, applies to ③⑤⑥)
+
+- **Trigger (verbatim, extracted):** "那如果我让子代理跑，他会犯这个错误吗？" + "那你是不是应该优化这个子代理呢？不然我以后用子代理跑岂不是自讨苦吃了。还有就是你有没有跑解析重写这个环节？"
+- **Classification:** `rework` (two strands): (a) "will the subagent make this mistake" → subagent prompt hardening; (b) "did you actually run ⑤" → ⑤ was self-declared done with zero retypesetting.
+- **Provenance:** `(extracted)` — full session in-context.
+- **Root cause (the unifying defect):** a passing `--only` self-check was treated as proof a role was complete. Verified for ⑤: `lint_markdown_analysis_paragraphs` returned `OK` on a file where ⑤ had done nothing (the lint checks paragraph *length*, not whether retypesetting happened). Same pattern for ③ (L1 above) and ⑥ (`--check-proofreading` returns 100+ FAILs where most are known false positives hiding real defects). This is the **lint-ceiling** anti-pattern (F4 reactive counterpart: don't trust lint as proof of completion).
+- **Gate verdict:** `strengthen` (G1 PASS — every semantic role / G2 strengthen — the 2026-06-30 path-independent self-check Hard Contract item sold the lint as verification but did not warn of its blind spots / G3 principle — verifiability discipline; a recurring failure mode).
+- **Landing zone:** `SKILL.md` Hard Contract "Path-independent self-check" item (added the "necessary, not sufficient" ceiling note naming ③⑤⑥ blind spots); `.opencode/agents/{math-comma-splitter,analysis-retypesetter,ocr-typo-fixer}.md` (each got an "Anti-shortcut clause" forcing per-unit quantified reporting). NOTE: agent edits now in skill-repo `agents/` via the symlink migration below.
+- **Strongest reason NOT to add:** may over-document. **Counter:** the model (main agent, not weak) made the ⑤ shortcut AND the ③ shortcut in one session; the ceiling note is the only durable fix since lints provably cannot see these gaps.
+- **Outcome:** APPLIED during-session; logged here for trace.
+
+### Architecture event — `.opencode/agents/` symlink to skill repo (single source of truth)
+
+- **Trigger (verbatim, extracted):** "opencode 的这个agent文件是否支持软链接，如果支持软链接可以放在技能仓库通过软链接链接过去，你可以做个小测试。"
+- **Classification:** NOT a rule candidate — a **file-organization architecture change** (recorded as an event, like the 2026-06-29 progressive-disclosure refactor).
+- **Problem exposed by this session:** the anti-shortcut edits (L1/L2) were written to the PROJECT `.opencode/agents/*.md` copies. The skill repo `agents/` held only `openai.yaml` — agent `.md` files were never version-controlled in the skill, so fixes did not propagate to other projects. This is the same "two copies drift" risk the skill's symlink convention already uses for `.zcode`/`.codex` skill loading.
+- **Empirical verification (extracted, opencode 1.17.11):**
+  1. Isolated test project with a symlinked agent → `opencode agent list` discovered it (format `name (mode)`).
+  2. Real-scenario canary: skill-repo `agents/repo-canary.md` → project `.opencode/agents/repo-canary.md` symlink → opencode discovered `repo-canary`. (Canary cleaned up after.)
+  3. Sync test: appended a marker line to skill-repo `math-comma-splitter.md` → project symlink read it immediately. (Marker cleaned up.)
+- **Migration performed:**
+  - 11 agent `.md` files copied project → skill repo `agents/` (truth source).
+  - Project `.opencode/agents/*.md` deleted, replaced with 11 symlinks → skill repo.
+  - `opencode agent list` confirms **11/11** symlinked agents discovered.
+- **Files written (skill repo):**
+  - `agents/*.md` (11 files — now canonical; carry this session's L1/L2 anti-shortcut edits)
+  - `agents/openai.yaml.bak-2026-06-30` (pre-migration snapshot)
+- **Files written (project, symlinks not committed):**
+  - `.opencode/agents/*.md` → 11 symlinks to skill repo
+  - `.opencode/agents.bak-2026-06-30/` (11 real-file backup, in case symlinks break)
+- **Known limitation (carried forward):** Windows symlinks are absolute-path; if the skill repo moves, all project symlinks break and must be rebuilt. Symlinks are a local-dev reference, NOT committable (a fresh clone gets dead links). The truth source (skill repo `agents/*.md`) is git-tracked.
+- **Outcome:** APPLIED (user "现在就迁移到软链架构").
+
+### Batch metadata
+
+- **Pairwise conflict check:** Fast path — 2 rule candidates (L1, L2) + 1 architecture event. L1 and L2 are complementary (L1 = specific fusion shapes for ③; L2 = the general lint-ceiling discipline across ③⑤⑥). No conflicts.
+- **Dev Eval:** N/A — all changes are instruction text / file organization; no validator code or test logic touched. (`validate_canonical_markdown.py` unchanged this session.)
+- **Recurrence count:** L1/L2 first occurrence *as strengthened rules*. The *pattern* "guidance exists, no executable gate / lint silent on a shape" recurs across 2026-06-23 (adjacent figures), 2026-06-29 (C1/C2/C4), and this session — L1/L2 are the latest strike; the symlink migration is the first architecture response to the propagation gap.
+- **Verification summary:** All verdicts auditable-evidence-only (instruction text + on-disk file states + pasted lint output + opencode discovery output). No machine verification of behavioral effect (Verification Ceiling applies — content skill has no runtime). The opencode symlink discovery (11/11) and the sync test are extracted hard evidence.
+- **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/*` does NOT change this session's loaded rewrite-doc2x-markdown skill text. The L1/L2 strengthen rules and the symlink architecture take effect in a **fresh rewrite session**. Recommend a fresh session to exercise the improved ③⑤⑥ anti-shortcut discipline + verify a real rewrite benefits from the symlinks.
+
+## 2026-06-30 — ch11 空间向量 session: 3 new rules (E1-E3) + permission-lockdown trace (E4)
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context session
+(not a subagent). Trace fields tagged `(extracted)`. Session ran the 8-role refinement
+chain on `product/2026-06-26-mst-bixiu2-ch11-空间向量与立体几何/`, then a permission
+investigation, then a long tail of source-transcript.md content fixes (table→Markdown,
+figure side-by-side, comma normalization, MathML attempt, formula splitting) — the
+content fixes are job-local, but 4 of them exposed skill-level gaps logged here.
+
+### Candidate E1 — `add_new`: md-cleaner input boundary (RAW OCR only)
+
+- **Trigger (verbatim, extracted):** "什么鬼，你为什么触发的不是那八个子代理而是什么 md-cleaner 子代理？我已经生成了 source-transcript.md 让你清细这个啊，你应该用之后的子代理工作啊"
+- **Classification:** `wrong` — orchestrator ran md-cleaner (Step 1 Auto-Fix) on an already-generated `source-transcript.md`, wasting a pass; the user wanted the Step 2.7 refinement chain.
+- **Provenance:** `(extracted)` — full session in-context.
+- **Gate verdict:** `add_new` (G1 PASS — any already-generated source-transcript.md / G2 `new` — grep `清洗.*source-transcript\|md-cleaner.*source-transcript\|canonical.*2\.7` → 0 hits; no rule distinguished raw-OCR input from canonical-transcript input / G3 principle — correct role selection, prevents wasted passes).
+  - Adversarial: "model should infer md-cleaner is for raw." Counter: the main orchestrator (a strong model) made this exact mistake; an explicit boundary is cheap insurance and the user's "什么鬼" proves the ambiguity was real.
+- **Landing zone:** `SKILL.md` Step 1 (new "Input boundary" paragraph right under the Step 1 heading, before the auto-fix-rules pointer). Tier-1 cascade: SKILL.md at 290 lines (not near cap); the rule governs main-workflow role selection.
+- **Strongest reason NOT to add:** md-cleaner's description already says "mechanically clean a Doc2X OCR Markdown file." Counter: the description describes what it does, not when NOT to invoke it; the user's framing "清洗 source-transcript.md" was ambiguous and the description did not resolve it.
+- **Outcome:** APPROVED (user "OK").
+
+### Candidate E2 — `strengthen`: Rule 5 also corrupts table separator rows
+
+- **Trigger (verbatim, extracted):** "调用子代理清洗的时候，为什么没有识别出这个表格异常？...它用的是下划线，但是正常的表格语法不是下划线。" (referring to `| :__________: |` that should be `| :---: |`)
+- **Classification:** `rework` → `strengthen`. The 2026-06-30 B9 rule covered `--fix` corrupting frontmatter `---` fences, but NOT Markdown table separator rows.
+- **Provenance:** `(extracted)` — full session in-context + byte-diff against `source-transcript.md.bak-20260630-prechain` (the corruption predated the 8-role chain; it was an earlier `--fix` run).
+- **Gate verdict:** `strengthen` (G1 PASS — any Markdown-table-bearing file run through `--fix` / G2 `strengthen` — `SKILL.md:238` "Rule 5 ... including the frontmatter `---` fences" named only frontmatter; table separators are a different victim object of the same Rule 5 / G3 principle — silent structural corruption; `lint_tables` is silent on underscore separators, verified).
+  - Evidence: 2 corrupted separators found in one job (L191 例3 table, L900 例18 table — both `> | :__________: |`), one inside a callout.
+- **Landing zone:** `SKILL.md` Step 4 (new paragraph after the "`--fix` vs frontmatter" block, extending Rule 5's victim list to table separators + the grep-restore procedure + the lint_tables-blind-spot note). Tier-1 cascade.
+- **Strongest reason NOT to add:** arguably covered by "re-assert after --fix". Counter: the existing re-assert step only checks frontmatter fences (L244 "first 5 lines MUST still parse as frontmatter"); table separators are mid-document and were not in the check.
+- **Outcome:** APPROVED (user "OK").
+
+### Candidate E3 — `add_new`: HTML blocks don't render `$...$`
+
+- **Trigger (verbatim, extracted):** "在 Markdown 中，HTML 表格里的公式如果使用 $ 符号是无法渲染的，只能使用 MathML。"
+- **Classification:** `missing` → `add_new`. SKILL.md L212 said `<div class="analysis-block">` requires MathML, but did NOT generalize to `<table>`.
+- **Provenance:** `(extracted)` — full session in-context (user stated the technical fact; orchestrator verified KaTeX config: `ignoredTags` does not include `table`, but Markdown processors pass HTML blocks through verbatim without scanning `$`).
+- **Gate verdict:** `add_new` (G1 PASS — any HTML-table/HTML-block containing formulas / G2 `new` — grep `table.*MathML\|HTML.*table.*\$` → 0 hits; L212 named `<div>` only / G3 principle — rendering correctness, verifiable).
+  - Adversarial: "L212 already says HTML needs MathML." Counter: L212 names `<div class="analysis-block">` specifically; the user hit the `<table>` case and it is NOT covered. The rule generalizes to ALL HTML blocks.
+  - Resolution chosen by user: convert HTML table → Markdown table (so `$...$` renders via KaTeX), NOT hand-write MathML (browser `mathvariant` support proved uneven in this session's test pages).
+- **Landing zone:** `SKILL.md` Step 3 (new paragraph after the "Parser choice" block, generalizing the HTML-needs-MathML rule to all HTML blocks + the convert-to-Markdown preferred fix). Tier-1 cascade.
+- **Strongest reason NOT to add:** borderline preference (Markdown-table vs MathML is a style choice). Counter: the core principle — "HTML blocks don't render `$...$`" — is a verifiable technical fact, not taste; the fix preference (Markdown table) is secondary and aligns with the existing "use plain Markdown" default.
+- **Outcome:** APPROVED (user "OK").
+
+### Candidate E4 — permission lockdown (APPLIED during session, trace only)
+
+- **Trigger (verbatim, extracted):** "搞清楚他为什么破坏啊" (re: role ⑤ destroying 6 tables + reverting 例6 label) → root cause: ⑤ used the `task` tool to spawn a grandchild analysis-retypesetter subagent → "根据 opencode 文档我可以控制 agent 能用什么工具/权限，这样他就无法调用子代理了" → "看看还有没有其余的工具或者权限要禁用的，避免复发其余问题"
+- **Classification:** NOT a new rule candidate for this retro — it was **applied during the session** and is recorded here for trace (same pattern as the 2026-06-30 architecture events). The 11 agents' `permission:` blocks were rewritten to deny `task`/`skill`/`todowrite`/`grep`/`glob`/all MCP (`lean-ctx_*`/`doc2x_*`/etc.), leaving only `edit`/`write`/`read`/`bash`. Verified empirically: a probe agent + the real `analysis-retypesetter` both report exactly 4 visible tools; a `task` call returns "Model tried to call unavailable tool 'task'".
+- **Provenance:** `(extracted)` — full session in-context + on-disk agent files.
+- **Files written (during session, via symlink → canonical repo):**
+  - `agents/*.md` (11 files — canonical source; each got the lockdown `permission:` block)
+  - `references/opencode-agent-invocation.md` (new "## Agent permission lockdown (MANDATORY — evolved 2026-06-30)" section with the full policy + the 3 verification findings: agent-level deny overrides project `"*":"allow"`, wildcard `"server_*": deny` is the reliable MCP form, enumerating `lean-ctx_*` tools individually is insufficient)
+- **Strongest reason NOT to add:** over-constrains agents. Counter: the grandchild-dispatch failure empirically destroyed 6 tables; leaf agents provably need only edit/write/read/bash; the lockdown is the durable fix and opencode 1.17.11 enforces it (verified).
+- **Outcome:** APPLIED during session (no new write this retro; the canonical files already carry it via the 2026-06-30 edits). Logged here for trace.
+
+### Batch metadata
+
+- **Pairwise conflict check:** Fast path — 3 new-write candidates (E1/E2/E3) + 1 trace-only (E4). E2 (extend Rule 5 victim list) and E3 (HTML render rule) are orthogonal files (Step 4 vs Step 3). E1 (role selection) is orthogonal to both. E4 is trace-only. No conflicts.
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **94 passed** (unchanged from the session's pre-edit baseline; pure instruction-text edits to SKILL.md, no validator/test code touched). Non-regression confirmed.
+- **Outcome:** APPROVED (user "OK" after a plain-language summary of the 3 changes).
+- **Files written (this retro):**
+  - `SKILL.md` (E1: new Step 1 "Input boundary" paragraph; E2: new Step 4 "Rule 5 also corrupts table separators" paragraph; E3: new Step 3 "HTML blocks don't render `$...$`" paragraph). 290 → 302 lines.
+  - `references/evolution-log.md` (this entry)
+- **Snapshot (same-day, 3rd):** `SKILL.md.bak-2026-06-30-3`
+- **Recurrence count:** E1/E2/E3 all first occurrence as rules. E2 is a sibling of the 2026-06-30 B9 frontmatter rule (same Rule 5, different victim object) — logged as a distinct strengthen because the victim (table separator) and its lint blind spot (lint_tables) are different from frontmatter's. E4 is first occurrence (the grandchild-dispatch root cause + permission-lockdown fix are new to the log).
+- **Verification summary:** Dev Eval machine-verified (pytest 94 pass) for non-regression. All 4 lessons are auditable-evidence-only (instruction text + extracted session evidence + on-disk file states + pasted grep/validator output) — no machine verification of their *behavioral* effect (Verification Ceiling applies; content skill has no runtime). E4's opencode enforcement (4 visible tools, `task` blocked) is extracted hard evidence.
+- **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/SKILL.md` does NOT change this session's loaded rewrite-doc2x-markdown skill text (loaded at session start). The 3 new rules (E1 role boundary, E2 table-separator check, E3 HTML-render rule) take effect in a **fresh rewrite session**. The E4 permission lockdown already took effect during this session (it is executable agent config, not loaded skill text). Recommend a fresh session to exercise the improved skill end-to-end.
+
+
+## 2026-06-30 — ch10 概率 session: 2 new strengthen rules (F1-F2)
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context session
+(not a subagent). Trace fields tagged `(extracted)`. Session ran the 8-role refinement
+chain on `product/2026-06-26-mst-bixiu2-ch10-概率/`, then a tail of rendering/typography
+fixes. 3 user corrections examined; 1 was already-resolved (table separator = E2 from
+the ch11 session earlier today), 2 were new → strengthened here.
+
+### Candidate F1 — `strengthen`: `aligned` is for ONE chain, not enumerating unrelated formulas
+
+- **Trigger (verbatim, extracted):** "这种公式为什么要用 align？明明它是一行就能写完的，而且它也不是一个公式，而是多个公式。为什么要放在一起？这没有道理。" (re: `\begin{aligned} P(A)&=½\ P(B)&=½\ P(AB)&=¼ \end{aligned}` cramming 3 independent probability values into one aligned block)
+- **Classification:** `rework` → `strengthen`.
+- **Provenance:** `(extracted)` — full session in-context + byte-diff of the 5 affected blocks (lines 313/321/491/525/549 in source-transcript.md).
+- **Gate verdict:** `strengthen` (G1 PASS — any doc with parallel value lists vs calculation chains / G2 `strengthen` — `canonical-markdown-rules.md:203` covers the reverse direction "long inline chain → move to `aligned`" but NOT the forward distinction "aligned = single chain, NOT enumeration"; `SKILL.md:222` says "long formulas use `\begin{aligned}`" without the boundary / G3 principle — semantic correctness; `aligned` force-aligns `=` signs across independent equations, which has no mathematical meaning).
+  - Evidence: 5 abused `aligned` blocks found in one job (例10选项B/D, 例19题干, 例20①, 例21 — all parallel P(A)/P(B)/P(AB)-style value lists), vs 5 legitimate chain blocks (例9, 例4传输, 例9家庭, 例11×2 — all single-quantity `&=` step-by-step). The split was unambiguous.
+  - Adversarial: "aligned-vs-gathered is a style preference." Counter: the user's reasoning ("它不是一个公式，而是多个公式...这没有道理") is a *semantic* argument — the equations are independent, so aligning their `=` is meaningless. This is typography principle, not taste.
+- **Landing zone:** `references/canonical-markdown-rules.md` (extend the existing L203 "long multi-equality chain" rule with the forward boundary). Tier-2 cascade: SKILL.md untouched (progressive disclosure — SKILL.md already says "read references/canonical-markdown-rules.md"). SKILL.md stays at 302 lines.
+- **Strongest reason NOT to add:** borderline preference. Counter: the chain-vs-enumeration distinction is verifiable (each `&=` row a different quantity → enumeration), and Doc2X provably abuses this pattern. Documented to stop models from inheriting Doc2X's hallucinated alignment.
+- **Outcome:** APPROVED (user "批准").
+
+### Candidate F2 — `strengthen`: `$$` + trailing punctuation breaks KaTeX (`$$.`/`$$,`)
+
+- **Trigger (verbatim, extracted):** "You can't use 'macro parameter character '#' in math mode 他怎么报这个错误怎么回事？...就是从这个之后的公式设锤子为...则样本空间" (re: `$$...$$.` at line 159 of source-transcript.md — the period glued to closing `$$` corrupted KaTeX state, silently breaking every formula from 例6 onward)
+- **Classification:** `rework` → `strengthen`.
+- **Provenance:** `(extracted)` — full session in-context; root cause verified by byte-inspection (line 159 was `$$.`) + the Doc2X raw transcript (`page-transcript.raw.md` showed `$$.` was an original Doc2X emission, not introduced by any role). Confirmed the failure cascaded: all formula rendering from line 159 onward stopped, with the misleading `#` error pointing at an unrelated `<span style="color:#9370DB">` line.
+- **Gate verdict:** `strengthen` (G1 PASS — any Doc2X-derived doc rendered with strict KaTeX / G2 `strengthen` — `canonical-markdown-rules.md:204` "Display math delimiters must be standalone block lines. Never emit `$$formula$$` on one line" already covers the single-line case but NOT the `$$`-followed-by-punctuation case; `auto-fix-rules.md:54` "Move punctuation outside `$...$` delimiters" covers inline `$...$` only, not block `$$` / G3 principle — rendering correctness, verifiable; the failure mode is silent and cascading, exactly the high-cost defect class).
+  - Evidence: 1 `$$.` corruption (line 159) + 8 single-line `$$X$$` blocks (lines 61/77/705/727/729/731/733/878) found in one job; all unwrapped, `$` balance 1496 preserved before/after.
+  - Adversarial: "L204 already implies `$$` must be on its own line; a careful reader infers `$$.` is wrong." Counter: a strong model (the orchestrator) hit this as a *rendering* failure after completing the full chain — the documented KaTeX error string (`#` math mode) is a red herring and not inferable from L204. A one-line failure-mode warning is cheap insurance.
+- **Landing zone:** `references/canonical-markdown-rules.md` (new bullet between L203 and L204, paired with F1). Tier-2 cascade. SKILL.md untouched.
+- **Strongest reason NOT to add:** arguably covered by L204's "standalone block lines". Counter: L204 governs delimiter placement but is silent on (a) the `$$`-touches-punctuation failure mode, (b) the misleading `#` red-herring error, (c) the silent cascade. The red-herring note alone saves real debugging time.
+- **Outcome:** APPROVED (user "批准").
+
+### Already-resolved (NOT a new lesson — correct discard)
+
+- **U1 — table separator `:__________:` corruption:** reworked during the session, but this is the **same substance** as candidate E2 from the ch11 session earlier today (2026-06-30). E2 already wrote the Rule-5-also-corrupts-table-separators rule to `SKILL.md:250-252`. This session's fix was an *application* of E2, not a new lesson. Correctly classified as Gate 2 `duplicate` → discard (precedence row 3). Logged here for recurrence traceability: this is the 2nd occurrence of the Rule-5-corruption pattern (1st = frontmatter B9, 2nd = table separators E2, this = re-application of E2).
+
+### Batch metadata
+
+- **Pairwise conflict check:** Fast path — 2 strengthen candidates (F1/F2) + 1 discard (U1). F1 (aligned/gathered boundary) and F2 (`$$`-punctuation hygiene) are orthogonal rules in the same reference file. No conflicts.
+- **Dev Eval:** INCONCLUSIVE — `py -3 -m pytest tests/ -q` returned `1 failed, 94 passed`. The 1 failure (`test_accepts_verbose_but_short_render_formula`) is **pre-existing in the baseline** (touched no validator/test code this session — pure instruction-text edits to canonical-markdown-rules.md). Per Dev Eval protocol: sample-already-failing → degrade to `unverified`. The edit cannot *cause* regression (instruction text only), but Dev Eval cannot prove non-regression.
+- **Recurrence count:** F1/F2 both first occurrence as rules. The *pattern* "Doc2X emits render-breaking formula structures that pass structural lints" recurs across 2026-06-29 (C-class) → F2 is the latest strike on the formula-rendering axis; F1 (aligned abuse) is a genuinely new axis (typography semantics, not rendering).
+- **Files written (this retro):**
+  - `references/canonical-markdown-rules.md` (F1: new "aligned is ONE chain, not enumeration" bullet; F2: new "`$$`+punctuation breaks KaTeX" bullet). 403 → 405 lines, +1931 bytes.
+  - `references/evolution-log.md` (this entry)
+- **Snapshot:** `references/canonical-markdown-rules.md.bak-2026-06-30` (first same-day snapshot for this file).
+- **Verification summary:** All verdicts auditable-evidence-only (instruction text + extracted session evidence + on-disk file states + pasted grep/validator output). Dev Eval inconclusive (pre-existing baseline failure). No machine verification of behavioral effect (Verification Ceiling applies — content skill has no runtime). The 5-vs-5 aligned split and the 1+8 `$$` corruption count are extracted hard evidence.
+- **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/references/canonical-markdown-rules.md` does NOT change this session's loaded rewrite-doc2x-markdown skill text (loaded at session start). The 2 new rules (F1 aligned-boundary, F2 `$$`-punctuation) take effect in a **fresh rewrite session**. Recommend a fresh session to exercise the improved formula-hygiene discipline.
+
+
+## 2026-06-30 — measure_inline_formula_width: real rendered width + three-band classifier
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context
+session (not a subagent). Trace fields tagged `(extracted)`. Driven by user
+feedback that the source-char-based `lint_long_inline_formula` judge was
+unreliable (a 275-source-char / 360px-render formula was flagged "long").
+
+### Trigger (verbatim, extracted)
+
+- "这个公式明明不长，为什么还是 align 改的我累死了实在不理解你的长度怎么判定的，能不能计算渲染出的宽度，根据这个来比较？单纯的字符数和等号实在不靠谱。"
+- "还有就是，你能不能计算出渲染之后的公式宽度？...基本上超过 A4 三分之二的话，就可以考虑用 inline。"
+- "你可以限制三个区间吗？1.短区间 2.长区间 3.中区间（中区间的话，就必须要主动判断）"
+- On the markdown-vs-render stage paradox: "就是不走 scan 技能不行吗？就是直接打印不行吗？...你就直接正常打印，你不用他的技能样式打印，你就朴素打印。" + "而且你这个打印的话，就只打印公式就行了"
+
+### Architecture decision (the key insight)
+
+The lint (`validate_canonical_markdown.py`) runs on `source-transcript.md`
+(markdown stage) — `handout.html` does not exist yet, and real pixel width
+needs a rendered DOM. **The user's solution**: do a PLAIN PRINT (minimal HTML =
+KaTeX CDN + formula spans only, no scan/A4 styling) and measure. This bypasses
+both the paradox (we measure for sizing, not for delivery) and the scan skill
+dependency. Verified 2026-06-30 that inline `.katex` width is
+**container-independent** (identical in a wide body vs a 100px-narrow div,
+measured via `.katex` itself wrapped in `white-space:nowrap`) — so the plain
+print's width equals the real handout width.
+
+### Three-band classifier (A4 physical basis)
+
+A4 text area = 210mm − 13mm×2 = 184mm ≈ 695px @ 96dpi, font-size 12px
+(the handout's base size; `.katex` inherits it, no scaling).
+
+- **short** (≤ 464px = A4 2/3): keep inline, regardless of `=` count.
+- **long** (> 625px = A4 90%): convert to `$$egin{aligned}$$`.
+- **medium** (464–625px): judge in context (derivation chain vs compact eval).
+
+### Candidate M1 — `add_new`: measure_inline_formula_width.py (plain-print width tool)
+
+- **Classification:** `missing` → `add_new`.
+- **Gate verdict:** add_new (G1 PASS — any inline-formula-bearing markdown / G2 `new` — grep `measure.*width|render.*width|playwright|getBoundingClientRect` in scripts/ → 0 hits; the validator is pure-Python-regex, no browser / G3 principle — measurement correctness, replaces an unreliable estimate with ground truth).
+  - Adversarial: "spins up a browser, too heavy for a lint." Counter: it is a STANDALONE tool called on-demand (NOT wired into the per-role `--only` self-check, which must stay fast); ~1s launch, called once when the coarse lint flags something worth verifying.
+  - Adversarial: "violates rewrite Hard Contract (no downstream renderers)." Counter: it does NOT depend on the scan skill or handout.html; it builds its OWN minimal KaTeX HTML. It measures for sizing, not for delivery — within rewrite's scope.
+- **Landing zone:** `scripts/measure_inline_formula_width.py` (new); `SKILL.md` Step 3 (the lint-coarse-signal paragraph rewritten to point at this tool + the three bands); `tests/test_measure_inline_formula_width.py` (new, 6 tests incl. the sin β regression).
+- **Outcome:** APPLIED (user approved the plan).
+
+### Candidate M2 — `strengthen`: SKILL.md three-band guidance (replaces the coarse-signal paragraph)
+
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 strengthen — the 2026-06-30 E-paragraph said "coarse signal, judge in context" but gave no precise tool or physical thresholds / G3 principle).
+- **Landing zone:** `SKILL.md` Step 3.
+- **Outcome:** APPLIED.
+
+### Evidence (extracted, hard)
+
+- **sin β regression:** measured 359.9px in the wide container, 359.9px in the 100px-narrow container (identical → container-independent confirmed). Band = short. The old source-char lint (275 chars > 90) flagged it "long"; the estimate (53 > 50) also flagged it. Real width says short. This is the defect the tool fixes.
+- **Real-doc sweep:** on the actual ch11 source-transcript.md (deduped), the tool reported **3** medium/long formulas (L286 long 628.7px, L475 medium 580.5px, L954 medium 480.6px). The coarse lint had flagged ~80. The precision tool reduces 80 coarse flags to 3 actionable ones.
+- **Container-independence probe:** 4 formulas measured in wide vs narrow containers — all identical to <0.1px.
+
+### Batch metadata
+
+- **Pairwise conflict check:** Fast path — 2 candidates (M1 new tool, M2 strengthen guidance). M2 points at M1; complementary, no conflict.
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **101 passed** (was 95; +6 for `test_measure_inline_formula_width.py`: 3 pure-logic + 3 browser-backed, incl. the sin β regression). Non-regression confirmed. The 3 browser-backed tests auto-skip if Playwright/Chromium is unavailable (import-skip + launch-probe), so the suite stays green on minimal environments.
+- **Outcome:** APPLIED (user approved the plan).
+- **Files written:**
+  - `scripts/measure_inline_formula_width.py` (NEW: plain-print width tool — KaTeX CDN + formula spans, Playwright headless measure, three-band classifier, `--md/--json/--band/--dedup` CLI)
+  - `tests/test_measure_inline_formula_width.py` (NEW: 6 tests, incl. sin β regression + container-independence via the sin β wide/narrow parity)
+  - `SKILL.md` (Step 3: coarse-signal paragraph rewritten → points at the tool + three bands with A4 px thresholds)
+  - `references/evolution-log.md` (this entry)
+- **Snapshot (same-day, 4th):** `SKILL.md.bak-2026-06-30-4`
+- **Recurrence count:** first occurrence. The *pattern* "estimate vs ground truth / lint over-flags" is new to the log; the source-char→estimate change earlier this session (the `estimate_render_width` commit) was the first attempt, this is the durable fix.
+- **Verification summary:** Dev Eval machine-verified (pytest 101 pass). The container-independence claim and the sin β short-band verdict are extracted hard evidence (pasted measurement output). The three-band thresholds (464/625px) are derived from the A4 geometry (also extracted from handout.css). The tool's *behavioral* effect on orchestrator decisions is auditable-evidence only (Verification Ceiling).
+- **Active-context staleness:** editing `my-skills/custom/rewrite-doc2x-markdown/*` does NOT change this session's loaded skill text. The new tool + three-band guidance take effect in a **fresh rewrite session**. The tool itself is executable now (it is a script, not loaded skill text). Recommend a fresh session to exercise the improved formula-width discipline end-to-end.
+
+
+## 2026-07-01 — integrate formula-length judgment into the skill flow (canonical-rules + self-check sync)
+
+**Session provenance:** CAPTURE extracted from the orchestrator's in-context
+session. Trace fields tagged `(extracted)`. Driven by the user's review question
+"现在技能哪个环节搞这个公式长度" + "你得先把技能和流程弄好，把这些工具都在技能当中使用。
+完整之后，你再提交仓库。"
+
+### Trigger (verbatim, extracted)
+
+- "关键是子代理你改没改？子代理专门负责公式的有吗？...现在技能哪个环节搞这个公式长度"
+- "你得先把技能和流程弄好，把这些工具都在技能当中使用。完整之后，你再提交仓库。"
+
+### Problem (the integration gap)
+
+The 2026-06-30 measure-inline-formula-width work added the tool + three-band
+classifier to SKILL.md Step 3, but **two flow documents still carried the old
+source-char heuristic (~90 chars)**, so an agent following the flow would hit
+stale rules:
+- `references/canonical-markdown-rules.md:203` — "over ~90 chars with ≥2 equalities... judge in context" (no measure tool, no three bands)
+- `references/self-check.md:36` — "over ~90 chars with ≥2 `=`... automated by lint" (no measure tool, no three bands)
+
+This is the "tool exists but the flow doesn't use it" gap the user flagged.
+
+### Design decision
+
+- **No new subagent.** The measure tool spins up a browser (~1s) — too heavy for
+  the 8-role `--only` self-check (retry ≤3 would cost tens of seconds). It is a
+  one-shot gate, precedent: ⑥'s `--check-proofreading` (independent CLI branch)
+  and Step 2.8 (independent gate).
+- **Formula-length judgment stays in Step 3** (structural format, main-agent).
+  It is a whole-document scan, not question-block refinement (Step 2.7).
+- **Integration = sync the three-band + measure tool into canonical-rules +
+  self-check**, so Step 3's "apply canonical-rules" naturally carries the
+  correct rule. SKILL.md Step 3 becomes a POINTER (progressive disclosure —
+  detailed rule lives in canonical-rules, single source).
+
+### Candidate I1 — `strengthen`: canonical-markdown-rules.md:203 (char → three-band)
+
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 strengthen — L203 existed but used the stale ~90-char heuristic / G3 principle — measurement correctness).
+- **Landing zone:** `references/canonical-markdown-rules.md:203` (rewritten in place).
+- **Outcome:** APPLIED.
+
+### Candidate I2 — `strengthen`: self-check.md:36 (char → three-band judgment item)
+
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 strengthen — L36 existed but pointed only at the coarse lint / G3 principle).
+- **Landing zone:** `references/self-check.md:36` (rewritten in place).
+- **Outcome:** APPLIED.
+
+### Candidate I3 — `strengthen`: SKILL.md Step 3 (deduplicate → pointer)
+
+- **Classification:** `rework` → `strengthen`.
+- **Gate verdict:** strengthen (G1 PASS / G2 strengthen — Step 3 had the full three-band text inline, duplicating canonical-rules / G3 principle — progressive disclosure, single source of truth).
+- **Landing zone:** `SKILL.md` Step 3 (long inline paragraph → pointer to canonical-rules + the one measure command).
+- **Outcome:** APPLIED.
+
+### Batch metadata
+
+- **Pairwise conflict check:** Fast path — 3 candidates, all strengthen the same rule across 3 files (canonical-rules = source, self-check = check, SKILL.md = pointer). Complementary, no conflict.
+- **Dev Eval:** `py -3 -m pytest tests/ -q` → **101 passed** (unchanged — pure doc edits, no code/test logic touched).
+- **Manual verification:** `~90 chars` grep → 0 hits across all 3 files (cleared); `measure_inline_formula_width` + three-band thresholds (464/625) present in all 3.
+- **Outcome:** APPLIED.
+- **Files written:**
+  - `references/canonical-markdown-rules.md` (I1: L203 char-heuristic → three-band + measure command)
+  - `references/self-check.md` (I2: L36 char-heuristic → three-band judgment item + measure command)
+  - `SKILL.md` (I3: Step 3 long paragraph → pointer + single command; progressive disclosure)
+  - `references/evolution-log.md` (this entry)
+- **Snapshots (2026-07-01):**
+  - `references/canonical-markdown-rules.md.bak-2026-07-01`
+  - `references/self-check.md.bak-2026-07-01`
+  - `SKILL.md.bak-2026-07-01`
+- **Recurrence count:** first occurrence of the integration (the measure tool itself was added 2026-06-30; this is the flow-sync that makes it actually used).
+- **Verification summary:** Dev Eval machine-verified (pytest 101 pass). The three doc edits are auditable-evidence-only (the flow is now self-consistent: Step 3 → canonical-rules → three bands → measure tool → self-check confirms).
+- **Active-context staleness:** editing the repo files does NOT change this session's loaded skill text. The integrated flow takes effect in a **fresh rewrite session**.
