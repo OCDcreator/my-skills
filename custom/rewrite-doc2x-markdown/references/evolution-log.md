@@ -1078,3 +1078,270 @@ This is the "tool exists but the flow doesn't use it" gap the user flagged.
 - **Active-context staleness:** editing the repo files does NOT change this
   session's loaded skill text. The new lint takes effect in a **fresh rewrite
   session** that re-reads `SKILL.md` Step 4 and runs the validator.
+
+---
+
+## 2026-07-02 — strengthen: block-element blank-line separator (lint_block_separator)
+
+- **Trigger (verbatim user messages, provenance: extracted):**
+  - "你没意识到这个有换行问题吗？" (+ pasted callout with 题干 glued to `> | A. ... |` table)
+  - "他的语法没问题，是因为她没有喝上一行，必须两个换行才会是新的行"
+  - "是题干和选项之间要有空行啊而且你怎么把表格语法改坏了？"
+  - "怎么能不是表格呢？…都是表格"
+  - "他只要换行，就必须是两次换行，不能是一次换行" (the generalization — NOT callout-only)
+- **Class:** rework (5 corrections in one task). Preceding assistant action:
+  audited `必修二-微专题01：向量万能建系法.md` for line-break issues, ran
+  `lint_paragraph_separator` (passed), but MISSED callout 题干↔table glue
+  because that lint only covers prose↔prose; then on user correction guessed
+  wrong 3× (拆表格/删分隔行/纵向非表格) before landing the fix.
+- **Root cause:** `lint_paragraph_separator` resets its prose cursor at every
+  table/HTML/math line, treating "prose glued to a block" as a legal boundary.
+  So the skill's documented rule "separate paragraphs everywhere
+  (blank-line)" was NOT actually hard-enforced for block openers — the
+  canonical-rules.md:334 claim "Hard-enforced by lint_paragraph_separator" was
+  over-broad (true only for prose↔prose). Obsidian/CommonMark merge a block
+  opener into the preceding paragraph on single `\n`, so a pipe table glued to
+  the line above does NOT render as a table.
+- **Gate verdicts:**
+  - G1 Generality: **pass** — user generalized to "只要换行就必须两次换行", not
+    single-document.
+  - G2 Duplication: **strengthen** — canonical-markdown-rules.md:334 already
+    says "everywhere" but the named enforcer only covered prose↔prose; the
+    block-opener half was uncovered.
+  - G3 Preference/Principle: **principle** — Obsidian/CommonMark rendering
+    engine objective behavior; tables/figures fail to render = functional
+    defect, not taste.
+  - Pairwise conflict check: fast path (≤3 candidates).
+- **Landing zone:** reference-domain (canonical-markdown-rules.md:334 sibling
+  bullet) for the rule; SKILL.md Step 4 lint-family list for the enforcer name.
+- **Change (approved packet, written 2026-07-02):**
+  - `scripts/validate_canonical_markdown.py` (+177): new `lint_block_separator`
+    — flags prose→block-opener (pipe table / `<figure>`/`<table>`/`<div>`) glue
+    in body AND callout channels. Display-math `$$` EXEMPT (KaTeX self-
+    recognizes boundaries — confirmed via test_accepts_markdown_math_and_html_mathml).
+    Only PROSE predecessors flagged (heading/list/another-block→opener is a
+    legal boundary). Registered in lint_markdown.
+  - `tests/test_validate_canonical_markdown.py` (+94): 5 new tests —
+    callout-table-glued (FAIL), callout-table-blank-separated (OK),
+    figure-glued-to-prose (FAIL), heading→figure (OK, regression guard vs
+    over-broad v1), prose→display-math (OK, exemption guard).
+  - `references/canonical-markdown-rules.md` (+1): new bullet after :334 —
+    block-element blank-line rule, names `lint_block_separator`, notes $$
+    exemption.
+  - `SKILL.md` (Step 4, +1/-1): adds `lint_block_separator` to the rewrite-
+    structure lint family with a one-clause description.
+- **Snapshot (2026-07-02):** `SKILL.md.bak-2026-07-02`
+- **Recurrence count:** 0 (first). Closest precedent is 2026-07-01
+  `lint_paragraph_separator` itself — same rule family (blank-line separation),
+  but that one covered prose↔prose; this entry closes the block-opener gap the
+  2026-07-01 entry explicitly left open ("HTML/code/table exempt" was the
+  design then; the 2026-07-02 correction is that block OPENERS are NOT exempt
+  when preceded by prose).
+- **Verification summary:** Dev Eval **machine-verified** — pytest 114 passed
+  (109 prior + 5 new), no regression. Two real glue cases caught on a synthetic
+  sample (callout 题干↔table at L5, prose↔figure at L9). v1 of the lint
+  over-flagged (12 false positives: heading→figure, prose→$$); v2 fixed both
+  by restricting to prose predecessors and exempting display-math. The 2
+  doc-line edits are auditable-evidence-only.
+- **Adversarial note (strongest reason NOT to add):** rule already documented
+  "everywhere" at canonical-rules:334; a model that read the rule would obey
+  it without a new lint. Rebuttal: :334 *named* `lint_paragraph_separator` as
+  the enforcer, and that lint provably did NOT cover block openers — so the
+  "hard-enforced" claim was false. The new lint makes the existing documented
+  claim true; it is not redundant prose.
+- **Known limitation (carried forward):** `lint_block_separator` detects
+  prose→opener glue only; block↔block glue (e.g. `<figure>` immediately
+  followed by a pipe table, no prose between) is NOT flagged. If real
+  transcripts show block↔block glue that fails to render, extend the prose-
+  predecessor check to a block-predecessor check. Also: the opener regex
+  (`figure|table|div|span|math`) is a finite allowlist; other HTML block tags
+  (`<pre>`, `<blockquote>`) are not yet covered.
+- **Active-context staleness:** the new lint takes effect in a **fresh rewrite
+  session** that re-runs the validator. This session's loaded SKILL.md is
+  unchanged.
+
+---
+
+## 2026-07-02 — strengthen (recurrence #1): lint_list_inside_math detects 3 fusion shapes
+
+- **Trigger (verbatim user messages, provenance: extracted):**
+  - "skill中到底有没有这个检测逗号的环节？有没有子代理负责这个的？"
+  - "当然要补上" (after I explained lint_list_inside_math was interval/percent-only
+    and SILENT on equation-chain/multi-point/multi-variable fusion, and that the
+    ③ math-comma-splitter role's self-check was therefore a false-green)
+- **Class:** rework/missing. Preceding assistant action: ran the 4 formula lints
+  on `必修二-微专题01：向量万能建系法.md` — all PASSED — then on user challenge
+  hand-scanned and found **57 inline spans** with comma-chained equations (e.g.
+  `${AM}=3, {BC}=10$`) that the green lint had silently approved.
+- **Root cause:** `lint_list_inside_math` (created 2026-06-29 as Candidate C2)
+  matched ONLY two repeating-unit shapes — interval lists (`\lbrack 5.31,5.33),
+  \lbrack 5.33,5.35)`) and percent series (`60%, 60%, 65%`). It was deliberately
+  conservative (the 2026-06-29 adversarial: "a broad regex would break intervals
+  and function arguments"). On 2026-06-30 the blind spot was *noticed* and
+  documented in refinement-agent-chain.md:157 ("lint is SILENT on
+  point/equation/variable enumerations; hand-scan") — but the lint itself was
+  never extended. Since this lint IS the ③ role's `--only` self-check, a green
+  self-check falsely signaled the role was complete, so 57 fused spans survived
+  a real rewrite pass on the 必修二 file.
+- **Recurrence count:** 1 (second occurrence).
+  - 1st (2026-06-29): C2 created the lint conservative; adversarial logged.
+  - 2026-06-30: blind spot noticed, routed to "hand-scan" comment, NOT fixed.
+  - 2nd (this entry, 2026-07-02): real file proved the hand-scan fallback
+    unreliable — the role green-self-checked and skipped the work entirely.
+- **Gate verdicts:**
+  - G1 Generality: **pass** — any math markdown has formula comma fusion.
+  - G2 Duplication: **strengthen** — lint exists but covers ~10% (interval/
+    percent); the other 90% (the three common shapes) was uncovered.
+  - G3 Preference/Principle: **principle** — KaTeX renders comma-fused
+    independent propositions as one formula; the false-green self-check hides
+    a structural rewrite failure. Functional defect, not taste.
+  - Pairwise conflict check: fast path (≤3 candidates).
+- **Landing zone:** the lint itself (`scripts/validate_canonical_markdown.py`:
+  `lint_list_inside_math` rewrite); SKILL.md:47 (③ role self-check contract
+  description); refinement-agent-chain.md:157-161 (blind-spot comment +
+  self-check ceiling note).
+- **Change (approved packet, written 2026-07-02):**
+  - `scripts/validate_canonical_markdown.py` (rewrite lint_list_inside_math):
+    keeps the legacy interval/percent detection; adds a **depth-0-comma
+    tracker** (`depth_zero_comma_positions`) that excludes structural commas
+    inside `()`/`[]`/`{}`, then three shape detectors on the split units:
+    (b) ≥2 units containing `=` (equation chain), (a) ≥2 units matching
+    `^[A-Z]\(` (labeled coordinate points), (c) ≥3 single-letter units
+    (independent variables; threshold 3 to avoid 2-letter prose false positives).
+    The depth tracking is what resolves the 2026-06-29 adversarial — structural
+    commas in `(x,y)`/`[a,b)`/`f(x,y)`/`{...}` are at depth>0 and never split.
+  - `tests/test_validate_canonical_markdown.py` (+5 tests): equation-chain
+    FAIL, multi-point FAIL, multi-variable FAIL, derivation-chain `A=B=C`
+    NOT-flagged (false-positive guard), single-coordinate `$A(0,0)$` NOT-flagged.
+  - `SKILL.md:47` — updated the ③ role self-check contract: lint_list_inside_math
+    now detects the three shapes; residual caveat = cannot judge if two
+    comma-joined equations are truly independent vs a legit compound statement.
+  - `references/refinement-agent-chain.md:157,161` — replaced "lint CANNOT
+    detect / hand-scan" with "lint now DETECTS via depth-0-comma"; updated
+    self-check ceiling note accordingly.
+- **Snapshot (2026-07-02):** `SKILL.md.bak-2026-07-02-2` (-2 suffix: the
+  same-day `-1` snapshot belongs to the earlier lint_block_separator round;
+  both rounds are uncommitted in the working tree together).
+- **Verification summary:** Dev Eval **machine-verified** — pytest 119 passed
+  (114 prior + 5 new), no regression. Synthetic 3-shape sample: all flagged;
+  single-coordinate + derivation-chain: NOT flagged. Real 必修二 file (already
+  hand-split earlier this session): rc=0, confirming the splits are complete.
+  One real bug caught during eval: a malformed regex (`\?\?left?` →
+  `PatternError: unterminated character set`) crashed the whole test suite at
+  72 failed; fixed to `(?:\left)?\(` and all green.
+- **Adversarial note (strongest reason NOT to add):** the 2026-06-29 creator
+  deliberately made this conservative because a broad comma-regex breaks
+  intervals/function-args — extending it risks the very false positives that
+  were warned against. **Rebuttal:** the depth-0-comma tracker is the precise
+  answer to that warning — structural commas live at depth>0 by definition, so
+  `(x,y)` / `[a,b)` / `f(x,y)` / `{...}` are mechanically exempt. The Dev Eval
+  false-positive guards (single coordinate, derivation chain) pass. The
+  residual risk is semantic (a legit compound statement flagged as fuse), which
+  is rare and surfaces as a lint FAIL the executor can judge — far better than
+  the prior silent approval of 57 real fuses.
+- **Known limitation (carried forward):** the equation-chain detector flags
+  ANY depth-0 comma between two `=`-containing units. It cannot judge whether
+  the two equations are *independent* (should split) or a *compound statement*
+  (e.g. a single definition `$a=1, b=2$` intended as one). In practice ~all
+  depth-0 comma + dual-`=` spans are genuine fuses (the 必修二 file had 0
+  compound-statement false positives among 57 cases), but the executor should
+  spot-check flagged spans for this edge. Also: multi-variable detection
+  requires ≥3 units to fire; a 2-variable fuse like `$k, l_1$` is NOT flagged
+  (intentional, to avoid prose false positives — hand-scan remains for 2-unit
+  variable lists).
+- **Active-context staleness:** the strengthened lint takes effect in a **fresh
+  rewrite session** that re-runs the ③ role self-check. This session's loaded
+  SKILL.md is unchanged.
+
+---
+
+## 2026-07-02 — strengthen: math-comma-splitter agent ASCII-comma coverage + lint/agent duty split
+
+- **Trigger (verbatim user message, provenance: extracted):**
+  - "不是有子代理吗？他是有阅读能力的，他可以辨别这个连接的方程是否是独立的"
+  (Correcting my prior claim that "residual blind spot: lint cannot judge equation
+  independence" was a lint problem. The user pointed out that independence judgment
+  is the SUBAGENT's job — it has reading comprehension — not the lint's.)
+- **Class:** rework (conceptual mis-assignment of responsibility). Preceding
+  assistant action: after extending lint_list_inside_math to detect the three
+  fusion shapes (round 2 this session), I wrote in the approval packet that the
+  "residual blind spot" was that lint cannot judge whether two comma-joined
+  equations are independent. The user corrected: that is exactly what the
+  math-comma-splitter subagent exists for.
+- **Root cause (TWO gaps found when I actually read the agent definition):**
+  1. **ASCII-comma blindness.** `agents/math-comma-splitter.md` scan step said
+     "for each formula that contains `，` or `、`" — Chinese comma + enumeration
+     comma ONLY. But the 57 fused spans in 必修二-向量万能建系法 were ALL joined
+     by the ASCII/English comma `,` (e.g. `${AM}=3, {BC}=10$`). Even a perfectly
+     executed role-③ pass would have skipped every one of them, because the scan
+     entry point never enumerated ASCII `,`. This is a MORE fundamental gap than
+     the lint blindness fixed in round 2 — the lint was extended to ASCII commas,
+     but the agent that is supposed to do the semantic judgment was still scanning
+     only Chinese commas.
+  2. **Stale Anti-shortcut clause.** The clause said "lint is SILENT on the three
+     fusion shapes; hand-scan". After round 2 the lint now DETECTS those shapes,
+     so the clause was wrong, AND it framed the work as "hand-scan because lint
+     is blind" rather than the correct "lint finds candidates structurally, agent
+     judges semantically".
+- **Correct duty split (the user's point, encoded):**
+  - `lint_list_inside_math` (regex, structural) → reports CANDIDATE positions
+    (depth-0 comma + unit shape). Cannot judge independence.
+  - `math-comma-splitter` agent (reading comprehension, semantic) → visits each
+    flagged/unflagged span, JUDGES independent (split) vs compound statement
+    (keep), and REPORTS each kept span with its judgment reason.
+- **Recurrence count:** 0 for the ASCII-comma gap specifically (first discovery).
+  It is the same defect CHAIN as rounds 1 (block separator) and 2 (lint
+  interval-only), but a different layer: round 2 fixed the regex detector, this
+  round fixes the semantic executor that the regex detector feeds. The user's
+  correction was specifically that I had mis-framed the residual as a lint limit
+  when it was an agent-responsibility limit.
+- **Gate verdicts:**
+  - G1 Generality: **pass** — ASCII-comma fusion is universal in math markdown.
+  - G2 Duplication: **strengthen** — agent already covered `，`/`、`; extending to
+    ASCII `,` + rewriting the stale Anti-shortcut clause.
+  - G3 Preference/Principle: **principle** — semantic judgment is the agent's
+    defined job; the scan-entry gap meant even perfect execution failed.
+  - Pairwise conflict check: fast path (≤3 candidates).
+- **Landing zone:** the agent definition file itself
+  (`agents/math-comma-splitter.md`). No SKILL.md change needed — round 2 already
+  updated SKILL.md:47's ③-role description; this round completes the agent half.
+- **Change (approved packet, written 2026-07-02):**
+  - `agents/math-comma-splitter.md` (+10/-6):
+    - frontmatter `description` + role line: `，`/`、` → add ASCII `,`, with a
+      NOTE that ASCII is the dominant fusion marker in real transcripts.
+    - step 3 scan condition: `含 ， 或 、` → `含 ，, 、, **或 ASCII ,**`.
+    - step 6 self-check: same ASCII-comma addition + "at depth 0".
+    - **Anti-shortcut clause REWRITTEN**: now states the lint/agent duty split
+      (lint = structural candidates; agent = semantic independence judgment),
+      requires the report to list every KEPT depth-0-comma span with its
+      compound-vs-independent judgment (not just every split).
+    - report-back: covers ASCII `,`.
+- **Snapshot (2026-07-02):** `agents/math-comma-splitter.md.bak-2026-07-02`.
+- **Verification summary:** agent file is a prompt (no runtime self-check —
+  Verification Ceiling applies). Structural checks done: frontmatter parses;
+  scan-step + Anti-shortcut + report-back all contain the ASCII-comma coverage;
+  lint test suite still 119 passed (agent change does not touch code). The real
+  verification is a fresh rewrite session dispatching role ③ — the agent should
+  now catch ASCII-comma fusions and its report should list kept-span judgments.
+- **Adversarial note (strongest reason NOT to add):** editing a prompt does not
+  guarantee the model executes it; the agent could still skip ASCII commas at
+  runtime. **Rebuttal:** the prior prompt EXPLICITLY restricted the scan to
+  Chinese commas — even a perfectly obedient agent failed. The edit removes that
+  hard floor. Combined with the rewritten Anti-shortcut clause requiring kept-
+  span judgments in the report, there is now an auditable artifact (the report)
+  the orchestrator can check, where before there was none.
+- **Known limitation (carried forward):** the agent's report-listing requirement
+  is auditable only if the orchestrator actually reads the report. (CORRECTION
+  2026-07-02: an earlier draft of this entry claimed `.opencode/agents/*.md` "does
+  not exist" — that was WRONG. `.opencode/agents/` lives in the *project*
+  scan-PDF-print-HTML, not in the my-skills repo, and its 11 agent files are
+  symlinks to `my-skills/.../agents/*.md` — see entry at line 706 of this log,
+  dated 2026-06-30. The path reference in SKILL.md:190 is correct relative to the
+  project root, and edits to `my-skills/.../agents/*.md` propagate via symlink.
+  The error came from checking for `.opencode/` under the my-skills repo root
+  instead of the project root.) Also: the duty split assumes the agent reads
+  each candidate's context — a weak model may still rubber-stamp; the
+  orchestrator's fresh-subagent cross-review (Step 2.8) remains the backstop.
+- **Active-context staleness:** the strengthened agent takes effect in a **fresh
+  rewrite session** that dispatches role ③ (or runs it inline from
+  refinement-agent-chain.md). This session's loaded SKILL.md is unchanged.

@@ -726,6 +726,182 @@ def lint_paragraph_separator(lines: list[str]) -> list[LintMessage]:
     return messages
 
 
+def lint_block_separator(lines: list[str]) -> list[LintMessage]:
+    """Flag a block-level element (pipe table, HTML block such as <figure>, or
+    display-math `$$`) glued directly to the preceding PROSE line by a single
+    `\\n` with no blank line between them.
+
+    Why this exists separately from `lint_paragraph_separator`: that lint only
+    catches PROSE↔PROSE joins — it deliberately resets its prose-run cursor at
+    every table / HTML / math line, treating "prose glued to a block" as a
+    legal boundary. But Obsidian/CommonMark merge a block-opening line into the
+    preceding paragraph too when only a single `\\n` separates them: a pipe
+    table whose first row follows prose on the next line does NOT render as a
+    table, and a `<figure>` glued to prose gets pulled into that paragraph.
+    <!-- evolved 2026-07-02 — user correction: "只要换行就必须两次换行";
+         the callout 题干↔表格 case in 必修二-向量万能建系法 was the trigger,
+         but the rule is universal, not callout-specific. -->
+
+    Only PROSE → block-opener joins are flagged. A block-opener preceded by a
+    heading, list item, another block, a blank line, or start-of-file is NOT
+    flagged (those are legitimate block boundaries that already terminate the
+    previous element). This mirrors lint_paragraph_separator's prose model.
+    """
+    messages: list[LintMessage] = []
+    in_frontmatter = False
+    fence: str | None = None
+    html_depth = 0
+    list_item_re = re.compile(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)")
+    pipe_table_re = re.compile(r"^\s*\|")
+    fence_open_re = re.compile(r"^(\s*)(`{3,}|~{3,})")
+    html_block_open_re = re.compile(r"^\s*<(?:figure|table|div|span|math)\b", re.I)
+    # Was the immediately-preceding line a PROSE line in this channel? Only a
+    # prose predecessor makes a glued block-opener a defect.
+    prev_body_prose = False
+    prev_callout_prose = False
+
+    def is_block_opener(stripped_content: str) -> str | None:
+        if pipe_table_re.match(stripped_content):
+            return "table"
+        if html_block_open_re.match(stripped_content):
+            return "figure/HTML block"
+        # NOTE: display-math `$$` is intentionally NOT flagged here. Obsidian's
+        # KaTeX/MathJax parser recognizes `$$` boundaries independently of
+        # Markdown paragraph splitting, so a `$$` glued to prose still renders
+        # as a standalone display block. Only Markdown/HTML block elements
+        # (tables, <figure>) rely on paragraph separation to render correctly.
+        return None
+
+    for index, raw in enumerate(lines):
+        line_no = index + 1
+        stripped_raw = raw.strip()
+        # --- frontmatter ---
+        if index == 0 and stripped_raw == "---":
+            in_frontmatter = True
+            prev_body_prose = False
+            continue
+        if in_frontmatter:
+            if stripped_raw == "---":
+                in_frontmatter = False
+            prev_body_prose = False
+            continue
+        # --- code fences ---
+        fence_match = fence_open_re.match(raw)
+        if fence_match:
+            delim_char = fence_match.group(2)[0]
+            delim = delim_char * len(fence_match.group(2))
+            if fence is None:
+                fence = delim
+            elif raw.lstrip().startswith(delim):
+                fence = None
+            prev_body_prose = False
+            prev_callout_prose = False
+            continue
+        if fence is not None:
+            continue
+        # --- HTML block depth tracking ---
+        content_for_html = strip_quote_marker(raw) if is_quote_line(raw) else raw
+        delta = html_depth_delta(content_for_html)
+        if html_depth > 0 or delta > 0:
+            # Is this line a block OPENER (depth 0 → >0) glued to preceding
+            # prose? Check BEFORE updating depth. Detect on the raw line.
+            opening_now = html_depth == 0 and delta > 0
+            is_callout_here = is_quote_line(raw)
+            if opening_now:
+                # determine opener label via the raw stripped content
+                raw_stripped_for_label = (strip_quote_marker(raw) if is_callout_here else raw).strip()
+                if html_block_open_re.match(raw_stripped_for_label):
+                    if is_callout_here and prev_callout_prose:
+                        messages.append(
+                            LintMessage(
+                                line_no,
+                                "missing blank `>` line before figure/HTML block: a block "
+                                "element glued to the preceding prose line by a single "
+                                "`\\n` does not render as a new block in Obsidian/CommonMark "
+                                "— separate with a blank `>` line",
+                            )
+                        )
+                    elif not is_callout_here and prev_body_prose:
+                        messages.append(
+                            LintMessage(
+                                line_no,
+                                "missing blank line before figure/HTML block: a block element "
+                                "glued to the preceding prose line by a single `\\n` does not "
+                                "render as a new block in Obsidian/CommonMark — separate with "
+                                "a blank line (`\\n\\n`)",
+                            )
+                        )
+            html_depth += delta
+            if html_depth < 0:
+                html_depth = 0
+            prev_body_prose = False
+            prev_callout_prose = False
+            continue
+        # Things that terminate a prose run WITHOUT being prose themselves
+        # (headings, lists, blank lines, display-math, table rows): reset both.
+        is_callout = is_quote_line(raw)
+        # blank line (body) / blank `>` (callout)
+        if not stripped_raw:
+            prev_body_prose = False
+            continue
+        if HEADING_LEVEL_PATTERN.match(stripped_raw):
+            prev_body_prose = False
+            prev_callout_prose = False
+            continue
+        if list_item_re.match(raw):
+            prev_body_prose = False
+            prev_callout_prose = False
+            continue
+
+        if is_callout:
+            callout_content = strip_quote_marker(raw)
+            callout_stripped = callout_content.strip()
+            if CALLOUT_TYPE_PATTERN.match(raw):
+                prev_callout_prose = False
+                continue
+            if callout_stripped == "":
+                prev_callout_prose = False
+                continue
+            # Is THIS line a block opener glued to preceding callout prose?
+            opener = is_block_opener(callout_stripped)
+            if opener and prev_callout_prose:
+                messages.append(
+                    LintMessage(
+                        line_no,
+                        f"missing blank `>` line before {opener}: a block element glued "
+                        "to the preceding prose line by a single `\\n` does not render as "
+                        "a new block in Obsidian/CommonMark — separate with a blank `>` "
+                        "line",
+                    )
+                )
+            # Update prose cursor: block openers / HTML / math-only lines are
+            # NOT prose; everything else (题干 prose) is.
+            prose_here = strip_math_for_count(callout_stripped).strip()
+            if opener or html_block_open_re.match(callout_stripped) or not prose_here or pipe_table_re.match(callout_content):
+                prev_callout_prose = False
+            else:
+                prev_callout_prose = True
+            continue
+
+        # --- BODY channel ---
+        opener = is_block_opener(stripped_raw)
+        if opener and prev_body_prose:
+            messages.append(
+                LintMessage(
+                    line_no,
+                    f"missing blank line before {opener}: a block element glued to the "
+                    "preceding prose line by a single `\\n` does not render as a new "
+                    "block in Obsidian/CommonMark — separate with a blank line (`\\n\\n`)",
+                )
+            )
+        prose_here = strip_math_for_count(stripped_raw).strip()
+        if opener or html_block_open_re.match(stripped_raw) or not prose_here or pipe_table_re.match(raw) or list_item_re.match(raw):
+            prev_body_prose = False
+        else:
+            prev_body_prose = True
+    return messages
+
+
 def lint_question_callout_title_attached(
     lines: list[str],
     blocks: list[QuoteBlock],
@@ -1671,58 +1847,144 @@ def lint_formula_dangling_tail(lines: list[str]) -> list[LintMessage]:
 
 
 def lint_list_inside_math(lines: list[str]) -> list[LintMessage]:
-    """C2 (2026-06-29): a list of independent math UNITS crammed into one
-    inline `$...$` span, separated by commas that should be OUTSIDE the math.
-    Patterns this session hit:
+    """C2 (2026-06-29; reworked 2026-07-02): independent math UNITS crammed
+    into one inline `$...$` span, separated by commas that should be OUTSIDE
+    the math. Five shapes now detected:
+
       - multiple intervals: `$\\lbrack 5.31, 5.33), \\lbrack 5.33, 5.35), \\cdots$`
       - percentage/value series: `${60}\\% , {60}\\% , {65}\\%$`
+      - comma-chained equations (added 2026-07-02): `${AM}=3, {BC}=10$`,
+        `$f(0)=1, f(2)=3$` — independent equalities fused by a comma.
+      - multiple labeled coordinate points (added 2026-07-02):
+        `$A(0,0), B(3,-2), C(5,1)$` — each point is independent; the comma
+        INSIDE `(x,y)` is structural and stays.
+      - multiple independent single-letter variables (added 2026-07-02):
+        `$A, B, C$`, `$k, l_1$`.
+
     Each unit should be its own `$...$` with the separator comma outside:
       `$\\lbrack 5.31, 5.33)$, $\\lbrack 5.33, 5.35)$, $\\cdots$`
 
-    Conservative heuristic — flag ONLY when one inline span contains a
-    REPEATING structure joined by commas: a unit token appearing 2+ times
-    with `, ` separators between distinct instances. A single interval
-    `$(0,1)$` or a function arg `$f(x,y)$` must NOT be flagged (those commas
-    are internal to one unit). This is the 'list of units' shape, not a
-    naive comma-count.
+    The KEY discriminant is bracket DEPTH: a comma at depth 0 (outside all
+    `()`/`[]`/`{}`) between two independent units is a separator that should
+    be outside the math; a comma inside `(x,y)` / `[a,b)` / `f(x,y)` / `{...}`
+    is structural and is NEVER a split point. This depth-tracking is what lets
+    the equation/point shapes be detected without false-flagging coordinates
+    and function arguments.
+
+    A single interval `$(0,1)$`, a single coordinate `$A(0,0)$`, or a function
+    arg `$f(x,y)$` is NOT flagged (no depth-0 comma, or only one unit).
+
+    <!-- evolved 2026-07-02 — the 2026-06-29 conservative heuristic only matched
+    interval-list / percent-series (repeating-unit openers); it was SILENT on
+    equation-chain / multi-point / multi-variable shapes, which are the COMMON
+    cases in real transcripts (57 spans in one 必修二 file). Since this lint is
+    the ③ math-comma-splitter role's self-check, a green lint falsely signaled
+    the role was done. The depth-tracking detector closes that gap. -->
     """
     messages: list[LintMessage] = []
-    # candidate repeating-unit openers: a bracket/brace-delimited value, or a
-    # number+percent, that appears 2+ times separated by ", " inside ONE span.
-    # interval opener: \lbrack / \left\lbrack / [ ; percent tail: }%
+    # candidate repeating-unit openers (legacy interval/percent shapes).
     unit_openers = [
         re.compile(r"\\lbrack|\\left\\lbrack"),
         re.compile(r"\\\}\\\\?%|\\}\\\\?%|\}%"),
     ]
+    CLOSERS = set(")]}")
+    PAIR_OPEN = {"(": ")", "[": "]", "{": "}"}
+
+    def depth_zero_comma_positions(body: str) -> list[int]:
+        """Indices of commas at bracket depth 0 (the splittable separators).
+
+        Skips `\\,` (LaTeX thin-space) — the backslash makes it a command, not
+        a separator. Tracks `()`/`[]`/`{}` nesting."""
+        depth = 0
+        positions = []
+        for i, ch in enumerate(body):
+            if ch in PAIR_OPEN:
+                depth += 1
+            elif ch in CLOSERS:
+                depth = max(0, depth - 1)
+            elif depth == 0 and ch == ",":
+                # exclude \, (thin space)
+                if i > 0 and body[i - 1] == "\\":
+                    continue
+                positions.append(i)
+        return positions
+
+    def split_at(body: str, positions: list[int]) -> list[str]:
+        """Split body at the given comma indices, dropping the commas."""
+        segs = []
+        prev = 0
+        for pos in positions:
+            segs.append(body[prev:pos])
+            prev = pos + 1
+        segs.append(body[prev:])
+        return [s.strip() for s in segs if s.strip()]
+
+    # multi-point shape: a unit starting with an uppercase letter followed by
+    # `(` or `\left(` — e.g. `A(0,0)`, `B\left(3,-2\right)`.
+    point_unit = re.compile(r"^[A-Z](?:\\left)?\(")
+    # multi-variable shape: a unit is a single letter (optionally with sub/sup)
+    single_letter_unit = re.compile(r"^[A-Za-z](?:[_^][A-Za-z0-9])?$")
+
     for index, raw in enumerate(lines, start=1):
         line_without_mathml = strip_mathml(raw)
         for match in INLINE_MATH_PATTERN.finditer(line_without_mathml):
             body = match.group(1)
-            # need at least 2 commas to be a list of >=3-ish units (avoid 2-unit noise)
-            if body.count(",") < 2:
-                continue
-            flagged = False
-            for opener in unit_openers:
-                hits = opener.findall(body)
-                if len(hits) >= 2:
-                    # confirm the openers are separated by commas (a list), not a
-                    # single nested expression: count ", " between first and last hit
-                    first = body.find(hits[0]) if hits else -1
-                    last = body.rfind(hits[-1]) if hits else -1
-                    segment = body[first:last] if first >= 0 and last > first else ""
-                    if segment.count(",") >= 1:
-                        flagged = True
-                        break
-            if flagged:
+            reason = None
+
+            # --- legacy: interval-list / percent-series (repeating openers) ---
+            if body.count(",") >= 2:
+                for opener in unit_openers:
+                    hits = opener.findall(body)
+                    if len(hits) >= 2:
+                        first = body.find(hits[0]) if hits else -1
+                        last = body.rfind(hits[-1]) if hits else -1
+                        segment = body[first:last] if first >= 0 and last > first else ""
+                        if segment.count(",") >= 1:
+                            reason = "a list of independent math units (intervals / values)"
+                            break
+
+            # --- new: depth-0-comma shapes (equation chain / multi-point /
+            #     multi-variable) ---
+            if reason is None:
+                comma_positions = depth_zero_comma_positions(body)
+                if len(comma_positions) >= 1:
+                    units = split_at(body, comma_positions)
+                    # need >= 2 units to be a "list"
+                    if len(units) >= 2:
+                        # equation chain: >= 2 units each containing '='
+                        eq_units = [u for u in units if "=" in u]
+                        if len(eq_units) >= 2:
+                            reason = (
+                                "comma-chained equations fused in one `$...$` span "
+                                "(e.g. `${AM}=3, {BC}=10$`)"
+                            )
+                        # multi-point: >= 2 units shaped `A(...)` (and the comma
+                        # inside the parens was correctly NOT a split point)
+                        elif sum(1 for u in units if point_unit.match(u)) >= 2:
+                            reason = (
+                                "multiple labeled coordinate points fused in one `$...$` "
+                                "span (e.g. `$A(0,0), B(3,-2)$`); the comma inside `(x,y)` "
+                                "stays, the comma BETWEEN points should be outside"
+                            )
+                        # multi-variable: >= 3 units each a single letter (require 3
+                        # to avoid false positives on 2-letter prose-like spans)
+                        elif (
+                            len(units) >= 3
+                            and all(single_letter_unit.match(u) for u in units)
+                        ):
+                            reason = (
+                                "multiple independent variables fused in one `$...$` span "
+                                "(e.g. `$A, B, C$`)"
+                            )
+
+            if reason is not None:
                 messages.append(
                     LintMessage(
                         index,
-                        "a list of independent math units (intervals / values) is crammed "
-                        "into one `$...$` span with separators inside; split each unit into "
-                        "its own `$...$` with the comma outside, e.g. "
-                        "`$\\lbrack 5.31, 5.33)$, $\\lbrack 5.33, 5.35)$, $\\cdots$`. "
-                        "A single interval `$(0,1)$` or function arg `$f(x,y)$` is fine "
-                        "and is NOT flagged.",
+                        f"{reason}; split each unit into its own `$...$` with the "
+                        "comma outside. Structural commas inside `(x,y)` / `[a,b)` / "
+                        "`f(x,y)` / `{...}` are NOT split points — only depth-0 "
+                        "commas between independent units are.",
                     )
                 )
                 break
@@ -1881,6 +2143,7 @@ def lint_markdown(
         ("lint_qa_ordering", lambda: lint_qa_ordering(lines, blocks)),
         ("lint_markdown_analysis_paragraphs", lambda: lint_markdown_analysis_paragraphs(lines)),
         ("lint_paragraph_separator", lambda: lint_paragraph_separator(lines)),
+        ("lint_block_separator", lambda: lint_block_separator(lines)),
         ("lint_question_callout_title_attached", lambda: lint_question_callout_title_attached(lines, blocks)),
         ("lint_formula_dangling_tail", lambda: lint_formula_dangling_tail(lines)),
         ("lint_list_inside_math", lambda: lint_list_inside_math(lines)),

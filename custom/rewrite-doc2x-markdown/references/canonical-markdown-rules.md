@@ -332,6 +332,7 @@ Key principles (summary):
 - Fix OCR typos (已/己/巳, 人/入, 末/未, etc.) during re-typesetting
 - For math-heavy content: use plain Markdown (`**解析**` with `$...$` / `$$...$$`), NOT `<div class="analysis-block">` HTML blocks
 - **Separate paragraphs with a blank line, never a single line break — everywhere.** Obsidian/Typora/CommonMark merge two lines joined by a single `\n` into the SAME paragraph; only a blank line (`\n\n`) ends a body paragraph, and only a blank `>` line ends a callout paragraph. Applies to body prose, callout prose, and analysis (`**解析**`) alike. Hard-enforced by `lint_paragraph_separator`. <!-- evolved 2026-07-01 -->
+- **A block-level element (pipe table, `<figure>`/`<table>`/`<div>` HTML block) must be blank-line-separated from preceding PROSE.** The same single-`\n` merge that joins two prose lines also swallows a block opener: a pipe table glued to the line above does NOT render as a table, and a `<figure>` glued to prose gets pulled into that paragraph. Required separator: a blank line (`\n\n`) in body, a blank `>` line in a callout. This is the block-opener counterpart of the prose↔prose rule above. Hard-enforced by `lint_block_separator`. (Display-math `$$` is exempt — KaTeX recognizes its boundaries independent of paragraph splitting.) <!-- evolved 2026-07-02 — user correction: "只要换行就必须两次换行"; the callout 题干↔表格 case in 必修二-向量万能建系法 was the trigger, but the rule is universal, not callout-specific. -->
 
 ## Tables
 

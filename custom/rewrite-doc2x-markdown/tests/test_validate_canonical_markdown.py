@@ -1463,6 +1463,86 @@ def test_rejects_list_of_intervals_inside_one_math_span(tmp_path: Path) -> None:
     assert ok_result.returncode == 0, ok_result.stdout + ok_result.stderr
 
 
+def test_rejects_comma_chained_equations_in_one_span(tmp_path: Path) -> None:
+    """Two independent equalities fused by a comma in one `$...$` must be split.
+    Regression: 2026-07-02 必修二-向量万能建系法 had 57 such spans (e.g.
+    `${AM}=3, {BC}=10$) that the old interval-only lint was SILENT on."""
+    result = run_validator(
+        tmp_path,
+        """# 已知
+
+已知 ${AM} = 3, {BC} = {10}$，求值。
+""",
+        "--only",
+        "lint_list_inside_math",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "comma-chained equations" in result.stdout
+
+
+def test_rejects_multiple_coordinate_points_in_one_span(tmp_path: Path) -> None:
+    """Multiple labeled coordinate points fused in one `$...$` must be split;
+    the comma INSIDE `(x,y)` is structural and stays."""
+    result = run_validator(
+        tmp_path,
+        """# 共线
+
+点 $A(0,0), B(3,-2), C(5,1)$ 共线。
+""",
+        "--only",
+        "lint_list_inside_math",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "coordinate points" in result.stdout
+
+
+def test_rejects_multiple_independent_variables_in_one_span(tmp_path: Path) -> None:
+    """Multiple independent single-letter variables fused in one `$...$` (≥3 to
+    avoid 2-letter prose false positives) must be split."""
+    result = run_validator(
+        tmp_path,
+        """# 设点
+
+设 $A, B, C$ 三点。
+""",
+        "--only",
+        "lint_list_inside_math",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "independent variables" in result.stdout
+
+
+def test_list_inside_math_does_not_flag_derivation_chain(tmp_path: Path) -> None:
+    """A derivation chain `A = B = C = result` (one quantity's computation,
+    joined by `=` NOT commas) is a legit single span and must NOT be flagged.
+    This is the false-positive guard for the equation-chain detector."""
+    result = run_validator(
+        tmp_path,
+        """# 计算
+
+所以 $\\overrightarrow{AE} \\cdot \\overrightarrow{AF} = \\left( {10}, \\sqrt{3}\\right) \\cdot \\left( {5}, 4\\sqrt{3}\\right) = {62}$.
+""",
+        "--only",
+        "lint_list_inside_math",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_list_inside_math_does_not_flag_single_coordinate(tmp_path: Path) -> None:
+    """A single coordinate `$A(0,0)$` has its comma inside parens (structural)
+    and must NOT be flagged."""
+    result = run_validator(
+        tmp_path,
+        """# 原点
+
+点 $A(0,0)$ 是原点。
+""",
+        "--only",
+        "lint_list_inside_math",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 @_SKIP_NO_BROWSER
 def test_rejects_overlong_inline_formula_span(tmp_path: Path) -> None:
     """A multi-equality chain inline `$...$` span whose real rendered width
@@ -1562,4 +1642,98 @@ def test_warns_medium_width_inline_formula(tmp_path: Path) -> None:
     assert "NOTE:" in result.stdout, (
         f"medium-band formula must emit a NOTE hint. stdout: {result.stdout}"
     )
+
+
+def test_rejects_callout_table_glued_to_stem(tmp_path: Path) -> None:
+    """A pipe table inside a callout whose first row directly follows the stem
+    line (no blank `>` line) does not render as a table in Obsidian — the
+    table's first row merges into the stem paragraph. Must be flagged."""
+    result = run_validator(
+        tmp_path,
+        """# 测试
+
+> [!question] 例1
+> 题干内容下列结论正确的是
+> | A. 1 | B. 2 | C. 3 | D. 4 |
+> | :---: | :---: | :---: | :---: |
+""",
+        "--only",
+        "lint_block_separator",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "missing blank `>` line before table" in result.stdout
+
+
+def test_accepts_callout_table_with_blank_separator(tmp_path: Path) -> None:
+    """The same callout with a blank `>` line between stem and table is OK."""
+    result = run_validator(
+        tmp_path,
+        """# 测试
+
+> [!question] 例1
+> 题干内容下列结论正确的是
+>
+> | A. 1 | B. 2 | C. 3 | D. 4 |
+> | :---: | :---: | :---: | :---: |
+""",
+        "--only",
+        "lint_block_separator",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_rejects_figure_glued_to_prose(tmp_path: Path) -> None:
+    """A <figure> HTML block glued to the preceding prose line (no blank line)
+    is pulled into that paragraph in Obsidian/CommonMark — must be flagged."""
+    result = run_validator(
+        tmp_path,
+        """# 测试
+
+正文段落紧贴下图。
+<figure style="text-align:center;">
+  <img src="x.jpg" alt="图" />
+</figure>
+""",
+        "--only",
+        "lint_block_separator",
+    )
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "missing blank line before figure/HTML block" in result.stdout
+
+
+def test_block_separator_allows_heading_then_figure(tmp_path: Path) -> None:
+    """A block opener preceded by a heading (not prose) is NOT a glue defect —
+    headings terminate the previous element. Regression guard against the
+    initial over-broad implementation that flagged heading→figure."""
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+<figure style="text-align:center;">
+  <img src="x.jpg" alt="图" />
+</figure>
+""",
+        "--only",
+        "lint_block_separator",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_block_separator_allows_prose_then_display_math(tmp_path: Path) -> None:
+    """Display-math `$$` glued to prose is intentionally NOT flagged —
+    Obsidian's KaTeX parser recognizes `$$` boundaries independent of Markdown
+    paragraph splitting, so the display block still renders standalone."""
+    result = run_validator(
+        tmp_path,
+        """# 测试
+
+普通正文中的 $x$ 可以渲染。
+$$
+x = 1
+$$
+""",
+        "--only",
+        "lint_block_separator",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
