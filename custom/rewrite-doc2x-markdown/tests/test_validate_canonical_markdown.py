@@ -481,6 +481,57 @@ def test_rejects_dense_analysis_paragraph(tmp_path: Path) -> None:
     assert "analysis paragraph is too dense" in result.stdout
 
 
+def test_accepts_multiline_display_math_inside_markdown_analysis(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+**解析**
+
+因为
+
+$$
+\\begin{aligned}
+\\dfrac{{V}_{甲}}{{V}_{乙}}
+&= \\dfrac{\\tfrac{1}{3}(S_1+S_2+\\sqrt{S_1S_2})h_{甲}}{\\tfrac{1}{3}(S_1+S_2+\\sqrt{S_1S_2})h_{乙}} \\\\
+&= \\dfrac{h_{甲}}{h_{乙}} \\\\
+&= \\dfrac{\\sqrt{3}(r_1-r_2)}{2\\sqrt{2}(r_1-r_2)} \\\\
+&= \\dfrac{\\sqrt{6}}{4}.
+\\end{aligned}
+$$
+
+故答案为 $\\dfrac{\\sqrt{6}}{4}$。
+""",
+        "--only",
+        "lint_markdown_analysis_paragraphs,lint_analysis",
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_accepts_compact_figure_inside_markdown_analysis(tmp_path: Path) -> None:
+    result = run_validator(
+        tmp_path,
+        """# 空间几何
+
+**解析**
+
+对于 A，由已知条件先作辅助线，得到垂直关系。
+
+<figure style="display:flex;justify-content:center;align-items:center;gap:0.8rem;flex-wrap:nowrap;text-align:center;">
+  <img src="doc2x/export/images/a.jpg" alt="插图" style="max-width:20%;height:auto;display:block;margin:0 auto;" />
+  <img src="doc2x/export/images/b.jpg" alt="插图" style="max-width:20%;height:auto;display:block;margin:0 auto;" />
+</figure>
+
+因此继续判定线面关系，最终得到选项成立。
+""",
+        "--only",
+        "lint_markdown_analysis_paragraphs,lint_analysis",
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_rejects_body_paragraphs_joined_by_single_newline(tmp_path: Path) -> None:
     # Two body-prose lines joined by a single `\n` (no blank line between) merge
     # into one paragraph in Obsidian/CommonMark — the whole-doc hard detector

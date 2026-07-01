@@ -481,6 +481,8 @@ def lint_markdown_analysis_paragraphs(
         para_start: int | None = None
         para_lines: list[str] = []
         scan = index + 1
+        in_display_math = False
+        html_depth = 0
 
         def flush_paragraph(start: int | None, collected: list[str]) -> None:
             if start is None or not collected:
@@ -501,6 +503,27 @@ def lint_markdown_analysis_paragraphs(
             raw = lines[scan]
             content = strip_quote_marker(raw) if is_quote_line(raw) else raw
             stripped = content.strip()
+            delta = html_depth_delta(content)
+            if html_depth > 0 or delta > 0:
+                flush_paragraph(para_start, para_lines)
+                para_start = None
+                para_lines = []
+                html_depth += delta
+                if html_depth < 0:
+                    html_depth = 0
+                scan += 1
+                continue
+            if stripped.startswith("$$"):
+                flush_paragraph(para_start, para_lines)
+                para_start = None
+                para_lines = []
+                if not (stripped.endswith("$$") and len(stripped) > 4):
+                    in_display_math = not in_display_math
+                scan += 1
+                continue
+            if in_display_math:
+                scan += 1
+                continue
             # Hard exits from the analysis region entirely.
             if HEADING_LEVEL_PATTERN.match(stripped):
                 break
