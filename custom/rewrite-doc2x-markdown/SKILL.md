@@ -221,15 +221,23 @@ Read `references/canonical-markdown-rules.md` and apply it to the proofread tran
 
 **Long formulas**: display formulas > one line use `\begin{aligned}` with `\\` breaks, split at `=`/`+`/`-`/logical boundaries. **Whether an inline `$...$` chain is "too long" is judged by RENDERED WIDTH, not source characters** — see `references/canonical-markdown-rules.md` (Formulas → "long multi-equality chain") for the three-band classifier (short ≤464px keep inline / long >625px convert to aligned / medium 464–625px judge in context; A4 text ≈695px).
 
-<!-- evolved 2026-07-01 — the three-band rule + measure tool now live in canonical-markdown-rules.md
-     (single source); SKILL.md keeps only the pointer + the one command. -->
-When `lint_long_inline_formula` (Step 4, coarse signal — estimates width by macro folding, over-flags verbose-but-short formulas like the sin β chain: 275 source chars, ~360px render) flags a formula, **measure the true width** before converting:
+<!-- evolved 2026-07-02 — the two-stage design (coarse regex lint → manual
+     measure tool) is collapsed into one: lint_long_inline_formula now measures
+     the TRUE rendered px width via headless Chromium + KaTeX directly inside
+     the --only self-check. No more separate manual measure step. -->
+`lint_long_inline_formula` (Step 4) measures each multi-equality inline `$...$` span's **true rendered width** via headless Chromium + KaTeX and classifies it into three bands relative to the A4 text area (≈695px):
+
+- **long (>625px, 90% A4)** → hard FAIL; fold to `$$\begin{aligned}$$`.
+- **medium (464–625px, 2/3..90%)** → `NOTE:` hint (does NOT fail the run); judge in context — may fit one line or read better folded.
+- **short (≤464px)** → pass.
+
+This requires Playwright + Chromium and network access to the KaTeX CDN. If unavailable, the lint reports a hard FAIL ("measurement returned 0 — cannot judge") rather than silently passing.
+
+The standalone `measure_inline_formula_width.py` CLI remains useful for **interactive** inspection (e.g. `--band medium,long --dedup` to see all candidates at once), but it is no longer a required second step — the lint already measures the true width:
 
 ```
 py -3 scripts/measure_inline_formula_width.py --md <file> --band medium,long --dedup
 ```
-
-This is a standalone tool (plain KaTeX print + headless Chromium, ~1s) — NOT wired into the per-role `--only` self-check; call it once when the coarse lint flags something. Do NOT blindly convert every lint FLAG to aligned.
 
 **Emphasis & color**: apply `references/emphasis-and-color-rules.md`. Downgrade mis-marked headings to bold/italic/color (don't delete); mark key points (conclusions/pitfalls/techniques) sparingly per the fixed four-color palette, color spans wrapping pure text only.
 

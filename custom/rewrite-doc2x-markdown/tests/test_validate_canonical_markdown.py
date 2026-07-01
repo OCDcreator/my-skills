@@ -1,11 +1,40 @@
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "validate_canonical_markdown.py"
+
+
+def _can_launch_chromium() -> bool:
+    """Probe whether Playwright + Chromium are usable in this environment.
+
+    lint_long_inline_formula measures real rendered width via headless Chromium
+    + KaTeX. Tests whose markdown contains a multi-equality inline `$...$`
+    formula trigger that browser path; they are skipped (not failed) when the
+    browser is unavailable, mirroring test_measure_inline_formula_width.py.
+    """
+    if importlib.util.find_spec("playwright") is None:
+        return False
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            b = p.chromium.launch(headless=True)
+            b.close()
+        return True
+    except Exception:
+        return False
+
+
+_SKIP_NO_BROWSER = pytest.mark.skipif(
+    not _can_launch_chromium(),
+    reason="Playwright/Chromium unavailable — lint_long_inline_formula needs headless browser; run `playwright install chromium`",
+)
 
 
 def run_validator(tmp_path: Path, markdown: str, *extra_args: str) -> subprocess.CompletedProcess[str]:
@@ -1379,6 +1408,7 @@ def test_callout_title_non_label_not_in_scope(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+@_SKIP_NO_BROWSER
 def test_rejects_formula_with_dangling_tail_outside_math(tmp_path: Path) -> None:
     """A formula that ends with '=' (or another operator) inside `$...$` but
     has its trailing value left outside as plain prose is truncated.
@@ -1433,13 +1463,20 @@ def test_rejects_list_of_intervals_inside_one_math_span(tmp_path: Path) -> None:
     assert ok_result.returncode == 0, ok_result.stdout + ok_result.stderr
 
 
+@_SKIP_NO_BROWSER
 def test_rejects_overlong_inline_formula_span(tmp_path: Path) -> None:
-    """A multi-equality chain inline `$...$` span that is also long is flagged
-    as better-fitted to a `$$...$$` aligned block. A single long expression
-    (one `=` or none) is NOT flagged."""
-    # long chain: a = b = c = ... (>= 90 chars, >= 2 equalities)
-    chain = " + ".join([str(i) for i in range(1, 16)])
-    long_body = f"s = \\dfrac{{1}}{{n}}\\left({chain}\\right) = {sum(range(1,16))}"
+    """A multi-equality chain inline `$...$` span whose real rendered width
+    exceeds 90% of the A4 text area (>625px) is flagged as better-fitted to a
+    `$$...$$` aligned block. Width is measured by headless Chromium + KaTeX.
+
+    A single long expression (one `=` or none) is NOT measured/flagged
+    (min_equals filter)."""
+    # range(1,22) renders ~720px (>625 long band) with 2 equalities.
+    # (range(1,16) renders only ~494px — medium, would NOT fail; the sample was
+    # sized for the old regex estimator and had to be re-calibrated to real px.)
+    vals = range(1, 22)
+    chain = " + ".join([str(i) for i in vals])
+    long_body = f"s = \\dfrac{{1}}{{n}}\\left({chain}\\right) = {sum(vals)}"
     result = run_validator(
         tmp_path,
         f"""# 求和
@@ -1447,8 +1484,8 @@ def test_rejects_overlong_inline_formula_span(tmp_path: Path) -> None:
 求和 {chain[:5]}: ${long_body}$.
 """,
     )
-    assert result.returncode == 1
-    assert "display block" in result.stdout or "equalities" in result.stdout
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "aligned" in result.stdout or "% of the" in result.stdout
 
     # A single long expression (one '=') is a legit inline span — NOT flagged.
     single_long = "\\dfrac{1}{" + "n".join([str(i) for i in range(1, 25)]) + "}"
@@ -1472,23 +1509,17 @@ def test_rejects_overlong_inline_formula_span(tmp_path: Path) -> None:
     assert ok2.returncode == 0, ok2.stdout + ok2.stderr
 
 
+@_SKIP_NO_BROWSER
 def test_accepts_verbose_but_short_render_formula(tmp_path: Path) -> None:
     """A formula whose SOURCE is long (verbose LaTeX macros: \\overrightarrow,
     \\dfrac, etc.) but whose RENDERED width is short must NOT be flagged.
 
-    This is the case the pre-2026-06-30 `len(body) > 90` source-char judge
-    false-flagged: verbose macros inflate source length without inflating render
-    width (\\overrightarrow{CM} = 18 source chars, 1 render glyph). The
-    render-width judge (estimate_render_width) must recognize the collapse.
-
-    Note: a formula that is BOTH verbose-source AND genuinely wide-render
-    (e.g. a real long derivation chain like sin β at ~53 render width with 4
-    equalities) WILL still be flagged — correctly, since it IS a long chain.
-    Whether to fold such a chain to aligned is a JUDGE-IN-CONTEXT call
-    documented in SKILL.md, not a forced lint FAIL. This test pins the
-    verbose-source / SHORT-render case (the false-positive the judge fixes).
+    Verbose macros inflate source length without inflating render width
+    (\\overrightarrow{CM} = 18 source chars, ~1 render glyph). The real-pixel
+    judge measures true rendered width via KaTeX, so it correctly passes this
+    case (~206px, short band).
     """
-    # 131 source chars (old >90 judge would FLAG), 15 render width, 2 equalities
+    # 131 source chars (old >90 source-char judge would FLAG), ~206px render, 2 equalities
     body = (
         r"\overrightarrow{AB} = \overrightarrow{CD} + \overrightarrow{EF} "
         r"= \dfrac{1}{2}\overrightarrow{GH} + \dfrac{1}{2}\overrightarrow{IJ}"
@@ -1503,5 +1534,32 @@ def test_accepts_verbose_but_short_render_formula(tmp_path: Path) -> None:
     assert result.returncode == 0, (
         f"verbose-but-short-render formula must NOT be flagged. "
         f"stdout: {result.stdout}"
+    )
+
+
+@_SKIP_NO_BROWSER
+def test_warns_medium_width_inline_formula(tmp_path: Path) -> None:
+    """A multi-equality inline chain in the medium band (464–625px, 2/3..90% of
+    the A4 text area) emits a NOTE hint but does NOT raise the exit code —
+    "judge in context", since it may still fit one line.
+
+    range(1,16) renders ~494px (medium)."""
+    vals = range(1, 16)
+    chain = " + ".join([str(i) for i in vals])
+    medium_body = f"s = \\dfrac{{1}}{{n}}\\left({chain}\\right) = {sum(vals)}"
+    result = run_validator(
+        tmp_path,
+        f"""# 求和
+
+求和 {chain[:5]}: ${medium_body}$.
+""",
+        "--only",
+        "lint_long_inline_formula",
+    )
+    assert result.returncode == 0, (
+        f"medium-band formula must NOT raise exit code. stdout: {result.stdout}"
+    )
+    assert "NOTE:" in result.stdout, (
+        f"medium-band formula must emit a NOTE hint. stdout: {result.stdout}"
     )
 

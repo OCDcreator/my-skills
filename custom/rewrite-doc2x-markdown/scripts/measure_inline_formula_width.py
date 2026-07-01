@@ -108,20 +108,45 @@ document.addEventListener("DOMContentLoaded", function() {{
 </body></html>"""
 
 
-def measure_widths(bodies: list[str], font_size_px: int = 12, wait_ms: int = 600) -> list[float]:
+def measure_widths(
+    bodies: list[str],
+    font_size_px: int = 12,
+    wait_ms: int = 600,
+    tmp_dir: str | Path | None = None,
+) -> list[float]:
     """Render the bodies via headless Chromium + KaTeX, return widths in px.
 
     Returns a list parallel to `bodies`; a body whose KaTeX render failed (no
-    .katex produced) gets width 0.0."""
+    .katex produced) gets width 0.0.
+
+    ``tmp_dir`` isolates the throwaway measure HTML. When None (default) a
+    process-unique temp dir is created via tempfile.mkdtemp and removed on
+    exit, so concurrent lint runs / CLI invocations no longer stomp the old
+    fixed path ``<skill-root>/.measure_inline_tmp.html`` (evolved 2026-07-02:
+    was ``Path(__file__).resolve().parent.parent``).
+
+    Raises RuntimeError if Playwright is not importable — callers (CLI main,
+    lint) decide whether to exit or fall back. Previously this sys.exit(2)'d
+    directly, which is wrong for a library function.
+    """
     try:
         from playwright.sync_api import sync_playwright
-    except ImportError:
-        print("ERROR: playwright not installed (pip install playwright; playwright install chromium)",
-              file=sys.stderr)
-        sys.exit(2)
+    except ImportError as exc:
+        raise RuntimeError(
+            "playwright not installed (pip install playwright; "
+            "playwright install chromium)"
+        ) from exc
+
+    import shutil
+    import tempfile
 
     html = build_measure_html(bodies, font_size_px)
-    tmp_html = Path(__file__).resolve().parent.parent / ".measure_inline_tmp.html"
+    owns_tmp = tmp_dir is None
+    work_dir = Path(tmp_dir) if tmp_dir is not None else Path(
+        tempfile.mkdtemp(prefix="measure_inline_")
+    )
+    work_dir.mkdir(parents=True, exist_ok=True)
+    tmp_html = work_dir / "measure_inline_tmp.html"
     tmp_html.write_text(html, encoding="utf-8")
     file_url = "file:///" + str(tmp_html).replace("\\", "/")
 
@@ -148,10 +173,13 @@ def measure_widths(bodies: list[str], font_size_px: int = 12, wait_ms: int = 600
                 widths[idx] = float(w) if w else 0.0
         finally:
             browser.close()
-            try:
-                tmp_html.unlink()
-            except OSError:
-                pass
+            if owns_tmp:
+                shutil.rmtree(work_dir, ignore_errors=True)
+            else:
+                try:
+                    tmp_html.unlink()
+                except OSError:
+                    pass
     return widths
 
 

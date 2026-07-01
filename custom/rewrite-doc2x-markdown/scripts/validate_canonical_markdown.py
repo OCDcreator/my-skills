@@ -159,6 +159,10 @@ QUESTION_STEM_START_PATTERN = re.compile(
 class LintMessage:
     line: int
     text: str
+    # "error" (default) raises the exit code to 1; "hint" is printed as NOTE:
+    # without failing the run. Evolved 2026-07-02 to support the medium band of
+    # lint_long_inline_formula (judge-in-context, no hard FAIL).
+    severity: str = "error"
 
 
 @dataclass(frozen=True)
@@ -1725,75 +1729,113 @@ def lint_list_inside_math(lines: list[str]) -> list[LintMessage]:
     return messages
 
 
-def estimate_render_width(body: str) -> int:
-    """Coarse estimate of how wide a LaTeX math body renders, in glyph units.
-
-    The raw `len(body)` source-char count badly over-estimates render width
-    because LaTeX macros are verbose but render compactly: `\\overrightarrow{CM}`
-    is 18 source chars but renders as one arrow-vector glyph (~1 unit wide);
-    `\\dfrac{a}{b}` is ~13 source chars but renders as a fraction ~max(a,b)
-    wide. This collapses macros to their rendered width so the long-formula
-    lint stops false-flagging short-render formulas with verbose LaTeX. Evolved
-    2026-06-30 — was the old `len(body) > 90` judge that flagged a 275-source-char
-    / 41-render-width vector formula (sin β chain) as "long".
-    """
-    w = body
-    # Arrow vectors render as one glyph: \overrightarrow{X} -> V
-    w = re.sub(r"\\overrightarrow\{[^{}]*\}", "V", w)
-    w = re.sub(r"\\overrightarrow", "V", w)
-    # Fractions -> inline a/b for width purposes (iter for nesting)
-    for _ in range(4):
-        w = re.sub(r"\\[dt]frac\{([^{}]*)\}\{([^{}]*)\}", r"\1/\2", w)
-    for _ in range(4):
-        w = re.sub(r"\\sqrt\{([^{}]*)\}", r"√(\1)", w)
-    w = re.sub(r"\\lvert", "|", w)
-    w = re.sub(r"\\rvert", "|", w)
-    # Command names render as their semantic glyph (~1 unit), strip the name
-    w = re.sub(r"\\(sin|cos|tan|cot|sec|csc|ln|log|lim|cdot|times|div|pm|mp|le|ge|neq|equiv|approx|propto|sim|perp|parallel|bot|cap|cup|in|notin|subset|supset|forall|exists|angle|langle|rangle|quad|qquad)\b", "", w)
-    w = re.sub(r"\\math(?:bf|bb|rm|it|cal)\{([^{}]*)\}", r"\1", w)
-    w = re.sub(r"\\(lambda|mu|nu|alpha|beta|gamma|delta|epsilon|varepsilon|theta|varphi|phi|psi|omega|pi|tau|eta|zeta|iota|kappa|chi|rho|sigma|upsilon|xi|Lambda|Gamma|Delta|Theta|Pi|Omega)\b", "G", w)
-    # Structural chars that don't add render width
-    w = re.sub(r"[{}\\]", "", w)
-    # super/subscript markers: x_1 / x^2 — keep the operand, drop the marker
-    w = re.sub(r"[_^]([a-zA-Z0-9])", r"\1", w)
-    w = re.sub(r"[_^]", "", w)
-    w = re.sub(r"\s+", "", w)
-    return len(w)
-
-
 def lint_long_inline_formula(lines: list[str]) -> list[LintMessage]:
-    """C4 (2026-06-29, coarse; reworked 2026-06-30): a CHAIN inline `$...$` span
-    — long AND with multiple equalities (an `a = b = c` chain) — is hard to read
-    on one line and should be a `$$...$$` display block folded with
-    `\\begin{aligned}`. Targeted, not blanket-long: a single long expression
-    (one `=` or none) is a legitimate inline span and is NOT flagged.
+    """C4: a CHAIN inline `$...$` span — multiple equalities (an `a = b = c`
+    chain) rendered so wide it overflows the A4 text area — is hard to read on
+    one line and should be a `$$...$$` display block folded with
+    `\\begin{aligned}`. A single long expression (one `=` or none) is a
+    legitimate inline span and is NOT flagged (filtered by ``min_equals``).
 
-    Reworked 2026-06-30: the length judge now uses ESTIMATED RENDER WIDTH
-    (`estimate_render_width`), not raw source-char count. The old `len(body) > 90`
-    badly over-estimated because LaTeX macros are verbose (\\overrightarrow{CM} =
-    18 source chars, 1 render glyph). It false-flagged a 275-source-char /
-    41-render-width vector formula (sin β chain) as "long". Render width is the
-    quantity that actually affects readability. Judge in context regardless.
+    Width is measured by REAL rendered pixels via headless Chromium + KaTeX
+    (``measure_inline_formula_width.measure_widths``), not by source-char count
+    or regex macro folding. Three bands relative to the A4 text area (695px):
+
+      * long   > 625px (90% A4): hard FAIL — almost certainly overflows/wraps
+        ugly; fold to ``\\begin{aligned}``.
+      * medium 464–625px (2/3..90%): NOTE hint — judge in context; may fit one
+        line or need folding. Does NOT raise the exit code.
+      * short  ≤ 464px: pass, keep inline.
+
+    Evolved 2026-07-02: was a two-stage design (coarse regex estimate here as a
+    HARD-GATE lint, then a separate manual ``measure_inline_formula_width.py``
+    run to get the true px). The regex estimate was unsalvageable — it could
+    not distinguish a 101-glyph medium chain from a 100-glyph long chain
+    because macro folding has no notion of A4 geometry. The two stages are now
+    collapsed: this lint measures the true width directly.
+
+    HARD DEPENDENCY: requires Playwright + Chromium and network access to the
+    KaTeX CDN. If Playwright is unavailable or a body renders to 0px (KaTeX
+    failure / no network), the affected formula is reported as a hard FAIL
+    ("measurement returned 0 — cannot judge") rather than silently passing.
     """
+    # Imported lazily so the rest of the validator (and its tests for OTHER
+    # lints) can run without Playwright installed.
+    try:
+        from measure_inline_formula_width import (
+            A4_TEXT_WIDTH_PX,
+            NINETY_PCT_PX,
+            TWO_THIRDS_PX,
+            measure_widths,
+        )
+    except ImportError as exc:
+        raise RuntimeError(
+            "lint_long_inline_formula requires measure_inline_formula_width.py "
+            "(sibling module). " + str(exc)
+        ) from exc
+
     messages: list[LintMessage] = []
-    min_render_width = 50   # evolved 2026-06-30: was min_length=90 source chars
     min_equals = 2
+
+    # Collect every inline `$...$` candidate (>= min_equals equalities) across
+    # the whole file, remembering the line of each occurrence. Bodies are
+    # deduped for a single batched browser session (one launch measures all).
+    occurrences: list[tuple[int, str]] = []  # (line_no, body)
     for index, raw in enumerate(lines, start=1):
         line_without_mathml = strip_mathml(raw)
         for match in INLINE_MATH_PATTERN.finditer(line_without_mathml):
             body = match.group(1)
-            render_width = estimate_render_width(body)
-            if render_width > min_render_width and body.count("=") >= min_equals:
-                messages.append(
-                    LintMessage(
-                        index,
-                        f"inline math span renders ~{render_width} wide with {body.count('=')} "
-                        "equalities; a multi-equality chain reads better as a `$$...$$` "
-                        "display block folded with `\\begin{aligned}`. (coarse signal — "
-                        "judge in context)",
-                    )
+            if body.count("=") >= min_equals:
+                occurrences.append((index, body))
+
+    if not occurrences:
+        return messages
+
+    unique_bodies: list[str] = []
+    body_to_width: dict[str, float] = {}
+    for _, body in occurrences:
+        if body not in body_to_width:
+            unique_bodies.append(body)
+            body_to_width[body] = 0.0  # placeholder, filled after measurement
+
+    widths = measure_widths(unique_bodies)
+    for body, width in zip(unique_bodies, widths):
+        body_to_width[body] = width
+
+    pct = lambda px: round(px * 100 / A4_TEXT_WIDTH_PX)
+    for line_no, body in occurrences:
+        width = body_to_width[body]
+        eq = body.count("=")
+        if width <= 0.0:
+            messages.append(
+                LintMessage(
+                    line_no,
+                    f"inline math span width measurement returned 0px ({eq} equalities); "
+                    "KaTeX render failed or no network — cannot judge. Ensure "
+                    "Playwright+Chromium are installed and the KaTeX CDN is "
+                    "reachable.",
                 )
-                break
+            )
+        elif width > NINETY_PCT_PX:
+            messages.append(
+                LintMessage(
+                    line_no,
+                    f"inline math span renders {width:.0f}px wide (~{pct(width)}% of the "
+                    f"{A4_TEXT_WIDTH_PX}px A4 text area) with {eq} equalities; fold into "
+                    "a `$$...$$` display block with `\\begin{aligned}`.",
+                )
+            )
+        elif width > TWO_THIRDS_PX:
+            messages.append(
+                LintMessage(
+                    line_no,
+                    f"inline math span renders {width:.0f}px wide (~{pct(width)}% of the "
+                    f"{A4_TEXT_WIDTH_PX}px A4 text area) with {eq} equalities; judge in "
+                    "context — may fit one line or read better folded.",
+                    severity="hint",
+                )
+            )
+        # short (<= TWO_THIRDS_PX): no message.
+    return messages
     return messages
 
 
@@ -1984,11 +2026,17 @@ def main() -> int:
     messages.extend(lint_rewrite_plan(job_dir, md_path))
 
     if messages:
-        update_job_status(job_dir, "failed")
+        # exit code is raised only by error-severity messages; hints (severity
+        # == "hint") print as NOTE: but do not fail the run.
+        hard = [m for m in messages if m.severity != "hint"]
+        if hard:
+            update_job_status(job_dir, "failed")
         for message in sorted(messages, key=lambda item: item.line):
             prefix = f"line {message.line}: " if message.line else ""
-            print(f"FAIL: {prefix}{message.text}")
-        return 1
+            tag = "FAIL" if message.severity != "hint" else "NOTE"
+            print(f"{tag}: {prefix}{message.text}")
+        if hard:
+            return 1
 
     update_job_status(job_dir, "passed")
     print(f"OK: canonical markdown passed for {md_path}")
