@@ -1526,15 +1526,40 @@ def lint_proofreading(markdown_text: str) -> list[LintMessage]:
 
     for index, line in enumerate(lines, start=1):
         content = strip_quote_marker(line) if is_quote_line(line) else line
-        if "$" in content and "```" not in content.lower():
-            # Skip lines containing LaTeX array constructs — these have legitimate brace imbalances
-            # e.g., \left\{ \begin{array}{l} ... \end{array} \right.
-            if r"\begin{array}" in content or r"\left\{" in content or r"\right." in content:
+        if "```" in content.lower():
+            continue
+        if "$" not in content:
+            # No math: just compare raw brace counts.
+            if content.count("{") != content.count("}"):
+                ob, cb = content.count("{"), content.count("}")
+                messages.append(LintMessage(index, f"unbalanced braces: {{{ob}}} vs {{{cb}}}"))
+            continue
+        # 1) Literal display braces \{ \} pair across the WHOLE line.
+        #    Skipped on lines with \left/\right: those introduce multi-line
+        #    delimiter constructs (e.g. \left\{ ... \right.) whose literal
+        #    braces legitimately span lines and cannot balance within one line.
+        if r"\left" not in content and r"\right" not in content:
+            lo, lc = content.count(r"\{"), content.count(r"\}")
+            if lo != lc:
+                messages.append(LintMessage(index, f"unbalanced literal braces: \\{{ x{lo} vs \\}} x{lc}"))
                 continue
-        open_braces = content.count("{")
-        close_braces = content.count("}")
-        if open_braces != close_braces and "```" not in content.lower():
-            messages.append(LintMessage(index, f"unbalanced braces: {{{open_braces}}} vs {{{close_braces}}}"))
+        # 2) Grouping braces {} pair per inline-math segment.
+        parts = re.split(r"\$", content)
+        flagged = False
+        for k in range(1, len(parts), 2):
+            math = parts[k]
+            if math.startswith("$"):
+                continue
+            # Skip multi-line math environments; their braces span lines.
+            if r"\begin{" in math:
+                continue
+            # Drop literal braces so they don't pollute the group count.
+            m = math.replace(r"\{", "").replace(r"\}", "")
+            if m.count("{") != m.count("}"):
+                flagged = True
+                break
+        if flagged:
+            messages.append(LintMessage(index, "unbalanced grouping braces in math"))
 
     # Check heading level jumps
     heading_levels: list[tuple[int, int]] = []
@@ -1554,17 +1579,40 @@ def lint_proofreading(markdown_text: str) -> list[LintMessage]:
         if GARBLED_LINE_PATTERN.match(line.strip()):
             messages.append(LintMessage(index, "line looks garbled or corrupted"))
 
-    # Check for confusable Chinese characters (flag as suspicious)
-    # But skip lines that contain LaTeX formulas — the backslash+brace patterns
-    # like \left\{ are often falsely flagged as containing "已"
+    # Check for confusable Chinese characters (flag as suspicious).
+    # Instead of flagging every occurrence, we only flag the character when it
+    # appears in a context where its confusable alternate was likely intended
+    # (e.g. flag 人 only in 收人/进人/纳人 where 入 was meant). This avoids
+    # mass false positives from common correct words (一个人/病人/人工智能...).
+    # Map: wrong char -> (alternate label, regex of suspicious contexts).
+    SUSPICIOUS_CONTEXTS = {
+        "己": ("已/巳", re.compile(r"己经|而己|不己|早己|己然|确己|己经")),
+        "已": ("己/巳", re.compile(r"自已|早已经")),
+        "末": ("未", re.compile(r"末来|末知|末必|未曾|末能|末可|末过|末及")),
+        "未": ("末", re.compile(r"周未|期未|月未|年未")),
+        "千": ("干", re.compile(r"千活|千嘛|千涉|千燥|千脆|千预|千杯|千掉|千净")),
+        "干": ("千", re.compile(r"一千|几千|数千|成千")),
+        "人": ("入", re.compile(
+            r"收人|进人|纳人|加人|投人|输人|深人|陷人|融人|渗人|介人|注人|"
+            r"灌人|导人|转人|步人|人场|人境|人门|人学|人院|人伍|人意|人迷|"
+            r"人睡|人耳|人围|人座|人选|人账|人库"
+        )),
+        "入": ("人", re.compile(r"收入人|进入人")),  # rare; 入误识为人 mainly caught by 人 rule
+        "白": ("日", re.compile(r"白期|今白|昨白|明白天|当白|本月本白|白历|白程")),
+        "日": ("白", re.compile(r"白天|白色|明白|空白")),
+        "十": ("干", re.compile(r"千活|千嘛")),  # minimal; 十 is very common
+        "土": ("士", re.compile(r"博士|学士|硕士|护士|勇士|战士|绅士")),
+        "午": ("牛", re.compile(r"牛肉|牛奶|牛角|蜗牛|黄牛|斗牛")),
+        "牛": ("午", re.compile(r"中午|上午|下午|午休|午餐|午夜|午时")),
+    }
     for index, line in enumerate(lines, start=1):
         if line.strip().startswith("```"):
             continue
         # Remove LaTeX math regions before checking confusable chars
         line_without_latex = re.sub(r"\\[A-Za-z]+\{[^}]*\}", "", line)
         line_without_latex = re.sub(r"\$[^\n$]+\$", "", line_without_latex)
-        for char, alternates in CONFUSABLE_CHINESE_CHARS.items():
-            if char in line_without_latex:
+        for char, (alternates, suspicious) in SUSPICIOUS_CONTEXTS.items():
+            if char in line_without_latex and suspicious.search(line_without_latex):
                 messages.append(LintMessage(index, f"suspicious character [{char}] near [{alternates}] — verify against page image"))
                 break
 
